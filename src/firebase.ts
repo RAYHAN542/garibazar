@@ -43,11 +43,7 @@ const app = initializeApp(firebaseConfig);
 // Silence Firestore transport warnings
 setLogLevel('error');
 
-// Set up Firebase App Check debug token for local sandbox/development environments
-if (typeof window !== "undefined" && (import.meta.env.DEV || import.meta.env.MODE === "development")) {
-  // @ts-ignore
-  self.FIREBASE_APPCHECK_DEBUG_TOKEN = true;
-}
+// App Check debug token disabled in production
 
 // Initialize App Check
 export let appCheck: any = null;
