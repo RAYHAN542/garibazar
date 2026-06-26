@@ -1,6 +1,5 @@
 import React, { useState } from "react";
-import { Image, ShieldAlert, RefreshCw } from "lucide-react";
-
+import { Image, ShieldAlert } from "lucide-react";
 interface ImageWithFallbackProps {
   id?: string;
   src: string;
