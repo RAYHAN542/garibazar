@@ -683,7 +683,7 @@ export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPromp
                           ) : (
                             <>
                               {task.status === 'retrying' ? (
-                                <RefreshCw className="w-5 h-5 animate-spin text-orange-500 mb-1" />
+                                <RotateCw className="w-5 h-5 animate-spin text-orange-500 mb-1" />
                               ) : (
                                 <Loader2 className="w-5 h-5 animate-spin text-amber-500 mb-1" />
                               )}
@@ -980,7 +980,7 @@ export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPromp
                           {renewingId === item.id ? (
                             <Loader2 className="w-3 h-3 animate-spin" />
                           ) : (
-                            <RefreshCw className="w-3 h-3" />
+                            <RotateCw className="w-3 h-3" />
                           )}
                           <span>{language === "bn" ? "রিনিউ" : "Renew"}</span>
                         </button>
