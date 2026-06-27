@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { SupportedLanguage } from "../types";
-import { ShieldCheck, Cpu, HardDrive, RotateCw, AlertCircle, Signal, CheckCircle2, ChevronRight, HelpCircle, Pocket, Layout, Loader2 } from "lucide-react";
+import { ShieldCheck, Cpu, HardDrive, Loader2, AlertCircle, Signal, CheckCircle2, ChevronRight, HelpCircle, Pocket, Layout } from "lucide-react";
 import { collection, getDocs, limit, query } from "firebase/firestore";
 import { db } from "../firebase";
 
