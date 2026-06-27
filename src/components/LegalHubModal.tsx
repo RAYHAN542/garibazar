@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { X, ShieldAlert, FileText, RefreshCw, Scale } from "lucide-react";
+import { X, ShieldAlert, FileText, RotateCw, Scale } from "lucide-react";
 import { SupportedLanguage } from "../types";
 
 interface LegalHubModalProps {
@@ -67,7 +67,7 @@ export default function LegalHubModal({ isOpen, onClose, language }: LegalHubMod
                 : "text-slate-600 hover:text-slate-900 hover:bg-slate-200/50"
             }`}
           >
-            <RefreshCw className="w-4 h-4" />
+            <RotateCw className="w-4 h-4" />
             {language === "bn" ? "ফেরত ও রিফান্ড নীতি" : "Return & Refund"}
           </button>
         </div>
