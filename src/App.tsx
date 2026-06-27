@@ -501,7 +501,7 @@ export default function App() {
     if (!searchQuery.trim()) return;
     const timer = setTimeout(() => {
       logAnalyticsEvent("search", { query: searchQuery.trim() });
-    }, 1500);
+    }, 300);
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
@@ -1206,7 +1206,7 @@ export default function App() {
               console.warn("Firestore write stalled, resolving with local fallback.");
               resolve({ id: "temp-" + Date.now() });
             }
-          }, 1500);
+          }, 300);
 
           addDoc(collection(db, "refill_requests"), docData)
             .then((docRef) => {
