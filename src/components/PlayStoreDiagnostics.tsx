@@ -184,7 +184,7 @@ export function PlayStoreDiagnostics({ language }: PlayStoreDiagnosticsProps) {
               : "bg-amber-500 hover:bg-amber-600 text-slate-950 shadow-lg shadow-amber-500/10"
           }`}
         >
-          <RotateCw className={`w-3.5 h-3.5 ${running ? "animate-spin" : ""}`} />
+          <Loader2 className={`w-3.5 h-3.5 ${running ? "animate-spin" : ""}`} />
           <span>{running ? (language === "bn" ? "নিরীক্ষা চলছে..." : "Optimizing...") : (language === "bn" ? "নিরীক্ষা শুরু করুন" : "Run Diagnostic Tests")}</span>
         </button>
       </div>
