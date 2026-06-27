@@ -1,5 +1,5 @@
 import React, { ErrorInfo, ReactNode } from "react";
-import { AlertTriangle, RefreshCw, Home } from "lucide-react";
+import { AlertTriangle, RotateCw, Home } from "lucide-react";
 import { logAnalyticsEvent } from "../firebase";
 
 interface Props {
@@ -71,7 +71,7 @@ export class ErrorBoundary extends React.Component<Props, State> {
                 onClick={this.handleReset}
                 className="flex-1 inline-flex items-center justify-center gap-2 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold px-5 py-3 rounded-xl transition duration-200 shadow-lg shadow-amber-500/10 hover:shadow-amber-500/25 text-sm"
               >
-                <RefreshCw className="w-4 h-4 animate-spin-slow" />
+                <RotateCw className="w-4 h-4 animate-spin-slow" />
                 {isBangla ? "রিলোড করুন" : "Reload App"}
               </button>
               
