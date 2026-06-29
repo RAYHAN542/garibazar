@@ -212,6 +212,7 @@ export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModa
       }
 
       setLoading(false);
+    }
   };
 
   const handleVerifyOtp = async (e: React.FormEvent) => {
