@@ -368,11 +368,13 @@ export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPromp
   const handlePostListing = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!currentUser) {
-      onLoginPrompt();
-      return;
+if (!currentUser) {
+      const stored = localStorage.getItem("gari_bazar_session_user");
+      if (!stored) {
+        onLoginPrompt();
+        return;
+      }
     }
-
     if (!title.trim() || !price.trim()) {
       setError(language === "bn" ? "দয়া করে প্রয়োজনীয় সব তথ্য প্রদান করুন" : "Please fill in all mandatory parameters");
       return;
