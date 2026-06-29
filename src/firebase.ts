@@ -103,7 +103,7 @@ if (typeof window !== "undefined") {
   } catch (error) {
     console.warn("Firebase Cloud Messaging is not supported or failed to initialize:", error);
   }
-}
+    }
 
 
 
