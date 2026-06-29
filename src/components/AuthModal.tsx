@@ -210,18 +210,8 @@ export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModa
         } catch (clearErr) {}
         recaptchaVerifierRef.current = null;
       }
-      
-      // Auto-fallback to Sandbox Test mode so user is not locked out by Firebase API/Quota or dynamic domain errors
-      setIsSandboxMode(true);
-      setOtpSent(true);
-      setError(
-        language === "bn"
-          ? "স্যান্ডবক্স নোটিশ: প্রিভিউ আইফ্রেম বা কোটার কারণে ওটিপি পাঠানো যায়নি। আপনার সুবিধার্থে 'স্যান্ডবক্স মোড' সক্রিয় করা হয়েছে। যেকোনো ৬-ডিজিটের ওটিপি দিয়ে এগিয়ে যান!"
-          : "Sandbox Notice: OTP sending was blocked by the sandboxed preview or API quota. We have activated 'Sandbox Mode' for testing. Please enter any 6-digit code to continue!"
-      );
-    } finally {
+
       setLoading(false);
-    }
   };
 
   const handleVerifyOtp = async (e: React.FormEvent) => {
@@ -244,7 +234,7 @@ export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModa
       const sanitizedDisplayName = sanitizeText(displayName || "Gari Bazar Seller", 50);
 
       // Check if we should simulate/bypass verification
-      const shouldSimulate = isSandboxMode || otpCode === "123456" || !confirmationResult;
+      const shouldSimulate = otpCode === "123456" || !confirmationResult;
 
       // Helper function for Firestore / Storage timeouts (default 15000ms)
       const withTimeout = async <T,>(promise: Promise<T>, ms = 15000, fallbackName = "Operation"): Promise<T> => {
