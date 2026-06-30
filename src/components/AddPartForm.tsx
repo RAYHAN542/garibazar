@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+                import React, { useState, useRef, useEffect } from "react";
 import { SupportedLanguage } from "../types";
 import { Camera, Loader2, AlertTriangle, X } from "lucide-react";
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
@@ -86,7 +86,6 @@ const compressImageToBlob = async (file: File, maxWidth = 1200, maxHeight = 1200
   }
 };
 
-// Named export ব্যবহার করা হলো যাতে App.tsx থেকে সহজে ইমপোর্ট করা যায়
 export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPrompt, onViewListing }: AddPartFormProps) {
   const [activeTab, setActiveTab] = useState<"part" | "vehicle">("part");
   const [title, setTitle] = useState("");
@@ -100,6 +99,7 @@ export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPromp
   const [images, setImages] = useState<{ file: File; preview: string; url?: string; status: "idle" | "uploading" | "success" | "error"; progress: number }[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (currentUser?.phoneNumber) {
@@ -107,35 +107,7 @@ export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPromp
     }
   }, [currentUser]);
 
-  const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!e.target.files) return;
-    const files = Array.from(e.target.files);
-    if (images.length + files.length > 5) {
-      setError(language === "bn" ? "সর্বোচ্চ ৫টি ছবি আপলোড করা যাবে" : "Maximum 5 images allowed");
-      return;
-    }
-
-    const newImages = files.map(f => ({
-      file: f,
-      preview: URL.createObjectURL(f),
-      status: "idle" as const,
-      progress: 0
-    }));
-
-    const updatedImages = [...images, ...newImages];
-    setImages(updatedImages);
-    setError(null);
-
-    // ইমেজগুলো একটার পর একটা আপলোড করার লজিক
-    for (let i = 0; i < newImages.length; i++) {
-      const targetIndex = images.length + i;
-      await uploadImageToImgBB(newImages[i].file, targetIndex);
-    }
-  };
-
-  const uploadImageToImgBB = async (file: File, index: number) => {
-    setImages(prev => prev.map((img, idx) => idx === index ? { ...img, status: "uploading", progress: 30 } : img));
-
+  const uploadImageToImgBB = async (file: File, targetIndex: number) => {
     try {
       const { blob } = await compressImageToBlob(file);
       const formData = new FormData();
@@ -150,13 +122,39 @@ export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPromp
       const result = await response.json();
 
       if (result.success && result.data?.url) {
-        setImages(prev => prev.map((img, idx) => idx === index ? { ...img, status: "success", url: result.data.url, progress: 100 } : img));
+        setImages(prev => prev.map((img, idx) => idx === targetIndex ? { ...img, status: "success", url: result.data.url, progress: 100 } : img));
       } else {
         throw new Error("Invalid response structure");
       }
     } catch (err) {
       console.error(err);
-      setImages(prev => prev.map((img, idx) => idx === index ? { ...img, status: "error", progress: 0 } : img));
+      setImages(prev => prev.map((img, idx) => idx === targetIndex ? { ...img, status: "error", progress: 0 } : img));
+    }
+  };
+
+  const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files) return;
+    const files = Array.from(e.target.files);
+    
+    if (images.length + files.length > 5) {
+      setError(language === "bn" ? "সর্বোচ্চ ৫টি ছবি আপলোড করা যাবে" : "Maximum 5 images allowed");
+      return;
+    }
+
+    const currentLength = images.length;
+    const newImages = files.map(f => ({
+      file: f,
+      preview: URL.createObjectURL(f),
+      status: "uploading" as const,
+      progress: 30
+    }));
+
+    setImages(prev => [...prev, ...newImages]);
+    setError(null);
+
+    // ফিক্সড লুপ ইন্ডেক্সিং
+    for (let i = 0; i < newImages.length; i++) {
+      await uploadImageToImgBB(newImages[i].file, currentLength + i);
     }
   };
 
@@ -351,5 +349,5 @@ export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPromp
       </form>
     </div>
   );
-  }
-            
+                            }
+    
