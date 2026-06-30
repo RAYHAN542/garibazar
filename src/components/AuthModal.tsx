@@ -31,14 +31,15 @@ export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModa
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    const cleanPhone = phoneNumber.replace(/\D/g, "");
 
-    if (!validateBanglaPhone(phoneNumber)) {
+    if (cleanPhone.length !== 11) {
       setError(language === "bn" ? "সঠিক ১১ ডিজিটের মোবাইল নম্বর দিন" : "Enter a valid 11-digit phone number");
       return;
     }
 
     setLoading(true);
-    const cleanPhone = phoneNumber.replace(/\D/g, "");
+    
 
     try {
       let existingUid: string | null = null;
