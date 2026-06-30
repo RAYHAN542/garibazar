@@ -195,7 +195,7 @@ export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPromp
       const cleanPhone = phone ? sanitizeText(phone) : "";
       const cleanPrice = price ? validatePriceInput(price) : "0";
 
-      const collectionName = activeTab === "part" ? "parts_listings" : "vehicle_listings";
+    const collectionName = "listings";
       const docRef = await addDoc(collection(db, collectionName), {
         title: cleanTitle,
         category,
