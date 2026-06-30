@@ -2529,7 +2529,7 @@ export default function App() {
                               className="bg-white dark:bg-slate-905 border border-slate-200 dark:border-slate-800 p-4 rounded-xl flex gap-3.5 items-center justify-between"
                             >
                               <div className="flex gap-3 items-center min-w-0">
-                                <img src={item.image} alt="" className="w-12 h-12 rounded-lg object-cover flex-shrink-0" referrerPolicy="no-referrer" loading="lazy" />
+                                <img src={item.images && item.images[0]} alt="" className="w-12 h-12 rounded-lg object-cover flex-shrink-0" referrerPolicy="no-referrer" loading="lazy" />
                                 <div className="min-w-0">
                                   <h5 className="text-sm font-bold text-slate-850 dark:text-white truncate">{item.title}</h5>
                                   <div className="text-[11px] text-slate-400 mt-0.5 flex gap-2">
@@ -2606,7 +2606,7 @@ export default function App() {
                               className="bg-white dark:bg-slate-905 border border-slate-200 dark:border-slate-800 p-4 rounded-xl flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
                             >
                               <div className="flex gap-3 items-center min-w-0">
-                                <img src={item.image} alt="" className="w-10 h-10 rounded-lg object-cover flex-shrink-0" referrerPolicy="no-referrer" loading="lazy" />
+                                <img src={item.images && item.images[0]} alt="" className="w-10 h-10 rounded-lg object-cover flex-shrink-0" referrerPolicy="no-referrer" loading="lazy" />
                                 <div className="min-w-0">
                                   <span className="text-[9px] uppercase font-bold text-indigo-500 tracking-wider block">ID: GBC-{item.id.slice(-5).toUpperCase()}</span>
                                   <h5 className="text-sm font-bold text-slate-850 dark:text-white truncate">{item.title}</h5>
@@ -3259,7 +3259,7 @@ export default function App() {
                               </div>
 
                               <div className="flex gap-3.5 items-center min-w-0">
-                                <img src={item.image} alt="" className="w-12 h-12 rounded-xl object-cover flex-shrink-0 border" referrerPolicy="no-referrer" loading="lazy" />
+                                <img src={item.images && item.images[0]} alt="" className="w-12 h-12 rounded-xl object-cover flex-shrink-0 border" referrerPolicy="no-referrer" loading="lazy" />
                                 <div className="min-w-0">
                                   <h5 className="text-xs font-bold text-slate-850 dark:text-white truncate">{item.title}</h5>
                                   <div className="text-[10px] text-slate-400 mt-1 flex gap-2">
