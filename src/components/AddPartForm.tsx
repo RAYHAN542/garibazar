@@ -1,8 +1,8 @@
 import React, { useState, useRef, useEffect } from "react";
-import { SupportedLanguage, PartListing } from "../types";
-import { Camera, Sparkles, Loader2, ArrowRight, Check, AlertTriangle, Eye, ShoppingBag, User, X, Clock, RotateCw } from "lucide-react";
-import { collection, addDoc, onSnapshot, query, orderBy, doc, updateDoc } from "firebase/firestore";
-import { db, auth } from "../firebase";
+import { SupportedLanguage } from "../types";
+import { Camera, Loader2, AlertTriangle, X } from "lucide-react";
+import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { db } from "../firebase";
 import { sanitizeText, validatePriceInput } from "../utils/sanitizer";
 
 interface AddPartFormProps {
@@ -12,13 +12,6 @@ interface AddPartFormProps {
   onLoginPrompt: () => void;
   onViewListing?: (listing: any) => void;
 }
-
-const PRESET_GEARS = [
-  { name: "Alloy Wheel Rims (অ্যালয় হুইল রিম)", url: "https://images.unsplash.com/photo-1506015391300-4802dc74de2e?w=500&auto=format&fit=crop&q=80" },
-  { name: "Turbocharger Assembly (টার্বোচার্জার)", url: "https://images.unsplash.com/photo-1486006920555-c77dce18193b?w=500&auto=format&fit=crop&q=80" },
-  { name: "Steering Wheel Accent (স্টিয়ারিং হুইল)", url: "https://images.unsplash.com/photo-1617814076367-b759ct7387w=500&auto=format&fit=crop&q=80" },
-  { name: "Premium Brake Discs (ব্রেক ডিস্ক)", url: "https://images.unsplash.com/photo-1621360841013-c7683c659ec6?w=500&auto=format&fit=crop&q=80" }
-];
 
 const compressImageToBlob = async (file: File, maxWidth = 1200, maxHeight = 1200): Promise<{ blob: Blob; dataUrl: string }> => {
   try {
@@ -93,7 +86,8 @@ const compressImageToBlob = async (file: File, maxWidth = 1200, maxHeight = 1200
   }
 };
 
-export default function AddPartForm({ language, currentUser, onPostSuccess, onLoginPrompt, onViewListing }: AddPartFormProps) {
+// Named export ব্যবহার করা হলো যাতে App.tsx থেকে সহজে ইমপোর্ট করা যায়
+export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPrompt, onViewListing }: AddPartFormProps) {
   const [activeTab, setActiveTab] = useState<"part" | "vehicle">("part");
   const [title, setTitle] = useState("");
   const [category, setCategory] = useState("");
@@ -106,14 +100,12 @@ export default function AddPartForm({ language, currentUser, onPostSuccess, onLo
   const [images, setImages] = useState<{ file: File; preview: string; url?: string; status: "idle" | "uploading" | "success" | "error"; progress: number }[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (currentUser?.phoneNumber) {
       setPhone(currentUser.phoneNumber);
     }
-  } , [currentUser]);
+  }, [currentUser]);
 
   const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files) return;
@@ -130,9 +122,11 @@ export default function AddPartForm({ language, currentUser, onPostSuccess, onLo
       progress: 0
     }));
 
-    setImages(prev => [...prev, ...newImages]);
+    const updatedImages = [...images, ...newImages];
+    setImages(updatedImages);
     setError(null);
 
+    // ইমেজগুলো একটার পর একটা আপলোড করার লজিক
     for (let i = 0; i < newImages.length; i++) {
       const targetIndex = images.length + i;
       await uploadImageToImgBB(newImages[i].file, targetIndex);
@@ -211,11 +205,10 @@ export default function AddPartForm({ language, currentUser, onPostSuccess, onLo
         sellerId: currentUser.uid,
         sellerName: currentUser.displayName || "Rayhan",
         status: "active",
-        createdAt: serverTimestamp ? serverTimestamp() : new Date(),
+        createdAt: serverTimestamp(),
         type: activeTab
       });
 
-      setSuccess(true);
       if (onViewListing) {
         onViewListing({ id: docRef.id, title, price, images: uploadedUrls, location, category, type: activeTab });
       }
@@ -358,5 +351,5 @@ export default function AddPartForm({ language, currentUser, onPostSuccess, onLo
       </form>
     </div>
   );
-}
-  
+  }
+            
