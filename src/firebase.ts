@@ -25,4 +25,9 @@ export const db = initializeFirestore(app, {
 
 export const storage = getStorage(app);
 
+// অন্যান্য কম্পোনেন্টের বিল্ড এরর দূর করার জন্য এই ফাংশনটি এক্সপোর্ট করা হলো
+export const logAnalyticsEvent = (eventName: string, eventParams?: any) => {
+  console.log(`Analytics Event: ${eventName}`, eventParams);
+};
+
 export default app;
