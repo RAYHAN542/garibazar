@@ -845,7 +845,7 @@ export function ListingDetailModal({ listing, language, currentUser, onClose, on
                 }}
               >
                 <div className="w-12 h-12 rounded-full bg-gradient-to-tr from-amber-500 to-orange-500 text-slate-955 font-black text-lg flex items-center justify-center uppercase shadow-md shadow-amber-500/10 group-hover/seller:rotate-6 transition-transform">
-                  {listing.sellerName.charAt(0)?.toUpperCase() || "S"}
+                  {listing.sellerName?.charAt(0)?.toUpperCase() || "S"}
                 </div>
                 <div>
                   <span className="text-slate-400 text-[10px] uppercase font-bold tracking-wider block">
