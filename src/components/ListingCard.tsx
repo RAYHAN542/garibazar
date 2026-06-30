@@ -26,7 +26,7 @@ export function ListingCard({ listing, language, onViewDetails, onPromoteClick }
       {/* 1. ASPECT-SQUARE IMAGE */}
       <div className="relative aspect-square w-full bg-slate-50 dark:bg-slate-950 overflow-hidden">
         <ImageWithFallback
-          src={listing.image}
+        src={listing.images && listing.images[0]}
           alt={listing.title}
           className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
         />
