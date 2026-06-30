@@ -43,22 +43,23 @@ export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModa
     setLoading(true);
     const cleanPhone = phoneNumber.replace(/\D/g, "");
 
-    try {
+        try {
       let existingUid: string | null = null;
       let existingData: any = null;
 
       const usersCol = collection(db, "users");
       const q = query(usersCol, where("phoneNumber", "==", cleanPhone));
       const querySnap = await getDocs(q);
-      
+
       if (!querySnap.empty) {
         existingUid = querySnap.docs[0].id;
         existingData = querySnap.docs[0].data();
       }
 
       if (isLogin) {
+        // --- লগইন মোড ---
         if (!existingUid || !existingData) {
-          setError(language === "bn" ? "এই নম্বরে কোনো একাউন্ট পাওয়া যায়নি।" : "No account found.");
+          setError(language === "bn" ? "এই নম্বরে কোনো অ্যাকাউন্ট পাওয়া যায়নি।" : "No account found.");
           setLoading(false);
           return;
         }
@@ -70,20 +71,23 @@ export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModa
           displayName: existingData.displayName,
           phoneNumber: existingData.phoneNumber,
           city: existingData.city,
-          photoURL: existingData.profilePicture || PRESET_AVATARS[0],
+          profilePicture: existingData.profilePicture || PRESET_AVATARS[0],
           simulatedCredits: existingData.simulatedCredits ?? 5000,
         };
 
         localStorage.setItem("gari_bazar_session_user", JSON.stringify(sessionUser));
         onAuthSuccess(sessionUser);
         onClose();
+
       } else {
+        // --- নতুন প্রোফাইল তৈরি মোড ---
         if (existingUid) {
-          setError(language === "bn" ? "এই নম্বরে আগে থেকেই একাউント আছে।" : "Account already exists.");
+          setError(language === "bn" ? "এই নম্বরে অলরেডি একটি অ্যাকাউন্ট আছে।" : "Account already exists.");
           setLoading(false);
           return;
         }
 
+        // নতুন ইউজারের জন্য ফায়ারবেস অথেনটিকেশন তৈরি
         const userCredential = await signInAnonymously(auth);
         const realUid = userCredential.user.uid;
         const sanitizedDisplayName = sanitizeText(displayName || "Gari Bazar Seller", 50);
@@ -100,10 +104,14 @@ export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModa
           referralCode: myReferralCode,
         };
 
+        // ফায়ারস্টোর ডেটাবেজে নতুন ডেটা সেভ করা
         await setDoc(doc(db, "users", realUid), savedData);
         localStorage.setItem("gari_bazar_session_user", JSON.stringify(savedData));
         onAuthSuccess(savedData);
         onClose();
+      }
+        }
+    
       }
     } catch (err) {
       setError(language === "bn" ? "কিছু একটা সমস্যা হয়েছে।" : "Something went wrong.");
