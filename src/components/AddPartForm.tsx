@@ -1,4 +1,4 @@
-                import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { SupportedLanguage } from "../types";
 import { Camera, Loader2, AlertTriangle, X } from "lucide-react";
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
@@ -95,7 +95,7 @@ export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPromp
   const [price, setPrice] = useState("");
   const [description, setDescription] = useState("");
   const [location, setLocation] = useState("");
-  const [phone, setPhone] = useState(currentUser?.phoneNumber || "");
+  const [phone, setPhone] = useState("");
   const [images, setImages] = useState<{ file: File; preview: string; url?: string; status: "idle" | "uploading" | "success" | "error"; progress: number }[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -152,7 +152,6 @@ export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPromp
     setImages(prev => [...prev, ...newImages]);
     setError(null);
 
-    // ফিক্সড লুপ ইন্ডেক্সিং
     for (let i = 0; i < newImages.length; i++) {
       await uploadImageToImgBB(newImages[i].file, currentLength + i);
     }
@@ -189,16 +188,23 @@ export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPromp
     setError(null);
 
     try {
+      // সেফটি চেক সহ রানটাইমে স্যানিটাইজেশন নিশ্চিত করা হলো
+      const cleanTitle = title ? sanitizeText(title) : "";
+      const cleanBrand = brand ? sanitizeText(brand) : "";
+      const cleanDesc = description ? sanitizeText(description) : "";
+      const cleanPhone = phone ? sanitizeText(phone) : "";
+      const cleanPrice = price ? validatePriceInput(price) : "0";
+
       const collectionName = activeTab === "part" ? "parts_listings" : "vehicle_listings";
       const docRef = await addDoc(collection(db, collectionName), {
-        title: sanitizeText(title),
+        title: cleanTitle,
         category,
-        brand: sanitizeText(brand),
+        brand: cleanBrand,
         condition,
-        price: parseFloat(validatePriceInput(price)),
-        description: sanitizeText(description),
+        price: parseFloat(cleanPrice) || 0,
+        description: cleanDesc,
         location,
-        phone: sanitizeText(phone),
+        phone: cleanPhone,
         images: uploadedUrls,
         sellerId: currentUser.uid,
         sellerName: currentUser.displayName || "Rayhan",
@@ -349,5 +355,5 @@ export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPromp
       </form>
     </div>
   );
-                            }
-    
+  }
+                      
