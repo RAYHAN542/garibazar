@@ -1,9 +1,9 @@
 import React, { useState, useRef, useEffect } from "react";
 import { SupportedLanguage, PartListing } from "../types";
-import { Camera, Sparkles, Loader2, ArrowRight, Check, AlertTriangle, Eye, ShoppingBag, User, X, Clock } from "lucide-react";
+import { Camera, Sparkles, Loader2, ArrowRight, Check, AlertTriangle, Eye, ShoppingBag, User, X, Clock, RotateCw } from "lucide-react";
 import { collection, addDoc, onSnapshot, query, orderBy, doc, updateDoc } from "firebase/firestore";
 import { db, storage, auth } from "../firebase";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { sanitizeText, validatePriceInput } from "../utils/sanitizer";
 
 interface AddPartFormProps {
