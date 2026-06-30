@@ -18,16 +18,11 @@ const app = initializeApp(firebaseConfig);
 
 export const auth = getAuth(app);
 
-// আপনার asia-south1 (মুম্বাই) ডাটাবেজটিকে সুনির্দিষ্টভাবে কানেক্ট করা হলো
+// Initialize Firestore
 export const db = initializeFirestore(app, {
   experimentalAutoDetectLongPolling: true,
-}, "(default)");
+});
 
 export const storage = getStorage(app);
 
 export default app;
-}
-
-
-
-      
