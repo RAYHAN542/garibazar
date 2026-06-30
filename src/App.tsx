@@ -2603,7 +2603,8 @@ export default function App() {
                           {purchases.map((item) => (
                             <div 
                               key={item.id}
-                              className="bg-white dark:bg-slate-905 border border-slate-200 dark:border-slate-800 p-4 rounded-xl flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
+                  onClick={() => handleViewListingDetails(item)}
+                              className="bg-white dark:bg-slate-905 border border-slate-200 dark:border-slate-800 p-4 rounded-xl flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-850 transition"
                             >
                               <div className="flex gap-3 items-center min-w-0">
                                 <img src={item.images && item.images[0]} alt="" className="w-10 h-10 rounded-lg object-cover flex-shrink-0" referrerPolicy="no-referrer" loading="lazy" />
