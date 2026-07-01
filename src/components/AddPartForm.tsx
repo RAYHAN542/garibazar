@@ -216,6 +216,7 @@ export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPromp
       if (onViewListing) {
         onViewListing({ id: docRef.id, title, price, images: uploadedUrls, location, category, type: activeTab });
       }
+      window.dispatchEvent(new Event("gari_bazar_refreshed_data"));
       onPostSuccess();
     } catch (err: any) {
       console.error(err);
