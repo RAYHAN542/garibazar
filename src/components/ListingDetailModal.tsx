@@ -144,7 +144,7 @@ export function ListingDetailModal({ listing, language, currentUser, onClose, on
     
     const newPurchaseDoc = {
       title: listing.title,
-      image: listing.image || "https://images.unsplash.com/photo-1506015391300-4802dc74de2e?w=500&auto=format&fit=crop&q=80",
+      image: (listing.images && listing.images[0]) || "https://images.unsplash.com/photo-1506015391300-4802dc74de2e?w=500&auto=format&fit=crop&q=80",
       price: Number(listing.price),
       sellerName: listing.sellerName || "Seller",
       sellerContact: listing.contactNumber || "01700000000",
