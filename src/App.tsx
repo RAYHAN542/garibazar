@@ -2607,7 +2607,7 @@ export default function App() {
                               className="bg-white dark:bg-slate-905 border border-slate-200 dark:border-slate-800 p-4 rounded-xl flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-850 transition"
                             >
                               <div className="flex gap-3 items-center min-w-0">
-                                <img src={item.images && item.images[0]} alt="" className="w-10 h-10 rounded-lg object-cover flex-shrink-0" referrerPolicy="no-referrer" loading="lazy" />
+                                <img src={item.images && item.images[0] || item.image} alt="" className="w-10 h-10 rounded-lg object-cover flex-shrink-0" referrerPolicy="no-referrer" loading="lazy" />
                                 <div className="min-w-0">
                                   <span className="text-[9px] uppercase font-bold text-indigo-500 tracking-wider block">ID: GBC-{item.id.slice(-5).toUpperCase()}</span>
                                   <h5 className="text-sm font-bold text-slate-850 dark:text-white truncate">{item.title}</h5>
