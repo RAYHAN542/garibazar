@@ -89,6 +89,7 @@ const compressImageToBlob = async (file: File, maxWidth = 1200, maxHeight = 1200
 export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPrompt, onViewListing }: AddPartFormProps) {
   const [activeTab, setActiveTab] = useState<"part" | "vehicle">("part");
   const [title, setTitle] = useState("");
+  const [model, setModel] = useState("");
   const [category, setCategory] = useState("");
   const [brand, setBrand] = useState("");
   const [condition, setCondition] = useState("used");
@@ -198,6 +199,7 @@ export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPromp
     const collectionName = "listings";
       const docRef = await addDoc(collection(db, collectionName), {
         title: cleanTitle,
+        model: model,
         category,
         brand: cleanBrand,
         condition,
@@ -284,6 +286,11 @@ export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPromp
           <label className="block text-xs font-semibold text-gray-700 mb-1">{language === "bn" ? "২. লিস্টিং টাইটেল *" : "2. Listing Title *"}</label>
           <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} placeholder={activeTab === "part" ? (language === "bn" ? "যেমন: সিলিন্ডার হেড, টিউনিং স্পয়লার" : "e.g. Cylinder Head") : (language === "bn" ? "যেমন: টয়োটা এক্সিও, ক্যাটারপিলার ৩২০ডি এক্সকাভেটর" : "e.g. Toyota Axio")} className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:border-orange-500" required />
         </div>
+
+		<div>
+			<label className="block text-xs font-semibold text-gray-700 mb-1">{language === "bn" ? "মডেল *" : "Model *"}</label>
+			<input type="text" value={model} onChange={(e) => setModel(e.target.value)} placeholder={language === "bn" ? "যেমন: টয়োটা এক্সিও ২০১৮" : "e.g. Toyota Axio 2018"} className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:border-orange-500" required />
+		</div>
 
         <div>
           <label className="block text-xs font-semibold text-gray-700 mb-1">{language === "bn" ? "৩. ক্যাটাগরি সিলেক্ট করুন *" : "3. Select Category *"}</label>
