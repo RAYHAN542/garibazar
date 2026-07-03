@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { auth, db } from "../firebase";
-import { signInAnonymously } from "firebase/auth";
+import { signInAnonymously, signInWithCustomToken } from "firebase/auth";
 import { doc, setDoc, collection, query, where, getDocs } from "firebase/firestore";
 import { X, Phone, User, MapPin, Loader2, Sparkles } from "lucide-react";
 import { CITIES } from "../translations";
@@ -57,15 +57,37 @@ export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModa
       if (isLogin) {
         // --- লগইন মোড ---
         if (!existingUid || !existingData) {
-          setError(language === "bn" ? "এই নম্বরে কোনো অ্যাকাউন্ট পাওয়া যায়নি।" : "No account found.");
+          setError(language === "bn" ? "এই নম্বরে কোনো অ্যাকাউন্ট পাওয়া যায়নি।" : "No account found.");
           setLoading(false);
           return;
         }
 
-        await signInAnonymously(auth);
+        // ধাপ ১: সাময়িক anonymous session বানাই ব্যাকএন্ডে কল করার জন্য
+        const tempCredential = await signInAnonymously(auth);
+        const tempIdToken = await tempCredential.user.getIdToken();
+
+        // ধাপ ২: ব্যাকএন্ড থেকে আসল uid এর জন্য custom token আনি
+        const linkRes = await fetch("/api/auth/link-account", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${tempIdToken}`,
+          },
+          body: JSON.stringify({ phoneNumber: cleanPhone }),
+        });
+
+        if (!linkRes.ok) {
+          throw new Error("Account linking failed");
+        }
+
+        const { customToken } = await linkRes.json();
+
+        // ধাপ ৩: আসল uid দিয়ে sign in করি
+        const finalCredential = await signInWithCustomToken(auth, customToken);
+        const realUid = finalCredential.user.uid;
 
         const sessionUser = {
-          uid: existingUid,
+          uid: realUid,
           displayName: existingData.displayName,
           phoneNumber: existingData.phoneNumber,
           city: existingData.city,
@@ -108,7 +130,7 @@ export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModa
       }
     } catch (err) {
       console.error(err);
-      setError(language === "bn" ? "কিছু একটা সমস্যা হয়েছে।" : "Something went wrong.");
+      setError(language === "bn" ? "কিছু একটা সমস্যা হয়েছে।" : "Something went wrong.");
     } finally {
       setLoading(false);
     }
@@ -177,5 +199,4 @@ export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModa
       </div>
     </div>
   );
-            }
-          
+}

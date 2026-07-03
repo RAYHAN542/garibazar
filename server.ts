@@ -317,6 +317,47 @@ async function startServer() {
     res.json({ status: "ok", aiEnabled: !!ai });
   });
 
+  app.post("/api/auth/link-account", async (req, res) => {
+    try {
+      let decodedToken;
+      try {
+        decodedToken = await verifyAuthToken(req);
+      } catch (authErr) {
+        return res.status(401).json({ error: "অননুমোদিত অনুরোধ।" });
+      }
+
+      const { phoneNumber } = req.body;
+      const cleanPhone = String(phoneNumber || "").replace(/\D/g, "");
+
+      if (cleanPhone.length !== 11) {
+        return res.status(400).json({ error: "সঠিক ফোন নম্বর দিন।" });
+      }
+
+      const rawIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress || "unknown_ip";
+      const clientIp = (Array.isArray(rawIp) ? rawIp[0] : rawIp).split(',')[0].trim();
+      const ipIsAllowed = await checkRateLimitFirestore("ip", `link_${clientIp}`, 15, 60 * 1000, ipLimitStoreFallback);
+      if (!ipIsAllowed) {
+        return res.status(429).json({ error: "অনুরোধের সংখ্যা বেশি, একটু পরে চেষ্টা করুন।" });
+      }
+
+      const adminSDK = getFirebaseAdmin();
+      const db = adminSDK.firestore();
+      const querySnap = await db.collection("users").where("phoneNumber", "==", cleanPhone).limit(1).get();
+
+      if (querySnap.empty) {
+        return res.status(404).json({ error: "এই নম্বরে কোনো অ্যাকাউন্ট পাওয়া যায়নি।" });
+      }
+
+      const existingUid = querySnap.docs[0].id;
+      const customToken = await adminSDK.auth().createCustomToken(existingUid);
+
+      return res.json({ customToken });
+    } catch (err) {
+      logger.error("link-account failed:", err);
+      return res.status(500).json({ error: "সার্ভারে সমস্যা হয়েছে।" });
+    }
+  });
+
   // AI-powered description generator for car parts sellers
   app.post("/api/generate-description", async (req, res) => {
     try {
