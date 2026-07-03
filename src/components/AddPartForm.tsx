@@ -175,7 +175,7 @@ export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPromp
       return;
     }
 
-    if (!title || !category || !price || !location || !phone) {
+    if (!category || !price || !location || !phone) {
       setError(language === "bn" ? "অনুগ্রহ করে সব বাধ্যতামূলক ঘর পূরণ করুন" : "Please fill all required fields");
       return;
     }
@@ -191,7 +191,7 @@ export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPromp
 
     try {
       // সেফটি চেক সহ রানটাইমে স্যানিটাইজেশন নিশ্চিত করা হলো
-      const cleanTitle = title ? sanitizeText(title) : "";
+      const cleanTitle = model ? sanitizeText(model) : "";
       const cleanBrand = brand ? sanitizeText(brand) : "";
       const cleanDesc = description ? sanitizeText(description) : "";
       const cleanPhone = phone ? sanitizeText(phone) : "";
