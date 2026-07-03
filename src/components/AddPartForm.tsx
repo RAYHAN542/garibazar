@@ -91,6 +91,7 @@ export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPromp
   const [title, setTitle] = useState("");
   const [model, setModel] = useState("");
   const [category, setCategory] = useState("");
+  const [customCategory, setCustomCategory] = useState("");
   const [brand, setBrand] = useState("");
   const [condition, setCondition] = useState("used");
   const [price, setPrice] = useState("");
@@ -303,6 +304,7 @@ export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPromp
                     <option value="Body">{language === "bn" ? "বডি ও এক্সটেরিয়র (Body)" : "Body"}</option>
                     <option value="Interior">{language === "bn" ? "ইন্টেরিয়র (Interior)" : "Interior"}</option>
                     <option value="Electrical">{language === "bn" ? "ইলেকট্রিক্যাল পার্টস" : "Electrical"}</option>
+                <option value="other">{language === "bn" ? "অন্যান্য (Other)" : "Other"}</option>
                   </>
                 ) : (
                   <>
@@ -310,10 +312,17 @@ export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPromp
                     <option value="Excavator">{language === "bn" ? "এক্সকাভেটর (Excavator)" : "Excavator"}</option>
                     <option value="Truck">{language === "bn" ? "ট্রাক ও কমার্শিয়াল (Truck)" : "Truck"}</option>
                     <option value="Forklift">{language === "bn" ? "ফর্কলিফট (Forklift)" : "Forklift"}</option>
+                <option value="other">{language === "bn" ? "অন্যান্য (Other)" : "Other"}</option>
                   </>
                 )}
               </select>
             </div>
+
+              {category === "other" && (
+                <div className="mt-2">
+                  <input type="text" value={customCategory} onChange={(e) => setCustomCategory(e.target.value)} placeholder={language === "bn" ? "আপনার আইটেমের নাম লিখুন" : "Type your item name"} className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:border-orange-500" required />
+                </div>
+              )}
           </div>
 
           <div>
