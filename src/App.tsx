@@ -4025,7 +4025,7 @@ export default function App() {
         <ListingDetailModal 
           listing={selectedListing}
           language={language}
-          currentUser={user}
+          currentUser={userMetadata || user}
           onClose={() => setSelectedListing(null)}
           onPurchaseAdded={() => {
             // updates purchases data automatically via firestore listener

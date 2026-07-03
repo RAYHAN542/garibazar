@@ -200,9 +200,9 @@ export function ListingDetailModal({ listing, language, currentUser, onClose, on
     }
   };
 
-  const isOwner = currentUser && (
+  const isOwner = !!currentUser?.uid && (
     listing.sellerId === currentUser.uid || 
-    listing.contactNumber === currentUser.phoneNumber
+    (!!currentUser.phoneNumber && listing.contactNumber === currentUser.phoneNumber)
   );
 
   const toggleFavorite = () => {
