@@ -871,36 +871,17 @@ export function ListingDetailModal({ listing, language, currentUser, onClose, on
                   <span className="font-sans font-bold text-sm text-slate-450 block mt-1">
                     {language === "bn" ? "প্রোডাক্ট বিক্রিত (নাম্বার অবরুদ্ধ)" : "Sold out (Number hidden)"}
                   </span>
-                ) : showPhoneNumber ? (
+                ) : (
                   <div className="flex items-center gap-3 mt-1 flex-wrap">
                     <a 
                       id="detail-contact-tele"
-                      href={`tel:${listing.contactNumber}`} 
+                      href={`tel:${listing.phone}`} 
                       onClick={handleContactClick}
                       className="font-mono font-black text-xl text-amber-500 hover:text-amber-600 hover:underline block cursor-pointer"
                     >
-                      📞 {listing.contactNumber}
+                      📞 {listing.phone}
                     </a>
-                    <button
-                      type="button"
-                      onClick={() => setShowPhoneNumber(false)}
-                      className="px-2 py-1 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-[10px] text-slate-600 dark:text-slate-350 font-bold rounded cursor-pointer transition"
-                    >
-                      {language === "bn" ? "লুকান" : "Hide"}
-                    </button>
                   </div>
-                ) : (
-                  <button
-                    type="button"
-                    id="reveal-phone-btn"
-                    onClick={() => {
-                      setShowPhoneNumber(true);
-                      handleContactClick();
-                    }}
-                    className="mt-1 px-3.5 py-1.5 bg-amber-500 hover:bg-amber-600 active:scale-98 text-slate-950 font-bold rounded-lg text-xs transition cursor-pointer shadow-sm flex items-center gap-1.5"
-                  >
-                    <span>{language === "bn" ? "📞 নম্বর দেখুন" : "📞 Show Number"}</span>
-                  </button>
                 )}
               </div>
             </div>
