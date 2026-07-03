@@ -282,73 +282,54 @@ export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPromp
           <input type="file" ref={fileInputRef} onChange={handleImageSelect} multiple accept="image/*" className="hidden" />
         </div>
 
-        <div>
-          <label className="block text-xs font-semibold text-gray-700 mb-1">{language === "bn" ? "২. লিস্টিং টাইটেল *" : "2. Listing Title *"}</label>
-          <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} placeholder={activeTab === "part" ? (language === "bn" ? "যেমন: সিলিন্ডার হেড, টিউনিং স্পয়লার" : "e.g. Cylinder Head") : (language === "bn" ? "যেমন: টয়োটা এক্সিও, ক্যাটারপিলার ৩২০ডি এক্সকাভেটর" : "e.g. Toyota Axio")} className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:border-orange-500" required />
-        </div>
-
-		<div>
-			<label className="block text-xs font-semibold text-gray-700 mb-1">{language === "bn" ? "মডেল *" : "Model *"}</label>
-			<input type="text" value={model} onChange={(e) => setModel(e.target.value)} placeholder={language === "bn" ? "যেমন: টয়োটা এক্সিও ২০১৮" : "e.g. Toyota Axio 2018"} className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:border-orange-500" required />
-		</div>
-
-        <div>
-          <label className="block text-xs font-semibold text-gray-700 mb-1">{language === "bn" ? "৩. ক্যাটাগরি সিলেক্ট করুন *" : "3. Select Category *"}</label>
-          <select value={category} onChange={(e) => setCategory(e.target.value)} className="w-full px-3 py-2 border rounded-lg text-sm bg-white focus:outline-none focus:border-orange-500" required>
-            <option value="">{language === "bn" ? "-- সিলেক্ট করুন --" : "-- Select --"}</option>
-            {activeTab === "part" ? (
-              <>
-                <option value="Engine">{language === "bn" ? "ইঞ্জিন পার্টস (Engine)" : "Engine"}</option>
-                <option value="Suspension">{language === "bn" ? "সাসপেনশন (Suspension)" : "Suspension"}</option>
-                <option value="Body">{language === "bn" ? "বডি ও এক্সটেরিয়র (Body)" : "Body"}</option>
-                <option value="Interior">{language === "bn" ? "ইন্টেরিয়র (Interior)" : "Interior"}</option>
-                <option value="Electrical">{language === "bn" ? "ইলেকট্রিক্যাল পার্টস" : "Electrical"}</option>
-              </>
-            ) : (
-              <>
-                <option value="Car">{language === "bn" ? "কার / গাড়ি (Car)" : "Car"}</option>
-                <option value="Excavator">{language === "bn" ? "এক্সকাভেটর (Excavator)" : "Excavator"}</option>
-                <option value="Truck">{language === "bn" ? "ট্রাক ও কমার্শিয়াল (Truck)" : "Truck"}</option>
-                <option value="Forklift">{language === "bn" ? "ফর্কলিফ্ট (Forklift)" : "Forklift"}</option>
-              </>
-            )}
-          </select>
-        </div>
-
-        <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="block text-xs font-semibold text-gray-700 mb-1">{language === "bn" ? "ব্র্যান্ড (Brand) - ঐচ্ছিক" : "Brand - Optional"}</label>
-            <input type="text" value={brand} onChange={(e) => setBrand(e.target.value)} placeholder="e.g. Toyota, Caterpillar" className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:border-orange-500" />
+            <label className="block text-xs font-semibold text-gray-700 mb-1">{language === "bn" ? "১. মূল্য (BDT) *" : "1. Price (BDT) *"}</label>
+            <input type="number" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="৳" className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:border-orange-500" required />
           </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 mb-1">{language === "bn" ? "২. মডেল *" : "2. Model *"}</label>
+              <input type="text" value={model} onChange={(e) => setModel(e.target.value)} placeholder={language === "bn" ? "যেমন: টয়োটা এক্সিও ২০১৮" : "e.g. Toyota Axio 2018"} className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:border-orange-500" required />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 mb-1">{language === "bn" ? "৩. ক্যাটাগরি *" : "3. Category *"}</label>
+              <select value={category} onChange={(e) => setCategory(e.target.value)} className="w-full px-3 py-2 border rounded-lg text-sm bg-white focus:outline-none focus:border-orange-500" required>
+                <option value="">{language === "bn" ? "-- সিলেক্ট করুন --" : "-- Select --"}</option>
+                {activeTab === "part" ? (
+                  <>
+                    <option value="Engine">{language === "bn" ? "ইঞ্জিন পার্টস (Engine)" : "Engine"}</option>
+                    <option value="Suspension">{language === "bn" ? "সাসপেনশন (Suspension)" : "Suspension"}</option>
+                    <option value="Body">{language === "bn" ? "বডি ও এক্সটেরিয়র (Body)" : "Body"}</option>
+                    <option value="Interior">{language === "bn" ? "ইন্টেরিয়র (Interior)" : "Interior"}</option>
+                    <option value="Electrical">{language === "bn" ? "ইলেকট্রিক্যাল পার্টস" : "Electrical"}</option>
+                  </>
+                ) : (
+                  <>
+                    <option value="Car">{language === "bn" ? "কার / গাড়ি (Car)" : "Car"}</option>
+                    <option value="Excavator">{language === "bn" ? "এক্সকাভেটর (Excavator)" : "Excavator"}</option>
+                    <option value="Truck">{language === "bn" ? "ট্রাক ও কমার্শিয়াল (Truck)" : "Truck"}</option>
+                    <option value="Forklift">{language === "bn" ? "ফর্কলিফট (Forklift)" : "Forklift"}</option>
+                  </>
+                )}
+              </select>
+            </div>
+          </div>
+
           <div>
-            <label className="block text-xs font-semibold text-gray-700 mb-1">{language === "bn" ? "অবস্থা (Condition) *" : "Condition *"}</label>
-            <select value={condition} onChange={(e) => setCondition(e.target.value)} className="w-full px-3 py-2 border rounded-lg text-sm bg-white focus:outline-none focus:border-orange-500">
-              <option value="used">{language === "bn" ? "ব্যবহৃত (Used)" : "Used"}</option>
-              <option value="new">{language === "bn" ? "নতুন (New)" : "New"}</option>
-              <option value="reconditioned">{language === "bn" ? "রিকন্ডিশনড" : "Reconditioned"}</option>
-            </select>
+            <label className="block text-xs font-semibold text-gray-700 mb-1">{language === "bn" ? "৪. মোবাইল নাম্বার *" : "4. Mobile Number *"}</label>
+            <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:border-orange-500" required />
           </div>
-        </div>
 
-        <div>
-          <label className="block text-xs font-semibold text-gray-700 mb-1">{language === "bn" ? "৪. মূল্য (BDT) *" : "4. Price (BDT) *"}</label>
-          <input type="number" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="৳" className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:border-orange-500" required />
-        </div>
+          <div>
+            <label className="block text-xs font-semibold text-gray-700 mb-1">{language === "bn" ? "৫. লোকেশন / ঠিকানা *" : "5. Location *"}</label>
+            <input type="text" value={location} onChange={(e) => setLocation(e.target.value)} placeholder={language === "bn" ? "যেমন: ঢাকা, চট্টগ্রাম" : "e.g. Dhaka"} className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:border-orange-500" required />
+          </div>
 
-        <div>
-          <label className="block text-xs font-semibold text-gray-700 mb-1">{language === "bn" ? "৫. বিস্তারিত বিবরণ *" : "5. Description *"}</label>
-          <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} placeholder={language === "bn" ? "পণ্যটির অবস্থা এবং বিস্তারিত লিখুন..." : "Describe item condition..."} className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:border-orange-500" required />
-        </div>
-
-        <div>
-          <label className="block text-xs font-semibold text-gray-700 mb-1">{language === "bn" ? "৬. লোকেশন / ঠিকানা *" : "6. Location *"}</label>
-          <input type="text" value={location} onChange={(e) => setLocation(e.target.value)} placeholder={language === "bn" ? "যেমন: ঢাকা, চট্টগ্রাম" : "e.g. Dhaka"} className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:border-orange-500" required />
-        </div>
-
-        <div>
-          <label className="block text-xs font-semibold text-gray-700 mb-1">{language === "bn" ? "৭. মোবাইল নাম্বার *" : "7. Mobile Number *"}</label>
-          <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:border-orange-500" required />
-        </div>
+          <div>
+            <label className="block text-xs font-semibold text-gray-700 mb-1">{language === "bn" ? "৬. বিস্তারিত বিবরণ *" : "6. Description *"}</label>
+            <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} placeholder={language === "bn" ? "পণ্যটির অবস্থা এবং বিস্তারিত লিখুন..." : "Describe item condition..."} className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:border-orange-500" required />
+          </div>
 
         <button type="submit" disabled={isSubmitting || images.some(img => img.status === "uploading")} className="w-full py-3 bg-orange-500 text-white font-semibold rounded-xl text-sm shadow-sm hover:bg-orange-600 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2">
           {isSubmitting ? (
