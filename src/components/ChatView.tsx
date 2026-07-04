@@ -293,9 +293,9 @@ export function ChatView({ currentUser, language, onLoginPrompt, initialListingT
       buyerName: currentUser.displayName || "Buyer",
       sellerName: initialListingToChat.sellerName || "Anonymous Seller",
       listingId: initialListingToChat.id,
-      listingTitle: initialListingToChat.title,
-      listingImage: initialListingToChat.image,
-      listingPrice: initialListingToChat.price,
+      listingTitle: initialListingToChat.title || "Untitled Listing",
+      listingImage: initialListingToChat.image || (initialListingToChat as any).images?.[0] || "",
+      listingPrice: initialListingToChat.price || 0,
       lastMessage: language === "bn" ? "চ্যাট শুরু হয়েছে" : "Chat conversation started",
       lastMessageAt: serverTimestamp(),
       participants: [currentUser.uid, initialListingToChat.sellerId || "unknown_seller"]
@@ -305,10 +305,8 @@ export function ChatView({ currentUser, language, onLoginPrompt, initialListingT
       await setDoc(doc(db, "chats", combinationId), newThread);
       const fullThread: ChatThread = { id: combinationId, ...newThread };
       setActiveThread(fullThread);
-      alert("DEBUG: chat created ok, id=" + combinationId);
     } catch (e) {
       console.error("Error creating chat thread:", e);
-      alert("DEBUG ERROR: " + String(e));
     }
 
     if (onClearInitialListing) onClearInitialListing();
