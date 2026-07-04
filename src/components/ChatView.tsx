@@ -305,8 +305,10 @@ export function ChatView({ currentUser, language, onLoginPrompt, initialListingT
       await setDoc(doc(db, "chats", combinationId), newThread);
       const fullThread: ChatThread = { id: combinationId, ...newThread };
       setActiveThread(fullThread);
+      alert("DEBUG: chat created ok, id=" + combinationId);
     } catch (e) {
       console.error("Error creating chat thread:", e);
+      alert("DEBUG ERROR: " + String(e));
     }
 
     if (onClearInitialListing) onClearInitialListing();
