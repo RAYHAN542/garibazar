@@ -327,7 +327,8 @@ export function ChatView({ currentUser, language, onLoginPrompt, initialListingT
       await addDoc(collection(chatDocRef, "messages"), {
         senderId: currentUser.uid,
         text: finalMsg,
-        createdAt: serverTimestamp()
+        createdAt: serverTimestamp(),
+        participants: [activeThread.buyerId, activeThread.sellerId]
       });
 
       // Update parent summary info
