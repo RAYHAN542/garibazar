@@ -77,7 +77,8 @@ export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModa
         });
 
         if (!linkRes.ok) {
-          throw new Error("Account linking failed");
+          const errText = await linkRes.text();
+          throw new Error("Account linking failed. Status=" + linkRes.status + " Body=" + errText);
         }
 
         const { customToken } = await linkRes.json();
