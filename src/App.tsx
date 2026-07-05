@@ -2603,7 +2603,14 @@ export default function App() {
                           {purchases.map((item) => (
                             <div 
                               key={item.id}
-                  onClick={() => handleViewListingDetails(item)}
+                  onClick={() => {
+                    const realListing = listings.find((l) => l.id === item.listingId);
+                    if (realListing) {
+                      handleViewListingDetails(realListing);
+                    } else {
+                      handleViewListingDetails(item);
+                    }
+                  }}
                               className="bg-white dark:bg-slate-905 border border-slate-200 dark:border-slate-800 p-4 rounded-xl flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-850 transition"
                             >
                               <div className="flex gap-3 items-center min-w-0">

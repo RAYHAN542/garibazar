@@ -150,7 +150,9 @@ export function ListingDetailModal({ listing, language, currentUser, onClose, on
       sellerContact: listing.contactNumber || "01700000000",
       buyerId: currentUser.uid,
       status: language === "bn" ? "অর্ডার পেন্ডিং" : "Pending Delivery",
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
+      listingId: listing.id,
+      sellerId: listing.sellerId || null
     };
 
     // 1. Immediately save to local storage for instant reactive sync
