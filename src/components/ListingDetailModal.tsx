@@ -410,7 +410,7 @@ export function ListingDetailModal({ listing, language, currentUser, onClose, on
   const techReport = getTechnicalAnalysis();
 
   return (
-    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex justify-center items-start sm:items-center p-0 sm:p-4 z-50 overflow-y-auto">
+    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex justify-center items-start sm:items-center p-0 sm:p-4 z-[60] overflow-y-auto">
       <div className="bg-white dark:bg-slate-900 w-full min-h-screen sm:min-h-fit sm:max-w-2xl shadow-2xl border-0 sm:border border-slate-200 dark:border-slate-800 relative overflow-hidden sm:rounded-2xl sm:my-8">
         
         {/* Colorful status highlight for ads */}
