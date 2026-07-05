@@ -341,6 +341,7 @@ export function ChatView({ currentUser, language, onLoginPrompt, initialListingT
 
     } catch (e) {
       console.error("Error sending message:", e);
+      alert("DEBUG SEND ERROR: " + String(e));
     }
   };
 
