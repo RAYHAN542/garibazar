@@ -1,14 +1,14 @@
-import * as adminPkg from "firebase-admin";
+import { initializeApp, getApps, cert } from "firebase-admin/app";
+import { getAuth } from "firebase-admin/auth";
+import { getFirestore } from "firebase-admin/firestore";
 
-const admin: any = (adminPkg as any).default ?? adminPkg;
-
-if (!admin.apps.length) {
+if (!getApps().length) {
   const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
   if (serviceAccountJson) {
     try {
       const serviceAccount = JSON.parse(serviceAccountJson);
-      admin.initializeApp({
-        credential: admin.credential.cert(serviceAccount),
+      initializeApp({
+        credential: cert(serviceAccount),
       });
     } catch (e) {
       console.error("Failed to parse FIREBASE_SERVICE_ACCOUNT_KEY:", e);
@@ -22,7 +22,7 @@ export default async function handler(req: any, res: any) {
   }
 
   try {
-    if (!admin.apps.length) {
+    if (!getApps().length) {
       return res.status(500).json({ error: "সার্ভার কনফিগারেশনে সমস্যা।" });
     }
 
@@ -32,7 +32,7 @@ export default async function handler(req: any, res: any) {
       return res.status(401).json({ error: "অননুমোদিত অনুরোধ।" });
     }
 
-    await admin.auth().verifyIdToken(idToken);
+    await getAuth().verifyIdToken(idToken);
 
     const { phoneNumber } = req.body || {};
     const cleanPhone = String(phoneNumber || "").replace(/\D/g, "");
@@ -41,7 +41,7 @@ export default async function handler(req: any, res: any) {
       return res.status(400).json({ error: "সঠিক ফোন নম্বর দিন।" });
     }
 
-    const db = admin.firestore();
+    const db = getFirestore();
     const querySnap = await db.collection("users").where("phoneNumber", "==", cleanPhone).limit(1).get();
 
     if (querySnap.empty) {
@@ -49,7 +49,7 @@ export default async function handler(req: any, res: any) {
     }
 
     const existingUid = querySnap.docs[0].id;
-    const customToken = await admin.auth().createCustomToken(existingUid);
+    const customToken = await getAuth().createCustomToken(existingUid);
 
     return res.status(200).json({ customToken });
   } catch (err: any) {
