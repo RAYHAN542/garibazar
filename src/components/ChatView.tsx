@@ -43,6 +43,7 @@ export function ChatView({ currentUser, language, onLoginPrompt, initialListingT
   const [newMessage, setNewMessage] = useState("");
   const [loadingThreads, setLoadingThreads] = useState(true);
   const [loadingMessages, setLoadingMessages] = useState(false);
+  const pendingMessagesRef = useRef<ChatMessage[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const [msgLimit, setMsgLimit] = useState(20);
@@ -227,7 +228,13 @@ export function ChatView({ currentUser, language, onLoginPrompt, initialListingT
       setHasMoreMessages(list.length === msgLimit);
       
       list.reverse(); // Display in chronological order
-      setMessages(list);
+
+      // Remove pending (optimistic) messages that are now confirmed by the server
+      pendingMessagesRef.current = pendingMessagesRef.current.filter(
+        (temp) => !list.some((real) => real.senderId === temp.senderId && real.text === temp.text)
+      );
+
+      setMessages([...list, ...pendingMessagesRef.current]);
       setLoadingMessages(false);
       
       // Scroll to bottom only if limit didn't increase (e.g. first load or new incoming messages)
@@ -319,6 +326,16 @@ export function ChatView({ currentUser, language, onLoginPrompt, initialListingT
     if (!textToSend) {
       setNewMessage("");
     }
+
+    // Show the message instantly, before waiting for the server
+    const tempMsg: ChatMessage = {
+      id: "temp_" + Date.now(),
+      senderId: currentUser.uid,
+      text: finalMsg,
+      createdAt: new Date()
+    };
+    pendingMessagesRef.current = [...pendingMessagesRef.current, tempMsg];
+    setMessages((prev) => [...prev, tempMsg]);
 
     try {
       const chatDocRef = doc(db, "chats", activeThread.id);
