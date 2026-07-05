@@ -332,7 +332,7 @@ export function ChatView({ currentUser, language, onLoginPrompt, initialListingT
       id: "temp_" + Date.now(),
       senderId: currentUser.uid,
       text: finalMsg,
-      createdAt: new Date()
+      createdAt: { seconds: Math.floor(Date.now() / 1000) } as any
     };
     pendingMessagesRef.current = [...pendingMessagesRef.current, tempMsg];
     setMessages((prev) => [...prev, tempMsg]);
