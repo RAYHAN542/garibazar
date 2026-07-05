@@ -11,9 +11,15 @@ interface ListingCardProps {
   onPromoteClick: (listing: PartListing) => any;
 }
 
-function getTimeAgo(createdAt: string, language: SupportedLanguage): string {
+function getTimeAgo(createdAt: any, language: SupportedLanguage): string {
   try {
-    const then = new Date(createdAt).getTime();
+    let then: number;
+    if (createdAt && typeof createdAt === "object" && typeof createdAt.seconds === "number") {
+      then = createdAt.seconds * 1000;
+    } else {
+      then = new Date(createdAt).getTime();
+    }
+    if (isNaN(then)) return "";
     const now = Date.now();
     const diffMs = Math.max(0, now - then);
     const minutes = Math.floor(diffMs / (1000 * 60));
