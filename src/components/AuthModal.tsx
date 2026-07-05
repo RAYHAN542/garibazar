@@ -131,7 +131,6 @@ export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModa
       }
     } catch (err) {
       console.error(err);
-      alert("DEBUG AUTH ERROR: " + String(err));
       setError(language === "bn" ? "কিছু একটা সমস্যা হয়েছে।" : "Something went wrong.");
     } finally {
       setLoading(false);
