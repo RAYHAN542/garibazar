@@ -1,4 +1,6 @@
-import admin from "firebase-admin";
+import * as adminPkg from "firebase-admin";
+
+const admin: any = (adminPkg as any).default ?? adminPkg;
 
 if (!admin.apps.length) {
   const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
@@ -52,6 +54,6 @@ export default async function handler(req: any, res: any) {
     return res.status(200).json({ customToken });
   } catch (err: any) {
     console.error("link-account failed:", err);
-    return res.status(500).json({ error: "সার্ভারে সমস্যা হয়েছে।" });
+    return res.status(500).json({ error: "সার্ভারে সমস্যা হয়েছে।", detail: String(err && err.message || err) });
   }
 }
