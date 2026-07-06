@@ -2214,23 +2214,24 @@ export default function App() {
                     </p>
                   </div>
                 ) : (
-                  <div className="flex overflow-x-auto gap-3 pb-4 scrollbar-none w-full">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2.5 sm:gap-4">
   {filteredListings.map((listing) => (
-    <div key={listing.id} className="flex-shrink-0 w-[165px]">
-      <ListingCard
-        listing={listing}
-        language={language}
-        onViewDetails={handleViewListingDetails}
-        onPromoteClick={(item) => {
-          if (!user) {
-            setIsAuthOpen(true);
-          } else {
-            setPromotingListing(item);
-          }
-        }}
-      />
-    </div>
+    <ListingCard
+      key={listing.id}
+      listing={listing}
+      language={language}
+      onViewDetails={handleViewListingDetails}
+      onPromoteClick={(item) => {
+        if (!user) {
+          setIsAuthOpen(true);
+        } else {
+          setPromotingListing(item);
+        }
+      }}
+    />
   ))}
+</div>
+                
 </div>
                 
                 )}
