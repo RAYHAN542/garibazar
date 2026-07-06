@@ -2229,13 +2229,10 @@ export default function App() {
         }
       }}
     />
-  ))}
+  ))
 </div>
+)}
                 
-</div>
-                
-                )}
-
                 {hasMoreListings && (
                   <div className="flex justify-center mt-8 mb-4">
                     <button
