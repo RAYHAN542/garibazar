@@ -1917,65 +1917,56 @@ export default function App() {
                 </div>
 
                 {/* 🚗 vs ⚙️ Side-by-Side Main Category Buy/Sell Buttons */}
-                <div className="grid grid-cols-2 gap-2.5 mb-2.5 animate-[slide-down_0.2s_ease-out]">
-                  <button
-                    onClick={() => {
-                      const nextCat = selectedCategory === "vehicles" ? "all" : "vehicles";
-                      setSelectedCategory(nextCat);
-                      setSelectedSubCategory("all");
-                    }}
-                    className={`flex items-center gap-2 p-2.5 rounded-2xl border transition-all duration-205 cursor-pointer group ${
-                      selectedCategory === "vehicles"
-                        ? "bg-amber-500/10 border-amber-500 text-amber-600 dark:text-amber-400 shadow-xs"
-                        : "bg-white dark:bg-slate-900 border-slate-150 dark:border-slate-800 text-slate-700 dark:text-slate-350 hover:border-amber-550/35"
-                    }`}
-                  >
-                    <div className={`p-1.5 rounded-xl transition-all duration-200 shrink-0 ${
-                      selectedCategory === "vehicles"
-                        ? "bg-amber-500 text-slate-950 shadow-xs"
-                        : "bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 group-hover:bg-amber-500 group-hover:text-slate-950"
-                    }`}>
-                      <Car className="w-4.5 h-4.5 stroke-[2]" />
-                    </div>
-                    <div className="text-left min-w-0">
-                      <div className="font-extrabold text-[11.5px] sm:text-xs leading-tight text-slate-850 dark:text-white truncate">
-                        {language === "bn" ? "গাড়ি বেচা/কেনা" : "Vehicle Buy & Sell"}
-                      </div>
-                      <p className="text-[8px] sm:text-[9px] text-slate-400 dark:text-slate-500 font-bold truncate mt-0.5">
-                        {language === "bn" ? "গাড়ি ও ভারী ইকুইপমেন্ট" : "Cars & Equipment"}
-                      </p>
-                    </div>
-                  </button>
 
-                  <button
-                    onClick={() => {
-                      const nextCat = selectedCategory === "spare_parts" ? "all" : "spare_parts";
-                      setSelectedCategory(nextCat);
-                      setSelectedSubCategory("all");
-                    }}
-                    className={`flex items-center gap-2 p-2.5 rounded-2xl border transition-all duration-205 cursor-pointer group ${
-                      selectedCategory === "spare_parts"
-                        ? "bg-amber-500/10 border-amber-500 text-amber-600 dark:text-amber-400 shadow-xs"
-                        : "bg-white dark:bg-slate-900 border-slate-150 dark:border-slate-800 text-slate-700 dark:text-slate-350 hover:border-amber-550/35"
-                    }`}
-                  >
-                    <div className={`p-1.5 rounded-xl transition-all duration-200 shrink-0 ${
-                      selectedCategory === "spare_parts"
-                        ? "bg-amber-500 text-slate-950 shadow-xs"
-                        : "bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 group-hover:bg-amber-500 group-hover:text-slate-950"
-                    }`}>
-                      <Wrench className="w-4.5 h-4.5 stroke-[2]" />
-                    </div>
-                    <div className="text-left min-w-0">
-                      <div className="font-extrabold text-[11.5px] sm:text-xs leading-tight text-slate-850 dark:text-white truncate">
-                        {language === "bn" ? "পার্ট বেচা/কেনা" : "Parts Buy & Sell"}
-                      </div>
-                      <p className="text-[8px] sm:text-[9px] text-slate-400 dark:text-slate-500 font-bold truncate mt-0.5">
-                        {language === "bn" ? "ইঞ্জিন ও খুচরা যন্ত্রাংশ" : "Engines & Spare Parts"}
-                      </p>
-                    </div>
-                  </button>
-                </div>
+          <div className="grid grid-cols-2 gap-2.5 mb-2.5 animate-[slide-down_0.2s_ease-out]">
+            <button
+              onClick={() => {
+                const nextCat = selectedCategory === "vehicles" ? "all" : "vehicles";
+                setSelectedCategory(nextCat);
+                setSelectedSubCategory("all");
+              }}
+              className="relative overflow-hidden rounded-2xl h-32 flex flex-col justify-between text-left cursor-pointer bg-gradient-to-br from-amber-50 to-amber-100 dark:from-slate-900 dark:to-slate-800 border border-amber-200/60 dark:border-slate-700 shadow-sm"
+            >
+              <img
+                src="https://images.unsplash.com/photo-1621922984029-93a30d0bf3f1?w=300&auto=format&fit=crop&q=60"
+                className="absolute right-[-10px] bottom-[-8px] w-24 h-24 object-contain opacity-90 pointer-events-none"
+                alt=""
+              />
+              <span className="font-black text-[13px] text-amber-800 dark:text-amber-300 leading-tight relative z-10 p-2.5">
+                {language === "bn" ? "গাড়ি বেচা/কেনা" : "Vehicle Buy & Sell"}
+              </span>
+              <span className="text-[9.5px] font-bold text-amber-700/70 dark:text-amber-400/70 leading-tight relative z-10 max-w-[75%] px-2.5">
+                {language === "bn" ? "সব ধরনের এক্সক্যাভেটর কিনুন বা বিক্রি করুন সহজে" : "Buy or sell all kinds of heavy equipment"}
+              </span>
+              <span className="absolute bottom-2.5 right-2.5 w-6 h-6 rounded-full bg-amber-500 text-white flex items-center justify-center shadow-sm z-10">
+                <ArrowRight className="w-3.5 h-3.5" />
+              </span>
+            </button>
+
+            <button
+              onClick={() => {
+                const nextCat = selectedCategory === "spare_parts" ? "all" : "spare_parts";
+                setSelectedCategory(nextCat);
+                setSelectedSubCategory("all");
+              }}
+              className="relative overflow-hidden rounded-2xl h-32 flex flex-col justify-between text-left cursor-pointer bg-gradient-to-br from-sky-50 to-sky-100 dark:from-slate-900 dark:to-slate-800 border border-sky-200/60 dark:border-slate-700 shadow-sm"
+            >
+              <img
+                src="https://images.unsplash.com/photo-1487754180451-c456f719a1fc?w=300&auto=format&fit=crop&q=60"
+                className="absolute right-[-10px] bottom-[-8px] w-24 h-24 object-contain opacity-90 pointer-events-none"
+                alt=""
+              />
+              <span className="font-black text-[13px] text-sky-800 dark:text-sky-300 leading-tight relative z-10 p-2.5">
+                {language === "bn" ? "গাড়ির পাট" : "Vehicle Parts"}
+              </span>
+              <span className="text-[9.5px] font-bold text-sky-700/70 dark:text-sky-400/70 leading-tight relative z-10 max-w-[75%] px-2.5">
+                {language === "bn" ? "হাইড্রোলিক পাম্প, ইঞ্জিন, ফিল্টার, গিয়ার ও আনুষঙ্গিক কিনুন" : "Hydraulic pumps, engines, filters & gear"}
+              </span>
+              <span className="absolute bottom-2.5 right-2.5 w-6 h-6 rounded-full bg-sky-600 text-white flex items-center justify-center shadow-sm z-10">
+                <ArrowRight className="w-3.5 h-3.5" />
+              </span>
+            </button>
+          </div>
 
                 {/* 🛠️ Modern Filters & Dynamic Sorting Panel (Revealed dynamically!) */}
                 {showFilters && (
