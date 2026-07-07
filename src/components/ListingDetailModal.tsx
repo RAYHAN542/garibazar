@@ -202,6 +202,9 @@ export function ListingDetailModal({ listing, language, currentUser, onClose, on
     }
   };
 
+  // ownership শুধু sellerId দিয়ে চেক করা হয় — phone number দিয়ে চেক করলে
+  // দুইজনের contact নম্বর মিলে গেলে বা placeholder নম্বর ব্যবহার হলে ভুলভাবে
+  // "owner" ধরে ফেলার (false positive) ঝুঁকি থাকে।
   const isOwner = !!currentUser?.uid && listing.sellerId === currentUser.uid;
 
   const toggleFavorite = () => {
@@ -896,7 +899,6 @@ export function ListingDetailModal({ listing, language, currentUser, onClose, on
                       {language === "bn" ? "ড্যাশবোর্ডে সফলভাবে যুক্ত হয়েছে!" : "Successfully added to dashboard!"}
                     </span>
                   </div>
-              )}
                 ) : (
                   <button
                     type="button"
@@ -915,6 +917,7 @@ export function ListingDetailModal({ listing, language, currentUser, onClose, on
                   </button>
                 )}
               </div>
+              )}
 
               {!isOwner && (
                 <div className="flex-1">
