@@ -2211,9 +2211,9 @@ export default function App() {
 
                 {/* 📲 PWA Install Prompt Banner — লগইন/রেজিস্টার করলে চিরতরে বন্ধ হয়ে যায় */}
                 {showInstallPrompt && (
-                  <div className="mb-6 bg-gradient-to-r from-emerald-600/10 to-teal-505/10 border border-emerald-500/20 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 animate-fade-in shadow-sm">
+                  <div className="mb-6 bg-white dark:bg-slate-900 border border-amber-200 dark:border-amber-900/40 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 animate-fade-in shadow-sm">
                     <div className="flex items-start gap-3">
-                      <div className="p-2.5 bg-emerald-505 text-white rounded-xl shadow-md shrink-0 flex items-center justify-center">
+                      <div className="p-2.5 bg-amber-500 text-slate-950 rounded-xl shadow-md shrink-0 flex items-center justify-center">
                         <Download className="w-5 h-5" />
                       </div>
                       <div>
@@ -2231,14 +2231,14 @@ export default function App() {
                       <button
                         type="button"
                         onClick={() => dismissInstallPrompt(false)}
-                        className="text-[10px] sm:text-xs font-bold text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 px-3 py-2 rounded-lg transition cursor-pointer"
+                        className="text-[10px] sm:text-xs font-bold text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 px-3 py-2 rounded-lg transition cursor-pointer"
                       >
                         {language === "bn" ? "পরে করুন" : "Later"}
                       </button>
                       <button
                         type="button"
                         onClick={handleInstallApp}
-                        className="bg-emerald-505 hover:bg-emerald-600 text-white font-bold px-4 py-2 rounded-xl text-[10px] sm:text-xs transition cursor-pointer shadow-sm"
+                        className="bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold px-4 py-2 rounded-xl text-[10px] sm:text-xs transition cursor-pointer shadow-sm active:scale-95"
                       >
                         {language === "bn" ? "ইনস্টল করুন" : "Install"}
                       </button>
