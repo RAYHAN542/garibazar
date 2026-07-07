@@ -2246,24 +2246,25 @@ export default function App() {
                   </div>
                 ) : (
                   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2.5 sm:gap-4">
-                    {filteredListings.map((listing) => (
-                      <ListingCard 
-                        key={listing.id}
-                        listing={listing}
-                        language={language}
-                        onViewDetails={handleViewListingDetails}
-                        onPromoteClick={(item) => {
-                          if (!user) {
-                            setIsAuthOpen(true);
-                          } else {
-                            setPromotingListing(item);
-                          }
-                        }}
-                      />
-                    ))}
-                  </div>
-                )}
-
+  {filteredListings.map((listing) => (
+    <ListingCard
+      key={listing.id}
+      listing={listing}
+      language={language}
+      onViewDetails={handleViewListingDetails}
+      onPromoteClick={(item) => {
+        if (!user) {
+          setIsAuthOpen(true);
+        } else {
+          setPromotingListing(item);
+        }
+      }}
+    />
+  ))}
+</div>
+)}
+               
+                
                 {hasMoreListings && (
                   <div className="flex justify-center mt-8 mb-4">
                     <button
