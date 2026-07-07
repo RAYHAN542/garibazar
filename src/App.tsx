@@ -68,6 +68,7 @@ import { SellerShopPage } from "./components/SellerShopPage";
 import Fuse from "fuse.js";
 import { buildSearchBlob, convertBengaliDigitsToEnglish, convertEnglishDigitsToBengali } from "./searchAliases";
 import { MessageSquare, Cpu, SlidersHorizontal, Moon, Sun, Users, HelpCircle, Mail, FileText, ArrowRight, Menu } from "lucide-react";
+import vehicleBannerImg from "./assets/images/vehicle-banner.jpg";
 
 const HOME_CATEGORIES = [
   { id: "all", bnName: "সব ক্যাটাগরি", enName: "All Categories" },
@@ -1964,20 +1965,11 @@ export default function App() {
               <span className="text-[10px] font-bold text-amber-700/70 dark:text-amber-400/70 leading-snug mt-1 mb-3">
                 {language === "bn" ? "এক্সক্যাভেটর, ট্রাক, কার ও অন্যান্য নির্মাণ যানবাহন কিনুন বা বিক্রি করুন সহজে ও নিরাপদে" : "Buy or sell excavators, trucks, cars and other construction vehicles safely"}
               </span>
-              <div className="grid grid-cols-5 gap-1 mt-auto">
-                {[
-                  { emoji: "🚜", label: language === "bn" ? "এক্সক্যাভেটর" : "Excavator" },
-                  { emoji: "🚛", label: language === "bn" ? "ট্রাক" : "Truck" },
-                  { emoji: "🚗", label: language === "bn" ? "কার" : "Car" },
-                  { emoji: "🏗️", label: language === "bn" ? "ক্রেন" : "Crane" },
-                  { emoji: "🚌", label: language === "bn" ? "বাস" : "Bus" },
-                ].map((sub, i) => (
-                  <div key={i} className="flex flex-col items-center gap-0.5">
-                    <span className="text-base">{sub.emoji}</span>
-                    <span className="text-[7px] font-bold text-amber-700/70 dark:text-amber-400/70 leading-none truncate w-full text-center">{sub.label}</span>
-                  </div>
-                ))}
-              </div>
+              <img
+                src={vehicleBannerImg}
+                className="w-full h-20 object-cover object-center rounded-xl mt-auto"
+                alt=""
+              />
               <span className="absolute bottom-3 right-3 w-7 h-7 rounded-full bg-amber-500 text-white flex items-center justify-center shadow-sm z-10">
                 <ArrowRight className="w-3.5 h-3.5" />
               </span>
