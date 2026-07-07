@@ -2010,6 +2010,13 @@ export default function App() {
           </div>
 
 
+                {/* 🚀 Boost Ads slide-show */}
+                <PromotedSlider 
+                  listings={filteredListings} 
+                  language={language}
+                  onViewListing={handleViewListingDetails}
+                />
+
                 {/* 🛠️ Modern Filters & Dynamic Sorting Panel (Revealed dynamically!) */}
                 {showFilters && (
                   <div className="bg-slate-50 dark:bg-slate-900 border border-slate-150 dark:border-slate-800 rounded-2xl p-3.5 mb-4 space-y-3.5 shadow-xs animate-fade-in text-slate-850 dark:text-slate-200">
@@ -2191,13 +2198,6 @@ export default function App() {
                     </div>
                   </div>
                 )}
-
-                {/* Promo Spotlight slide-show */}
-                <PromotedSlider 
-                  listings={filteredListings} 
-                  language={language}
-                  onViewListing={handleViewListingDetails}
-                />
 
                 {/* Filter count indicators */}
                 <div className="flex items-center justify-between mt-1 mb-3.5 px-1">
