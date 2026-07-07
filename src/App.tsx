@@ -191,7 +191,7 @@ export default function App() {
   const [userMetadata, setUserMetadata] = useState<any>(null);
   const [showFilters, setShowFilters] = useState(false);
   const [isPersonalInfoOpen, setIsPersonalInfoOpen] = useState(false);
-  const [isMyShopSectionOpen, setIsMyShopSectionOpen] = useState(false);
+  const [isMyShopSectionOpen, setIsMyShopSectionOpen] = useState(false); // eslint-disable-line -- kept for future use, no longer drives duplicate My Shop card
   const [isLanguageOpen, setIsLanguageOpen] = useState(false);
   const [isTeamOpen, setIsTeamOpen] = useState(false);
   const [isTermsSectionOpen, setIsTermsSectionOpen] = useState(false);
@@ -3649,12 +3649,19 @@ export default function App() {
                     )}
                   </div>
 
-                  {/* Row 1.5: My Shop (আমার দোকান) */}
+                  {/* Row 1.5: My Shop (আমার দোকান) — এখন শুধু Dashboard-এ navigate করে, ডুপ্লিকেট কার্ড নেই */}
                   <div className="transition duration-150">
                     <button
                       type="button"
                       id="profile-row-myshop"
-                      onClick={() => setIsMyShopSectionOpen(!isMyShopSectionOpen)}
+                      onClick={() => {
+                        if (!user) {
+                          setIsAuthOpen(true);
+                          return;
+                        }
+                        setActiveTab("my-dashboard");
+                        setDashboardSubTab("my-shop");
+                      }}
                       className="w-full flex items-center justify-between p-4.5 hover:bg-slate-50 dark:hover:bg-slate-800/40 cursor-pointer text-left transition select-none"
                     >
                       <div className="flex items-center gap-3.5">
@@ -3670,122 +3677,8 @@ export default function App() {
                           </p>
                         </div>
                       </div>
-                      <div className="flex items-center gap-1 text-slate-400 dark:text-slate-500">
-                        {isMyShopSectionOpen ? (
-                          <span className="text-xs font-bold text-amber-500">{language === "bn" ? "বন্ধ করুন" : "Close"}</span>
-                        ) : (
-                          <span className="text-xs font-bold text-slate-400 dark:text-slate-550">{language === "bn" ? "খুলুন" : "Open"}</span>
-                        )}
-                        <ChevronRight className={`w-4 h-4 transition-transform duration-200 ${isMyShopSectionOpen ? "rotate-90 text-amber-500" : ""}`} />
-                      </div>
+                      <ChevronRight className="w-4 h-4 text-slate-400 dark:text-slate-500" />
                     </button>
-
-                    {/* Expandable My Shop details */}
-                    {isMyShopSectionOpen && (
-                      <div className="p-5 bg-slate-50/55 dark:bg-slate-950/35 border-t border-slate-100 dark:border-slate-800/60 animate-slide-down space-y-4">
-                        {user ? (
-                          <div className="space-y-4">
-                            <div className="flex items-center gap-3.5">
-                              <img 
-                                src={user.photoURL || `https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80`} 
-                                alt={user.displayName}
-                                className="w-12 h-12 rounded-full object-cover border-2 border-amber-500/80 shadow-md"
-                                referrerPolicy="no-referrer"
-                                onError={(e) => {
-                                  (e.target as HTMLImageElement).src = `https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80`;
-                                }}
-                              />
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-1.5 flex-wrap">
-                                  <h4 className="font-extrabold text-sm sm:text-base text-slate-800 dark:text-white truncate">
-                                    {user.displayName || user.email?.split("@")[0] || "Gari Bazar Seller"}
-                                  </h4>
-                                  <span className="text-[9px] font-extrabold bg-amber-500/15 text-amber-400 border border-amber-500/35 px-1.5 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-0.5">
-                                    <Sparkles className="w-2.5 h-2.5" />
-                                    {language === "bn" ? "ভেরিফাইড শপ" : "Verified Shop"}
-                                  </span>
-                                </div>
-                                <p className="text-xs text-slate-400 dark:text-slate-500 font-bold mt-0.5 flex items-center gap-1">
-                                  <MapPin className="w-3.5 h-3.5 text-amber-500" />
-                                  {userMetadata?.city || "Dhaka"}
-                                </p>
-                              </div>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-2 text-xs pt-1">
-                              <div className="bg-white dark:bg-slate-900 border border-slate-150/80 dark:border-slate-800 p-2.5 rounded-xl shadow-xs">
-                                <span className="text-[9px] text-slate-400 font-bold uppercase block">
-                                  {language === "bn" ? "মোট সক্রিয় পণ্য" : "Active Items"}
-                                </span>
-                                <span className="font-extrabold text-slate-750 dark:text-slate-205 block mt-0.5 font-mono text-sm">
-                                  {listings.filter(item => item.sellerId === user.uid && !item.isSold).length}
-                                </span>
-                              </div>
-                              <div className="bg-white dark:bg-slate-900 border border-slate-150/80 dark:border-slate-800 p-2.5 rounded-xl shadow-xs">
-                                <span className="text-[9px] text-slate-400 font-bold uppercase block">
-                                  {language === "bn" ? "কাস্টমার রেটিং" : "Customer Rating"}
-                                </span>
-                                <span className="font-extrabold text-amber-500 block mt-0.5 flex items-center gap-0.5 text-sm">
-                                  <Star className="w-3.5 h-3.5 fill-amber-500 text-amber-500" />
-                                  {currentUserReviews.length > 0 
-                                    ? `${(currentUserReviews.reduce((sum, r) => sum + r.rating, 0) / currentUserReviews.length).toFixed(1)}`
-                                    : "5.0"}
-                                </span>
-                              </div>
-                            </div>
-
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-2">
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setActiveSellerShopId(user.uid);
-                                  setActiveSellerShopFallback({
-                                    name: user.displayName || user.email?.split("@")[0] || "Gari Bazar Seller",
-                                    photo: user.photoURL,
-                                    location: userMetadata?.city || "Dhaka",
-                                    contact: userMetadata?.phoneNumber || user?.phoneNumber || ""
-                                  });
-                                }}
-                                className="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-black py-2.5 px-4 rounded-xl text-xs transition duration-200 flex items-center justify-center gap-1.5 shadow-md shadow-amber-500/10 cursor-pointer"
-                              >
-                                <ShoppingBag className="w-4 h-4 shrink-0" />
-                                <span>{language === "bn" ? "পাবলিক দোকান দেখুন" : "View Public Shop"}</span>
-                              </button>
-                              
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setActiveTab("my-dashboard");
-                                  setDashboardSubTab("my-shop");
-                                }}
-                                className="w-full bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-850 dark:text-white font-extrabold py-2.5 px-4 rounded-xl text-xs transition duration-200 flex items-center justify-center gap-1.5 cursor-pointer"
-                              >
-                                <Sparkles className="w-4 h-4 text-amber-500 shrink-0" />
-                                <span>{language === "bn" ? "ম্যানেজ করুন ও রিভিউ" : "Manage Shop & Reviews"}</span>
-                              </button>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="text-center py-2 space-y-3">
-                            <p className="text-xs text-slate-500 dark:text-slate-450 leading-relaxed font-bold">
-                              {language === "bn" 
-                                ? "আপনার দোকান পৃষ্ঠা দেখতে এবং কাস্টমাইজ করতে দয়া করে লগইন করুন।" 
-                                : "Please sign in to access and view your registered shop page."}
-                            </p>
-                            <div className="grid grid-cols-1 gap-2">
-                              <button
-                                type="button"
-                                onClick={() => setIsAuthOpen(true)}
-                                className="w-full bg-gradient-to-r from-amber-500 to-orange-550 hover:from-amber-600 hover:to-orange-605 text-slate-950 font-black py-2.5 px-4 rounded-xl text-xs transition duration-200 flex items-center justify-center gap-1.5 shadow-sm shadow-amber-550/15 cursor-pointer"
-                              >
-                                <User className="w-4 h-4 fill-slate-950 text-slate-950 shrink-0" />
-                                <span>{language === "bn" ? "লগইন করুন / রেজিস্ট্রেশন" : "Sign In / Register"}</span>
-                              </button>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    )}
                   </div>
 
                   {/* Row 2: Change language (ক্লিক করলে ডিয়েটাইল দেখাবে) */}
