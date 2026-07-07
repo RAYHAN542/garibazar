@@ -2211,34 +2211,41 @@ export default function App() {
 
                 {/* 📲 PWA Install Prompt Banner — লগইন/রেজিস্টার করলে চিরতরে বন্ধ হয়ে যায় */}
                 {showInstallPrompt && (
-                  <div className="mb-6 bg-white dark:bg-slate-900 border border-amber-200 dark:border-amber-900/40 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 animate-fade-in shadow-sm">
-                    <div className="flex items-start gap-3">
-                      <div className="p-2.5 bg-amber-500 text-slate-950 rounded-xl shadow-md shrink-0 flex items-center justify-center">
-                        <Download className="w-5 h-5" />
-                      </div>
-                      <div>
-                        <h3 className="font-bold text-xs sm:text-sm text-slate-800 dark:text-white leading-snug">
-                          {language === "bn" ? "গাড়ি বাজার অ্যাপ ইনস্টল করুন" : "Install the Gari Bazar App"}
+                  <div className="mb-6 bg-white dark:bg-slate-900 border border-amber-200 dark:border-amber-900/40 rounded-2xl p-4 animate-fade-in shadow-sm">
+                    <div className="flex items-center gap-3">
+                      <img
+                        src="/icon-192.png"
+                        alt="Gari Bazar"
+                        className="w-14 h-14 rounded-2xl shadow-md shrink-0 object-cover"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-black text-base sm:text-lg text-slate-900 dark:text-white leading-tight">
+                          {language === "bn" ? "গাড়ি বাজার" : "Gari Bazar"}
                         </h3>
-                        <p className="text-[10px] sm:text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-xl leading-relaxed">
+                        <p className="text-[11px] sm:text-xs text-slate-500 dark:text-slate-400 leading-snug">
                           {language === "bn"
-                            ? "হোমস্ক্রিনে যোগ করুন, দ্রুত লোড হবে এবং নোটিফিকেশন সরাসরি অ্যাপের নামে আসবে, Chrome থেকে না।"
-                            : "Add to your home screen for faster loading and notifications from the app itself, not Chrome."}
+                            ? "অ্যাপটি হোমস্ক্রিনে ইনস্টল করুন"
+                            : "Install this app on your home screen"}
                         </p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
+                    <p className="text-[10px] sm:text-xs text-slate-500 dark:text-slate-400 mt-3 leading-relaxed">
+                      {language === "bn"
+                        ? "দ্রুত লোড হবে এবং নোটিফিকেশন সরাসরি \"গাড়ি বাজার\" অ্যাপের নামে আসবে, Chrome থেকে না।"
+                        : "Faster loading and notifications will come from the app itself, not Chrome."}
+                    </p>
+                    <div className="flex items-center justify-end gap-2 mt-3">
                       <button
                         type="button"
                         onClick={() => dismissInstallPrompt(false)}
-                        className="text-[10px] sm:text-xs font-bold text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 px-3 py-2 rounded-lg transition cursor-pointer"
+                        className="text-[11px] sm:text-xs font-bold text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 px-3 py-2.5 rounded-lg transition cursor-pointer"
                       >
                         {language === "bn" ? "পরে করুন" : "Later"}
                       </button>
                       <button
                         type="button"
                         onClick={handleInstallApp}
-                        className="bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold px-4 py-2 rounded-xl text-[10px] sm:text-xs transition cursor-pointer shadow-sm active:scale-95"
+                        className="flex-1 sm:flex-none bg-amber-500 hover:bg-amber-600 text-slate-950 font-black px-6 py-2.5 rounded-xl text-xs sm:text-sm transition cursor-pointer shadow-sm active:scale-95"
                       >
                         {language === "bn" ? "ইনস্টল করুন" : "Install"}
                       </button>
