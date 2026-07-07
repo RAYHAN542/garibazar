@@ -1,11 +1,12 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import { auth, db } from "../firebase";
 import { signInAnonymously, signInWithCustomToken } from "firebase/auth";
 import { doc, setDoc, collection, query, where, getDocs } from "firebase/firestore";
-import { X, Phone, User, MapPin, Loader2, Sparkles } from "lucide-react";
+import { X, Phone, User, MapPin, Loader2, Sparkles, Camera } from "lucide-react";
 import { CITIES } from "../translations";
 import { SupportedLanguage } from "../types";
 import { sanitizeText, validateBanglaPhone } from "../utils/sanitizer";
+import { uploadToCloudinary } from "../utils/cloudinary";
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -25,8 +26,29 @@ export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModa
   const [city, setCity] = useState(CITIES[0]);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [profilePhotoFile, setProfilePhotoFile] = useState<File | null>(null);
+  const [profilePhotoPreview, setProfilePhotoPreview] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   if (!isOpen) return null;
+
+  const handlePhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      setError(language === "bn" ? "শুধু ছবি ফাইল দিতে পারবেন" : "Only image files are allowed");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setError(language === "bn" ? "ছবির সাইজ ৫MB এর কম হতে হবে" : "Photo must be under 5MB");
+      return;
+    }
+
+    setError("");
+    setProfilePhotoFile(file);
+    setProfilePhotoPreview(URL.createObjectURL(file));
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -113,12 +135,24 @@ export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModa
         const sanitizedDisplayName = sanitizeText(displayName || "Gari Bazar Seller", 50);
         const myReferralCode = `GB-${cleanPhone.slice(-4)}`;
 
+        let uploadedPhotoUrl = PRESET_AVATARS[0];
+        if (profilePhotoFile) {
+          try {
+            uploadedPhotoUrl = await uploadToCloudinary(profilePhotoFile);
+          } catch (photoErr) {
+            console.error("Profile photo upload failed:", photoErr);
+            setError(language === "bn" ? "ছবি আপলোড ব্যর্থ হয়েছে। আবার চেষ্টা করুন অথবা ছবি ছাড়াই এগিয়ে যান।" : "Photo upload failed. Try again or continue without a photo.");
+            setLoading(false);
+            return;
+          }
+        }
+
         const savedData = {
           uid: realUid,
           displayName: sanitizedDisplayName,
           phoneNumber: cleanPhone,
           city: sanitizeText(city, 50),
-          profilePicture: PRESET_AVATARS[0],
+          profilePicture: uploadedPhotoUrl,
           createdAt: new Date().toISOString(),
           simulatedCredits: 5000,
           referralCode: myReferralCode,
@@ -162,6 +196,25 @@ export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModa
         {error && <div className="p-3 bg-red-500/10 text-red-600 rounded-lg text-xs mb-3 text-center">{error}</div>}
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          {!isLogin && (
+            <div className="flex justify-center mb-2">
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="relative w-20 h-20 rounded-full overflow-hidden border-2 border-dashed border-slate-300 dark:border-slate-600 flex items-center justify-center bg-slate-50 dark:bg-slate-800"
+              >
+                {profilePhotoPreview ? (
+                  <img src={profilePhotoPreview} alt="preview" className="w-full h-full object-cover" />
+                ) : (
+                  <Camera className="w-6 h-6 text-slate-400" />
+                )}
+                <div className="absolute bottom-0 inset-x-0 bg-black/50 text-white text-[9px] font-bold text-center py-0.5">
+                  {language === "bn" ? "ছবি দিন" : "Add Photo"}
+                </div>
+              </button>
+              <input type="file" ref={fileInputRef} onChange={handlePhotoSelect} accept="image/*" className="hidden" />
+            </div>
+          )}
           {!isLogin && (
             <div>
               <label className="text-[10px] font-bold block mb-1 text-slate-500">{language === "bn" ? "আপনার নাম *" : "Name *"}</label>
