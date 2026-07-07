@@ -1959,7 +1959,7 @@ export default function App() {
               className="relative overflow-hidden rounded-2xl h-32 flex flex-col justify-between text-left cursor-pointer bg-gradient-to-br from-amber-50 to-amber-100 dark:from-slate-900 dark:to-slate-800 border border-amber-200/60 dark:border-slate-700 shadow-sm"
             >
               <img
-                src="https://images.unsplash.com/photo-1621922984029-93a30d0bf3f1?w=300&auto=format&fit=crop&q=60"
+                src="https://images.unsplash.com/photo-1580901369630-a8ac6dae2313?w=300&auto=format&fit=crop&q=60" onError={(e) => { e.currentTarget.style.display = "none"; }}
                 className="absolute right-[-10px] bottom-[-8px] w-24 h-24 object-contain opacity-90 pointer-events-none"
                 alt=""
               />
@@ -1983,7 +1983,7 @@ export default function App() {
               className="relative overflow-hidden rounded-2xl h-32 flex flex-col justify-between text-left cursor-pointer bg-gradient-to-br from-sky-50 to-sky-100 dark:from-slate-900 dark:to-slate-800 border border-sky-200/60 dark:border-slate-700 shadow-sm"
             >
               <img
-                src="https://images.unsplash.com/photo-1487754180451-c456f719a1fc?w=300&auto=format&fit=crop&q=60"
+                src="https://images.unsplash.com/photo-1487754180451-c456f719a1fc?w=300&auto=format&fit=crop&q=60" onError={(e) => { e.currentTarget.style.display = "none"; }}
                 className="absolute right-[-10px] bottom-[-8px] w-24 h-24 object-contain opacity-90 pointer-events-none"
                 alt=""
               />
