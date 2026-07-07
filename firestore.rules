@@ -5,22 +5,37 @@ service cloud.firestore {
     function isSignedIn() {
       return request.auth != null;
     }
-    
+
     function isAdmin() {
       return isSignedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
     }
 
-    // 1. users/{userId}
+    // ---------- USERS ----------
     match /users/{userId} {
       allow read: if isSignedIn() && (userId == request.auth.uid || isAdmin());
-      allow create, update: if isSignedIn() && userId == request.auth.uid;
+      allow create: if isSignedIn() && userId == request.auth.uid;
+
+      // Owner can update their own profile, but NOT their own wallet balance.
+      // Only admin (via approved refill_requests) can change simulatedCredits.
+      allow update: if isSignedIn() && (
+                      (userId == request.auth.uid &&
+                       !request.resource.data.diff(resource.data).affectedKeys().hasAny(['simulatedCredits', 'uid'])
+                      ) || isAdmin()
+                    );
       allow delete: if isAdmin();
     }
 
-    // 2. listings/{listingId}
+    // ---------- ADMINS ----------
+    match /admins/{userId} {
+      allow read: if isSignedIn() && userId == request.auth.uid;
+      allow write: if false;
+    }
+
+    // ---------- LISTINGS ----------
     match /listings/{listingId} {
       allow read: if true;
-      allow create: if isSignedIn() && 
+
+      allow create: if isSignedIn() &&
                     request.resource.data.sellerId == request.auth.uid &&
                     request.resource.data.price is number &&
                     request.resource.data.price >= 1 &&
@@ -30,88 +45,88 @@ service cloud.firestore {
                     request.resource.data.title.size() < 200 &&
                     request.resource.data.description is string &&
                     request.resource.data.description.size() < 3000;
-      allow update: if isSignedIn() && 
-                    (resource.data.sellerId == request.auth.uid || isAdmin()) &&
-                    // Block server-only fields from client writes
-                    !request.resource.data.diff(resource.data).affectedKeys().hasAny([
-                      'createdAt', 'sellerId', 'views', 'promotedUntil', 'isPremium', 'featuredRank'
-                    ]);
+
+      // Owner can edit their listing but cannot self-promote (isAd/adTier/etc are admin-only).
+      allow update: if isSignedIn() && (
+                      (resource.data.sellerId == request.auth.uid &&
+                       !request.resource.data.diff(resource.data).affectedKeys().hasAny(
+                         ['createdAt', 'sellerId', 'isAd', 'adTier', 'adDurationDays', 'adExpiresAt']
+                       )
+                      ) || isAdmin()
+                    );
+
+      // Any signed-in user may bump views by exactly +1 (analytics tracking on view).
+      allow update: if isSignedIn() &&
+                    request.resource.data.diff(resource.data).affectedKeys().hasOnly(['views']) &&
+                    request.resource.data.views == (resource.data.views is number ? resource.data.views : 0) + 1;
+
+      // Any signed-in user may bump clicks by exactly +1.
+      allow update: if isSignedIn() &&
+                    request.resource.data.diff(resource.data).affectedKeys().hasOnly(['clicks']) &&
+                    request.resource.data.clicks == (resource.data.clicks is number ? resource.data.clicks : 0) + 1;
+
       allow delete: if isSignedIn() && (resource.data.sellerId == request.auth.uid || isAdmin());
     }
 
-    // 3. admins/{userId}
-    match /admins/{userId} {
-      allow read: if isSignedIn() && userId == request.auth.uid;
-      allow write: if false;
-    }
-
-    // 4. rate_limits/{key}
-    match /rate_limits/{key} {
-      allow read, write: if false;
-    }
-
-    // 5. refill_requests/{requestId}
+    // ---------- REFILL / AD-PROMOTION REQUESTS ----------
     match /refill_requests/{requestId} {
       allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
-      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid && request.resource.data.status == "pending";
-      allow update, delete: if isSignedIn() && isAdmin();
+      allow create: if isSignedIn() &&
+                    request.resource.data.userId == request.auth.uid &&
+                    request.resource.data.amount is number &&
+                    request.resource.data.amount > 0;
+      allow update, delete: if isAdmin();
     }
 
-    // 6. payments/{paymentId}
-    match /payments/{paymentId} {
-      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
-      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
-      allow update, delete: if isSignedIn() && isAdmin();
-    }
-
-    // 7. purchases/{purchaseId}
+    // ---------- PURCHASES (order records, immutable after creation) ----------
     match /purchases/{purchaseId} {
       allow read: if isSignedIn() && (resource.data.buyerId == request.auth.uid || isAdmin());
       allow create: if isSignedIn() && request.resource.data.buyerId == request.auth.uid;
-      allow update, delete: if isSignedIn() && isAdmin();
+      allow update, delete: if isAdmin();
     }
 
-    // 8. seller_reviews/{reviewId}
-    // Require a completed purchase before allowing review
+    // ---------- SELLER REVIEWS ----------
     match /seller_reviews/{reviewId} {
       allow read: if true;
-      allow create: if isSignedIn() && 
+      allow create: if isSignedIn() &&
                     request.resource.data.reviewerId == request.auth.uid &&
+                    request.resource.data.sellerId is string &&
                     request.resource.data.comment is string &&
                     request.resource.data.comment.size() < 1000 &&
                     request.resource.data.rating is number &&
                     request.resource.data.rating >= 1 &&
-                    request.resource.data.rating <= 5 &&
-                    exists(/databases/$(database)/documents/purchases/$(request.auth.uid + "_" + request.resource.data.sellerId));
+                    request.resource.data.rating <= 5;
       allow update, delete: if isSignedIn() && (resource.data.reviewerId == request.auth.uid || isAdmin());
     }
 
-    // 9. chats/{chatId}
+    // ---------- CHATS ----------
     match /chats/{chatId} {
       allow read: if isSignedIn() && (request.auth.uid in resource.data.participants);
       allow create: if isSignedIn() && (request.auth.uid in request.resource.data.participants);
-      // Only allow updating specific fields, not participants list
-      allow update: if isSignedIn() && 
+      allow update: if isSignedIn() &&
                     (request.auth.uid in resource.data.participants) &&
                     !request.resource.data.diff(resource.data).affectedKeys().hasAny(['participants']);
       allow delete: if isAdmin();
-      
+
       match /messages/{messageId} {
-        allow read: if isSignedIn() && (request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participants);
-        allow create: if isSignedIn() && 
-                      (request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participants) && 
+        allow read: if isSignedIn() &&
+                    (request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participants);
+        allow create: if isSignedIn() &&
+                      (request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participants) &&
                       request.resource.data.senderId == request.auth.uid;
         allow update, delete: if isAdmin();
       }
     }
 
-    // 10. support_tickets/{ticketId}
+    // ---------- SUPPORT TICKETS (guests can also submit) ----------
     match /support_tickets/{ticketId} {
       allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
-      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      allow create: if (isSignedIn() && request.resource.data.userId == request.auth.uid) ||
+                    (!isSignedIn() && request.resource.data.userId == "guest");
       allow update, delete: if isAdmin();
     }
 
+    // ---------- Everything else: locked down ----------
     match /{document=**} {
       allow read, write: if false;
     }
