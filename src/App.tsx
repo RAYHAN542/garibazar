@@ -67,7 +67,7 @@ import SellerAnalyticsGraph from "./components/SellerAnalyticsGraph";
 import { SellerShopPage } from "./components/SellerShopPage";
 import Fuse from "fuse.js";
 import { buildSearchBlob, convertBengaliDigitsToEnglish, convertEnglishDigitsToBengali } from "./searchAliases";
-import { MessageSquare, Cpu, SlidersHorizontal, Moon, Sun, Users, HelpCircle, Mail, FileText, ArrowRight, Menu } from "lucide-react";
+import { MessageSquare, Cpu, SlidersHorizontal, Moon, Sun, Users, HelpCircle, Mail, FileText, ArrowRight, Menu, Download } from "lucide-react";
 import vehicleBannerImg from "./assets/images/vehicle-banner.jpg";
 
 const HOME_CATEGORIES = [
@@ -392,6 +392,52 @@ export default function App() {
   );
 
   const prevListingsIdRef = useRef<Set<string>>(new Set());
+
+  // 📲 PWA Install Prompt — একবার লগইন/রেজিস্টার করলে আর দেখানো হবে না
+  const [deferredInstallPrompt, setDeferredInstallPrompt] = useState<any>(null);
+  const [showInstallPrompt, setShowInstallPrompt] = useState(false);
+
+  useEffect(() => {
+    const alreadyLoggedIn = !!localStorage.getItem("gari_bazar_session_user");
+    const dismissedForever = localStorage.getItem("gari_bazar_install_dismissed") === "true";
+
+    const handleBeforeInstallPrompt = (e: any) => {
+      e.preventDefault();
+      setDeferredInstallPrompt(e);
+      if (!alreadyLoggedIn && !dismissedForever) {
+        setShowInstallPrompt(true);
+      }
+    };
+
+    window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+
+    const handleAppInstalled = () => {
+      localStorage.setItem("gari_bazar_install_dismissed", "true");
+      setShowInstallPrompt(false);
+      setDeferredInstallPrompt(null);
+    };
+    window.addEventListener("appinstalled", handleAppInstalled);
+
+    return () => {
+      window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+      window.removeEventListener("appinstalled", handleAppInstalled);
+    };
+  }, []);
+
+  const handleInstallApp = async () => {
+    if (!deferredInstallPrompt) return;
+    deferredInstallPrompt.prompt();
+    await deferredInstallPrompt.userChoice;
+    setDeferredInstallPrompt(null);
+    setShowInstallPrompt(false);
+  };
+
+  const dismissInstallPrompt = (forever: boolean) => {
+    setShowInstallPrompt(false);
+    if (forever) {
+      localStorage.setItem("gari_bazar_install_dismissed", "true");
+    }
+  };
 
   // Check for incoming referral code from shared links
   useEffect(() => {
@@ -1700,7 +1746,9 @@ export default function App() {
               className="relative p-2 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300"
             >
               <Bell className="w-5 h-5" />
-              <span className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full bg-orange-500 text-white text-[9px] font-bold flex items-center justify-center">3</span>
+              {notificationPermission === "default" && (
+                <span className="absolute -top-0.5 -right-0.5 w-3 h-3 rounded-full bg-orange-500 border-2 border-white dark:border-slate-900"></span>
+              )}
             </button>
             <button
               onClick={() => setActiveTab("profile")}
@@ -2160,6 +2208,43 @@ export default function App() {
                   </div>
                 </div>
               )}
+
+                {/* 📲 PWA Install Prompt Banner — লগইন/রেজিস্টার করলে চিরতরে বন্ধ হয়ে যায় */}
+                {showInstallPrompt && (
+                  <div className="mb-6 bg-gradient-to-r from-emerald-600/10 to-teal-505/10 border border-emerald-500/20 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 animate-fade-in shadow-sm">
+                    <div className="flex items-start gap-3">
+                      <div className="p-2.5 bg-emerald-505 text-white rounded-xl shadow-md shrink-0 flex items-center justify-center">
+                        <Download className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h3 className="font-bold text-xs sm:text-sm text-slate-800 dark:text-white leading-snug">
+                          {language === "bn" ? "গাড়ি বাজার অ্যাপ ইনস্টল করুন" : "Install the Gari Bazar App"}
+                        </h3>
+                        <p className="text-[10px] sm:text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-xl leading-relaxed">
+                          {language === "bn"
+                            ? "হোমস্ক্রিনে যোগ করুন, দ্রুত লোড হবে এবং নোটিফিকেশন সরাসরি অ্যাপের নামে আসবে, Chrome থেকে না।"
+                            : "Add to your home screen for faster loading and notifications from the app itself, not Chrome."}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => dismissInstallPrompt(false)}
+                        className="text-[10px] sm:text-xs font-bold text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 px-3 py-2 rounded-lg transition cursor-pointer"
+                      >
+                        {language === "bn" ? "পরে করুন" : "Later"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleInstallApp}
+                        className="bg-emerald-505 hover:bg-emerald-600 text-white font-bold px-4 py-2 rounded-xl text-[10px] sm:text-xs transition cursor-pointer shadow-sm"
+                      >
+                        {language === "bn" ? "ইনস্টল করুন" : "Install"}
+                      </button>
+                    </div>
+                  </div>
+                )}
 
                 {/* Notification Permission Request Banner */}
                 {showNotificationPrompt && (
@@ -4058,6 +4143,7 @@ export default function App() {
           });
           setUserMetadata(sessionUser);
           setIsAuthOpen(false);
+          dismissInstallPrompt(true);
         }}
       />
 
