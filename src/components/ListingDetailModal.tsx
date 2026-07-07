@@ -887,6 +887,7 @@ export function ListingDetailModal({ listing, language, currentUser, onClose, on
 
             {/* Quick Actions (Add to Dashboard, Report) */}
             <div className="pt-2 border-t border-slate-150 dark:border-slate-800/80 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+              {!isOwner && (
               <div className="flex-1">
                 {addToDashboardSuccess ? (
                   <div className="w-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-450 py-3 px-5 rounded-xl font-bold text-xs text-center flex items-center justify-center gap-2">
@@ -895,6 +896,7 @@ export function ListingDetailModal({ listing, language, currentUser, onClose, on
                       {language === "bn" ? "ড্যাশবোর্ডে সফলভাবে যুক্ত হয়েছে!" : "Successfully added to dashboard!"}
                     </span>
                   </div>
+              )}
                 ) : (
                   <button
                     type="button"
