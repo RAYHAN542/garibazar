@@ -2537,7 +2537,7 @@ export default function App() {
                 </div>
 
                 {/* Dashboard Tab Toggles */}
-                <div className="flex border-b border-slate-200 dark:border-slate-800" id="dash-tabs-bar">
+                <div className="flex overflow-x-auto no-scrollbar border-b border-slate-200 dark:border-slate-800" id="dash-tabs-bar">
                   <button
                     id="dash-subtab-inventory"
                     onClick={() => {
@@ -2545,7 +2545,7 @@ export default function App() {
                       setAdPromoSuccess(false);
                       setAdPromoError("");
                     }}
-                    className={`pb-3 px-4 text-sm font-bold border-b-2 transition-all flex items-center gap-2 cursor-pointer ${
+                    className={`pb-3 px-4 text-sm font-bold border-b-2 transition-all flex items-center gap-2 cursor-pointer shrink-0 whitespace-nowrap ${
                       dashboardSubTab === 'inventory'
                         ? 'border-amber-500 text-amber-500'
                         : 'border-transparent text-slate-400 hover:text-slate-250 dark:hover:text-slate-250'
@@ -2562,7 +2562,7 @@ export default function App() {
                       setAdPromoSuccess(false);
                       setAdPromoError("");
                     }}
-                    className={`pb-3 px-4 text-sm font-bold border-b-2 transition-all flex items-center gap-2 cursor-pointer ${
+                    className={`pb-3 px-4 text-sm font-bold border-b-2 transition-all flex items-center gap-2 cursor-pointer shrink-0 whitespace-nowrap ${
                       dashboardSubTab === 'my-shop'
                         ? 'border-amber-500 text-amber-500'
                         : 'border-transparent text-slate-400 hover:text-slate-250 dark:hover:text-slate-250'
@@ -2579,7 +2579,7 @@ export default function App() {
                       setAdPromoSuccess(false);
                       setAdPromoError("");
                     }}
-                    className={`pb-3 px-4 text-sm font-bold border-b-2 transition-all flex items-center gap-2 cursor-pointer relative ${
+                    className={`pb-3 px-4 text-sm font-bold border-b-2 transition-all flex items-center gap-2 cursor-pointer relative shrink-0 whitespace-nowrap ${
                       dashboardSubTab === 'ads'
                         ? 'border-amber-500 text-amber-500'
                         : 'border-transparent text-slate-400 hover:text-slate-250 dark:hover:text-slate-250'
@@ -2598,7 +2598,7 @@ export default function App() {
                       onClick={() => {
                         setDashboardSubTab('admin');
                       }}
-                      className={`pb-3 px-4 text-sm font-bold border-b-2 transition-all flex items-center gap-2 cursor-pointer relative ${
+                      className={`pb-3 px-4 text-sm font-bold border-b-2 transition-all flex items-center gap-2 cursor-pointer relative shrink-0 whitespace-nowrap ${
                         dashboardSubTab === 'admin'
                           ? 'border-red-500 text-red-500'
                           : 'border-transparent text-slate-400 hover:text-slate-250 dark:hover:text-slate-250'
@@ -2615,7 +2615,7 @@ export default function App() {
                       onClick={() => {
                         setDashboardSubTab('playstore-audit');
                       }}
-                      className={`pb-3 px-4 text-sm font-bold border-b-2 transition-all flex items-center gap-2 cursor-pointer relative ${
+                      className={`pb-3 px-4 text-sm font-bold border-b-2 transition-all flex items-center gap-2 cursor-pointer relative shrink-0 whitespace-nowrap ${
                         dashboardSubTab === 'playstore-audit'
                           ? 'border-amber-500 text-amber-500'
                           : 'border-transparent text-slate-400 hover:text-slate-250 dark:hover:text-slate-250'
