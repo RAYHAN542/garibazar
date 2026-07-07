@@ -212,12 +212,10 @@ export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPromp
     return () => unsubscribe();
   }, []);
 
-  // Filter listings based on current signed in user ID or stored local listing IDs
   const myAddedListings = allListings.filter((item) => {
     const hasMatchId = localSavedIds.includes(item.id);
     const hasUserIdMatch = currentUser?.uid && item.sellerId === currentUser.uid;
-    const hasContactMatch = currentUser?.phoneNumber && item.contactNumber === currentUser.phoneNumber;
-    return hasMatchId || hasUserIdMatch || hasContactMatch;
+    return hasMatchId || hasUserIdMatch;
   });
 
   const handlePartPhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
