@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { PartListing, SupportedLanguage } from "../types";
-import { ChevronLeft, ChevronRight, Sparkles } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 
 interface PromotedSliderProps {
   listings: PartListing[];
@@ -54,18 +54,18 @@ export function PromotedSlider({ listings, language, onViewListing }: PromotedSl
 
   return (
     <div className="mb-2 w-full max-w-xl mx-auto animate-fade-in">
-      {/* Title with star icon */}
-      <div className="mb-1 flex items-center gap-1.5 px-0.5">
-        <span className="text-amber-500 text-xs">⭐</span>
-        <h3 className="text-[10px] font-black font-sans text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1">
-          {language === "bn" ? "স্পনসরড বিজ্ঞাপন" : "Sponsored Listings"}
+      {/* Title with rocket icon */}
+      <div className="mb-2 flex items-center gap-1.5 px-0.5">
+        <span className="text-sm">🚀</span>
+        <h3 className="text-[13px] font-black font-sans text-slate-800 dark:text-slate-200">
+          {language === "bn" ? "Boost Ads" : "Boost Ads"}
         </h3>
       </div>
 
       {/* Main Slide Card */}
       <div 
         onClick={() => onViewListing(currentItem)}
-        className="relative group w-full aspect-[16/9.5] max-h-[195px] sm:max-h-[260px] md:max-h-[300px] rounded-xl overflow-hidden bg-slate-100 dark:bg-slate-950 border border-slate-200/60 dark:border-slate-800 shadow-[0_2px_12px_rgba(0,0,0,0.04)] hover:shadow-lg transition-all duration-300 cursor-pointer"
+        className="relative group w-full aspect-[16/9.5] max-h-[195px] sm:max-h-[260px] md:max-h-[300px] rounded-xl overflow-hidden bg-slate-900 border border-slate-800 shadow-[0_2px_12px_rgba(0,0,0,0.04)] hover:shadow-lg transition-all duration-300 cursor-pointer"
       >
         {/* Full-bleed cover image */}
         {currentItem.image ? (
@@ -76,7 +76,7 @@ export function PromotedSlider({ listings, language, onViewListing }: PromotedSl
             referrerPolicy="no-referrer"
           />
         ) : (
-          <div className="w-full h-full flex flex-col items-center justify-center text-slate-350 dark:text-slate-700">
+          <div className="w-full h-full flex flex-col items-center justify-center text-slate-700">
             {/* Fallback car SVG/illustration */}
             <svg className="w-16 h-16 opacity-40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
               <path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12.5V16c0 .6.4 1 1 1h2m10 0h4" />
@@ -86,25 +86,25 @@ export function PromotedSlider({ listings, language, onViewListing }: PromotedSl
           </div>
         )}
 
-        {/* Top-Left AD Badge */}
-        <div className="absolute top-3.5 left-3.5 bg-amber-500 text-slate-950 font-black text-[9px] uppercase tracking-wider px-2 py-0.5 rounded-lg shadow-md z-10 flex items-center gap-1">
-          <Sparkles className="w-2.5 h-2.5 fill-slate-950 text-slate-950 shrink-0 animate-pulse" />
-          <span>{language === "bn" ? "বিজ্ঞাপন" : "AD"}</span>
+        {/* Top-Left Premium Badge */}
+        <div className="absolute top-3.5 left-3.5 bg-amber-400 text-slate-950 font-black text-[10px] uppercase tracking-wider px-2.5 py-1 rounded-lg shadow-md z-10 flex items-center gap-1">
+          <span className="text-[10px]">⭐</span>
+          <span>{language === "bn" ? "প্রিমিয়াম" : "Premium"}</span>
         </div>
 
-        {/* Custom Nav Arrows Center-Aligned (Shows on Hover/Touch) */}
+        {/* Nav Arrows - always visible, positioned at edges */}
         {promotedListings.length > 1 && (
           <>
             <button
               onClick={handlePrev}
-              className="absolute left-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/30 hover:bg-black/55 backdrop-blur-xs flex items-center justify-center text-white transition-all cursor-pointer opacity-80 group-hover:opacity-100 border border-white/10 z-15"
+              className="absolute left-2.5 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/45 hover:bg-black/65 backdrop-blur-xs flex items-center justify-center text-white transition-all cursor-pointer border border-white/10 z-15"
               aria-label="Previous slide"
             >
               <ChevronLeft className="w-5 h-5 stroke-[2.5]" />
             </button>
             <button
               onClick={handleNext}
-              className="absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/30 hover:bg-black/55 backdrop-blur-xs flex items-center justify-center text-white transition-all cursor-pointer opacity-80 group-hover:opacity-100 border border-white/10 z-15"
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/45 hover:bg-black/65 backdrop-blur-xs flex items-center justify-center text-white transition-all cursor-pointer border border-white/10 z-15"
               aria-label="Next slide"
             >
               <ChevronRight className="w-5 h-5 stroke-[2.5]" />
@@ -113,37 +113,46 @@ export function PromotedSlider({ listings, language, onViewListing }: PromotedSl
         )}
 
         {/* Bottom Text Overlay with Gradient */}
-        <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/85 via-black/50 to-transparent pt-12 pb-4 px-4 flex flex-col justify-end text-white select-none">
-          <h4 className="font-sans font-bold text-sm sm:text-base md:text-lg text-white leading-tight mb-1 truncate drop-shadow-xs">
+        <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/90 via-black/55 to-transparent pt-14 pb-3.5 px-4 flex flex-col justify-end text-white select-none">
+          <h4 className="font-sans font-bold text-sm sm:text-base md:text-lg text-white leading-tight mb-0.5 truncate drop-shadow-xs">
             {currentItem.title}
           </h4>
-          <div className="flex items-end justify-between">
+          {currentItem.location && (
+            <span className="text-[11px] sm:text-xs text-slate-300 flex items-center gap-1 mb-1.5">
+              📍 {currentItem.location}
+            </span>
+          )}
+          <div className="flex items-center justify-between gap-2">
             <span className="text-base sm:text-lg font-black text-amber-400 font-mono drop-shadow-xs">
               {language === "bn" ? "৳" + toBanglaNumber(currentItem.price) : "৳" + currentItem.price.toLocaleString("en-IN")}
             </span>
-
-            {/* Slide bullet indicators on bottom right */}
-            {promotedListings.length > 1 && (
-              <div className="flex gap-1.5 pb-1">
-                {promotedListings.map((_, index) => (
-                  <button
-                    key={index}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setCurrentIndex(index);
-                    }}
-                    className={`h-2 rounded-full transition-all duration-300 cursor-pointer ${
-                      index === currentIndex ? "w-4 bg-amber-500" : "w-1.5 bg-white/50 hover:bg-white"
-                    }`}
-                    title={`Slide ${index + 1}`}
-                  />
-                ))}
-              </div>
-            )}
+            <button
+              onClick={(e) => { e.stopPropagation(); onViewListing(currentItem); }}
+              className="bg-amber-500 hover:bg-amber-600 text-slate-950 text-[11px] sm:text-xs font-extrabold px-3 py-1.5 rounded-lg shadow-md flex items-center gap-1 cursor-pointer shrink-0"
+            >
+              {language === "bn" ? "বিস্তারিত দেখুন" : "View details"}
+              <ChevronRight className="w-3.5 h-3.5" />
+            </button>
           </div>
         </div>
 
       </div>
+
+      {/* Slide bullet indicators below the card */}
+      {promotedListings.length > 1 && (
+        <div className="flex justify-center gap-1.5 mt-2.5">
+          {promotedListings.map((_, index) => (
+            <button
+              key={index}
+              onClick={() => setCurrentIndex(index)}
+              className={`h-2 rounded-full transition-all duration-300 cursor-pointer ${
+                index === currentIndex ? "w-4 bg-amber-500" : "w-2 bg-slate-300 dark:bg-slate-700 hover:bg-slate-400"
+              }`}
+              title={`Slide ${index + 1}`}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }

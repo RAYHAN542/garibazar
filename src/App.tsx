@@ -1956,20 +1956,21 @@ export default function App() {
                 setSelectedCategory(nextCat);
                 setSelectedSubCategory("all");
               }}
-              className="relative overflow-hidden rounded-2xl h-32 flex flex-col justify-between text-left cursor-pointer bg-gradient-to-br from-amber-50 to-amber-100 dark:from-slate-900 dark:to-slate-800 border border-amber-200/60 dark:border-slate-700 shadow-sm"
+              className="relative overflow-hidden rounded-2xl p-3.5 flex flex-col text-left cursor-pointer bg-gradient-to-br from-amber-50 to-amber-100 dark:from-slate-900 dark:to-slate-800 border border-amber-200/60 dark:border-slate-700 shadow-sm"
             >
-              <img
-                src="https://images.unsplash.com/photo-1580901369630-a8ac6dae2313?w=300&auto=format&fit=crop&q=60" onError={(e) => { e.currentTarget.style.display = "none"; }}
-                className="absolute right-[-10px] bottom-[-8px] w-24 h-24 object-contain opacity-90 pointer-events-none"
-                alt=""
-              />
-              <span className="font-black text-[13px] text-amber-800 dark:text-amber-300 leading-tight relative z-10 p-2.5">
+              <span className="font-black text-[15px] text-amber-800 dark:text-amber-300 leading-tight">
                 {language === "bn" ? "গাড়ি বেচা/কেনা" : "Vehicle Buy & Sell"}
               </span>
-              <span className="text-[9.5px] font-bold text-amber-700/70 dark:text-amber-400/70 leading-tight relative z-10 max-w-[75%] px-2.5">
-                {language === "bn" ? "সব ধরনের এক্সক্যাভেটর কিনুন বা বিক্রি করুন সহজে" : "Buy or sell all kinds of heavy equipment"}
+              <span className="text-[10px] font-bold text-amber-700/70 dark:text-amber-400/70 leading-snug mt-1 mb-3">
+                {language === "bn" ? "এক্সক্যাভেটর, ট্রাক, কার ও অন্যান্য নির্মাণ যানবাহন কিনুন বা বিক্রি করুন সহজে ও নিরাপদে" : "Buy or sell excavators, trucks, cars and other construction vehicles safely"}
               </span>
-              <span className="absolute bottom-2.5 right-2.5 w-6 h-6 rounded-full bg-amber-500 text-white flex items-center justify-center shadow-sm z-10">
+              <img
+                src="https://images.unsplash.com/photo-1580901369630-a8ac6dae2313?w=300&auto=format&fit=crop&q=60"
+                onError={(e) => { e.currentTarget.style.display = "none"; }}
+                className="w-full h-16 object-contain object-bottom mt-auto"
+                alt=""
+              />
+              <span className="absolute bottom-3 right-3 w-7 h-7 rounded-full bg-amber-500 text-white flex items-center justify-center shadow-sm z-10">
                 <ArrowRight className="w-3.5 h-3.5" />
               </span>
             </button>
@@ -1980,24 +1981,34 @@ export default function App() {
                 setSelectedCategory(nextCat);
                 setSelectedSubCategory("all");
               }}
-              className="relative overflow-hidden rounded-2xl h-32 flex flex-col justify-between text-left cursor-pointer bg-gradient-to-br from-sky-50 to-sky-100 dark:from-slate-900 dark:to-slate-800 border border-sky-200/60 dark:border-slate-700 shadow-sm"
+              className="relative overflow-hidden rounded-2xl p-3.5 flex flex-col text-left cursor-pointer bg-gradient-to-br from-sky-50 to-sky-100 dark:from-slate-900 dark:to-slate-800 border border-sky-200/60 dark:border-slate-700 shadow-sm"
             >
-              <img
-                src="https://images.unsplash.com/photo-1487754180451-c456f719a1fc?w=300&auto=format&fit=crop&q=60" onError={(e) => { e.currentTarget.style.display = "none"; }}
-                className="absolute right-[-10px] bottom-[-8px] w-24 h-24 object-contain opacity-90 pointer-events-none"
-                alt=""
-              />
-              <span className="font-black text-[13px] text-sky-800 dark:text-sky-300 leading-tight relative z-10 p-2.5">
+              <span className="font-black text-[15px] text-sky-800 dark:text-sky-300 leading-tight">
                 {language === "bn" ? "গাড়ির পাট" : "Vehicle Parts"}
               </span>
-              <span className="text-[9.5px] font-bold text-sky-700/70 dark:text-sky-400/70 leading-tight relative z-10 max-w-[75%] px-2.5">
-                {language === "bn" ? "হাইড্রোলিক পাম্প, ইঞ্জিন, ফিল্টার, গিয়ার ও আনুষঙ্গিক কিনুন" : "Hydraulic pumps, engines, filters & gear"}
+              <span className="text-[10px] font-bold text-sky-700/70 dark:text-sky-400/70 leading-snug mt-1 mb-3">
+                {language === "bn" ? "ইঞ্জিন, হাইড্রোলিক পাম্প, গিয়ারবক্স, ফিল্টার, ব্যাটারি ও আরও অনেক কিছু" : "Engines, hydraulic pumps, gearboxes, filters, batteries & more"}
               </span>
-              <span className="absolute bottom-2.5 right-2.5 w-6 h-6 rounded-full bg-sky-600 text-white flex items-center justify-center shadow-sm z-10">
+              <div className="grid grid-cols-5 gap-1 mt-auto">
+                {[
+                  { emoji: "🔧", label: language === "bn" ? "ইঞ্জিন" : "Engine" },
+                  { emoji: "⚙️", label: language === "bn" ? "পাম্প" : "Pump" },
+                  { emoji: "🛠️", label: language === "bn" ? "গিয়ার" : "Gear" },
+                  { emoji: "🌀", label: language === "bn" ? "ফিল্টার" : "Filter" },
+                  { emoji: "🔋", label: language === "bn" ? "ব্যাটারি" : "Battery" },
+                ].map((sub, i) => (
+                  <div key={i} className="flex flex-col items-center gap-0.5">
+                    <span className="text-base">{sub.emoji}</span>
+                    <span className="text-[7px] font-bold text-sky-700/70 dark:text-sky-400/70 leading-none truncate w-full text-center">{sub.label}</span>
+                  </div>
+                ))}
+              </div>
+              <span className="absolute bottom-3 right-3 w-7 h-7 rounded-full bg-sky-600 text-white flex items-center justify-center shadow-sm z-10">
                 <ArrowRight className="w-3.5 h-3.5" />
               </span>
             </button>
           </div>
+
 
                 {/* 🛠️ Modern Filters & Dynamic Sorting Panel (Revealed dynamically!) */}
                 {showFilters && (
