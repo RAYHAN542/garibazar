@@ -44,6 +44,7 @@ import {
   Gift,
   Wrench,
   RotateCw,
+  Truck,
 } from "lucide-react";
 
 import { PartListing, SupportedLanguage } from "./types";
@@ -68,7 +69,8 @@ import { SellerShopPage } from "./components/SellerShopPage";
 import Fuse from "fuse.js";
 import { buildSearchBlob, convertBengaliDigitsToEnglish, convertEnglishDigitsToBengali } from "./searchAliases";
 import { MessageSquare, Cpu, SlidersHorizontal, Moon, Sun, Users, HelpCircle, Mail, FileText, ArrowRight, Menu, Download, ChevronDown } from "lucide-react";
-import vehicleBannerImg from "./assets/images/vehicle-banner.jpg";
+import vehicleCardImg from "./assets/images/vehicle-card.jpg";
+import partsCardImg from "./assets/images/parts-card.jpg";
 
 const HOME_CATEGORIES = [
   { id: "all", bnName: "সব ক্যাটাগরি", enName: "All Categories" },
@@ -1311,22 +1313,11 @@ export default function App() {
   // 5. Track views asynchronously when user reviews details
   const handleViewListingDetails = async (listing: PartListing) => {
     setSelectedListing(listing);
-
-    const newViews = (listing.views || 0) + 1;
-
-    // Optimistically patch local state so the UI shows the new count immediately,
-    // without waiting for a manual refresh.
-    setFirebaseListings((prev) =>
-      prev.map((item) => (item.id === listing.id ? { ...item, views: newViews } : item))
-    );
-    setMoreListings((prev) =>
-      prev.map((item) => (item.id === listing.id ? { ...item, views: newViews } : item))
-    );
-
+    
     try {
       const listingRef = doc(db, "listings", listing.id);
       await updateDoc(listingRef, {
-        views: newViews
+        views: (listing.views || 0) + 1
       });
     } catch (err) {
       console.warn("Could not increment view counter:", err);
@@ -1754,14 +1745,12 @@ export default function App() {
           </div>
           <div className="flex items-center gap-3">
             <button
-              onClick={() => setActiveTab("chats")}
+              onClick={() => setShowNotificationPrompt(true)}
               className="relative p-2 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300"
             >
               <Bell className="w-5 h-5" />
-              {unreadChatsCount > 0 && (
-                <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-0.5 rounded-full bg-orange-500 text-white text-[9px] font-bold flex items-center justify-center border-2 border-white dark:border-slate-900">
-                  {unreadChatsCount > 9 ? "9+" : unreadChatsCount}
-                </span>
+              {notificationPermission === "default" && (
+                <span className="absolute -top-0.5 -right-0.5 w-3 h-3 rounded-full bg-orange-500 border-2 border-white dark:border-slate-900"></span>
               )}
             </button>
             <button
@@ -2019,7 +2008,11 @@ export default function App() {
                 setSelectedCategory(nextCat);
                 setSelectedSubCategory("all");
               }}
-              className="relative overflow-hidden rounded-2xl p-3.5 flex flex-col text-left cursor-pointer bg-gradient-to-br from-amber-50 to-amber-100 dark:from-slate-900 dark:to-slate-800 border border-amber-200/60 dark:border-slate-700 shadow-sm"
+              className={`relative overflow-hidden rounded-2xl p-3.5 flex flex-col text-left cursor-pointer bg-gradient-to-br from-amber-50 to-amber-100 dark:from-slate-900 dark:to-slate-800 shadow-sm transition-all duration-150 ${
+                selectedCategory === "vehicles"
+                  ? "ring-2 ring-amber-500 ring-offset-2 dark:ring-offset-slate-950 scale-[0.98]"
+                  : "ring-1 ring-amber-200/60 dark:ring-slate-700"
+              }`}
             >
               <span className="font-black text-[15px] text-amber-800 dark:text-amber-300 leading-tight">
                 {language === "bn" ? "গাড়ি বেচা/কেনা" : "Vehicle Buy & Sell"}
@@ -2028,10 +2021,15 @@ export default function App() {
                 {language === "bn" ? "এক্সক্যাভেটর, ট্রাক, কার ও অন্যান্য নির্মাণ যানবাহন কিনুন বা বিক্রি করুন সহজে ও নিরাপদে" : "Buy or sell excavators, trucks, cars and other construction vehicles safely"}
               </span>
               <img
-                src={vehicleBannerImg}
+                src={vehicleCardImg}
+                alt={language === "bn" ? "গাড়ি বেচা/কেনা" : "Vehicle Buy & Sell"}
                 className="w-full h-20 object-cover object-center rounded-xl mt-auto"
-                alt=""
               />
+              {selectedCategory === "vehicles" && (
+                <span className="absolute top-2 right-2 w-6 h-6 rounded-full bg-amber-500 text-white flex items-center justify-center shadow-md z-10">
+                  <Check className="w-3.5 h-3.5" />
+                </span>
+              )}
               <span className="absolute bottom-3 right-3 w-7 h-7 rounded-full bg-amber-500 text-white flex items-center justify-center shadow-sm z-10">
                 <ArrowRight className="w-3.5 h-3.5" />
               </span>
@@ -2043,7 +2041,11 @@ export default function App() {
                 setSelectedCategory(nextCat);
                 setSelectedSubCategory("all");
               }}
-              className="relative overflow-hidden rounded-2xl p-3.5 flex flex-col text-left cursor-pointer bg-gradient-to-br from-sky-50 to-sky-100 dark:from-slate-900 dark:to-slate-800 border border-sky-200/60 dark:border-slate-700 shadow-sm"
+              className={`relative overflow-hidden rounded-2xl p-3.5 flex flex-col text-left cursor-pointer bg-gradient-to-br from-sky-50 to-sky-100 dark:from-slate-900 dark:to-slate-800 shadow-sm transition-all duration-150 ${
+                selectedCategory === "spare_parts"
+                  ? "ring-2 ring-sky-500 ring-offset-2 dark:ring-offset-slate-950 scale-[0.98]"
+                  : "ring-1 ring-sky-200/60 dark:ring-slate-700"
+              }`}
             >
               <span className="font-black text-[15px] text-sky-800 dark:text-sky-300 leading-tight">
                 {language === "bn" ? "গাড়ির পাট" : "Vehicle Parts"}
@@ -2051,20 +2053,16 @@ export default function App() {
               <span className="text-[10px] font-bold text-sky-700/70 dark:text-sky-400/70 leading-snug mt-1 mb-3">
                 {language === "bn" ? "ইঞ্জিন, হাইড্রোলিক পাম্প, গিয়ারবক্স, ফিল্টার, ব্যাটারি ও আরও অনেক কিছু" : "Engines, hydraulic pumps, gearboxes, filters, batteries & more"}
               </span>
-              <div className="grid grid-cols-5 gap-1 mt-auto">
-                {[
-                  { emoji: "🔧", label: language === "bn" ? "ইঞ্জিন" : "Engine" },
-                  { emoji: "⚙️", label: language === "bn" ? "পাম্প" : "Pump" },
-                  { emoji: "🛠️", label: language === "bn" ? "গিয়ার" : "Gear" },
-                  { emoji: "🌀", label: language === "bn" ? "ফিল্টার" : "Filter" },
-                  { emoji: "🔋", label: language === "bn" ? "ব্যাটারি" : "Battery" },
-                ].map((sub, i) => (
-                  <div key={i} className="flex flex-col items-center gap-0.5">
-                    <span className="text-base">{sub.emoji}</span>
-                    <span className="text-[7px] font-bold text-sky-700/70 dark:text-sky-400/70 leading-none truncate w-full text-center">{sub.label}</span>
-                  </div>
-                ))}
-              </div>
+              <img
+                src={partsCardImg}
+                alt={language === "bn" ? "গাড়ির পাট" : "Vehicle Parts"}
+                className="w-full h-20 object-cover object-center rounded-xl mt-auto"
+              />
+              {selectedCategory === "spare_parts" && (
+                <span className="absolute top-2 right-2 w-6 h-6 rounded-full bg-sky-600 text-white flex items-center justify-center shadow-md z-10">
+                  <Check className="w-3.5 h-3.5" />
+                </span>
+              )}
               <span className="absolute bottom-3 right-3 w-7 h-7 rounded-full bg-sky-600 text-white flex items-center justify-center shadow-sm z-10">
                 <ArrowRight className="w-3.5 h-3.5" />
               </span>
@@ -4074,7 +4072,7 @@ export default function App() {
           currentUser={user}
           onClose={() => setPromotingListing(null)}
           onPromotionSuccess={() => {
-            window.dispatchEvent(new CustomEvent("gari_bazar_refreshed_data"));
+            // listing gets updated automatically via listener hook
           }}
         />
       )}
