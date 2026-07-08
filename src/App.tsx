@@ -2023,16 +2023,13 @@ export default function App() {
               <img
                 src={vehicleCardImg}
                 alt={language === "bn" ? "গাড়ি বেচা/কেনা" : "Vehicle Buy & Sell"}
-                className="w-full h-20 object-cover object-center rounded-xl mt-auto"
+                className="w-full h-auto object-contain rounded-xl mt-auto"
               />
               {selectedCategory === "vehicles" && (
                 <span className="absolute top-2 right-2 w-6 h-6 rounded-full bg-amber-500 text-white flex items-center justify-center shadow-md z-10">
                   <Check className="w-3.5 h-3.5" />
                 </span>
               )}
-              <span className="absolute bottom-3 right-3 w-7 h-7 rounded-full bg-amber-500 text-white flex items-center justify-center shadow-sm z-10">
-                <ArrowRight className="w-3.5 h-3.5" />
-              </span>
             </button>
 
             <button
@@ -2056,7 +2053,7 @@ export default function App() {
               <img
                 src={partsCardImg}
                 alt={language === "bn" ? "গাড়ির পাট" : "Vehicle Parts"}
-                className="w-full h-20 object-cover object-center rounded-xl mt-auto"
+                className="w-full h-auto object-contain rounded-xl mt-auto"
               />
               {selectedCategory === "spare_parts" && (
                 <span className="absolute top-2 right-2 w-6 h-6 rounded-full bg-sky-600 text-white flex items-center justify-center shadow-md z-10">
