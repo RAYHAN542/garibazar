@@ -67,7 +67,7 @@ import SellerAnalyticsGraph from "./components/SellerAnalyticsGraph";
 import { SellerShopPage } from "./components/SellerShopPage";
 import Fuse from "fuse.js";
 import { buildSearchBlob, convertBengaliDigitsToEnglish, convertEnglishDigitsToBengali } from "./searchAliases";
-import { MessageSquare, Cpu, SlidersHorizontal, Moon, Sun, Users, HelpCircle, Mail, FileText, ArrowRight, Menu, Download } from "lucide-react";
+import { MessageSquare, Cpu, SlidersHorizontal, Moon, Sun, Users, HelpCircle, Mail, FileText, ArrowRight, Menu, Download, ChevronDown } from "lucide-react";
 import vehicleBannerImg from "./assets/images/vehicle-banner.jpg";
 
 const HOME_CATEGORIES = [
@@ -168,6 +168,7 @@ export default function App() {
   const [currentUserReviews, setCurrentUserReviews] = useState<any[]>([]);
   const [currentUserReviewsLoading, setCurrentUserReviewsLoading] = useState(false);
   const [selectedPromoPkg, setSelectedPromoPkg] = useState<any>(AD_PACKAGES[1]); // Default to Premium Promo package
+  const [expandedAdPkgId, setExpandedAdPkgId] = useState<string | null>(null); // accordion: which ad package card is expanded
   const [adSelectedListingId, setAdSelectedListingId] = useState<string>("");
   const [adPromoLoading, setAdPromoLoading] = useState(false);
   const [adPromoSuccess, setAdPromoSuccess] = useState(false);
@@ -2409,49 +2410,7 @@ export default function App() {
 
             {/* TAB 3: USER DASHBOARD & TRACKING DESK */}
             {activeTab === 'my-dashboard' && user && (
-              <div className="space-y-8 animate-fade-in">
-                
-                {/* 1. Header Profile overview card */}
-                <div className="bg-slate-900 text-white rounded-2xl p-5 border border-slate-800 flex flex-col sm:flex-row items-center gap-4 text-center sm:text-left justify-between w-full">
-                  <div className="flex flex-col sm:flex-row items-center gap-4">
-                    <div className="w-14 h-14 rounded-full bg-amber-500 overflow-hidden flex items-center justify-center font-bold text-slate-950 text-lg border-2 border-slate-750">
-                      {user.photoURL ? (
-                        <img src={user.photoURL} alt="Profile" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                      ) : (
-                        user.displayName?.charAt(0).toUpperCase() || "A"
-                      )}
-                    </div>
-                    <div>
-                      <h3 className="text-lg font-bold font-sans tracking-tight">{user.displayName || "Gari Bazar User"}</h3>
-                      <div className="text-[11px] text-slate-400 mt-1 flex flex-col sm:flex-row sm:items-center gap-x-2 gap-y-0.5">
-                        <span>📧 {user.email}</span>
-                        <span className="hidden sm:inline text-slate-600">•</span>
-                        <span>📞 {userMetadata?.phoneNumber || "No number registered"}</span>
-                        <span className="hidden sm:inline text-slate-600">•</span>
-                        <span>📍 {userMetadata?.city || "No Location"}</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex flex-row items-center gap-2 mt-3 sm:mt-0 shrink-0">
-                    <button
-                      type="button"
-                      onClick={() => setIsStandaloneDeletion(true)}
-                      className="px-3.5 py-2 bg-red-650 hover:bg-red-700 text-white font-bold text-[11px] rounded-xl transition flex items-center gap-1.5 cursor-pointer shadow-md border-0"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                      <span>{language === "bn" ? "অ্যাকাউন্ট মুছুন" : "Delete Account"}</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleLogout}
-                      className="px-3.5 py-2 bg-slate-800 hover:bg-slate-750 text-slate-200 hover:text-white font-bold text-[11px] rounded-xl transition flex items-center gap-1.5 cursor-pointer border border-slate-700"
-                    >
-                      <LogOut className="w-3.5 h-3.5 text-slate-400" />
-                      <span>{language === "bn" ? "লগআউট" : "Logout"}</span>
-                    </button>
-                  </div>
-                </div>
+              <div className="space-y-4 animate-fade-in">
 
                 {/* 2. Marketing Analytics cards */}
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -2629,7 +2588,7 @@ export default function App() {
 
                 {dashboardSubTab === 'inventory' && (
                   /* 3. My Listings list vs Tracks Purchased items split layout */
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 animate-fade-in">
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 animate-fade-in">
                     
                     {/* Left: Listings posted by currently logged in User */}
                     <div className="space-y-4">
@@ -2638,7 +2597,7 @@ export default function App() {
                       </h3>
 
                       {listings.filter(item => item.sellerId === user.uid).length === 0 ? (
-                        <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-850 p-6 text-center text-slate-500">
+                        <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-850 p-4 text-center text-slate-500">
                           <p className="text-xs">{language === "bn" ? "আপনি এখনো কোনো প্রোডাক্ট পোস্ট করেননি" : "You have not listed any car parts yet."}</p>
                           <button
                             onClick={() => setActiveTab("sell")}
@@ -2721,7 +2680,7 @@ export default function App() {
                       </h4>
 
                       {purchases.length === 0 ? (
-                        <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-850 p-6 text-center text-slate-500">
+                        <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-850 p-4 text-center text-slate-500">
                           <p className="text-xs">{language === "bn" ? "কোন অর্ডার বা কেনাকাটার ট্র্যাক ইতিহাস নেই!" : "Empty. Click 'Buy / Order This Part' on any detail card to simulate."}</p>
                         </div>
                       ) : (
@@ -2791,12 +2750,12 @@ export default function App() {
                   <div className="space-y-6 animate-fade-in" id="dashboard-my-shop-section">
                     
                     {/* Shop profile overview card */}
-                    <div className="bg-gradient-to-br from-slate-950 to-slate-900 border border-slate-800 rounded-2xl p-6 relative overflow-hidden shadow-xl">
+                    <div className="bg-gradient-to-br from-slate-950 to-slate-900 border border-slate-800 rounded-2xl p-4 relative overflow-hidden shadow-xl">
                       <div className="absolute top-0 right-0 p-8 text-amber-500/5 select-none pointer-events-none">
                         <ShoppingBag className="w-48 h-48" />
                       </div>
 
-                      <div className="flex flex-col md:flex-row items-center md:items-start justify-between gap-6 z-10 relative">
+                      <div className="flex flex-col md:flex-row items-center md:items-start justify-between gap-4 z-10 relative">
                         <div className="flex flex-col md:flex-row items-center gap-5 text-center md:text-left">
                           <img 
                             src={user.photoURL || `https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80`} 
@@ -2836,7 +2795,7 @@ export default function App() {
                         </div>
 
                         {/* Stats Metrics Grid */}
-                        <div className="flex gap-6 border-t md:border-t-0 md:border-l border-slate-800 pt-4 md:pt-0 md:pl-8 w-full md:w-auto justify-around md:justify-end">
+                        <div className="flex gap-4 border-t md:border-t-0 md:border-l border-slate-800 pt-4 md:pt-0 md:pl-5 w-full md:w-auto justify-around md:justify-end">
                           <div className="text-center md:text-right">
                             <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block leading-none mb-1.5">
                               {language === "bn" ? "মোট পোস্ট করা লিস্টিং" : "Total Posted"}
@@ -2865,7 +2824,7 @@ export default function App() {
                       </h4>
 
                       {listings.filter(item => item.sellerId === user.uid && !item.isSold).length === 0 ? (
-                        <div className="text-center py-10 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-850 rounded-2xl p-6 text-slate-500 text-xs">
+                        <div className="text-center py-6 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-850 rounded-2xl p-4 text-slate-500 text-xs">
                           {language === "bn" 
                             ? "আপনার কোন সক্রিয় প্রোডাক্ট বা কার পার্টস লিস্টিং নেই! লিস্টিং যোগ করতে 'বিক্রি করুন' ট্যাবে যান।" 
                             : "You don't have any active listings. Go to the 'Sell Part' tab to add items!"}
@@ -2897,7 +2856,7 @@ export default function App() {
                           <Loader2 className="w-6 h-6 animate-spin text-amber-500" />
                         </div>
                       ) : currentUserReviews.length === 0 ? (
-                        <div className="p-6 bg-slate-50 dark:bg-slate-955 rounded-xl text-center text-slate-500 text-xs border border-slate-150 dark:border-slate-850">
+                        <div className="p-4 bg-slate-50 dark:bg-slate-955 rounded-xl text-center text-slate-500 text-xs border border-slate-150 dark:border-slate-850">
                           {language === "bn" 
                             ? "এখনো ক্রেতারা আপনাকে কোনো রিভিউ বা ফিডব্যাক দেননি।" 
                             : "No customer reviews yet. Build trust by completing orders and listing quality parts!"}
@@ -2927,10 +2886,10 @@ export default function App() {
 
                 {dashboardSubTab === 'ads' && (
                   /* Option B: Live Ad Campaign & Boost Manager Panel */
-                  <div className="space-y-8 animate-fade-in" id="ads-campaign-suite">
+                  <div className="space-y-5 animate-fade-in" id="ads-campaign-suite">
                     
                     {/* Header Suite Guide */}
-                    <div className="bg-slate-950 border border-slate-800 rounded-2xl p-6 relative overflow-hidden">
+                    <div className="bg-slate-950 border border-slate-800 rounded-2xl p-4 relative overflow-hidden">
                       <div className="absolute top-0 right-0 p-8 text-amber-500/5 select-none pointer-events-none">
                         <Sparkles className="w-36 h-36" />
                       </div>
@@ -2955,18 +2914,14 @@ export default function App() {
                         {language === "bn" ? "ধাপ ১: বিজ্ঞাপন প্যাকেজ এবং বুস্ট টিয়ার সিলেক্ট করুন" : "STEP 1: SELECT YOUR SPONSORSHIP TIER"}
                       </h5>
                       
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                         {AD_PACKAGES.map((pkg) => {
                           const isSelected = selectedPromoPkg?.id === pkg.id;
+                          const isExpanded = expandedAdPkgId === pkg.id;
                           return (
                             <div
                               key={pkg.id}
-                              onClick={() => {
-                                setSelectedPromoPkg(pkg);
-                                setAdPromoSuccess(false);
-                                setAdPromoError("");
-                              }}
-                              className={`rounded-2xl p-5 border transition-all cursor-pointer flex flex-col justify-between relative ${
+                              className={`rounded-2xl border transition-all relative overflow-hidden ${
                                 isSelected
                                   ? "bg-slate-900 border-amber-400 ring-2 ring-amber-400/20 text-white shadow-xl"
                                   : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-100 hover:border-slate-355"
@@ -2979,54 +2934,74 @@ export default function App() {
                                 </div>
                               )}
 
-                              <div>
-                                <span className={`text-[10px] font-extrabold uppercase tracking-widest px-2.5 py-1 rounded-full ${
-                                  pkg.id === 'pkg-featured' 
-                                    ? 'bg-rose-500/15 text-rose-500 border border-rose-500/10'
-                                    : pkg.id === 'pkg-premium'
-                                    ? 'bg-indigo-505/15 text-indigo-500 border border-indigo-500/10'
-                                    : 'bg-emerald-500/15 text-emerald-500 border border-emerald-500/10'
-                                }`}>
-                                  {language === "bn" ? pkg.nameBn : pkg.nameEn}
-                                </span>
-
-                                <div className="mt-4 mb-2 flex items-baseline gap-1">
-                                  <span className={`text-2xl font-black font-mono transition-colors ${isSelected ? "text-white" : "text-slate-900 dark:text-white"}`}>
-                                    ৳{pkg.price.toLocaleString("en-IN")}
+                              {/* Accordion header — সবসময় দেখা যাবে, ট্যাপ করলে খুলবে/বন্ধ হবে */}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setSelectedPromoPkg(pkg);
+                                  setAdPromoSuccess(false);
+                                  setAdPromoError("");
+                                  setExpandedAdPkgId(isExpanded ? null : pkg.id);
+                                }}
+                                className="w-full text-left p-4 flex items-center justify-between gap-2 cursor-pointer"
+                              >
+                                <div>
+                                  <span className={`text-[10px] font-extrabold uppercase tracking-widest px-2.5 py-1 rounded-full ${
+                                    pkg.id === 'pkg-featured' 
+                                      ? 'bg-rose-500/15 text-rose-500 border border-rose-500/10'
+                                      : pkg.id === 'pkg-premium'
+                                      ? 'bg-indigo-505/15 text-indigo-500 border border-indigo-500/10'
+                                      : 'bg-emerald-500/15 text-emerald-500 border border-emerald-500/10'
+                                  }`}>
+                                    {language === "bn" ? pkg.nameBn : pkg.nameEn}
                                   </span>
-                                  <span className={`text-xs ${isSelected ? "text-slate-300" : "text-slate-500 dark:text-slate-400"}`}>
-                                    / {language === "bn" ? `${pkg.durationDays} দিন` : `${pkg.durationDays} days`}
-                                  </span>
+                                  <div className="mt-2 flex items-baseline gap-1">
+                                    <span className={`text-xl font-black font-mono transition-colors ${isSelected ? "text-white" : "text-slate-900 dark:text-white"}`}>
+                                      ৳{pkg.price.toLocaleString("en-IN")}
+                                    </span>
+                                    <span className={`text-xs ${isSelected ? "text-slate-300" : "text-slate-500 dark:text-slate-400"}`}>
+                                      / {language === "bn" ? `${pkg.durationDays} দিন` : `${pkg.durationDays} days`}
+                                    </span>
+                                  </div>
                                 </div>
+                                <ChevronDown className={`w-4.5 h-4.5 shrink-0 transition-transform ${isExpanded ? "rotate-180" : ""} ${isSelected ? "text-slate-300" : "text-slate-400"}`} />
+                              </button>
 
-                                {/* Benefits bullet list */}
-                                <ul className="space-y-2 mt-4">
-                                  {(language === "bn" ? pkg.benefitsBn : pkg.benefitsEn).map((benefit, bIdx) => (
-                                    <li key={bIdx} className="flex items-start gap-1.5 leading-tight text-[11px]">
-                                      <Zap className="w-3.5 h-3.5 text-amber-400 mt-0.5 flex-shrink-0" />
-                                      <span className={`${isSelected ? "text-slate-200" : "text-slate-600 dark:text-slate-350"}`}>
-                                        {benefit}
-                                      </span>
-                                    </li>
-                                  ))}
-                                </ul>
-                              </div>
+                              {/* Accordion body — শুধু expand করলে দেখাবে */}
+                              {isExpanded && (
+                                <div className="px-4 pb-4">
+                                  <ul className="space-y-2">
+                                    {(language === "bn" ? pkg.benefitsBn : pkg.benefitsEn).map((benefit, bIdx) => (
+                                      <li key={bIdx} className="flex items-start gap-1.5 leading-tight text-[11px]">
+                                        <Zap className="w-3.5 h-3.5 text-amber-400 mt-0.5 flex-shrink-0" />
+                                        <span className={`${isSelected ? "text-slate-200" : "text-slate-600 dark:text-slate-350"}`}>
+                                          {benefit}
+                                        </span>
+                                      </li>
+                                    ))}
+                                  </ul>
 
-                              <div className="mt-6">
-                                <button
-                                  type="button"
-                                  className={`w-full py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                                    isSelected
-                                      ? "bg-amber-500 hover:bg-amber-600 text-slate-950 shadow-md"
-                                      : "bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-350"
-                                  }`}
-                                >
-                                  {isSelected 
-                                    ? (language === "bn" ? "প্যাকেজটি সিলেক্টেড" : "Selected Tier")
-                                    : (language === "bn" ? "প্যাকেজ নির্বাচন করুন" : "Select Tier")}
-                                </button>
-                              </div>
-
+                                  <div className="mt-4">
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setSelectedPromoPkg(pkg);
+                                        setAdPromoSuccess(false);
+                                        setAdPromoError("");
+                                      }}
+                                      className={`w-full py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                                        isSelected
+                                          ? "bg-amber-500 hover:bg-amber-600 text-slate-950 shadow-md"
+                                          : "bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-350"
+                                      }`}
+                                    >
+                                      {isSelected 
+                                        ? (language === "bn" ? "প্যাকেজটি সিলেক্টেড" : "Selected Tier")
+                                        : (language === "bn" ? "প্যাকেজ নির্বাচন করুন" : "Select Tier")}
+                                    </button>
+                                  </div>
+                                </div>
+                              )}
                             </div>
                           );
                         })}
@@ -3034,7 +3009,7 @@ export default function App() {
                     </div>
 
                     {/* Step 2: Campaign config wizard form */}
-                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 border-t border-slate-100 dark:border-slate-800 pt-8">
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 border-t border-slate-100 dark:border-slate-800 pt-5">
                       
                       {/* Left Block: Selector Form */}
                       <div className="lg:col-span-7 space-y-4">
@@ -3371,14 +3346,14 @@ export default function App() {
                     </div>
 
                     {/* Section 3: Active boosted list tracker */}
-                    <div className="space-y-4 border-t border-slate-100 dark:border-slate-800 pt-8">
+                    <div className="space-y-4 border-t border-slate-100 dark:border-slate-800 pt-5">
                       <h4 className="text-sm font-semibold text-slate-900 dark:text-white flex items-center gap-2">
                         <Sparkles className="w-4 h-4 text-amber-500 fill-amber-500 animate-pulse" />
                         {language === "bn" ? "আমার চলমান বিজ্ঞাপন এবং ক্যাম্পেইন ট্র্যাকিং" : "My Active Campaigns & Traffic Stats"}
                       </h4>
 
                       {listings.filter(item => item.sellerId === user.uid && item.isAd).length === 0 ? (
-                        <div className="bg-slate-50 dark:bg-slate-950 border border-dashed border-slate-200 dark:border-slate-800 rounded-xl p-6 text-center text-slate-500">
+                        <div className="bg-slate-50 dark:bg-slate-950 border border-dashed border-slate-200 dark:border-slate-800 rounded-xl p-4 text-center text-slate-500">
                           <p className="text-xs">{language === "bn" ? "আপনার প্রোফাইলে কোনো চলমান বিজ্ঞাপন ক্যাম্পেইন নেই।" : "No sponsored ad campaigns active for the current session. Choose a product above to boost!"}</p>
                         </div>
                       ) : (
