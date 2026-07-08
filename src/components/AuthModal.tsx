@@ -19,6 +19,49 @@ const PRESET_AVATARS = [
   "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80"
 ];
 
+// Resizes/compresses a picked profile photo client-side before it goes to Cloudinary,
+// so uploads stay fast on slow connections and don't waste storage.
+const compressImageToBlob = async (file: File, maxWidth = 512, maxHeight = 512): Promise<Blob> => {
+  const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+    const objectUrl = URL.createObjectURL(file);
+    const image = new Image();
+    image.onload = () => {
+      URL.revokeObjectURL(objectUrl);
+      resolve(image);
+    };
+    image.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new Error("Failed to load image for compression"));
+    };
+    image.src = objectUrl;
+  });
+
+  let { width, height } = img;
+  if (width > height) {
+    if (width > maxWidth) {
+      height = Math.round((height * maxWidth) / width);
+      width = maxWidth;
+    }
+  } else if (height > maxHeight) {
+    width = Math.round((width * maxHeight) / height);
+    height = maxHeight;
+  }
+
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Canvas context is null");
+  ctx.drawImage(img, 0, 0, width, height);
+
+  return await new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob((b) => {
+      if (!b) reject(new Error("Failed to convert canvas to Blob"));
+      else resolve(b);
+    }, "image/jpeg", 0.8);
+  });
+};
+
 export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModalProps) {
   const [isLogin, setIsLogin] = useState(false);
   const [displayName, setDisplayName] = useState("");
@@ -28,6 +71,7 @@ export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModa
   const [loading, setLoading] = useState(false);
   const [profilePhotoFile, setProfilePhotoFile] = useState<File | null>(null);
   const [profilePhotoPreview, setProfilePhotoPreview] = useState<string | null>(null);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   if (!isOpen) return null;
@@ -47,6 +91,7 @@ export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModa
 
     setError("");
     setProfilePhotoFile(file);
+    if (profilePhotoPreview) URL.revokeObjectURL(profilePhotoPreview);
     setProfilePhotoPreview(URL.createObjectURL(file));
   };
 
@@ -137,14 +182,26 @@ export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModa
 
         let uploadedPhotoUrl = PRESET_AVATARS[0];
         if (profilePhotoFile) {
+          setUploadingPhoto(true);
           try {
-            uploadedPhotoUrl = await uploadToCloudinary(profilePhotoFile);
-          } catch (photoErr) {
+            const compressedBlob = await compressImageToBlob(profilePhotoFile);
+            const uploadPromise = uploadToCloudinary(compressedBlob);
+            const timeoutPromise = new Promise<never>((_, reject) =>
+              setTimeout(() => reject(new Error("upload/timeout")), 60000)
+            );
+            uploadedPhotoUrl = await Promise.race([uploadPromise, timeoutPromise]);
+          } catch (photoErr: any) {
             console.error("Profile photo upload failed:", photoErr);
-            setError(language === "bn" ? "ছবি আপলোড ব্যর্থ হয়েছে। আবার চেষ্টা করুন অথবা ছবি ছাড়াই এগিয়ে যান।" : "Photo upload failed. Try again or continue without a photo.");
+            setUploadingPhoto(false);
             setLoading(false);
+            setError(
+              photoErr?.message === "upload/timeout"
+                ? (language === "bn" ? "ছবি আপলোড আটকে গেছে (Timeout)! আবার চেষ্টা করুন।" : "Photo upload timed out. Please try again.")
+                : (language === "bn" ? "ছবি আপলোড ব্যর্থ হয়েছে। আবার চেষ্টা করুন অথবা ছবি ছাড়াই এগিয়ে যান।" : "Photo upload failed. Try again or continue without a photo.")
+            );
             return;
           }
+          setUploadingPhoto(false);
         }
 
         const savedData = {
@@ -204,13 +261,20 @@ export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModa
                 className="relative w-20 h-20 rounded-full overflow-hidden border-2 border-dashed border-slate-300 dark:border-slate-600 flex items-center justify-center bg-slate-50 dark:bg-slate-800"
               >
                 {profilePhotoPreview ? (
-                  <img src={profilePhotoPreview} alt="preview" className="w-full h-full object-cover" />
+                  <>
+                    <img src={profilePhotoPreview} alt="preview" className="w-full h-full object-cover" />
+                    <span className="absolute bottom-0 inset-x-0 bg-slate-900/60 text-white flex items-center justify-center py-1">
+                      <Camera className="w-3.5 h-3.5" />
+                    </span>
+                  </>
                 ) : (
-                  <Camera className="w-6 h-6 text-slate-400" />
+                  <>
+                    <Camera className="w-6 h-6 text-slate-400" />
+                    <div className="absolute bottom-0 inset-x-0 bg-black/50 text-white text-[9px] font-bold text-center py-0.5">
+                      {language === "bn" ? "ছবি দিন" : "Add Photo"}
+                    </div>
+                  </>
                 )}
-                <div className="absolute bottom-0 inset-x-0 bg-black/50 text-white text-[9px] font-bold text-center py-0.5">
-                  {language === "bn" ? "ছবি দিন" : "Add Photo"}
-                </div>
               </button>
               <input type="file" ref={fileInputRef} onChange={handlePhotoSelect} accept="image/*" className="hidden" />
             </div>
@@ -247,7 +311,11 @@ export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModa
 
           <button type="submit" disabled={loading} className="w-full py-2.5 bg-amber-500 hover:bg-amber-600 disabled:bg-amber-300 text-white font-bold rounded-lg text-sm flex items-center justify-center gap-2">
             {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-            {isLogin ? (language === "bn" ? "লগইন নিশ্চিত করুন" : "Confirm Login") : (language === "bn" ? "প্রোফাইল তৈরি করুন" : "Create Profile")}
+            {uploadingPhoto
+              ? (language === "bn" ? "ছবি আপলোড হচ্ছে..." : "Uploading photo...")
+              : isLogin
+                ? (language === "bn" ? "লগইন নিশ্চিত করুন" : "Confirm Login")
+                : (language === "bn" ? "প্রোফাইল তৈরি করুন" : "Create Profile")}
           </button>
         </form>
       </div>
