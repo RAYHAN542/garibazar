@@ -1743,12 +1743,14 @@ export default function App() {
           </div>
           <div className="flex items-center gap-3">
             <button
-              onClick={() => setShowNotificationPrompt(true)}
+              onClick={() => setActiveTab("chats")}
               className="relative p-2 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300"
             >
               <Bell className="w-5 h-5" />
-              {notificationPermission === "default" && (
-                <span className="absolute -top-0.5 -right-0.5 w-3 h-3 rounded-full bg-orange-500 border-2 border-white dark:border-slate-900"></span>
+              {unreadChatsCount > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-0.5 rounded-full bg-orange-500 text-white text-[9px] font-bold flex items-center justify-center border-2 border-white dark:border-slate-900">
+                  {unreadChatsCount > 9 ? "9+" : unreadChatsCount}
+                </span>
               )}
             </button>
             <button
@@ -2016,7 +2018,7 @@ export default function App() {
               </span>
               <img
                 src={vehicleBannerImg}
-                className="w-full h-20 object-contain object-bottom mt-auto"
+                className="w-full h-20 object-cover object-center rounded-xl mt-auto"
                 alt=""
               />
               <span className="absolute bottom-3 right-3 w-7 h-7 rounded-full bg-amber-500 text-white flex items-center justify-center shadow-sm z-10">
