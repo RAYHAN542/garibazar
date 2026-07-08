@@ -896,7 +896,6 @@ export function ListingDetailModal({ listing, language, currentUser, onClose, on
                       {language === "bn" ? "ড্যাশবোর্ডে সফলভাবে যুক্ত হয়েছে!" : "Successfully added to dashboard!"}
                     </span>
                   </div>
-              )}
                 ) : (
                   <button
                     type="button"
@@ -915,6 +914,7 @@ export function ListingDetailModal({ listing, language, currentUser, onClose, on
                   </button>
                 )}
               </div>
+              )}
 
               {!isOwner && (
                 <div className="flex-1">

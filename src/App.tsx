@@ -1967,7 +1967,7 @@ export default function App() {
               </span>
               <img
                 src={vehicleBannerImg}
-                className="w-full h-20 object-cover object-center rounded-xl mt-auto"
+                className="w-full h-20 object-contain object-bottom mt-auto"
                 alt=""
               />
               <span className="absolute bottom-3 right-3 w-7 h-7 rounded-full bg-amber-500 text-white flex items-center justify-center shadow-sm z-10">
