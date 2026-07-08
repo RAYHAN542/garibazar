@@ -88,7 +88,7 @@ export default function SellerAnalyticsGraph({
 
   // SVG Chart Configuration
   const width = 500;
-  const height = 180;
+  const height = 120;
   const paddingX = 40;
   const paddingY = 25;
   const chartWidth = width - paddingX * 2;
@@ -156,7 +156,7 @@ export default function SellerAnalyticsGraph({
   }[selectedMetric];
 
   return (
-    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm space-y-5 relative overflow-hidden" id="seller-analytics-graph-card">
+    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-sm space-y-3 relative overflow-hidden" id="seller-analytics-graph-card">
       {/* Background radial highlight */}
       <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-blue-500/5 to-indigo-500/5 rounded-full blur-2xl pointer-events-none"></div>
 
@@ -218,7 +218,7 @@ export default function SellerAnalyticsGraph({
       </div>
 
       {/* Primary Analytics Graph Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-center">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 items-center">
         {/* Graph Card Column (7 cols) */}
         <div className="lg:col-span-8 bg-slate-50 dark:bg-slate-950/60 border border-slate-150 dark:border-slate-850 rounded-2xl p-4 flex flex-col justify-between relative min-h-[220px]">
           
@@ -385,9 +385,9 @@ export default function SellerAnalyticsGraph({
         </div>
 
         {/* Highlight Insights Stats Column (4 cols) */}
-        <div className="lg:col-span-4 space-y-3.5">
+        <div className="lg:col-span-4 space-y-2">
           {/* Conversions Card */}
-          <div className="bg-slate-50 dark:bg-slate-950 p-4 border border-slate-150 dark:border-slate-850 rounded-2xl flex flex-col justify-between">
+          <div className="bg-slate-50 dark:bg-slate-950 p-3 border border-slate-150 dark:border-slate-850 rounded-xl flex flex-col justify-between">
             <div className="flex items-center justify-between">
               <span className="text-[10px] uppercase font-black text-slate-400 block tracking-wider">
                 {language === "bn" ? "মোট ভিউস ও অর্জন" : "Audience & Leads"}
@@ -415,7 +415,7 @@ export default function SellerAnalyticsGraph({
           </div>
 
           {/* Performance Status Card */}
-          <div className="bg-slate-50 dark:bg-slate-950 p-4 border border-slate-150 dark:border-slate-850 rounded-2xl">
+          <div className="bg-slate-50 dark:bg-slate-950 p-3 border border-slate-150 dark:border-slate-850 rounded-xl">
             <span className="text-[10px] uppercase font-black text-slate-400 block tracking-wider mb-2">
               {language === "bn" ? "ক্যাম্পেইন সক্ষমতা স্ট্যাটাস" : "Acquisition Funnel health"}
             </span>
@@ -443,7 +443,7 @@ export default function SellerAnalyticsGraph({
 
           {/* Most popular listing highlight */}
           {mostPopularListing && (
-            <div className="bg-gradient-to-r from-amber-500/[0.04] to-indigo-500/[0.04] dark:from-amber-500/[0.02] dark:to-indigo-500/[0.02] p-4 border border-amber-500/20 dark:border-amber-500/10 rounded-2xl space-y-2">
+            <div className="bg-gradient-to-r from-amber-500/[0.04] to-indigo-500/[0.04] dark:from-amber-500/[0.02] dark:to-indigo-500/[0.02] p-3 border border-amber-500/20 dark:border-amber-500/10 rounded-xl space-y-1">
               <span className="text-[9px] uppercase font-black text-amber-600 dark:text-amber-400 block tracking-wider flex items-center gap-1">
                 <TrendingUp className="w-3 h-3" />
                 <span>{language === "bn" ? "সেরা পারফর্মিং প্রোডাক্ট" : "Top Performing Product"}</span>

@@ -202,6 +202,9 @@ export function ListingDetailModal({ listing, language, currentUser, onClose, on
     }
   };
 
+  // ownership শুধু sellerId দিয়ে চেক করা হয় — phone number দিয়ে চেক করলে
+  // দুইজনের contact নম্বর মিলে গেলে বা placeholder নম্বর ব্যবহার হলে ভুলভাবে
+  // "owner" ধরে ফেলার (false positive) ঝুঁকি থাকে।
   const isOwner = !!currentUser?.uid && listing.sellerId === currentUser.uid;
 
   const toggleFavorite = () => {

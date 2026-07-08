@@ -67,7 +67,7 @@ import SellerAnalyticsGraph from "./components/SellerAnalyticsGraph";
 import { SellerShopPage } from "./components/SellerShopPage";
 import Fuse from "fuse.js";
 import { buildSearchBlob, convertBengaliDigitsToEnglish, convertEnglishDigitsToBengali } from "./searchAliases";
-import { MessageSquare, Cpu, SlidersHorizontal, Moon, Sun, Users, HelpCircle, Mail, FileText, ArrowRight, Menu } from "lucide-react";
+import { MessageSquare, Cpu, SlidersHorizontal, Moon, Sun, Users, HelpCircle, Mail, FileText, ArrowRight, Menu, Download, ChevronDown } from "lucide-react";
 import vehicleBannerImg from "./assets/images/vehicle-banner.jpg";
 
 const HOME_CATEGORIES = [
@@ -168,6 +168,7 @@ export default function App() {
   const [currentUserReviews, setCurrentUserReviews] = useState<any[]>([]);
   const [currentUserReviewsLoading, setCurrentUserReviewsLoading] = useState(false);
   const [selectedPromoPkg, setSelectedPromoPkg] = useState<any>(AD_PACKAGES[1]); // Default to Premium Promo package
+  const [expandedAdPkgId, setExpandedAdPkgId] = useState<string | null>(null); // accordion: which ad package card is expanded
   const [adSelectedListingId, setAdSelectedListingId] = useState<string>("");
   const [adPromoLoading, setAdPromoLoading] = useState(false);
   const [adPromoSuccess, setAdPromoSuccess] = useState(false);
@@ -191,7 +192,7 @@ export default function App() {
   const [userMetadata, setUserMetadata] = useState<any>(null);
   const [showFilters, setShowFilters] = useState(false);
   const [isPersonalInfoOpen, setIsPersonalInfoOpen] = useState(false);
-  const [isMyShopSectionOpen, setIsMyShopSectionOpen] = useState(false);
+  const [isMyShopSectionOpen, setIsMyShopSectionOpen] = useState(false); // eslint-disable-line -- kept for future use, no longer drives duplicate My Shop card
   const [isLanguageOpen, setIsLanguageOpen] = useState(false);
   const [isTeamOpen, setIsTeamOpen] = useState(false);
   const [isTermsSectionOpen, setIsTermsSectionOpen] = useState(false);
@@ -392,6 +393,52 @@ export default function App() {
   );
 
   const prevListingsIdRef = useRef<Set<string>>(new Set());
+
+  // 📲 PWA Install Prompt — একবার লগইন/রেজিস্টার করলে আর দেখানো হবে না
+  const [deferredInstallPrompt, setDeferredInstallPrompt] = useState<any>(null);
+  const [showInstallPrompt, setShowInstallPrompt] = useState(false);
+
+  useEffect(() => {
+    const alreadyLoggedIn = !!localStorage.getItem("gari_bazar_session_user");
+    const dismissedForever = localStorage.getItem("gari_bazar_install_dismissed") === "true";
+
+    const handleBeforeInstallPrompt = (e: any) => {
+      e.preventDefault();
+      setDeferredInstallPrompt(e);
+      if (!alreadyLoggedIn && !dismissedForever) {
+        setShowInstallPrompt(true);
+      }
+    };
+
+    window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+
+    const handleAppInstalled = () => {
+      localStorage.setItem("gari_bazar_install_dismissed", "true");
+      setShowInstallPrompt(false);
+      setDeferredInstallPrompt(null);
+    };
+    window.addEventListener("appinstalled", handleAppInstalled);
+
+    return () => {
+      window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+      window.removeEventListener("appinstalled", handleAppInstalled);
+    };
+  }, []);
+
+  const handleInstallApp = async () => {
+    if (!deferredInstallPrompt) return;
+    deferredInstallPrompt.prompt();
+    await deferredInstallPrompt.userChoice;
+    setDeferredInstallPrompt(null);
+    setShowInstallPrompt(false);
+  };
+
+  const dismissInstallPrompt = (forever: boolean) => {
+    setShowInstallPrompt(false);
+    if (forever) {
+      localStorage.setItem("gari_bazar_install_dismissed", "true");
+    }
+  };
 
   // Check for incoming referral code from shared links
   useEffect(() => {
@@ -1700,7 +1747,9 @@ export default function App() {
               className="relative p-2 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300"
             >
               <Bell className="w-5 h-5" />
-              <span className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full bg-orange-500 text-white text-[9px] font-bold flex items-center justify-center">3</span>
+              {notificationPermission === "default" && (
+                <span className="absolute -top-0.5 -right-0.5 w-3 h-3 rounded-full bg-orange-500 border-2 border-white dark:border-slate-900"></span>
+              )}
             </button>
             <button
               onClick={() => setActiveTab("profile")}
@@ -2161,6 +2210,50 @@ export default function App() {
                 </div>
               )}
 
+                {/* 📲 PWA Install Prompt Banner — লগইন/রেজিস্টার করলে চিরতরে বন্ধ হয়ে যায় */}
+                {showInstallPrompt && (
+                  <div className="mb-6 bg-white dark:bg-slate-900 border border-amber-200 dark:border-amber-900/40 rounded-2xl p-4 animate-fade-in shadow-sm">
+                    <div className="flex items-center gap-3">
+                      <img
+                        src="/icon-192.png"
+                        alt="Gari Bazar"
+                        className="w-14 h-14 rounded-2xl shadow-md shrink-0 object-cover"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-black text-base sm:text-lg text-slate-900 dark:text-white leading-tight">
+                          {language === "bn" ? "গাড়ি বাজার" : "Gari Bazar"}
+                        </h3>
+                        <p className="text-[11px] sm:text-xs text-slate-500 dark:text-slate-400 leading-snug">
+                          {language === "bn"
+                            ? "অ্যাপটি হোমস্ক্রিনে ইনস্টল করুন"
+                            : "Install this app on your home screen"}
+                        </p>
+                      </div>
+                    </div>
+                    <p className="text-[10px] sm:text-xs text-slate-500 dark:text-slate-400 mt-3 leading-relaxed">
+                      {language === "bn"
+                        ? "দ্রুত লোড হবে এবং নোটিফিকেশন সরাসরি \"গাড়ি বাজার\" অ্যাপের নামে আসবে, Chrome থেকে না।"
+                        : "Faster loading and notifications will come from the app itself, not Chrome."}
+                    </p>
+                    <div className="flex items-center justify-end gap-2 mt-3">
+                      <button
+                        type="button"
+                        onClick={() => dismissInstallPrompt(false)}
+                        className="text-[11px] sm:text-xs font-bold text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 px-3 py-2.5 rounded-lg transition cursor-pointer"
+                      >
+                        {language === "bn" ? "পরে করুন" : "Later"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleInstallApp}
+                        className="flex-1 sm:flex-none bg-amber-500 hover:bg-amber-600 text-slate-950 font-black px-6 py-2.5 rounded-xl text-xs sm:text-sm transition cursor-pointer shadow-sm active:scale-95"
+                      >
+                        {language === "bn" ? "ইনস্টল করুন" : "Install"}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 {/* Notification Permission Request Banner */}
                 {showNotificationPrompt && (
                   <div className="mb-6 bg-gradient-to-r from-blue-600/10 to-orange-505/10 border border-orange-500/20 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 animate-fade-in shadow-sm">
@@ -2317,49 +2410,7 @@ export default function App() {
 
             {/* TAB 3: USER DASHBOARD & TRACKING DESK */}
             {activeTab === 'my-dashboard' && user && (
-              <div className="space-y-8 animate-fade-in">
-                
-                {/* 1. Header Profile overview card */}
-                <div className="bg-slate-900 text-white rounded-2xl p-5 border border-slate-800 flex flex-col sm:flex-row items-center gap-4 text-center sm:text-left justify-between w-full">
-                  <div className="flex flex-col sm:flex-row items-center gap-4">
-                    <div className="w-14 h-14 rounded-full bg-amber-500 overflow-hidden flex items-center justify-center font-bold text-slate-950 text-lg border-2 border-slate-750">
-                      {user.photoURL ? (
-                        <img src={user.photoURL} alt="Profile" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                      ) : (
-                        user.displayName?.charAt(0).toUpperCase() || "A"
-                      )}
-                    </div>
-                    <div>
-                      <h3 className="text-lg font-bold font-sans tracking-tight">{user.displayName || "Gari Bazar User"}</h3>
-                      <div className="text-[11px] text-slate-400 mt-1 flex flex-col sm:flex-row sm:items-center gap-x-2 gap-y-0.5">
-                        <span>📧 {user.email}</span>
-                        <span className="hidden sm:inline text-slate-600">•</span>
-                        <span>📞 {userMetadata?.phoneNumber || "No number registered"}</span>
-                        <span className="hidden sm:inline text-slate-600">•</span>
-                        <span>📍 {userMetadata?.city || "No Location"}</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex flex-row items-center gap-2 mt-3 sm:mt-0 shrink-0">
-                    <button
-                      type="button"
-                      onClick={() => setIsStandaloneDeletion(true)}
-                      className="px-3.5 py-2 bg-red-650 hover:bg-red-700 text-white font-bold text-[11px] rounded-xl transition flex items-center gap-1.5 cursor-pointer shadow-md border-0"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                      <span>{language === "bn" ? "অ্যাকাউন্ট মুছুন" : "Delete Account"}</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleLogout}
-                      className="px-3.5 py-2 bg-slate-800 hover:bg-slate-750 text-slate-200 hover:text-white font-bold text-[11px] rounded-xl transition flex items-center gap-1.5 cursor-pointer border border-slate-700"
-                    >
-                      <LogOut className="w-3.5 h-3.5 text-slate-400" />
-                      <span>{language === "bn" ? "লগআউট" : "Logout"}</span>
-                    </button>
-                  </div>
-                </div>
+              <div className="space-y-4 animate-fade-in">
 
                 {/* 2. Marketing Analytics cards */}
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -2445,7 +2496,7 @@ export default function App() {
                 </div>
 
                 {/* Dashboard Tab Toggles */}
-                <div className="flex border-b border-slate-200 dark:border-slate-800" id="dash-tabs-bar">
+                <div className="flex overflow-x-auto no-scrollbar border-b border-slate-200 dark:border-slate-800" id="dash-tabs-bar">
                   <button
                     id="dash-subtab-inventory"
                     onClick={() => {
@@ -2453,7 +2504,7 @@ export default function App() {
                       setAdPromoSuccess(false);
                       setAdPromoError("");
                     }}
-                    className={`pb-3 px-4 text-sm font-bold border-b-2 transition-all flex items-center gap-2 cursor-pointer ${
+                    className={`pb-3 px-4 text-sm font-bold border-b-2 transition-all flex items-center gap-2 cursor-pointer shrink-0 whitespace-nowrap ${
                       dashboardSubTab === 'inventory'
                         ? 'border-amber-500 text-amber-500'
                         : 'border-transparent text-slate-400 hover:text-slate-250 dark:hover:text-slate-250'
@@ -2470,7 +2521,7 @@ export default function App() {
                       setAdPromoSuccess(false);
                       setAdPromoError("");
                     }}
-                    className={`pb-3 px-4 text-sm font-bold border-b-2 transition-all flex items-center gap-2 cursor-pointer ${
+                    className={`pb-3 px-4 text-sm font-bold border-b-2 transition-all flex items-center gap-2 cursor-pointer shrink-0 whitespace-nowrap ${
                       dashboardSubTab === 'my-shop'
                         ? 'border-amber-500 text-amber-500'
                         : 'border-transparent text-slate-400 hover:text-slate-250 dark:hover:text-slate-250'
@@ -2487,7 +2538,7 @@ export default function App() {
                       setAdPromoSuccess(false);
                       setAdPromoError("");
                     }}
-                    className={`pb-3 px-4 text-sm font-bold border-b-2 transition-all flex items-center gap-2 cursor-pointer relative ${
+                    className={`pb-3 px-4 text-sm font-bold border-b-2 transition-all flex items-center gap-2 cursor-pointer relative shrink-0 whitespace-nowrap ${
                       dashboardSubTab === 'ads'
                         ? 'border-amber-500 text-amber-500'
                         : 'border-transparent text-slate-400 hover:text-slate-250 dark:hover:text-slate-250'
@@ -2506,7 +2557,7 @@ export default function App() {
                       onClick={() => {
                         setDashboardSubTab('admin');
                       }}
-                      className={`pb-3 px-4 text-sm font-bold border-b-2 transition-all flex items-center gap-2 cursor-pointer relative ${
+                      className={`pb-3 px-4 text-sm font-bold border-b-2 transition-all flex items-center gap-2 cursor-pointer relative shrink-0 whitespace-nowrap ${
                         dashboardSubTab === 'admin'
                           ? 'border-red-500 text-red-500'
                           : 'border-transparent text-slate-400 hover:text-slate-250 dark:hover:text-slate-250'
@@ -2523,7 +2574,7 @@ export default function App() {
                       onClick={() => {
                         setDashboardSubTab('playstore-audit');
                       }}
-                      className={`pb-3 px-4 text-sm font-bold border-b-2 transition-all flex items-center gap-2 cursor-pointer relative ${
+                      className={`pb-3 px-4 text-sm font-bold border-b-2 transition-all flex items-center gap-2 cursor-pointer relative shrink-0 whitespace-nowrap ${
                         dashboardSubTab === 'playstore-audit'
                           ? 'border-amber-500 text-amber-500'
                           : 'border-transparent text-slate-400 hover:text-slate-250 dark:hover:text-slate-250'
@@ -2537,7 +2588,7 @@ export default function App() {
 
                 {dashboardSubTab === 'inventory' && (
                   /* 3. My Listings list vs Tracks Purchased items split layout */
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 animate-fade-in">
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 animate-fade-in">
                     
                     {/* Left: Listings posted by currently logged in User */}
                     <div className="space-y-4">
@@ -2546,7 +2597,7 @@ export default function App() {
                       </h3>
 
                       {listings.filter(item => item.sellerId === user.uid).length === 0 ? (
-                        <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-850 p-6 text-center text-slate-500">
+                        <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-850 p-4 text-center text-slate-500">
                           <p className="text-xs">{language === "bn" ? "আপনি এখনো কোনো প্রোডাক্ট পোস্ট করেননি" : "You have not listed any car parts yet."}</p>
                           <button
                             onClick={() => setActiveTab("sell")}
@@ -2629,7 +2680,7 @@ export default function App() {
                       </h4>
 
                       {purchases.length === 0 ? (
-                        <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-850 p-6 text-center text-slate-500">
+                        <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-850 p-4 text-center text-slate-500">
                           <p className="text-xs">{language === "bn" ? "কোন অর্ডার বা কেনাকাটার ট্র্যাক ইতিহাস নেই!" : "Empty. Click 'Buy / Order This Part' on any detail card to simulate."}</p>
                         </div>
                       ) : (
@@ -2699,12 +2750,12 @@ export default function App() {
                   <div className="space-y-6 animate-fade-in" id="dashboard-my-shop-section">
                     
                     {/* Shop profile overview card */}
-                    <div className="bg-gradient-to-br from-slate-950 to-slate-900 border border-slate-800 rounded-2xl p-6 relative overflow-hidden shadow-xl">
+                    <div className="bg-gradient-to-br from-slate-950 to-slate-900 border border-slate-800 rounded-2xl p-4 relative overflow-hidden shadow-xl">
                       <div className="absolute top-0 right-0 p-8 text-amber-500/5 select-none pointer-events-none">
                         <ShoppingBag className="w-48 h-48" />
                       </div>
 
-                      <div className="flex flex-col md:flex-row items-center md:items-start justify-between gap-6 z-10 relative">
+                      <div className="flex flex-col md:flex-row items-center md:items-start justify-between gap-4 z-10 relative">
                         <div className="flex flex-col md:flex-row items-center gap-5 text-center md:text-left">
                           <img 
                             src={user.photoURL || `https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80`} 
@@ -2744,7 +2795,7 @@ export default function App() {
                         </div>
 
                         {/* Stats Metrics Grid */}
-                        <div className="flex gap-6 border-t md:border-t-0 md:border-l border-slate-800 pt-4 md:pt-0 md:pl-8 w-full md:w-auto justify-around md:justify-end">
+                        <div className="flex gap-4 border-t md:border-t-0 md:border-l border-slate-800 pt-4 md:pt-0 md:pl-5 w-full md:w-auto justify-around md:justify-end">
                           <div className="text-center md:text-right">
                             <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block leading-none mb-1.5">
                               {language === "bn" ? "মোট পোস্ট করা লিস্টিং" : "Total Posted"}
@@ -2773,7 +2824,7 @@ export default function App() {
                       </h4>
 
                       {listings.filter(item => item.sellerId === user.uid && !item.isSold).length === 0 ? (
-                        <div className="text-center py-10 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-850 rounded-2xl p-6 text-slate-500 text-xs">
+                        <div className="text-center py-6 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-850 rounded-2xl p-4 text-slate-500 text-xs">
                           {language === "bn" 
                             ? "আপনার কোন সক্রিয় প্রোডাক্ট বা কার পার্টস লিস্টিং নেই! লিস্টিং যোগ করতে 'বিক্রি করুন' ট্যাবে যান।" 
                             : "You don't have any active listings. Go to the 'Sell Part' tab to add items!"}
@@ -2805,7 +2856,7 @@ export default function App() {
                           <Loader2 className="w-6 h-6 animate-spin text-amber-500" />
                         </div>
                       ) : currentUserReviews.length === 0 ? (
-                        <div className="p-6 bg-slate-50 dark:bg-slate-955 rounded-xl text-center text-slate-500 text-xs border border-slate-150 dark:border-slate-850">
+                        <div className="p-4 bg-slate-50 dark:bg-slate-955 rounded-xl text-center text-slate-500 text-xs border border-slate-150 dark:border-slate-850">
                           {language === "bn" 
                             ? "এখনো ক্রেতারা আপনাকে কোনো রিভিউ বা ফিডব্যাক দেননি।" 
                             : "No customer reviews yet. Build trust by completing orders and listing quality parts!"}
@@ -2835,10 +2886,10 @@ export default function App() {
 
                 {dashboardSubTab === 'ads' && (
                   /* Option B: Live Ad Campaign & Boost Manager Panel */
-                  <div className="space-y-8 animate-fade-in" id="ads-campaign-suite">
+                  <div className="space-y-5 animate-fade-in" id="ads-campaign-suite">
                     
                     {/* Header Suite Guide */}
-                    <div className="bg-slate-950 border border-slate-800 rounded-2xl p-6 relative overflow-hidden">
+                    <div className="bg-slate-950 border border-slate-800 rounded-2xl p-4 relative overflow-hidden">
                       <div className="absolute top-0 right-0 p-8 text-amber-500/5 select-none pointer-events-none">
                         <Sparkles className="w-36 h-36" />
                       </div>
@@ -2863,18 +2914,14 @@ export default function App() {
                         {language === "bn" ? "ধাপ ১: বিজ্ঞাপন প্যাকেজ এবং বুস্ট টিয়ার সিলেক্ট করুন" : "STEP 1: SELECT YOUR SPONSORSHIP TIER"}
                       </h5>
                       
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                         {AD_PACKAGES.map((pkg) => {
                           const isSelected = selectedPromoPkg?.id === pkg.id;
+                          const isExpanded = expandedAdPkgId === pkg.id;
                           return (
                             <div
                               key={pkg.id}
-                              onClick={() => {
-                                setSelectedPromoPkg(pkg);
-                                setAdPromoSuccess(false);
-                                setAdPromoError("");
-                              }}
-                              className={`rounded-2xl p-5 border transition-all cursor-pointer flex flex-col justify-between relative ${
+                              className={`rounded-2xl border transition-all relative overflow-hidden ${
                                 isSelected
                                   ? "bg-slate-900 border-amber-400 ring-2 ring-amber-400/20 text-white shadow-xl"
                                   : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-100 hover:border-slate-355"
@@ -2887,54 +2934,74 @@ export default function App() {
                                 </div>
                               )}
 
-                              <div>
-                                <span className={`text-[10px] font-extrabold uppercase tracking-widest px-2.5 py-1 rounded-full ${
-                                  pkg.id === 'pkg-featured' 
-                                    ? 'bg-rose-500/15 text-rose-500 border border-rose-500/10'
-                                    : pkg.id === 'pkg-premium'
-                                    ? 'bg-indigo-505/15 text-indigo-500 border border-indigo-500/10'
-                                    : 'bg-emerald-500/15 text-emerald-500 border border-emerald-500/10'
-                                }`}>
-                                  {language === "bn" ? pkg.nameBn : pkg.nameEn}
-                                </span>
-
-                                <div className="mt-4 mb-2 flex items-baseline gap-1">
-                                  <span className={`text-2xl font-black font-mono transition-colors ${isSelected ? "text-white" : "text-slate-900 dark:text-white"}`}>
-                                    ৳{pkg.price.toLocaleString("en-IN")}
+                              {/* Accordion header — সবসময় দেখা যাবে, ট্যাপ করলে খুলবে/বন্ধ হবে */}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setSelectedPromoPkg(pkg);
+                                  setAdPromoSuccess(false);
+                                  setAdPromoError("");
+                                  setExpandedAdPkgId(isExpanded ? null : pkg.id);
+                                }}
+                                className="w-full text-left p-4 flex items-center justify-between gap-2 cursor-pointer"
+                              >
+                                <div>
+                                  <span className={`text-[10px] font-extrabold uppercase tracking-widest px-2.5 py-1 rounded-full ${
+                                    pkg.id === 'pkg-featured' 
+                                      ? 'bg-rose-500/15 text-rose-500 border border-rose-500/10'
+                                      : pkg.id === 'pkg-premium'
+                                      ? 'bg-indigo-505/15 text-indigo-500 border border-indigo-500/10'
+                                      : 'bg-emerald-500/15 text-emerald-500 border border-emerald-500/10'
+                                  }`}>
+                                    {language === "bn" ? pkg.nameBn : pkg.nameEn}
                                   </span>
-                                  <span className={`text-xs ${isSelected ? "text-slate-300" : "text-slate-500 dark:text-slate-400"}`}>
-                                    / {language === "bn" ? `${pkg.durationDays} দিন` : `${pkg.durationDays} days`}
-                                  </span>
+                                  <div className="mt-2 flex items-baseline gap-1">
+                                    <span className={`text-xl font-black font-mono transition-colors ${isSelected ? "text-white" : "text-slate-900 dark:text-white"}`}>
+                                      ৳{pkg.price.toLocaleString("en-IN")}
+                                    </span>
+                                    <span className={`text-xs ${isSelected ? "text-slate-300" : "text-slate-500 dark:text-slate-400"}`}>
+                                      / {language === "bn" ? `${pkg.durationDays} দিন` : `${pkg.durationDays} days`}
+                                    </span>
+                                  </div>
                                 </div>
+                                <ChevronDown className={`w-4.5 h-4.5 shrink-0 transition-transform ${isExpanded ? "rotate-180" : ""} ${isSelected ? "text-slate-300" : "text-slate-400"}`} />
+                              </button>
 
-                                {/* Benefits bullet list */}
-                                <ul className="space-y-2 mt-4">
-                                  {(language === "bn" ? pkg.benefitsBn : pkg.benefitsEn).map((benefit, bIdx) => (
-                                    <li key={bIdx} className="flex items-start gap-1.5 leading-tight text-[11px]">
-                                      <Zap className="w-3.5 h-3.5 text-amber-400 mt-0.5 flex-shrink-0" />
-                                      <span className={`${isSelected ? "text-slate-200" : "text-slate-600 dark:text-slate-350"}`}>
-                                        {benefit}
-                                      </span>
-                                    </li>
-                                  ))}
-                                </ul>
-                              </div>
+                              {/* Accordion body — শুধু expand করলে দেখাবে */}
+                              {isExpanded && (
+                                <div className="px-4 pb-4">
+                                  <ul className="space-y-2">
+                                    {(language === "bn" ? pkg.benefitsBn : pkg.benefitsEn).map((benefit, bIdx) => (
+                                      <li key={bIdx} className="flex items-start gap-1.5 leading-tight text-[11px]">
+                                        <Zap className="w-3.5 h-3.5 text-amber-400 mt-0.5 flex-shrink-0" />
+                                        <span className={`${isSelected ? "text-slate-200" : "text-slate-600 dark:text-slate-350"}`}>
+                                          {benefit}
+                                        </span>
+                                      </li>
+                                    ))}
+                                  </ul>
 
-                              <div className="mt-6">
-                                <button
-                                  type="button"
-                                  className={`w-full py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                                    isSelected
-                                      ? "bg-amber-500 hover:bg-amber-600 text-slate-950 shadow-md"
-                                      : "bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-350"
-                                  }`}
-                                >
-                                  {isSelected 
-                                    ? (language === "bn" ? "প্যাকেজটি সিলেক্টেড" : "Selected Tier")
-                                    : (language === "bn" ? "প্যাকেজ নির্বাচন করুন" : "Select Tier")}
-                                </button>
-                              </div>
-
+                                  <div className="mt-4">
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setSelectedPromoPkg(pkg);
+                                        setAdPromoSuccess(false);
+                                        setAdPromoError("");
+                                      }}
+                                      className={`w-full py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                                        isSelected
+                                          ? "bg-amber-500 hover:bg-amber-600 text-slate-950 shadow-md"
+                                          : "bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-350"
+                                      }`}
+                                    >
+                                      {isSelected 
+                                        ? (language === "bn" ? "প্যাকেজটি সিলেক্টেড" : "Selected Tier")
+                                        : (language === "bn" ? "প্যাকেজ নির্বাচন করুন" : "Select Tier")}
+                                    </button>
+                                  </div>
+                                </div>
+                              )}
                             </div>
                           );
                         })}
@@ -2942,7 +3009,7 @@ export default function App() {
                     </div>
 
                     {/* Step 2: Campaign config wizard form */}
-                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 border-t border-slate-100 dark:border-slate-800 pt-8">
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 border-t border-slate-100 dark:border-slate-800 pt-5">
                       
                       {/* Left Block: Selector Form */}
                       <div className="lg:col-span-7 space-y-4">
@@ -3279,14 +3346,14 @@ export default function App() {
                     </div>
 
                     {/* Section 3: Active boosted list tracker */}
-                    <div className="space-y-4 border-t border-slate-100 dark:border-slate-800 pt-8">
+                    <div className="space-y-4 border-t border-slate-100 dark:border-slate-800 pt-5">
                       <h4 className="text-sm font-semibold text-slate-900 dark:text-white flex items-center gap-2">
                         <Sparkles className="w-4 h-4 text-amber-500 fill-amber-500 animate-pulse" />
                         {language === "bn" ? "আমার চলমান বিজ্ঞাপন এবং ক্যাম্পেইন ট্র্যাকিং" : "My Active Campaigns & Traffic Stats"}
                       </h4>
 
                       {listings.filter(item => item.sellerId === user.uid && item.isAd).length === 0 ? (
-                        <div className="bg-slate-50 dark:bg-slate-950 border border-dashed border-slate-200 dark:border-slate-800 rounded-xl p-6 text-center text-slate-500">
+                        <div className="bg-slate-50 dark:bg-slate-950 border border-dashed border-slate-200 dark:border-slate-800 rounded-xl p-4 text-center text-slate-500">
                           <p className="text-xs">{language === "bn" ? "আপনার প্রোফাইলে কোনো চলমান বিজ্ঞাপন ক্যাম্পেইন নেই।" : "No sponsored ad campaigns active for the current session. Choose a product above to boost!"}</p>
                         </div>
                       ) : (
@@ -3557,12 +3624,19 @@ export default function App() {
                     )}
                   </div>
 
-                  {/* Row 1.5: My Shop (আমার দোকান) */}
+                  {/* Row 1.5: My Shop (আমার দোকান) — এখন শুধু Dashboard-এ navigate করে, ডুপ্লিকেট কার্ড নেই */}
                   <div className="transition duration-150">
                     <button
                       type="button"
                       id="profile-row-myshop"
-                      onClick={() => setIsMyShopSectionOpen(!isMyShopSectionOpen)}
+                      onClick={() => {
+                        if (!user) {
+                          setIsAuthOpen(true);
+                          return;
+                        }
+                        setActiveTab("my-dashboard");
+                        setDashboardSubTab("my-shop");
+                      }}
                       className="w-full flex items-center justify-between p-4.5 hover:bg-slate-50 dark:hover:bg-slate-800/40 cursor-pointer text-left transition select-none"
                     >
                       <div className="flex items-center gap-3.5">
@@ -3578,122 +3652,8 @@ export default function App() {
                           </p>
                         </div>
                       </div>
-                      <div className="flex items-center gap-1 text-slate-400 dark:text-slate-500">
-                        {isMyShopSectionOpen ? (
-                          <span className="text-xs font-bold text-amber-500">{language === "bn" ? "বন্ধ করুন" : "Close"}</span>
-                        ) : (
-                          <span className="text-xs font-bold text-slate-400 dark:text-slate-550">{language === "bn" ? "খুলুন" : "Open"}</span>
-                        )}
-                        <ChevronRight className={`w-4 h-4 transition-transform duration-200 ${isMyShopSectionOpen ? "rotate-90 text-amber-500" : ""}`} />
-                      </div>
+                      <ChevronRight className="w-4 h-4 text-slate-400 dark:text-slate-500" />
                     </button>
-
-                    {/* Expandable My Shop details */}
-                    {isMyShopSectionOpen && (
-                      <div className="p-5 bg-slate-50/55 dark:bg-slate-950/35 border-t border-slate-100 dark:border-slate-800/60 animate-slide-down space-y-4">
-                        {user ? (
-                          <div className="space-y-4">
-                            <div className="flex items-center gap-3.5">
-                              <img 
-                                src={user.photoURL || `https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80`} 
-                                alt={user.displayName}
-                                className="w-12 h-12 rounded-full object-cover border-2 border-amber-500/80 shadow-md"
-                                referrerPolicy="no-referrer"
-                                onError={(e) => {
-                                  (e.target as HTMLImageElement).src = `https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80`;
-                                }}
-                              />
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-1.5 flex-wrap">
-                                  <h4 className="font-extrabold text-sm sm:text-base text-slate-800 dark:text-white truncate">
-                                    {user.displayName || user.email?.split("@")[0] || "Gari Bazar Seller"}
-                                  </h4>
-                                  <span className="text-[9px] font-extrabold bg-amber-500/15 text-amber-400 border border-amber-500/35 px-1.5 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-0.5">
-                                    <Sparkles className="w-2.5 h-2.5" />
-                                    {language === "bn" ? "ভেরিফাইড শপ" : "Verified Shop"}
-                                  </span>
-                                </div>
-                                <p className="text-xs text-slate-400 dark:text-slate-500 font-bold mt-0.5 flex items-center gap-1">
-                                  <MapPin className="w-3.5 h-3.5 text-amber-500" />
-                                  {userMetadata?.city || "Dhaka"}
-                                </p>
-                              </div>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-2 text-xs pt-1">
-                              <div className="bg-white dark:bg-slate-900 border border-slate-150/80 dark:border-slate-800 p-2.5 rounded-xl shadow-xs">
-                                <span className="text-[9px] text-slate-400 font-bold uppercase block">
-                                  {language === "bn" ? "মোট সক্রিয় পণ্য" : "Active Items"}
-                                </span>
-                                <span className="font-extrabold text-slate-750 dark:text-slate-205 block mt-0.5 font-mono text-sm">
-                                  {listings.filter(item => item.sellerId === user.uid && !item.isSold).length}
-                                </span>
-                              </div>
-                              <div className="bg-white dark:bg-slate-900 border border-slate-150/80 dark:border-slate-800 p-2.5 rounded-xl shadow-xs">
-                                <span className="text-[9px] text-slate-400 font-bold uppercase block">
-                                  {language === "bn" ? "কাস্টমার রেটিং" : "Customer Rating"}
-                                </span>
-                                <span className="font-extrabold text-amber-500 block mt-0.5 flex items-center gap-0.5 text-sm">
-                                  <Star className="w-3.5 h-3.5 fill-amber-500 text-amber-500" />
-                                  {currentUserReviews.length > 0 
-                                    ? `${(currentUserReviews.reduce((sum, r) => sum + r.rating, 0) / currentUserReviews.length).toFixed(1)}`
-                                    : "5.0"}
-                                </span>
-                              </div>
-                            </div>
-
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-2">
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setActiveSellerShopId(user.uid);
-                                  setActiveSellerShopFallback({
-                                    name: user.displayName || user.email?.split("@")[0] || "Gari Bazar Seller",
-                                    photo: user.photoURL,
-                                    location: userMetadata?.city || "Dhaka",
-                                    contact: userMetadata?.phoneNumber || user?.phoneNumber || ""
-                                  });
-                                }}
-                                className="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-black py-2.5 px-4 rounded-xl text-xs transition duration-200 flex items-center justify-center gap-1.5 shadow-md shadow-amber-500/10 cursor-pointer"
-                              >
-                                <ShoppingBag className="w-4 h-4 shrink-0" />
-                                <span>{language === "bn" ? "পাবলিক দোকান দেখুন" : "View Public Shop"}</span>
-                              </button>
-                              
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setActiveTab("my-dashboard");
-                                  setDashboardSubTab("my-shop");
-                                }}
-                                className="w-full bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-850 dark:text-white font-extrabold py-2.5 px-4 rounded-xl text-xs transition duration-200 flex items-center justify-center gap-1.5 cursor-pointer"
-                              >
-                                <Sparkles className="w-4 h-4 text-amber-500 shrink-0" />
-                                <span>{language === "bn" ? "ম্যানেজ করুন ও রিভিউ" : "Manage Shop & Reviews"}</span>
-                              </button>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="text-center py-2 space-y-3">
-                            <p className="text-xs text-slate-500 dark:text-slate-450 leading-relaxed font-bold">
-                              {language === "bn" 
-                                ? "আপনার দোকান পৃষ্ঠা দেখতে এবং কাস্টমাইজ করতে দয়া করে লগইন করুন।" 
-                                : "Please sign in to access and view your registered shop page."}
-                            </p>
-                            <div className="grid grid-cols-1 gap-2">
-                              <button
-                                type="button"
-                                onClick={() => setIsAuthOpen(true)}
-                                className="w-full bg-gradient-to-r from-amber-500 to-orange-550 hover:from-amber-600 hover:to-orange-605 text-slate-950 font-black py-2.5 px-4 rounded-xl text-xs transition duration-200 flex items-center justify-center gap-1.5 shadow-sm shadow-amber-550/15 cursor-pointer"
-                              >
-                                <User className="w-4 h-4 fill-slate-950 text-slate-950 shrink-0" />
-                                <span>{language === "bn" ? "লগইন করুন / রেজিস্ট্রেশন" : "Sign In / Register"}</span>
-                              </button>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    )}
                   </div>
 
                   {/* Row 2: Change language (ক্লিক করলে ডিয়েটাইল দেখাবে) */}
@@ -4058,6 +4018,7 @@ export default function App() {
           });
           setUserMetadata(sessionUser);
           setIsAuthOpen(false);
+          dismissInstallPrompt(true);
         }}
       />
 
