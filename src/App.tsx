@@ -1311,11 +1311,22 @@ export default function App() {
   // 5. Track views asynchronously when user reviews details
   const handleViewListingDetails = async (listing: PartListing) => {
     setSelectedListing(listing);
-    
+
+    const newViews = (listing.views || 0) + 1;
+
+    // Optimistically patch local state so the UI shows the new count immediately,
+    // without waiting for a manual refresh.
+    setFirebaseListings((prev) =>
+      prev.map((item) => (item.id === listing.id ? { ...item, views: newViews } : item))
+    );
+    setMoreListings((prev) =>
+      prev.map((item) => (item.id === listing.id ? { ...item, views: newViews } : item))
+    );
+
     try {
       const listingRef = doc(db, "listings", listing.id);
       await updateDoc(listingRef, {
-        views: (listing.views || 0) + 1
+        views: newViews
       });
     } catch (err) {
       console.warn("Could not increment view counter:", err);
@@ -4063,7 +4074,7 @@ export default function App() {
           currentUser={user}
           onClose={() => setPromotingListing(null)}
           onPromotionSuccess={() => {
-            // listing gets updated automatically via listener hook
+            window.dispatchEvent(new CustomEvent("gari_bazar_refreshed_data"));
           }}
         />
       )}
