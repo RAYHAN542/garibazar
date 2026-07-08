@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { db } from "../firebase";
+import { db, auth } from "../firebase";
 import { collection, addDoc, doc, onSnapshot, query, where, orderBy, getDoc, updateDoc } from "firebase/firestore";
 import { X, Copy, Check, ShieldAlert, Loader2, Coins, CheckCircle2, History, CreditCard, Sparkles, AlertCircle } from "lucide-react";
 import { SupportedLanguage } from "../types";
@@ -215,6 +215,43 @@ export function RefillModal({ isOpen, onClose, currentUser, language }: RefillMo
     } catch (err: any) {
       setError(err?.message || "Something went wrong. Please try again.");
     } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRealPaymentGateway = async () => {
+    if (!currentUser) return;
+    setLoading(true);
+    setError("");
+
+    try {
+      // 1. Create a pending refill_request first — the webhook will approve it once paid.
+      const docData = {
+        userId: currentUser.uid,
+        userName: currentUser.displayName || "Gari Bazar User",
+        amount: Number(amount),
+        status: "pending",
+        createdAt: new Date().toISOString()
+      };
+      const docRef = await addDoc(collection(db, "refill_requests"), docData);
+
+      // 2. Ask our server to open a UddoktaPay checkout session for this request.
+      const idToken = await auth.currentUser?.getIdToken();
+      const res = await fetch("/api/payment/create-charge", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
+        body: JSON.stringify({ requestId: docRef.id })
+      });
+      const data = await res.json();
+
+      if (!res.ok || !data.payment_url) {
+        throw new Error(data.error || "পেমেন্ট গেটওয়ে শুরু করা যায়নি।");
+      }
+
+      // 3. Send the user to the real UddoktaPay checkout page.
+      window.location.href = data.payment_url;
+    } catch (err: any) {
+      setError(err?.message || "কিছু ভুল হয়েছে। আবার চেষ্টা করুন।");
       setLoading(false);
     }
   };
@@ -437,13 +474,18 @@ export function RefillModal({ isOpen, onClose, currentUser, language }: RefillMo
             {/* Launch Checkout button */}
             <button
               type="button"
-              onClick={() => setIsPortalOpen(true)}
-              className="w-full py-3.5 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-xs rounded-xl uppercase tracking-wider transition flex items-center justify-center gap-2 shadow-lg shadow-amber-500/15 cursor-pointer"
+              onClick={handleRealPaymentGateway}
+              disabled={loading}
+              className="w-full py-3.5 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-xs rounded-xl uppercase tracking-wider transition flex items-center justify-center gap-2 shadow-lg shadow-amber-500/15 cursor-pointer disabled:opacity-60"
             >
-              <CreditCard className="w-4 h-4 text-slate-950" />
+              {loading ? (
+                <Loader2 className="w-4 h-4 text-slate-950 animate-spin" />
+              ) : (
+                <CreditCard className="w-4 h-4 text-slate-950" />
+              )}
               <span>
                 {language === "bn" 
-                  ? `৳${amount.toLocaleString()} সরাসরি পেমেন্ট করুন (স্বয়ংক্রিয় গেটওয়ে)` 
+                  ? `৳${amount.toLocaleString()} সরাসরি পেমেন্ট করুন (স্বয়ংক্রিয় গেটওয়ে)` 
                   : `Proceed to Pay ৳${amount.toLocaleString()} (Instant Gateway)`}
               </span>
             </button>
