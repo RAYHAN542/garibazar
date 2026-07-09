@@ -67,9 +67,15 @@ import DataDeletionPage from "./components/DataDeletionPage";
 import SellerAnalyticsGraph from "./components/SellerAnalyticsGraph";
 import { SellerShopPage } from "./components/SellerShopPage";
 import Fuse from "fuse.js";
+<<<<<<< HEAD
+import { buildSearchBlob, convertBengaliDigitsToEnglish, convertEnglishDigitsToBengali, toPhoneticKey } from "./searchAliases";
+import { MessageSquare, Cpu, SlidersHorizontal, Moon, Sun, Users, HelpCircle, Mail, FileText, ArrowRight, Menu, Download, ChevronDown, Check } from "lucide-react";
+import vehicleCardImg from "./assets/images/vehicle-banner.jpg";
+=======
 import { buildSearchBlob, convertBengaliDigitsToEnglish, convertEnglishDigitsToBengali } from "./searchAliases";
 import { MessageSquare, Cpu, SlidersHorizontal, Moon, Sun, Users, HelpCircle, Mail, FileText, ArrowRight, Menu, Download, ChevronDown } from "lucide-react";
 import vehicleCardImg from "./assets/images/vehicle-card.png";
+>>>>>>> 7af5fd79b4b4588bfad411ceb497812cbe0b3d75
 import partsCardImg from "./assets/images/parts-card.png";
 
 const HOME_CATEGORIES = [
@@ -1421,6 +1427,10 @@ export default function App() {
       const words = queryLower.split(/\s+/).filter(w => w.trim().length > 1);
       const engWords = words.map(w => convertBengaliDigitsToEnglish(w));
       const bngWords = words.map(w => convertEnglishDigitsToBengali(w));
+
+      // Bangla<->English phonetic key, so "gari" finds Bengali posts and vice versa
+      const queryPhonetic = toPhoneticKey(queryLower);
+      const phoneticWords = words.map(w => toPhoneticKey(w));
       
       const searchOptions = Array.from(new Set([
         queryLower,
@@ -1429,9 +1439,12 @@ export default function App() {
         queryLower.replace(/\s+/g, ""),
         queryEnglishDigits.replace(/\s+/g, ""),
         queryBengaliDigits.replace(/\s+/g, ""),
+        queryPhonetic,
+        queryPhonetic.replace(/\s+/g, ""),
         ...words,
         ...engWords,
-        ...bngWords
+        ...bngWords,
+        ...phoneticWords
       ])).filter(Boolean);
       
       let matchedItems: any[] = [];
@@ -2398,37 +2411,31 @@ export default function App() {
               <div className="space-y-4 animate-fade-in">
 
                 {/* 2. Marketing Analytics cards */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div className="bg-white dark:bg-slate-900 rounded-xl p-3 border border-slate-200 dark:border-slate-800 shadow-sm flex items-center gap-3">
-                    <div className="p-2.5 bg-blue-500/10 text-blue-500 rounded-xl">
-                      <Grid className="w-4.5 h-4.5" />
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="bg-white dark:bg-slate-900 rounded-xl p-2.5 border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col items-center text-center gap-1">
+                    <div className="p-1.5 bg-blue-500/10 text-blue-500 rounded-lg">
+                      <Grid className="w-3.5 h-3.5" />
                     </div>
-                    <div>
-                      <span className="text-[10px] uppercase font-bold text-slate-400 block">{activeTranslations.statsActive}</span>
-                      <span className="text-base font-black text-slate-800 dark:text-white">{listings.filter(item => item.sellerId === user.uid).length}</span>
-                    </div>
+                    <span className="text-[8px] sm:text-[9px] uppercase font-bold text-slate-400 leading-tight">{activeTranslations.statsActive}</span>
+                    <span className="text-sm font-black text-slate-800 dark:text-white">{listings.filter(item => item.sellerId === user.uid).length}</span>
                   </div>
 
-                  <div className="bg-white dark:bg-slate-900 rounded-xl p-3 border border-slate-200 dark:border-slate-800 shadow-sm flex items-center gap-3">
-                    <div className="p-2.5 bg-emerald-500/10 text-emerald-500 rounded-xl">
-                      <ShoppingBag className="w-4.5 h-4.5" />
+                  <div className="bg-white dark:bg-slate-900 rounded-xl p-2.5 border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col items-center text-center gap-1">
+                    <div className="p-1.5 bg-emerald-500/10 text-emerald-500 rounded-lg">
+                      <ShoppingBag className="w-3.5 h-3.5" />
                     </div>
-                    <div>
-                      <span className="text-[10px] uppercase font-bold text-slate-400 block">{language === "bn" ? "আমার ক্রুস ট্র্যাক" : "Total Tracked Orders"}</span>
-                      <span className="text-base font-black text-slate-800 dark:text-white">{purchases.filter(item => item.buyerId === user.uid).length}</span>
-                    </div>
+                    <span className="text-[8px] sm:text-[9px] uppercase font-bold text-slate-400 leading-tight">{language === "bn" ? "ক্রুস ট্র্যাক" : "Tracked Orders"}</span>
+                    <span className="text-sm font-black text-slate-800 dark:text-white">{purchases.filter(item => item.buyerId === user.uid).length}</span>
                   </div>
 
-                  <div className="bg-white dark:bg-slate-900 rounded-xl p-3 border border-slate-200 dark:border-slate-800 shadow-sm flex items-center gap-3">
-                    <div className="p-2.5 bg-indigo-500/10 text-indigo-500 rounded-xl">
-                      <Eye className="w-4.5 h-4.5" />
+                  <div className="bg-white dark:bg-slate-900 rounded-xl p-2.5 border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col items-center text-center gap-1">
+                    <div className="p-1.5 bg-indigo-500/10 text-indigo-500 rounded-lg">
+                      <Eye className="w-3.5 h-3.5" />
                     </div>
-                    <div>
-                      <span className="text-[10px] uppercase font-bold text-slate-400 block">{language === "bn" ? "মার্কেট ভিউস" : "Your Shop Views"}</span>
-                      <span className="text-base font-black text-slate-800 dark:text-white">
-                        {listings.filter(item => item.sellerId === user.uid).reduce((sum, current) => sum + (current.views ?? 0), 0) + 18}
-                      </span>
-                    </div>
+                    <span className="text-[8px] sm:text-[9px] uppercase font-bold text-slate-400 leading-tight">{language === "bn" ? "মার্কেট ভিউস" : "Shop Views"}</span>
+                    <span className="text-sm font-black text-slate-800 dark:text-white">
+                      {listings.filter(item => item.sellerId === user.uid).reduce((sum, current) => sum + (current.views ?? 0), 0) + 18}
+                    </span>
                   </div>
                 </div>
 
