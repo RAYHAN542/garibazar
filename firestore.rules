@@ -126,6 +126,11 @@ service cloud.firestore {
       allow update, delete: if isAdmin();
     }
 
+    // ---------- OTP CODES (server-only, written/read by Admin SDK from api/auth/*) ----------
+    match /otp_codes/{phone} {
+      allow read, write: if false;
+    }
+
     // ---------- Everything else: locked down ----------
     match /{document=**} {
       allow read, write: if false;
