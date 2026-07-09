@@ -67,15 +67,9 @@ import DataDeletionPage from "./components/DataDeletionPage";
 import SellerAnalyticsGraph from "./components/SellerAnalyticsGraph";
 import { SellerShopPage } from "./components/SellerShopPage";
 import Fuse from "fuse.js";
-<<<<<<< HEAD
 import { buildSearchBlob, convertBengaliDigitsToEnglish, convertEnglishDigitsToBengali, toPhoneticKey } from "./searchAliases";
 import { MessageSquare, Cpu, SlidersHorizontal, Moon, Sun, Users, HelpCircle, Mail, FileText, ArrowRight, Menu, Download, ChevronDown, Check } from "lucide-react";
 import vehicleCardImg from "./assets/images/vehicle-banner.jpg";
-=======
-import { buildSearchBlob, convertBengaliDigitsToEnglish, convertEnglishDigitsToBengali } from "./searchAliases";
-import { MessageSquare, Cpu, SlidersHorizontal, Moon, Sun, Users, HelpCircle, Mail, FileText, ArrowRight, Menu, Download, ChevronDown } from "lucide-react";
-import vehicleCardImg from "./assets/images/vehicle-card.png";
->>>>>>> 7af5fd79b4b4588bfad411ceb497812cbe0b3d75
 import partsCardImg from "./assets/images/parts-card.png";
 
 const HOME_CATEGORIES = [
