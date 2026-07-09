@@ -2060,9 +2060,6 @@ export default function App() {
                   <Check className="w-3.5 h-3.5" />
                 </span>
               )}
-              <span className="absolute bottom-3 right-3 w-7 h-7 rounded-full bg-sky-600 text-white flex items-center justify-center shadow-sm z-10">
-                <ArrowRight className="w-3.5 h-3.5" />
-              </span>
             </button>
           </div>
 
