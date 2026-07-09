@@ -86,7 +86,7 @@ export function PromotedSlider({ listings, language, onViewListing }: PromotedSl
         )}
 
         {/* Dark gradient so right-side text stays readable */}
-        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-black/35 to-black/85" />
+        <div className="absolute inset-0 bg-gradient-to-r from-transparent from-40% via-black/25 via-70% to-black/80" />
 
         {/* Top-Left Premium/Tier Badge */}
         <div className="absolute top-3.5 left-3.5 bg-amber-500 text-slate-950 font-black text-[9px] uppercase tracking-wider px-2 py-0.5 rounded-lg shadow-md z-10 flex items-center gap-1">
