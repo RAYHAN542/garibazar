@@ -2044,13 +2044,6 @@ export default function App() {
           </div>
 
 
-                {/* 🚀 Boost Ads slide-show */}
-                <PromotedSlider 
-                  listings={filteredListings} 
-                  language={language}
-                  onViewListing={handleViewListingDetails}
-                />
-
                 {/* 🛠️ Modern Filters & Dynamic Sorting Panel (Revealed dynamically!) */}
                 {showFilters && (
                   <div className="bg-slate-50 dark:bg-slate-900 border border-slate-150 dark:border-slate-800 rounded-2xl p-3.5 mb-4 space-y-3.5 shadow-xs animate-fade-in text-slate-850 dark:text-slate-200">
@@ -2194,6 +2187,13 @@ export default function App() {
                   </div>
                 </div>
               )}
+
+                {/* 🚀 Boost Ads slide-show */}
+                <PromotedSlider 
+                  listings={filteredListings} 
+                  language={language}
+                  onViewListing={handleViewListingDetails}
+                />
 
                 {/* 📲 PWA Install Prompt Banner — লগইন/রেজিস্টার করলে চিরতরে বন্ধ হয়ে যায় */}
                 {showInstallPrompt && (
