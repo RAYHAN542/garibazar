@@ -68,8 +68,8 @@ import SellerAnalyticsGraph from "./components/SellerAnalyticsGraph";
 import { SellerShopPage } from "./components/SellerShopPage";
 import Fuse from "fuse.js";
 import { buildSearchBlob, convertBengaliDigitsToEnglish, convertEnglishDigitsToBengali } from "./searchAliases";
-import { MessageSquare, Cpu, SlidersHorizontal, Moon, Sun, Users, HelpCircle, Mail, FileText, ArrowRight, Menu, Download, ChevronDown, Check } from "lucide-react";
-import vehicleCardImg from "./assets/images/vehicle-banner.jpg";
+import { MessageSquare, Cpu, SlidersHorizontal, Moon, Sun, Users, HelpCircle, Mail, FileText, ArrowRight, Menu, Download, ChevronDown } from "lucide-react";
+import vehicleCardImg from "./assets/images/vehicle-card.png";
 import partsCardImg from "./assets/images/parts-card.png";
 
 const HOME_CATEGORIES = [
@@ -2023,7 +2023,7 @@ export default function App() {
               <img
                 src={vehicleCardImg}
                 alt={language === "bn" ? "গাড়ি বেচা/কেনা" : "Vehicle Buy & Sell"}
-                className="w-full h-auto mt-auto rounded-lg"
+                className="w-full h-20 object-contain mt-auto"
               />
               {selectedCategory === "vehicles" && (
                 <span className="absolute top-2 right-2 w-6 h-6 rounded-full bg-amber-500 text-white flex items-center justify-center shadow-md z-10">
@@ -2053,13 +2053,16 @@ export default function App() {
               <img
                 src={partsCardImg}
                 alt={language === "bn" ? "গাড়ির পাট" : "Vehicle Parts"}
-                className="w-full h-auto mt-auto rounded-lg"
+                className="w-full h-20 object-contain mt-auto"
               />
               {selectedCategory === "spare_parts" && (
                 <span className="absolute top-2 right-2 w-6 h-6 rounded-full bg-sky-600 text-white flex items-center justify-center shadow-md z-10">
                   <Check className="w-3.5 h-3.5" />
                 </span>
               )}
+              <span className="absolute bottom-3 right-3 w-7 h-7 rounded-full bg-sky-600 text-white flex items-center justify-center shadow-sm z-10">
+                <ArrowRight className="w-3.5 h-3.5" />
+              </span>
             </button>
           </div>
 
@@ -3983,18 +3986,18 @@ export default function App() {
       </main>
 
       {/* 5. Footer with credit/disclaimers */}
-      <footer className="bg-slate-950 border-t border-slate-900 text-slate-500 text-xs py-8 mt-12">
+      <footer className="bg-slate-950 border-t border-slate-900 text-slate-500 text-xs py-8 pb-28 md:pb-8 mt-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center space-y-3">
-          <div className="flex items-center gap-1.5 justify-center text-slate-400 font-bold">
+          <div className="flex items-center gap-1.5 justify-center text-slate-300 font-bold">
             <Car className="w-4 h-4 text-amber-500" />
             <span>{language === "bn" ? "গাড়ি বাজার লিমিটেড" : "Gari Bazar Auto Parts Marketplace"}</span>
           </div>
-          <p className="max-w-md mx-auto leading-relaxed text-[11px] text-slate-500">
+          <p className="max-w-md mx-auto leading-relaxed text-[11px] text-slate-400">
             {language === "bn" 
               ? "গাড়ি ও বাইকের অরিজিনাল জেনুইন খুচরা যন্ত্রাংশের বিশ্বস্ত বাজার। স্পন্সরড বিজ্ঞাপনদাতাদের জন্য উন্নত অ্যাড ক্যাম্পেইন ও AI ডেসক্রিপশন জেনারেটর ইঞ্জিন।" 
               : "Bangladesh's premium online car parts listings deck. Refill your promotional wallet to test live boosted sponsored ad placement in real-time."}
           </p>
-          <div className="text-[10px] text-slate-650 flex flex-wrap gap-x-4 gap-y-1 justify-center pt-2">
+          <div className="text-[10px] text-slate-400 flex flex-wrap gap-x-4 gap-y-1 justify-center pt-2">
             <span>© 2026 Gari Bazar Tech</span>
             <span>•</span>
             <button 
