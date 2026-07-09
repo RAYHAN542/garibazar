@@ -1995,7 +1995,7 @@ export default function App() {
                 setSelectedCategory(nextCat);
                 setSelectedSubCategory("all");
               }}
-              className={`relative overflow-hidden rounded-2xl p-3.5 flex flex-col text-left cursor-pointer bg-gradient-to-br from-amber-50 to-amber-100 dark:from-slate-900 dark:to-slate-800 shadow-sm transition-all duration-150 ${
+              className={`relative overflow-hidden rounded-2xl p-3 flex flex-col text-left cursor-pointer bg-white dark:bg-gradient-to-br dark:from-slate-900 dark:to-slate-800 shadow-sm transition-all duration-150 ${
                 selectedCategory === "vehicles"
                   ? "ring-2 ring-amber-500 ring-offset-2 dark:ring-offset-slate-950 scale-[0.98]"
                   : "ring-1 ring-amber-200/60 dark:ring-slate-700"
@@ -2004,13 +2004,13 @@ export default function App() {
               <span className="font-black text-[15px] text-amber-800 dark:text-amber-300 leading-tight">
                 {language === "bn" ? "গাড়ি বেচা/কেনা" : "Vehicle Buy & Sell"}
               </span>
-              <span className="text-[10px] font-bold text-amber-700/70 dark:text-amber-400/70 leading-snug mt-1 mb-3">
+              <span className="text-[10px] font-bold text-amber-700/70 dark:text-amber-400/70 leading-snug mt-1 mb-2">
                 {language === "bn" ? "এক্সক্যাভেটর, ট্রাক, কার ও অন্যান্য নির্মাণ যানবাহন কিনুন বা বিক্রি করুন সহজে ও নিরাপদে" : "Buy or sell excavators, trucks, cars and other construction vehicles safely"}
               </span>
               <img
                 src={vehicleCardImg}
                 alt={language === "bn" ? "গাড়ি বেচা/কেনা" : "Vehicle Buy & Sell"}
-                className="w-full h-20 object-contain mt-auto"
+                className="w-full h-16 object-contain mt-auto"
               />
               {selectedCategory === "vehicles" && (
                 <span className="absolute top-2 right-2 w-6 h-6 rounded-full bg-amber-500 text-white flex items-center justify-center shadow-md z-10">
@@ -2025,7 +2025,7 @@ export default function App() {
                 setSelectedCategory(nextCat);
                 setSelectedSubCategory("all");
               }}
-              className={`relative overflow-hidden rounded-2xl p-3.5 flex flex-col text-left cursor-pointer bg-gradient-to-br from-sky-50 to-sky-100 dark:from-slate-900 dark:to-slate-800 shadow-sm transition-all duration-150 ${
+              className={`relative overflow-hidden rounded-2xl p-3 flex flex-col text-left cursor-pointer bg-white dark:bg-gradient-to-br dark:from-slate-900 dark:to-slate-800 shadow-sm transition-all duration-150 ${
                 selectedCategory === "spare_parts"
                   ? "ring-2 ring-sky-500 ring-offset-2 dark:ring-offset-slate-950 scale-[0.98]"
                   : "ring-1 ring-sky-200/60 dark:ring-slate-700"
@@ -2034,13 +2034,13 @@ export default function App() {
               <span className="font-black text-[15px] text-sky-800 dark:text-sky-300 leading-tight">
                 {language === "bn" ? "গাড়ির পাট" : "Vehicle Parts"}
               </span>
-              <span className="text-[10px] font-bold text-sky-700/70 dark:text-sky-400/70 leading-snug mt-1 mb-3">
+              <span className="text-[10px] font-bold text-sky-700/70 dark:text-sky-400/70 leading-snug mt-1 mb-2">
                 {language === "bn" ? "ইঞ্জিন, হাইড্রোলিক পাম্প, গিয়ারবক্স, ফিল্টার, ব্যাটারি ও আরও অনেক কিছু" : "Engines, hydraulic pumps, gearboxes, filters, batteries & more"}
               </span>
               <img
                 src={partsCardImg}
                 alt={language === "bn" ? "গাড়ির পাট" : "Vehicle Parts"}
-                className="w-full h-20 object-contain mt-auto"
+                className="w-full h-16 object-contain mt-auto"
               />
               {selectedCategory === "spare_parts" && (
                 <span className="absolute top-2 right-2 w-6 h-6 rounded-full bg-sky-600 text-white flex items-center justify-center shadow-md z-10">
