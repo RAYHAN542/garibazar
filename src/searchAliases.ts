@@ -48,6 +48,115 @@ export const SEARCH_ALIAS_GROUPS: string[][] = [
   ["caterpillar", "cat", "ক্যাটারপিলার", "ক্যাট"]
 ];
 
+// ---------------------------------------------------------------------------
+// Bengali <-> English phonetic matching
+// Converts Bengali script into a rough Latin phonetic key (e.g. "\u0997\u09be\u09dc\u09bf" -> "gari")
+// so that a listing written in one script can still be found by a query typed
+// in the other. This is a heuristic transliteration (not a linguistically
+// perfect one) tuned for search recall, paired with Fuse.js fuzzy matching to
+// absorb small spelling differences.
+// ---------------------------------------------------------------------------
+
+const BN_CONSONANTS: Record<string, string> = {
+  "\u0995": "k", "\u0996": "kh", "\u0997": "g", "\u0998": "gh", "\u0999": "ng",
+  "\u099a": "ch", "\u099b": "chh", "\u099c": "j", "\u099d": "jh", "\u099e": "n",
+  "\u099f": "t", "\u09a0": "th", "\u09a1": "d", "\u09a2": "dh", "\u09a3": "n",
+  "\u09a4": "t", "\u09a5": "th", "\u09a6": "d", "\u09a7": "dh", "\u09a8": "n",
+  "\u09aa": "p", "\u09ab": "ph", "\u09ac": "b", "\u09ad": "bh", "\u09ae": "m",
+  "\u09af": "j", "\u09b0": "r", "\u09b2": "l", "\u09b6": "sh", "\u09b7": "sh",
+  "\u09b8": "s", "\u09b9": "h", "\u09ce": "t"
+};
+
+// Bengali "nukta" (\u09bc) modifies the base letter's sound: \u09a1+\u09bc -> \u09a1\u09bc (r), \u09a2+\u09bc -> \u09a2\u09bc (rh),
+// \u09af+\u09bc -> \u09af\u09bc (y). In real-world text these are almost always stored as this
+// base-letter + combining-nukta sequence rather than a single precomposed
+// character, so we handle the modifier explicitly instead of as a map key.
+const BN_NUKTA = "\u09BC";
+const BN_NUKTA_OVERRIDE: Record<string, string> = { "\u09a1": "r", "\u09a2": "rh", "\u09af": "y" };
+
+const BN_INDEPENDENT_VOWELS: Record<string, string> = {
+  "\u0985": "o", "\u0986": "a", "\u0987": "i", "\u0988": "i", "\u0989": "u", "\u098a": "u",
+  "\u098b": "ri", "\u098f": "e", "\u0990": "oi", "\u0993": "o", "\u0994": "ou"
+};
+
+const BN_MATRAS: Record<string, string> = {
+  "\u09be": "a", "\u09bf": "i", "\u09c0": "i", "\u09c1": "u", "\u09c2": "u",
+  "\u09c3": "ri", "\u09c7": "e", "\u09c8": "oi", "\u09cb": "o", "\u09cc": "ou"
+};
+
+const BN_OTHER_MARKS: Record<string, string> = {
+  "\u0982": "ng", "\u0983": "h", "\u0981": ""
+};
+
+const BN_HASANT = "\u09cd";
+
+/**
+ * Converts mixed Bengali/English text into a rough Latin phonetic key.
+ * English/Latin characters pass through (lowercased) unchanged, so it's safe
+ * to call on any text regardless of script.
+ */
+export function toPhoneticKey(text: string): string {
+  if (!text) return "";
+  const chars = Array.from(text);
+  let out = "";
+  let i = 0;
+
+  while (i < chars.length) {
+    const ch = chars[i];
+
+    if (BN_CONSONANTS[ch]) {
+      let latin = BN_CONSONANTS[ch];
+      let consumed = 1;
+
+      // Consonant + nukta (e.g. base + nukta = retroflex flap) changes the sound
+      if (chars[i + 1] === BN_NUKTA) {
+        latin = BN_NUKTA_OVERRIDE[ch] || latin;
+        consumed = 2;
+      }
+
+      const next = chars[i + consumed];
+      if (next === BN_HASANT) {
+        out += latin; // suppressed inherent vowel
+        consumed += 1;
+      } else if (next && BN_MATRAS[next]) {
+        out += latin + BN_MATRAS[next];
+        consumed += 1;
+      } else {
+        out += latin + "o"; // default inherent vowel
+      }
+      i += consumed;
+      continue;
+    }
+
+    if (BN_INDEPENDENT_VOWELS[ch]) {
+      out += BN_INDEPENDENT_VOWELS[ch];
+      i += 1;
+      continue;
+    }
+
+    if (ch === BN_NUKTA) {
+      i += 1; // stray nukta with no preceding consonant, drop
+      continue;
+    }
+
+    if (BN_OTHER_MARKS[ch] !== undefined) {
+      out += BN_OTHER_MARKS[ch];
+      i += 1;
+      continue;
+    }
+
+    if (ch === BN_HASANT) {
+      i += 1; // stray hasant, drop
+      continue;
+    }
+
+    out += ch.toLowerCase();
+    i += 1;
+  }
+
+  return out;
+}
+
 export function convertBengaliDigitsToEnglish(text: string): string {
   const bDigits = ["০", "১", "২", "৩", "৪", "৫", "৬", "৭", "৮", "৯"];
   return text.split("").map((char) => {
@@ -138,6 +247,11 @@ export function buildSearchBlob(parts: (string | undefined)[]): string {
     }
   }
 
+  // Phonetic Bangla<->English key so a listing in one script is still found
+  // when searched in the other (e.g. a Bengali listing matches a "gari" query).
+  const phoneticKey = toPhoneticKey(rawText);
+  const collapsedPhonetic = phoneticKey.replace(/\s+/g, "");
+
   const partsList = [
     rawText,
     englishDigits,
@@ -145,6 +259,8 @@ export function buildSearchBlob(parts: (string | undefined)[]): string {
     collapsedOriginal,
     collapsedEnglish,
     collapsedBengali,
+    phoneticKey,
+    collapsedPhonetic,
     Array.from(collectedAliases).join(" "),
     Array.from(extraCombinations).join(" ")
   ];
