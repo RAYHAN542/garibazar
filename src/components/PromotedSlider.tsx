@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { PartListing, SupportedLanguage } from "../types";
-import { ChevronLeft, ChevronRight, MapPin, ArrowRight } from "lucide-react";
+import { MapPin, ArrowRight } from "lucide-react";
 
 interface PromotedSliderProps {
   listings: PartListing[];
@@ -23,9 +23,50 @@ export function PromotedSlider({ listings, language, onViewListing }: PromotedSl
     if (promotedListings.length <= 1) return;
     const interval = setInterval(() => {
       setCurrentIndex((prev) => (prev + 1) % promotedListings.length);
-    }, 5000);
+    }, 3000);
     return () => clearInterval(interval);
   }, [promotedListings.length]);
+
+  // 👉 হাত দিয়ে সোয়াইপ করার জন্য টাচ ট্র্যাকিং
+  const touchStartX = useRef<number | null>(null);
+  const touchDeltaX = useRef(0);
+  const didSwipe = useRef(false);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX;
+    touchDeltaX.current = 0;
+    didSwipe.current = false;
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (touchStartX.current === null) return;
+    touchDeltaX.current = e.touches[0].clientX - touchStartX.current;
+  };
+
+  const handleTouchEnd = () => {
+    const SWIPE_THRESHOLD = 40; // px
+    if (Math.abs(touchDeltaX.current) > SWIPE_THRESHOLD && promotedListings.length > 1) {
+      didSwipe.current = true;
+      if (touchDeltaX.current < 0) {
+        // বামে সোয়াইপ → পরের স্লাইড
+        setCurrentIndex((prev) => (prev + 1) % promotedListings.length);
+      } else {
+        // ডানে সোয়াইপ → আগের স্লাইড
+        setCurrentIndex((prev) => (prev - 1 + promotedListings.length) % promotedListings.length);
+      }
+    }
+    touchStartX.current = null;
+    touchDeltaX.current = 0;
+  };
+
+  const handleCardClick = () => {
+    // সোয়াইপ করার পর accidentally listing না খুলে যাওয়ার জন্য
+    if (didSwipe.current) {
+      didSwipe.current = false;
+      return;
+    }
+    onViewListing(currentItem);
+  };
 
   if (promotedListings.length === 0) {
     return null;
@@ -36,16 +77,6 @@ export function PromotedSlider({ listings, language, onViewListing }: PromotedSl
   if (!currentItem) {
     return null;
   }
-
-  const handleNext = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setCurrentIndex((prev) => (prev + 1) % promotedListings.length);
-  };
-
-  const handlePrev = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setCurrentIndex((prev) => (prev - 1 + promotedListings.length) % promotedListings.length);
-  };
 
   const toBanglaNumber = (num: number): string => {
     const banglaDigits = ["০", "১", "২", "৩", "৪", "৫", "৬", "৭", "৮", "৯"];
@@ -62,10 +93,13 @@ export function PromotedSlider({ listings, language, onViewListing }: PromotedSl
         </h3>
       </div>
 
-      {/* Main Slide Card */}
+      {/* Main Slide Card — swipeable */}
       <div
-        onClick={() => onViewListing(currentItem)}
-        className="relative group w-full aspect-[16/9.5] max-h-[195px] sm:max-h-[260px] md:max-h-[300px] rounded-2xl overflow-hidden bg-slate-950 border border-slate-800 shadow-[0_4px_16px_rgba(0,0,0,0.18)] hover:shadow-lg transition-all duration-300 cursor-pointer"
+        onClick={handleCardClick}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        className="relative group w-full aspect-[16/9.5] max-h-[195px] sm:max-h-[260px] md:max-h-[300px] rounded-2xl overflow-hidden bg-slate-950 border border-slate-800 shadow-[0_4px_16px_rgba(0,0,0,0.18)] hover:shadow-lg transition-all duration-300 cursor-pointer touch-pan-y"
       >
         {/* Full-bleed cover image */}
         {(currentItem.images?.[0] || currentItem.image) ? (
@@ -74,6 +108,7 @@ export function PromotedSlider({ listings, language, onViewListing }: PromotedSl
             alt={currentItem.title}
             className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-[1.03]"
             referrerPolicy="no-referrer"
+            draggable={false}
           />
         ) : (
           <div className="w-full h-full flex flex-col items-center justify-center text-slate-700">
@@ -98,28 +133,8 @@ export function PromotedSlider({ listings, language, onViewListing }: PromotedSl
           </span>
         </div>
 
-        {/* Custom Nav Arrows Center-Aligned */}
-        {promotedListings.length > 1 && (
-          <>
-            <button
-              onClick={handlePrev}
-              className="absolute left-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/35 hover:bg-black/60 backdrop-blur-xs flex items-center justify-center text-white transition-all cursor-pointer border border-white/10 z-15"
-              aria-label="Previous slide"
-            >
-              <ChevronLeft className="w-5 h-5 stroke-[2.5]" />
-            </button>
-            <button
-              onClick={handleNext}
-              className="absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/35 hover:bg-black/60 backdrop-blur-xs flex items-center justify-center text-white transition-all cursor-pointer border border-white/10 z-15"
-              aria-label="Next slide"
-            >
-              <ChevronRight className="w-5 h-5 stroke-[2.5]" />
-            </button>
-          </>
-        )}
-
         {/* Right-side Text Block: title, location, price, CTA button */}
-        <div className="absolute right-4 bottom-4 max-w-[58%] text-right text-white select-none">
+        <div className="absolute right-4 bottom-4 max-w-[58%] text-right text-white select-none z-10">
           <h4 className="font-sans font-bold text-[13px] sm:text-base leading-tight mb-1 drop-shadow-xs line-clamp-2">
             {currentItem.title}
           </h4>
