@@ -68,8 +68,8 @@ import { SellerShopPage } from "./components/SellerShopPage";
 import Fuse from "fuse.js";
 import { buildSearchBlob, convertBengaliDigitsToEnglish, convertEnglishDigitsToBengali, toPhoneticKey } from "./searchAliases";
 import { MessageSquare, Cpu, SlidersHorizontal, Moon, Sun, Users, HelpCircle, Mail, FileText, ArrowRight, Menu, Download, ChevronDown, Check } from "lucide-react";
-import vehicleCardImg from "./assets/images/vehicle-banner.jpg";
-import partsCardImg from "./assets/images/parts-card.png";
+import vehicleCardImg from "./assets/images/vehicle-card-new.png";
+import partsCardImg from "./assets/images/parts-card-new.png";
 
 const HOME_CATEGORIES = [
   { id: "all", bnName: "সব ক্যাটাগরি", enName: "All Categories" },
