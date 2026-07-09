@@ -68,8 +68,8 @@ import SellerAnalyticsGraph from "./components/SellerAnalyticsGraph";
 import { SellerShopPage } from "./components/SellerShopPage";
 import Fuse from "fuse.js";
 import { buildSearchBlob, convertBengaliDigitsToEnglish, convertEnglishDigitsToBengali } from "./searchAliases";
-import { MessageSquare, Cpu, SlidersHorizontal, Moon, Sun, Users, HelpCircle, Mail, FileText, ArrowRight, Menu, Download, ChevronDown } from "lucide-react";
-import vehicleCardImg from "./assets/images/vehicle-card.png";
+import { MessageSquare, Cpu, SlidersHorizontal, Moon, Sun, Users, HelpCircle, Mail, FileText, ArrowRight, Menu, Download, ChevronDown, Check } from "lucide-react";
+import vehicleCardImg from "./assets/images/vehicle-banner.jpg";
 import partsCardImg from "./assets/images/parts-card.png";
 
 const HOME_CATEGORIES = [
@@ -2023,7 +2023,7 @@ export default function App() {
               <img
                 src={vehicleCardImg}
                 alt={language === "bn" ? "গাড়ি বেচা/কেনা" : "Vehicle Buy & Sell"}
-                className="w-full h-20 object-contain mt-auto"
+                className="w-full h-auto mt-auto rounded-lg"
               />
               {selectedCategory === "vehicles" && (
                 <span className="absolute top-2 right-2 w-6 h-6 rounded-full bg-amber-500 text-white flex items-center justify-center shadow-md z-10">
@@ -2053,7 +2053,7 @@ export default function App() {
               <img
                 src={partsCardImg}
                 alt={language === "bn" ? "গাড়ির পাট" : "Vehicle Parts"}
-                className="w-full h-20 object-contain mt-auto"
+                className="w-full h-auto mt-auto rounded-lg"
               />
               {selectedCategory === "spare_parts" && (
                 <span className="absolute top-2 right-2 w-6 h-6 rounded-full bg-sky-600 text-white flex items-center justify-center shadow-md z-10">
