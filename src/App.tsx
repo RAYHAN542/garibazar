@@ -56,7 +56,6 @@ import { EditListingModal } from "./components/EditListingModal";
 import { AuthModal } from "./components/AuthModal";
 import { PromoteAdModal } from "./components/PromoteAdModal";
 import { AddPartForm } from "./components/AddPartForm";
-import { RefillModal } from "./components/RefillModal";
 import { AdminPanel } from "./components/AdminPanel";
 import { ChatView } from "./components/ChatView";
 import { PlayStoreDiagnostics } from "./components/PlayStoreDiagnostics";
@@ -360,7 +359,6 @@ export default function App() {
   
   // UI Triggers & Modals
   const [isAuthOpen, setIsAuthOpen] = useState(false);
-  const [isRefillModalOpen, setIsRefillModalOpen] = useState(false);
   const [isLegalOpen, setIsLegalOpen] = useState(false);
   const [selectedListing, setSelectedListing] = useState<PartListing | null>(null);
   const [promotingListing, setPromotingListing] = useState<PartListing | null>(null);
@@ -597,7 +595,7 @@ export default function App() {
 
   // Intercept browser back button to close active modal instead of exiting the page/iframe
   useEffect(() => {
-    const isAnyModalOpen = !!(isAuthOpen || selectedListing || promotingListing || editingListing || isRefillModalOpen || isLegalOpen);
+    const isAnyModalOpen = !!(isAuthOpen || selectedListing || promotingListing || editingListing || isLegalOpen);
 
     const handlePopState = () => {
       modalHistoryRef.current = false;
@@ -605,7 +603,6 @@ export default function App() {
       setSelectedListing(null);
       setPromotingListing(null);
       setEditingListing(null);
-      setIsRefillModalOpen(false);
       setIsLegalOpen(false);
     };
 
@@ -1091,15 +1088,6 @@ export default function App() {
       console.error("Error deleting listing:", err);
       alert(language === "bn" ? "মুছে ফেলতে ব্যর্থ হয়েছে" : "Failed to delete listing.");
     }
-  };
-
-  // 4. Quick simulated Recharge Wallet budget
-  const handleRechargeWallet = async () => {
-    if (!user) {
-      setIsAuthOpen(true);
-      return;
-    }
-    setIsRefillModalOpen(true);
   };
 
   // Instant automatical direct payment success callback like Daraz
@@ -2441,46 +2429,6 @@ export default function App() {
                   language={language}
                 />
 
-                {/* 3. Marketing Campaign Wallet Center (Clean version without Refer and Earn) */}
-                <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800/80 rounded-2xl p-5 shadow-sm relative overflow-hidden">
-                  <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-amber-500/5 to-orange-500/5 rounded-full blur-xl pointer-events-none"></div>
-                  
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-1.5">
-                        <Coins className="w-5 h-5 text-amber-505" />
-                        <h4 className="font-extrabold text-sm sm:text-base text-slate-800 dark:text-white tracking-tight">
-                          {language === "bn" ? "লিস্টিং কভারেজ ও মার্কেটিং বাজেট" : "Premium Campaign Wallet"}
-                        </h4>
-                      </div>
-                      <p className="text-[10px] sm:text-xs text-slate-400 dark:text-slate-450 leading-normal">
-                        {language === "bn" 
-                          ? "আপনার পার্টস বিক্রির তালিকাগুলো টপ-স্লাইডারে প্রমোট করার ডেমো পেমেন্ট ও রিচার্জ গেটওয়ে।" 
-                          : "Virtual sandbox ad balance used for testing listing spotlight bumps & carousel metrics."}
-                      </p>
-                    </div>
-
-                    <div className="flex items-center gap-2.5">
-                      <div className="text-right">
-                        <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider leading-none">
-                          {language === "bn" ? "চলতি বাজেট ব্যালেন্স" : "Ad Wallet Balance"}
-                        </span>
-                        <span className="text-xl sm:text-2xl font-black text-orange-650 dark:text-orange-400 font-mono">
-                          ৳{(userMetadata?.simulatedCredits ?? user?.simulatedCredits ?? 5000).toLocaleString("en-IN")}
-                        </span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={handleRechargeWallet}
-                        className="p-2 sm:px-3 sm:py-2 rounded-xl bg-orange-500 hover:bg-orange-650 text-white dark:text-slate-950 font-extrabold text-[10px] sm:text-xs transition flex items-center gap-1 shadow-md shadow-orange-500/20 cursor-pointer border-0"
-                      >
-                        <Plus className="w-4 h-4" />
-                        <span>{language === "bn" ? "রিফিল করুন" : "Refill"}</span>
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
                 {/* Dashboard Tab Toggles */}
                 <div className="flex overflow-x-auto no-scrollbar border-b border-slate-200 dark:border-slate-800" id="dash-tabs-bar">
                   <button
@@ -3561,21 +3509,13 @@ export default function App() {
                               </div>
                             </div>
 
-                            <div className="grid grid-cols-2 gap-2 text-xs pt-1">
+                            <div className="grid grid-cols-1 gap-2 text-xs pt-1">
                               <div className="bg-white dark:bg-slate-900 border border-slate-150/80 dark:border-slate-800 p-2.5 rounded-xl shadow-xs">
                                 <span className="text-[9px] text-slate-400 font-bold uppercase block">
                                   {language === "bn" ? "ফোন নম্বর" : "Phone Number"}
                                 </span>
                                 <span className="font-extrabold text-slate-750 dark:text-slate-205 block mt-0.5 font-mono">
                                   {userMetadata?.phoneNumber || user?.phoneNumber || "—"}
-                                </span>
-                              </div>
-                              <div className="bg-white dark:bg-slate-900 border border-slate-150/80 dark:border-slate-800 p-2.5 rounded-xl shadow-xs">
-                                <span className="text-[9px] text-slate-400 font-bold uppercase block">
-                                  {language === "bn" ? "ব্যালেন্স" : "Ad Wallet Balance"}
-                                </span>
-                                <span className="font-extrabold text-amber-550 block mt-0.5 font-mono">
-                                  ৳{(userMetadata?.simulatedCredits ?? user?.simulatedCredits ?? 5000).toLocaleString("en-IN")}
                                 </span>
                               </div>
                             </div>
@@ -4051,14 +3991,6 @@ export default function App() {
           }}
         />
       )}
-
-      {/* 4. Refill Ad Budget Wallet */}
-      <RefillModal
-        isOpen={isRefillModalOpen}
-        onClose={() => setIsRefillModalOpen(false)}
-        currentUser={userMetadata || user}
-        language={language}
-      />
 
       {/* 5. Simulated Direct Payment Portal for Campaign Promotions */}
       {isAdPortalOpen && (
