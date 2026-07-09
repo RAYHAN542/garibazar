@@ -1730,39 +1730,6 @@ export default function App() {
         </div>
       </header>
 
-      <header className="md:hidden sticky top-0 z-30 bg-white dark:bg-slate-900 border-b border-slate-150 dark:border-slate-800 shadow-xs">
-        <div className="flex justify-between items-center px-4 h-16">
-          <div className="flex items-center gap-2 cursor-pointer" onClick={() => setActiveTab("market")}>
-            <span className="text-2xl">🚜</span>
-            <div className="flex flex-col leading-none">
-              <h1 className="text-lg font-black tracking-tight text-slate-850 dark:text-white">
-                {language === "bn" ? "গাড়ি বাজার" : "Gari Bazar"}
-              </h1>
-              <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 flex items-center gap-0.5">
-                📍 {language === "bn" ? "ঢাকা, বাংলাদেশ" : "Dhaka, Bangladesh"}
-              </span>
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => setShowNotificationPrompt(true)}
-              className="relative p-2 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300"
-            >
-              <Bell className="w-5 h-5" />
-              {notificationPermission === "default" && (
-                <span className="absolute -top-0.5 -right-0.5 w-3 h-3 rounded-full bg-orange-500 border-2 border-white dark:border-slate-900"></span>
-              )}
-            </button>
-            <button
-              onClick={() => setActiveTab("profile")}
-              className="p-2 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300"
-            >
-              <Menu className="w-5 h-5" />
-            </button>
-          </div>
-        </div>
-      </header>
-
       {/* Mobile Sticky Bottom Navigation Dock (Perfect native App layout matching screenshot) */}
       <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white dark:bg-slate-950 border-t border-slate-300 dark:border-slate-800 shadow-[0_-8px_32px_rgba(0,0,0,0.12)] flex justify-around items-end pb-4 pt-2.5 px-2 text-[12px] antialiased">
         {/* Market */}
@@ -1936,6 +1903,27 @@ export default function App() {
                       )}
                     </div>
 
+                    {/* মোবাইলে হেডার বাদ দেওয়ার পর, ☰ মেনু ও 🔔 নোটিফিকেশন বাটন সার্চ বারের পাশে বসানো হলো */}
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab("profile")}
+                      className="md:hidden p-3 w-11 h-11 rounded-2xl border bg-white dark:bg-slate-900 border-slate-150 dark:border-slate-800 text-slate-600 dark:text-slate-300 flex items-center justify-center cursor-pointer shrink-0"
+                      title={language === "bn" ? "প্রোফাইল" : "Profile"}
+                    >
+                      <Menu className="w-5 h-5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowNotificationPrompt(true)}
+                      className="md:hidden relative p-3 w-11 h-11 rounded-2xl border bg-white dark:bg-slate-900 border-slate-150 dark:border-slate-800 text-slate-600 dark:text-slate-300 flex items-center justify-center cursor-pointer shrink-0"
+                      title={language === "bn" ? "নোটিফিকেশন" : "Notifications"}
+                    >
+                      <Bell className="w-5 h-5" />
+                      {notificationPermission === "default" && (
+                        <span className="absolute top-2 right-2 w-2.5 h-2.5 rounded-full bg-orange-500 border-2 border-white dark:border-slate-900"></span>
+                      )}
+                    </button>
+
                     {/* Reset/All Categories Button next to the 3-line filter button */}
                     {(selectedCategory !== "all" || selectedSubCategory !== "all" || selectedCity !== "all") && (
                       <button
@@ -2060,9 +2048,6 @@ export default function App() {
                   <Check className="w-3.5 h-3.5" />
                 </span>
               )}
-              <span className="absolute bottom-3 right-3 w-7 h-7 rounded-full bg-sky-600 text-white flex items-center justify-center shadow-sm z-10">
-                <ArrowRight className="w-3.5 h-3.5" />
-              </span>
             </button>
           </div>
 
