@@ -1,7 +1,7 @@
 import React, { useState, useRef } from "react";
 import { auth, db } from "../firebase";
 import { signInAnonymously, signInWithCustomToken } from "firebase/auth";
-import { doc, setDoc, collection, query, where, getDocs } from "firebase/firestore";
+import { doc, setDoc } from "firebase/firestore";
 import { X, Phone, User, MapPin, Loader2, Sparkles, Camera } from "lucide-react";
 import { CITIES } from "../translations";
 import { SupportedLanguage } from "../types";
@@ -78,7 +78,6 @@ export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModa
   const [step, setStep] = useState<"form" | "otp">("form");
   const [otpCode, setOtpCode] = useState("");
   const [otpTempIdToken, setOtpTempIdToken] = useState("");
-  const [otpExistingData, setOtpExistingData] = useState<any>(null);
   const [resendCooldown, setResendCooldown] = useState(0);
 
   React.useEffect(() => {
@@ -129,31 +128,16 @@ export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModa
 
     setLoading(true);
     try {
-      const usersCol = collection(db, "users");
-      const q = query(usersCol, where("phoneNumber", "==", cleanPhone));
-      const querySnap = await getDocs(q);
-      const existingUid = querySnap.empty ? null : querySnap.docs[0].id;
-      const existingData = querySnap.empty ? null : querySnap.docs[0].data();
-
-      if (isLogin && !existingUid) {
-        setError(language === "bn" ? "এই নম্বরে কোনো অ্যাকাউন্ট পাওয়া যায়নি।" : "No account found.");
-        setLoading(false);
-        return;
-      }
-      if (!isLogin && existingUid) {
-        setError(language === "bn" ? "এই নম্বরে অলরেডি একটি অ্যাকাউন্ট আছে।" : "Account already exists.");
-        setLoading(false);
-        return;
-      }
-
-      // ownership যাচাইয়ের জন্য anonymous session লাগবেই, backend request-এ পাঠানোর জন্য
+      // ownership যাচাইয়ের জন্য anonymous session লাগবেই, backend request-এ পাঠানোর জন্য।
+      // account থাকা/না-থাকা চেকটাও এখন সার্ভারেই হয় (Admin SDK দিয়ে) — client থেকে
+      // সরাসরি অন্য কারো ফোন নম্বর দিয়ে Firestore query করা rules-এ নিষেধ (privacy রক্ষায়)।
       const tempCredential = await signInAnonymously(auth);
       const tempIdToken = await tempCredential.user.getIdToken();
 
       const otpRes = await fetch("/api/auth/send-otp", {
         method: "POST",
         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${tempIdToken}` },
-        body: JSON.stringify({ phoneNumber: cleanPhone }),
+        body: JSON.stringify({ phoneNumber: cleanPhone, purpose: isLogin ? "login" : "register" }),
       });
       if (!otpRes.ok) {
         const errData = await otpRes.json().catch(() => ({}));
@@ -161,7 +145,6 @@ export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModa
       }
 
       setOtpTempIdToken(tempIdToken);
-      setOtpExistingData(existingData);
       setResendCooldown(60);
       setStep("otp");
     } catch (err: any) {
@@ -180,7 +163,7 @@ export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModa
       const otpRes = await fetch("/api/auth/send-otp", {
         method: "POST",
         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${otpTempIdToken}` },
-        body: JSON.stringify({ phoneNumber: cleanPhone }),
+        body: JSON.stringify({ phoneNumber: cleanPhone, purpose: isLogin ? "login" : "register" }),
       });
       if (!otpRes.ok) {
         const errData = await otpRes.json().catch(() => ({}));
@@ -220,7 +203,7 @@ export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModa
         // --- লগইন মোড: OTP-verified customToken দিয়ে আসল account-এ সাইন-ইন ---
         const finalCredential = await signInWithCustomToken(auth, verifyData.customToken);
         const realUid = finalCredential.user.uid;
-        const existingData = otpExistingData;
+        const existingData = verifyData.existingData;
 
         const sessionUser = {
           uid: realUid,

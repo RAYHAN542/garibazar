@@ -37,13 +37,26 @@ export default async function handler(req: any, res: any) {
     }
     await getAuth().verifyIdToken(idToken);
 
-    const { phoneNumber } = req.body || {};
+    const { phoneNumber, purpose } = req.body || {};
     const cleanPhone = String(phoneNumber || "").replace(/\D/g, "");
     if (cleanPhone.length !== 11) {
       return res.status(400).json({ error: "সঠিক ১১ ডিজিটের মোবাইল নম্বর দিন।" });
     }
 
     const db = getFirestore();
+
+    // Account existence check হয় এখানে (Admin SDK দিয়ে) — client থেকে সরাসরি
+    // Firestore query করলে rules ব্লক করে (অন্য কারো ফোন নম্বর দিয়ে খোঁজা যায় না, যেটা privacy-র জন্য ঠিক আছে)।
+    const userQuery = await db.collection("users").where("phoneNumber", "==", cleanPhone).limit(1).get();
+    const accountExists = !userQuery.empty;
+
+    if (purpose === "login" && !accountExists) {
+      return res.status(404).json({ error: "এই নম্বরে কোনো অ্যাকাউন্ট পাওয়া যায়নি।" });
+    }
+    if (purpose === "register" && accountExists) {
+      return res.status(409).json({ error: "এই নম্বরে অলরেডি একটি অ্যাকাউন্ট আছে।" });
+    }
+
     const otpRef = db.collection("otp_codes").doc(cleanPhone);
     const existing = await otpRef.get();
 

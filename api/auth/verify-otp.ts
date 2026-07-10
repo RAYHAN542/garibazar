@@ -78,9 +78,10 @@ export default async function handler(req: any, res: any) {
       if (querySnap.empty) {
         return res.status(404).json({ error: "এই নম্বরে কোনো অ্যাকাউন্ট পাওয়া যায়নি।" });
       }
-      const existingUid = querySnap.docs[0].id;
+      const existingDoc = querySnap.docs[0];
+      const existingUid = existingDoc.id;
       const customToken = await getAuth().createCustomToken(existingUid);
-      return res.status(200).json({ verified: true, customToken });
+      return res.status(200).json({ verified: true, customToken, existingData: existingDoc.data() });
     }
 
     return res.status(200).json({ verified: true });
