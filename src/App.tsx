@@ -3,10 +3,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useRef, lazy, Suspense } from "react";
 import { auth, db, logAnalyticsEvent } from "./firebase";
 import { onAuthStateChanged, signOut } from "firebase/auth";
-import { collection, onSnapshot, query, orderBy, getDocs, doc, setDoc, getDoc, updateDoc, where, addDoc, deleteDoc, limit, startAfter, DocumentSnapshot, increment } from "firebase/firestore";
+import { collection, onSnapshot, query, orderBy, getDocs, doc, setDoc, getDoc, updateDoc, where, addDoc, deleteDoc, limit, startAfter, DocumentSnapshot } from "firebase/firestore";
 import { 
   Car, 
   Search, 
@@ -51,25 +51,28 @@ import { PartListing, SupportedLanguage } from "./types";
 import { translations, CITIES, CATEGORIES, SAMPLE_LISTINGS, AD_PACKAGES } from "./translations";
 import { PromotedSlider } from "./components/PromotedSlider";
 import { ListingCard } from "./components/ListingCard";
-import { ListingDetailModal } from "./components/ListingDetailModal";
-import { EditListingModal } from "./components/EditListingModal";
-import { AuthModal } from "./components/AuthModal";
-import { PromoteAdModal } from "./components/PromoteAdModal";
-import { AddPartForm } from "./components/AddPartForm";
-import { AdminPanel } from "./components/AdminPanel";
-import { ChatView } from "./components/ChatView";
-import { PlayStoreDiagnostics } from "./components/PlayStoreDiagnostics";
-import SimulatedPaymentPortal from "./components/SimulatedPaymentPortal";
-import LegalHubModal from "./components/LegalHubModal";
-import PrivacyPolicyPage from "./components/PrivacyPolicyPage";
-import DataDeletionPage from "./components/DataDeletionPage";
-import SellerAnalyticsGraph from "./components/SellerAnalyticsGraph";
-import { SellerShopPage } from "./components/SellerShopPage";
+// 📦 নিচের কম্পোনেন্টগুলো lazy-loaded — এগুলোর কোড শুধু তখনই ডাউনলোড হবে যখন
+// ইউজার সত্যিই সেই অংশে যাবে (modal খুলবে/ট্যাব বদলাবে), শুরুতেই না।
+const ListingDetailModal = lazy(() => import("./components/ListingDetailModal").then(m => ({ default: m.ListingDetailModal })));
+const EditListingModal = lazy(() => import("./components/EditListingModal").then(m => ({ default: m.EditListingModal })));
+const AuthModal = lazy(() => import("./components/AuthModal").then(m => ({ default: m.AuthModal })));
+const PromoteAdModal = lazy(() => import("./components/PromoteAdModal").then(m => ({ default: m.PromoteAdModal })));
+const AddPartForm = lazy(() => import("./components/AddPartForm").then(m => ({ default: m.AddPartForm })));
+const RefillModal = lazy(() => import("./components/RefillModal").then(m => ({ default: m.RefillModal })));
+const AdminPanel = lazy(() => import("./components/AdminPanel").then(m => ({ default: m.AdminPanel })));
+const ChatView = lazy(() => import("./components/ChatView").then(m => ({ default: m.ChatView })));
+const PlayStoreDiagnostics = lazy(() => import("./components/PlayStoreDiagnostics").then(m => ({ default: m.PlayStoreDiagnostics })));
+const SimulatedPaymentPortal = lazy(() => import("./components/SimulatedPaymentPortal"));
+const LegalHubModal = lazy(() => import("./components/LegalHubModal"));
+const PrivacyPolicyPage = lazy(() => import("./components/PrivacyPolicyPage"));
+const DataDeletionPage = lazy(() => import("./components/DataDeletionPage"));
+const SellerAnalyticsGraph = lazy(() => import("./components/SellerAnalyticsGraph"));
+const SellerShopPage = lazy(() => import("./components/SellerShopPage").then(m => ({ default: m.SellerShopPage })));
 import Fuse from "fuse.js";
 import { buildSearchBlob, convertBengaliDigitsToEnglish, convertEnglishDigitsToBengali, toPhoneticKey } from "./searchAliases";
 import { MessageSquare, Cpu, SlidersHorizontal, Moon, Sun, Users, HelpCircle, Mail, FileText, ArrowRight, Menu, Download, ChevronDown, Check } from "lucide-react";
-import vehicleCardImg from "./assets/images/vehicle-card-new.png";
-import partsCardImg from "./assets/images/parts-card-new.png";
+import vehicleCardImg from "./assets/images/vehicle-banner.jpg";
+import partsCardImg from "./assets/images/parts-card.png";
 
 const HOME_CATEGORIES = [
   { id: "all", bnName: "সব ক্যাটাগরি", enName: "All Categories" },
@@ -359,6 +362,7 @@ export default function App() {
   
   // UI Triggers & Modals
   const [isAuthOpen, setIsAuthOpen] = useState(false);
+  const [isRefillModalOpen, setIsRefillModalOpen] = useState(false);
   const [isLegalOpen, setIsLegalOpen] = useState(false);
   const [selectedListing, setSelectedListing] = useState<PartListing | null>(null);
   const [promotingListing, setPromotingListing] = useState<PartListing | null>(null);
@@ -595,7 +599,7 @@ export default function App() {
 
   // Intercept browser back button to close active modal instead of exiting the page/iframe
   useEffect(() => {
-    const isAnyModalOpen = !!(isAuthOpen || selectedListing || promotingListing || editingListing || isLegalOpen);
+    const isAnyModalOpen = !!(isAuthOpen || selectedListing || promotingListing || editingListing || isRefillModalOpen || isLegalOpen);
 
     const handlePopState = () => {
       modalHistoryRef.current = false;
@@ -603,6 +607,7 @@ export default function App() {
       setSelectedListing(null);
       setPromotingListing(null);
       setEditingListing(null);
+      setIsRefillModalOpen(false);
       setIsLegalOpen(false);
     };
 
@@ -891,70 +896,41 @@ export default function App() {
     }
   };
 
-  // 3. Real-time Purchases Sync (filtered by buyerId/sellerContact — avoids reading every user's purchases)
-  const lastBuyerDocRef = useRef<DocumentSnapshot | null>(null);
-  const lastSellerDocRef = useRef<DocumentSnapshot | null>(null);
+  // 3. Real-time Purchases Sync (capped to 20 documents)
   useEffect(() => {
     if (!user) {
       setFirebasePurchases([]);
       setMorePurchases([]);
       setLastPurchasesDoc(null);
       setHasMorePurchases(false);
-      lastBuyerDocRef.current = null;
-      lastSellerDocRef.current = null;
       return;
     }
 
-    let buyerDocs: any[] = [];
-    let sellerDocs: any[] = [];
-    let buyerHasMore = false;
-    let sellerHasMore = false;
+    const q = query(collection(db, "purchases"), orderBy("createdAt", "desc"), limit(20));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      if (snapshot.empty) {
+        setFirebasePurchases([]);
+        setLastPurchasesDoc(null);
+        setHasMorePurchases(false);
+      } else {
+        const firestoreList: any[] = [];
+        snapshot.forEach((doc) => {
+          const data = doc.data();
+          if (data.buyerId === user.uid || data.sellerContact === userMetadata?.phoneNumber) {
+            firestoreList.push({ id: doc.id, ...data });
+          }
+        });
 
-    const mergeAndSet = () => {
-      const map = new Map<string, any>();
-      [...buyerDocs, ...sellerDocs].forEach((item) => map.set(item.id, item));
-      const merged = Array.from(map.values());
-      merged.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-      setFirebasePurchases(merged);
-      setHasMorePurchases(buyerHasMore || sellerHasMore);
-    };
-
-    const buyerQuery = query(
-      collection(db, "purchases"),
-      where("buyerId", "==", user.uid),
-      orderBy("createdAt", "desc"),
-      limit(20)
-    );
-    const unsubBuyer = onSnapshot(buyerQuery, (snapshot) => {
-      buyerDocs = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-      lastBuyerDocRef.current = snapshot.docs[snapshot.docs.length - 1] || null;
-      buyerHasMore = snapshot.docs.length === 20;
-      mergeAndSet();
+        setFirebasePurchases(firestoreList);
+        setLastPurchasesDoc(snapshot.docs[snapshot.docs.length - 1]);
+        setHasMorePurchases(snapshot.docs.length === 20);
+      }
     }, (err) => {
-      console.warn("Using offline buyer purchases:", err.message);
+      console.warn("Using offline purchases:", err);
     });
 
-    let unsubSeller = () => {};
-    if (userMetadata?.phoneNumber) {
-      const sellerQuery = query(
-        collection(db, "purchases"),
-        where("sellerContact", "==", userMetadata.phoneNumber),
-        orderBy("createdAt", "desc"),
-        limit(20)
-      );
-      unsubSeller = onSnapshot(sellerQuery, (snapshot) => {
-        sellerDocs = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-        lastSellerDocRef.current = snapshot.docs[snapshot.docs.length - 1] || null;
-        sellerHasMore = snapshot.docs.length === 20;
-        mergeAndSet();
-      }, (err) => {
-        console.warn("Using offline seller purchases:", err.message);
-      });
-    }
-
     return () => {
-      unsubBuyer();
-      unsubSeller();
+      unsubscribe();
     };
   }, [user, userMetadata?.phoneNumber]);
 
@@ -1005,53 +981,42 @@ export default function App() {
     };
   }, [firebasePurchases, morePurchases]);
 
-  // 3c. Purchases Pagination Loader helper (buyer + seller, filtered)
+  // 3c. Purchases Pagination Loader helper
   const handleLoadMorePurchases = async () => {
-    if (!user || (!lastBuyerDocRef.current && !lastSellerDocRef.current) || loadingMorePurchases) return;
+    if (!user || !lastPurchasesDoc || loadingMorePurchases) return;
     setLoadingMorePurchases(true);
     try {
-      const nextList: any[] = [];
-      let stillMore = false;
-
-      if (lastBuyerDocRef.current) {
-        const buyerQ = query(
-          collection(db, "purchases"),
-          where("buyerId", "==", user.uid),
-          orderBy("createdAt", "desc"),
-          startAfter(lastBuyerDocRef.current),
-          limit(20)
-        );
-        const buyerSnap = await getDocs(buyerQ);
-        buyerSnap.docs.forEach((doc) => nextList.push({ id: doc.id, ...doc.data() }));
-        lastBuyerDocRef.current = buyerSnap.docs[buyerSnap.docs.length - 1] || null;
-        if (buyerSnap.docs.length === 20) stillMore = true;
-      }
-
-      if (userMetadata?.phoneNumber && lastSellerDocRef.current) {
-        const sellerQ = query(
-          collection(db, "purchases"),
-          where("sellerContact", "==", userMetadata.phoneNumber),
-          orderBy("createdAt", "desc"),
-          startAfter(lastSellerDocRef.current),
-          limit(20)
-        );
-        const sellerSnap = await getDocs(sellerQ);
-        sellerSnap.docs.forEach((doc) => nextList.push({ id: doc.id, ...doc.data() }));
-        lastSellerDocRef.current = sellerSnap.docs[sellerSnap.docs.length - 1] || null;
-        if (sellerSnap.docs.length === 20) stillMore = true;
-      }
-
-      setMorePurchases(prev => {
-        const combined = [...prev];
-        nextList.forEach(item => {
-          if (!combined.some(existing => existing.id === item.id)) {
-            combined.push(item);
+      const q = query(
+        collection(db, "purchases"),
+        orderBy("createdAt", "desc"),
+        startAfter(lastPurchasesDoc),
+        limit(20)
+      );
+      const snapshot = await getDocs(q);
+      if (snapshot.empty) {
+        setHasMorePurchases(false);
+      } else {
+        const nextList: any[] = [];
+        snapshot.forEach((doc) => {
+          const data = doc.data();
+          if (data.buyerId === user.uid || data.sellerContact === userMetadata?.phoneNumber) {
+            nextList.push({ id: doc.id, ...data });
           }
         });
-        return combined;
-      });
 
-      setHasMorePurchases(stillMore);
+        setMorePurchases(prev => {
+          const combined = [...prev];
+          nextList.forEach(item => {
+            if (!combined.some(existing => existing.id === item.id)) {
+              combined.push(item);
+            }
+          });
+          return combined;
+        });
+
+        setLastPurchasesDoc(snapshot.docs[snapshot.docs.length - 1]);
+        setHasMorePurchases(snapshot.docs.length === 20);
+      }
     } catch (err) {
       console.warn("Failed to load more purchases:", err);
     } finally {
@@ -1128,6 +1093,15 @@ export default function App() {
       console.error("Error deleting listing:", err);
       alert(language === "bn" ? "মুছে ফেলতে ব্যর্থ হয়েছে" : "Failed to delete listing.");
     }
+  };
+
+  // 4. Quick simulated Recharge Wallet budget
+  const handleRechargeWallet = async () => {
+    if (!user) {
+      setIsAuthOpen(true);
+      return;
+    }
+    setIsRefillModalOpen(true);
   };
 
   // Instant automatical direct payment success callback like Daraz
@@ -1338,16 +1312,14 @@ export default function App() {
     }
   };
 
-  // 5. Track views asynchronously when user reviews details (also records real per-day stats)
+  // 5. Track views asynchronously when user reviews details
   const handleViewListingDetails = async (listing: PartListing) => {
     setSelectedListing(listing);
-
+    
     try {
       const listingRef = doc(db, "listings", listing.id);
-      const todayKey = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
       await updateDoc(listingRef, {
-        views: (listing.views || 0) + 1,
-        [`dailyStats.${todayKey}.views`]: increment(1)
+        views: (listing.views || 0) + 1
       });
     } catch (err) {
       console.warn("Could not increment view counter:", err);
@@ -1605,33 +1577,37 @@ export default function App() {
 
   if (isStandalonePrivacy) {
     return (
-      <PrivacyPolicyPage 
-        language={language}
-        standalone={true}
-        onBack={() => {
-          setIsStandalonePrivacy(false);
-          if (typeof window !== "undefined" && window.history.pushState) {
-            const cleanUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
-            window.history.pushState({ path: cleanUrl }, "", cleanUrl);
-          }
-        }}
-      />
+      <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><Loader2 className="w-6 h-6 animate-spin text-amber-500" /></div>}>
+        <PrivacyPolicyPage 
+          language={language}
+          standalone={true}
+          onBack={() => {
+            setIsStandalonePrivacy(false);
+            if (typeof window !== "undefined" && window.history.pushState) {
+              const cleanUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
+              window.history.pushState({ path: cleanUrl }, "", cleanUrl);
+            }
+          }}
+        />
+      </Suspense>
     );
   }
 
   if (isStandaloneDeletion) {
     return (
-      <DataDeletionPage
-        language={language}
-        standalone={true}
-        onBack={() => {
-          setIsStandaloneDeletion(false);
-          if (typeof window !== "undefined" && window.history.pushState) {
-            const cleanUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
-            window.history.pushState({ path: cleanUrl }, "", cleanUrl);
-          }
-        }}
-      />
+      <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><Loader2 className="w-6 h-6 animate-spin text-amber-500" /></div>}>
+        <DataDeletionPage
+          language={language}
+          standalone={true}
+          onBack={() => {
+            setIsStandaloneDeletion(false);
+            if (typeof window !== "undefined" && window.history.pushState) {
+              const cleanUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
+              window.history.pushState({ path: cleanUrl }, "", cleanUrl);
+            }
+          }}
+        />
+      </Suspense>
     );
   }
 
@@ -2025,7 +2001,7 @@ export default function App() {
                 setSelectedCategory(nextCat);
                 setSelectedSubCategory("all");
               }}
-              className={`relative overflow-hidden rounded-2xl p-2 flex flex-col text-left cursor-pointer bg-white dark:bg-gradient-to-br dark:from-slate-900 dark:to-slate-800 shadow-sm transition-all duration-150 ${
+              className={`relative overflow-hidden rounded-2xl p-3.5 flex flex-col text-left cursor-pointer bg-gradient-to-br from-amber-50 to-amber-100 dark:from-slate-900 dark:to-slate-800 shadow-sm transition-all duration-150 ${
                 selectedCategory === "vehicles"
                   ? "ring-2 ring-amber-500 ring-offset-2 dark:ring-offset-slate-950 scale-[0.98]"
                   : "ring-1 ring-amber-200/60 dark:ring-slate-700"
@@ -2034,13 +2010,13 @@ export default function App() {
               <span className="font-black text-[15px] text-amber-800 dark:text-amber-300 leading-tight">
                 {language === "bn" ? "গাড়ি বেচা/কেনা" : "Vehicle Buy & Sell"}
               </span>
-              <span className="text-[10px] font-bold text-amber-700/70 dark:text-amber-400/70 leading-snug mt-0.5 mb-1">
+              <span className="text-[10px] font-bold text-amber-700/70 dark:text-amber-400/70 leading-snug mt-1 mb-3">
                 {language === "bn" ? "এক্সক্যাভেটর, ট্রাক, কার ও অন্যান্য নির্মাণ যানবাহন কিনুন বা বিক্রি করুন সহজে ও নিরাপদে" : "Buy or sell excavators, trucks, cars and other construction vehicles safely"}
               </span>
               <img
                 src={vehicleCardImg}
                 alt={language === "bn" ? "গাড়ি বেচা/কেনা" : "Vehicle Buy & Sell"}
-                className="w-full h-auto max-h-16 object-contain mt-auto"
+                className="w-full h-20 object-contain mt-auto"
               />
               {selectedCategory === "vehicles" && (
                 <span className="absolute top-2 right-2 w-6 h-6 rounded-full bg-amber-500 text-white flex items-center justify-center shadow-md z-10">
@@ -2055,7 +2031,7 @@ export default function App() {
                 setSelectedCategory(nextCat);
                 setSelectedSubCategory("all");
               }}
-              className={`relative overflow-hidden rounded-2xl p-2 flex flex-col text-left cursor-pointer bg-white dark:bg-gradient-to-br dark:from-slate-900 dark:to-slate-800 shadow-sm transition-all duration-150 ${
+              className={`relative overflow-hidden rounded-2xl p-3.5 flex flex-col text-left cursor-pointer bg-gradient-to-br from-sky-50 to-sky-100 dark:from-slate-900 dark:to-slate-800 shadow-sm transition-all duration-150 ${
                 selectedCategory === "spare_parts"
                   ? "ring-2 ring-sky-500 ring-offset-2 dark:ring-offset-slate-950 scale-[0.98]"
                   : "ring-1 ring-sky-200/60 dark:ring-slate-700"
@@ -2064,13 +2040,13 @@ export default function App() {
               <span className="font-black text-[15px] text-sky-800 dark:text-sky-300 leading-tight">
                 {language === "bn" ? "গাড়ির পাট" : "Vehicle Parts"}
               </span>
-              <span className="text-[10px] font-bold text-sky-700/70 dark:text-sky-400/70 leading-snug mt-0.5 mb-1">
+              <span className="text-[10px] font-bold text-sky-700/70 dark:text-sky-400/70 leading-snug mt-1 mb-3">
                 {language === "bn" ? "ইঞ্জিন, হাইড্রোলিক পাম্প, গিয়ারবক্স, ফিল্টার, ব্যাটারি ও আরও অনেক কিছু" : "Engines, hydraulic pumps, gearboxes, filters, batteries & more"}
               </span>
               <img
                 src={partsCardImg}
                 alt={language === "bn" ? "গাড়ির পাট" : "Vehicle Parts"}
-                className="w-full h-auto max-h-16 object-contain mt-auto"
+                className="w-full h-20 object-contain mt-auto"
               />
               {selectedCategory === "spare_parts" && (
                 <span className="absolute top-2 right-2 w-6 h-6 rounded-full bg-sky-600 text-white flex items-center justify-center shadow-md z-10">
@@ -2417,17 +2393,19 @@ export default function App() {
 
             {/* TAB 2: POST / SELL */}
             {activeTab === 'sell' && (
-              <AddPartForm 
-                language={language}
-                currentUser={userMetadata}
-                onPostSuccess={() => {
-                  setActiveTab("market");
-                }}
-                onLoginPrompt={() => {
-                  setIsAuthOpen(true);
-                }}
-                onViewListing={handleViewListingDetails}
-              />
+              <Suspense fallback={<div className="flex items-center justify-center py-16"><Loader2 className="w-6 h-6 animate-spin text-amber-500" /></div>}>
+                <AddPartForm 
+                  language={language}
+                  currentUser={userMetadata}
+                  onPostSuccess={() => {
+                    setActiveTab("market");
+                  }}
+                  onLoginPrompt={() => {
+                    setIsAuthOpen(true);
+                  }}
+                  onViewListing={handleViewListingDetails}
+                />
+              </Suspense>
             )}
 
             {/* TAB 3: USER DASHBOARD & TRACKING DESK */}
@@ -2458,18 +2436,60 @@ export default function App() {
                     </div>
                     <span className="text-[8px] sm:text-[9px] uppercase font-bold text-slate-400 leading-tight">{language === "bn" ? "মার্কেট ভিউস" : "Shop Views"}</span>
                     <span className="text-sm font-black text-slate-800 dark:text-white">
-                      {listings.filter(item => item.sellerId === user.uid).reduce((sum, current) => sum + (current.views ?? 0), 0)}
+                      {listings.filter(item => item.sellerId === user.uid).reduce((sum, current) => sum + (current.views ?? 0), 0) + 18}
                     </span>
                   </div>
                 </div>
 
                 {/* Seller Performance Analytics Graph */}
-                <SellerAnalyticsGraph
-                  listings={listings}
-                  purchases={purchases}
-                  userId={user.uid}
-                  language={language}
-                />
+                <Suspense fallback={<div className="flex items-center justify-center py-16"><Loader2 className="w-6 h-6 animate-spin text-amber-500" /></div>}>
+                  <SellerAnalyticsGraph
+                    listings={listings}
+                    purchases={purchases}
+                    userId={user.uid}
+                    language={language}
+                  />
+                </Suspense>
+
+                {/* 3. Marketing Campaign Wallet Center (Clean version without Refer and Earn) */}
+                <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800/80 rounded-2xl p-5 shadow-sm relative overflow-hidden">
+                  <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-amber-500/5 to-orange-500/5 rounded-full blur-xl pointer-events-none"></div>
+                  
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-1.5">
+                        <Coins className="w-5 h-5 text-amber-505" />
+                        <h4 className="font-extrabold text-sm sm:text-base text-slate-800 dark:text-white tracking-tight">
+                          {language === "bn" ? "লিস্টিং কভারেজ ও মার্কেটিং বাজেট" : "Premium Campaign Wallet"}
+                        </h4>
+                      </div>
+                      <p className="text-[10px] sm:text-xs text-slate-400 dark:text-slate-450 leading-normal">
+                        {language === "bn" 
+                          ? "আপনার পার্টস বিক্রির তালিকাগুলো টপ-স্লাইডারে প্রমোট করার ডেমো পেমেন্ট ও রিচার্জ গেটওয়ে।" 
+                          : "Virtual sandbox ad balance used for testing listing spotlight bumps & carousel metrics."}
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-2.5">
+                      <div className="text-right">
+                        <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider leading-none">
+                          {language === "bn" ? "চলতি বাজেট ব্যালেন্স" : "Ad Wallet Balance"}
+                        </span>
+                        <span className="text-xl sm:text-2xl font-black text-orange-650 dark:text-orange-400 font-mono">
+                          ৳{(userMetadata?.simulatedCredits ?? user?.simulatedCredits ?? 5000).toLocaleString("en-IN")}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleRechargeWallet}
+                        className="p-2 sm:px-3 sm:py-2 rounded-xl bg-orange-500 hover:bg-orange-650 text-white dark:text-slate-950 font-extrabold text-[10px] sm:text-xs transition flex items-center gap-1 shadow-md shadow-orange-500/20 cursor-pointer border-0"
+                      >
+                        <Plus className="w-4 h-4" />
+                        <span>{language === "bn" ? "রিফিল করুন" : "Refill"}</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
 
                 {/* Dashboard Tab Toggles */}
                 <div className="flex overflow-x-auto no-scrollbar border-b border-slate-200 dark:border-slate-800" id="dash-tabs-bar">
@@ -3378,11 +3398,15 @@ export default function App() {
                 )}
 
                 {dashboardSubTab === 'admin' && isUserAdmin && (
-                  <AdminPanel language={language} currentUser={userMetadata || user} listings={listings} isUserAdmin={isUserAdmin} />
+                  <Suspense fallback={<div className="flex items-center justify-center py-16"><Loader2 className="w-6 h-6 animate-spin text-amber-500" /></div>}>
+                    <AdminPanel language={language} currentUser={userMetadata || user} listings={listings} isUserAdmin={isUserAdmin} />
+                  </Suspense>
                 )}
 
                 {dashboardSubTab === 'playstore-audit' && (
-                  <PlayStoreDiagnostics language={language} />
+                  <Suspense fallback={<div className="flex items-center justify-center py-16"><Loader2 className="w-6 h-6 animate-spin text-amber-500" /></div>}>
+                    <PlayStoreDiagnostics language={language} />
+                  </Suspense>
                 )}
 
               </div>
@@ -3391,13 +3415,15 @@ export default function App() {
             {/* TAB: CHAT / MESSAGES */}
             {activeTab === 'chats' && (
               <div className="animate-fade-in">
-                <ChatView
-                  currentUser={user}
-                  language={language}
-                  onLoginPrompt={() => setIsAuthOpen(true)}
-                  initialListingToChat={initialListingToChat}
-                  onClearInitialListing={() => setInitialListingToChat(null)}
-                />
+                <Suspense fallback={<div className="flex items-center justify-center py-16"><Loader2 className="w-6 h-6 animate-spin text-amber-500" /></div>}>
+                  <ChatView
+                    currentUser={user}
+                    language={language}
+                    onLoginPrompt={() => setIsAuthOpen(true)}
+                    initialListingToChat={initialListingToChat}
+                    onClearInitialListing={() => setInitialListingToChat(null)}
+                  />
+                </Suspense>
               </div>
             )}
 
@@ -3551,13 +3577,21 @@ export default function App() {
                               </div>
                             </div>
 
-                            <div className="grid grid-cols-1 gap-2 text-xs pt-1">
+                            <div className="grid grid-cols-2 gap-2 text-xs pt-1">
                               <div className="bg-white dark:bg-slate-900 border border-slate-150/80 dark:border-slate-800 p-2.5 rounded-xl shadow-xs">
                                 <span className="text-[9px] text-slate-400 font-bold uppercase block">
                                   {language === "bn" ? "ফোন নম্বর" : "Phone Number"}
                                 </span>
                                 <span className="font-extrabold text-slate-750 dark:text-slate-205 block mt-0.5 font-mono">
                                   {userMetadata?.phoneNumber || user?.phoneNumber || "—"}
+                                </span>
+                              </div>
+                              <div className="bg-white dark:bg-slate-900 border border-slate-150/80 dark:border-slate-800 p-2.5 rounded-xl shadow-xs">
+                                <span className="text-[9px] text-slate-400 font-bold uppercase block">
+                                  {language === "bn" ? "ব্যালেন্স" : "Ad Wallet Balance"}
+                                </span>
+                                <span className="font-extrabold text-amber-550 block mt-0.5 font-mono">
+                                  ৳{(userMetadata?.simulatedCredits ?? user?.simulatedCredits ?? 5000).toLocaleString("en-IN")}
                                 </span>
                               </div>
                             </div>
@@ -3971,6 +4005,7 @@ export default function App() {
       </footer>
 
       {/* All interactive floating dialogs & Modals */}
+      <Suspense fallback={null}>
       
       {/* 1. Auth Modals */}
       <AuthModal 
@@ -4034,6 +4069,14 @@ export default function App() {
         />
       )}
 
+      {/* 4. Refill Ad Budget Wallet */}
+      <RefillModal
+        isOpen={isRefillModalOpen}
+        onClose={() => setIsRefillModalOpen(false)}
+        currentUser={userMetadata || user}
+        language={language}
+      />
+
       {/* 5. Simulated Direct Payment Portal for Campaign Promotions */}
       {isAdPortalOpen && (
         <SimulatedPaymentPortal
@@ -4089,6 +4132,7 @@ export default function App() {
           }}
         />
       )}
+      </Suspense>
 
     </div>
   );
