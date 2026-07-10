@@ -2,7 +2,7 @@ import { initializeApp, getApps, cert } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 import { getFirestore } from "firebase-admin/firestore";
 import { createHash } from "crypto";
-import { sendSms, generateOtp } from "../utils/sms";
+import { sendSms, generateOtp } from "../utils/sms.js";
 
 if (!getApps().length) {
   const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
