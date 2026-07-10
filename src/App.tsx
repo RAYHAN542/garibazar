@@ -179,7 +179,7 @@ export default function App() {
   const [adPromoError, setAdPromoError] = useState("");
   
   // Direct payment states for Dashboard
-  const [adPayMode, setAdPayMode] = useState<"instant" | "manual">("instant");
+  const [adPayMode, setAdPayMode] = useState<"instant" | "manual">("manual"); // "instant" gateway disabled (unverified) — manual admin-verified payment only
   const [isAdPortalOpen, setIsAdPortalOpen] = useState(false);
   const [adSenderNumber, setAdSenderNumber] = useState("");
   const [adTransactionId, setAdTransactionId] = useState("");
@@ -3077,42 +3077,12 @@ export default function App() {
                             </div>
                           )}
 
-                          {/* Payment Mode Tab Selection - Direct Online bKash Checkout vs Manual Send Money */}
-                          <div className="grid grid-cols-2 gap-2 p-1 bg-slate-100 dark:bg-slate-955 rounded-xl border border-slate-200 dark:border-slate-800">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setAdPayMode("instant");
-                                setAdPromoError("");
-                              }}
-                              className={`py-2 px-3 rounded-lg text-xs font-black transition flex items-center justify-center gap-1.5 cursor-pointer ${
-                                adPayMode === "instant"
-                                  ? "bg-amber-500 text-slate-950 shadow-md font-bold"
-                                  : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
-                              }`}
-                            >
-                              <Sparkles className="w-3.5 h-3.5 text-slate-950" />
-                              <span className="text-slate-955">
-                                {language === "bn" ? "অনলাইন গেটওয়ে (No TxID)" : "Online Gateway (No TxID)"}
-                              </span>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setAdPayMode("manual");
-                                setAdPromoError("");
-                              }}
-                              className={`py-2 px-3 rounded-lg text-xs font-black transition flex items-center justify-center gap-1.5 cursor-pointer ${
-                                adPayMode === "manual"
-                                  ? "bg-amber-500 text-slate-950 shadow-md font-bold"
-                                  : "text-slate-550 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
-                              }`}
-                            >
-                              <History className="w-3.5 h-3.5 text-slate-900" />
-                              <span className="text-slate-955">
-                                {language === "bn" ? "ম্যানুয়ালি সেন্ড মানি (TxID)" : "Manual Pay (TxID)"}
-                              </span>
-                            </button>
+                          {/* Payment Method: Manual Send Money & TxID (Admin-Verified) — fake "instant" gateway removed */}
+                          <div className="flex items-center justify-center gap-1.5 p-2.5 bg-amber-500 text-slate-950 rounded-xl shadow-md font-black text-xs">
+                            <History className="w-3.5 h-3.5 text-slate-950" />
+                            <span>
+                              {language === "bn" ? "ম্যানুয়ালি সেন্ড মানি (TxID)" : "Manual Pay (TxID)"}
+                            </span>
                           </div>
 
                           {adPayMode === "instant" ? (
