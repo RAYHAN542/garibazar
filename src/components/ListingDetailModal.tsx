@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { PartListing, SupportedLanguage } from "../types";
 import { X, Eye, MapPin, Sparkles, Play, SquarePlay, Heart, Flag, ShieldAlert, CheckCircle2, RotateCcw, ChevronLeft, ChevronRight, Loader2, ShoppingBag, Star, User, MessageSquare, Calendar, Send } from "lucide-react";
-import { doc, getDoc, updateDoc, collection, addDoc, query, where, getDocs } from "firebase/firestore";
+import { doc, getDoc, updateDoc, collection, addDoc, query, where, getDocs, increment } from "firebase/firestore";
 import { db, logAnalyticsEvent } from "../firebase";
 
 interface ListingDetailModalProps {
@@ -317,8 +317,10 @@ export function ListingDetailModal({ listing, language, currentUser, onClose, on
       const docRef = doc(db, "listings", listing.id);
       const docSnap = await getDoc(docRef);
       if (docSnap.exists()) {
+        const todayKey = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
         await updateDoc(docRef, {
-          clicks: (docSnap.data().clicks || 0) + 1
+          clicks: (docSnap.data().clicks || 0) + 1,
+          [`dailyStats.${todayKey}.clicks`]: increment(1)
         });
       }
     } catch (err) {

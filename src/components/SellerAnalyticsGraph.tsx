@@ -28,23 +28,21 @@ export default function SellerAnalyticsGraph({
 }: SellerAnalyticsGraphProps) {
   const [selectedMetric, setSelectedMetric] = useState<"views" | "clicks" | "conversion">("views");
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+  const [isExpanded, setIsExpanded] = useState(false);
 
   // Filter listings owned by this user
   const myListings = useMemo(() => {
     return listings.filter(item => item.sellerId === userId);
   }, [listings, userId]);
 
-  // Total Views from listings + a realistic baseline for presentation
+  // Total Views — real sum only, no artificial baseline
   const totalViews = useMemo(() => {
-    const rawViews = myListings.reduce((sum, item) => sum + (item.views ?? 0), 0);
-    // Add a baseline of 18 views if user has listings, so it's not empty/boring
-    return myListings.length > 0 ? rawViews + 18 : 0;
+    return myListings.reduce((sum, item) => sum + (item.views ?? 0), 0);
   }, [myListings]);
 
-  // Total Clicks from listings + a baseline
+  // Total Clicks — real sum only, no artificial baseline
   const totalClicks = useMemo(() => {
-    const rawClicks = myListings.reduce((sum, item) => sum + (item.clicks ?? 0), 0);
-    return myListings.length > 0 ? rawClicks + 4 : 0;
+    return myListings.reduce((sum, item) => sum + (item.clicks ?? 0), 0);
   }, [myListings]);
 
   // Calculate Average Conversion Rate
@@ -59,32 +57,43 @@ export default function SellerAnalyticsGraph({
     return [...myListings].sort((a, b) => (b.views ?? 0) - (a.views ?? 0))[0];
   }, [myListings]);
 
-  // Generate 7-day trend data dynamically based on listings and purchases, with realistic distributions
+  // Build the real last-7-calendar-days trend by summing each listing's
+  // dailyStats (recorded when a real view/click happens) — no simulated data.
   const trendData = useMemo(() => {
-    const daysEn = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-    const daysBn = ["সোম", "মঙ্গল", "বুধ", "বৃহস্পতি", "শুক্র", "শনি", "রবি"];
-    
-    // Seed unique pseudo-random numbers based on userId string to make the dashboard feel consistent
-    const seed = userId.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0) || 42;
-    
-    return Array.from({ length: 7 }).map((_, idx) => {
-      // Create interesting deterministic wave patterns
-      const factor1 = Math.sin((idx + seed) * 0.9) * 0.4 + 0.6; // 0.2 to 1.0
-      const factor2 = Math.cos((idx * 1.3) + seed) * 0.3 + 0.5; // 0.2 to 0.8
+    const daysEn = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+    const daysBn = ["রবি", "সোম", "মঙ্গল", "বুধ", "বৃহস্পতি", "শুক্র", "শনি"];
 
-      // Distribute views and clicks over 7 days based on totals
-      const baseDailyViews = myListings.length > 0 ? Math.ceil((totalViews / 7) * factor1) : 0;
-      const baseDailyClicks = myListings.length > 0 ? Math.min(baseDailyViews, Math.ceil((totalClicks / 7) * factor2)) : 0;
-      const conversion = baseDailyViews > 0 ? parseFloat(((baseDailyClicks / baseDailyViews) * 100).toFixed(1)) : 0;
+    const today = new Date();
+    const last7Dates: string[] = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(today);
+      d.setDate(today.getDate() - i);
+      last7Dates.push(d.toISOString().slice(0, 10)); // YYYY-MM-DD
+    }
+
+    return last7Dates.map((dateKey) => {
+      const dayIdx = new Date(dateKey).getDay();
+      let dayViews = 0;
+      let dayClicks = 0;
+
+      myListings.forEach((item) => {
+        const stat = item.dailyStats?.[dateKey];
+        if (stat) {
+          dayViews += stat.views ?? 0;
+          dayClicks += stat.clicks ?? 0;
+        }
+      });
+
+      const conversion = dayViews > 0 ? parseFloat(((dayClicks / dayViews) * 100).toFixed(1)) : 0;
 
       return {
-        day: language === "bn" ? daysBn[idx] : daysEn[idx],
-        views: myListings.length > 0 ? Math.max(1, baseDailyViews) : 0,
-        clicks: myListings.length > 0 ? Math.max(0, baseDailyClicks) : 0,
-        conversion: myListings.length > 0 ? Math.min(100, conversion) : 0
+        day: language === "bn" ? daysBn[dayIdx] : daysEn[dayIdx],
+        views: dayViews,
+        clicks: dayClicks,
+        conversion
       };
     });
-  }, [myListings, totalViews, totalClicks, userId, language]);
+  }, [myListings, language]);
 
   // SVG Chart Configuration
   const width = 500;
@@ -161,7 +170,11 @@ export default function SellerAnalyticsGraph({
       <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-blue-500/5 to-indigo-500/5 rounded-full blur-2xl pointer-events-none"></div>
 
       {/* Header and Selectors */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <button
+        type="button"
+        onClick={() => setIsExpanded(prev => !prev)}
+        className="w-full flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-left bg-transparent border-0 p-0 cursor-pointer"
+      >
         <div className="space-y-1">
           <div className="flex items-center gap-1.5">
             <Activity className="w-5 h-5 text-indigo-550 dark:text-indigo-400 animate-pulse" />
@@ -169,15 +182,39 @@ export default function SellerAnalyticsGraph({
               {language === "bn" ? "বিক্রেতা পারফরম্যান্স ও ভিজ্যুয়াল গ্রাফ" : "Seller Performance Analytics"}
             </h4>
           </div>
-          <p className="text-[10px] sm:text-xs text-slate-400 dark:text-slate-450">
-            {language === "bn" 
-              ? "আপনার পার্টস এবং প্রোডাক্ট লিস্টিংয়ের দৈনিক প্রচার ও কার্যকারিতা গ্রাফ।" 
-              : "Track daily metrics and viewer acquisition funnel for your auto shop inventory."}
-          </p>
+          {isExpanded && (
+            <p className="text-[10px] sm:text-xs text-slate-400 dark:text-slate-450">
+              {language === "bn"
+                ? "আপনার পার্টস এবং প্রোডাক্ট লিস্টিংয়ের দৈনিক প্রচার ও কার্যকারিতা গ্রাফ।"
+                : "Track daily metrics and viewer acquisition funnel for your auto shop inventory."}
+            </p>
+          )}
         </div>
 
-        {/* Tab Controls */}
-        <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-950 p-1 rounded-xl shrink-0 self-start sm:self-auto">
+        {/* Compact summary + toggle chevron */}
+        <div className="flex items-center gap-3 shrink-0 self-start sm:self-auto">
+          {!isExpanded && (
+            <div className="flex items-center gap-3 text-[11px] font-bold text-slate-500 dark:text-slate-400">
+              <span className="flex items-center gap-1">
+                <Eye className="w-3.5 h-3.5 text-blue-500" />
+                {totalViews}
+              </span>
+              <span className="flex items-center gap-1">
+                <MousePointerClick className="w-3.5 h-3.5 text-emerald-500" />
+                {totalClicks}
+              </span>
+            </div>
+          )}
+          <span className="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-300">
+            <ChevronRight className={`w-4 h-4 transition-transform duration-200 ${isExpanded ? "rotate-90" : ""}`} />
+          </span>
+        </div>
+      </button>
+
+      {isExpanded && (
+      <>
+      {/* Tab Controls */}
+      <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-950 p-1 rounded-xl shrink-0 self-start sm:self-auto w-fit">
           <button
             type="button"
             onClick={() => setSelectedMetric("views")}
@@ -214,8 +251,8 @@ export default function SellerAnalyticsGraph({
             <Percent className="w-3.5 h-3.5 text-amber-500" />
             <span>{language === "bn" ? "কনভার্সন %" : "Conversion %"}</span>
           </button>
-        </div>
       </div>
+
 
       {/* Primary Analytics Graph Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 items-center">
@@ -392,9 +429,6 @@ export default function SellerAnalyticsGraph({
               <span className="text-[10px] uppercase font-black text-slate-400 block tracking-wider">
                 {language === "bn" ? "মোট ভিউস ও অর্জন" : "Audience & Leads"}
               </span>
-              <span className="text-[10px] font-extrabold text-blue-500 bg-blue-500/10 px-2 py-0.5 rounded">
-                +14.8%
-              </span>
             </div>
             
             <div className="mt-2 flex items-baseline gap-2">
@@ -466,6 +500,8 @@ export default function SellerAnalyticsGraph({
           )}
         </div>
       </div>
+      </>
+      )}
     </div>
   );
 }

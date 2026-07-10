@@ -6,7 +6,7 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { auth, db, logAnalyticsEvent } from "./firebase";
 import { onAuthStateChanged, signOut } from "firebase/auth";
-import { collection, onSnapshot, query, orderBy, getDocs, doc, setDoc, getDoc, updateDoc, where, addDoc, deleteDoc, limit, startAfter, DocumentSnapshot } from "firebase/firestore";
+import { collection, onSnapshot, query, orderBy, getDocs, doc, setDoc, getDoc, updateDoc, where, addDoc, deleteDoc, limit, startAfter, DocumentSnapshot, increment } from "firebase/firestore";
 import { 
   Car, 
   Search, 
@@ -1298,14 +1298,16 @@ export default function App() {
     }
   };
 
-  // 5. Track views asynchronously when user reviews details
+  // 5. Track views asynchronously when user reviews details (also records real per-day stats)
   const handleViewListingDetails = async (listing: PartListing) => {
     setSelectedListing(listing);
-    
+
     try {
       const listingRef = doc(db, "listings", listing.id);
+      const todayKey = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
       await updateDoc(listingRef, {
-        views: (listing.views || 0) + 1
+        views: (listing.views || 0) + 1,
+        [`dailyStats.${todayKey}.views`]: increment(1)
       });
     } catch (err) {
       console.warn("Could not increment view counter:", err);
@@ -2416,7 +2418,7 @@ export default function App() {
                     </div>
                     <span className="text-[8px] sm:text-[9px] uppercase font-bold text-slate-400 leading-tight">{language === "bn" ? "মার্কেট ভিউস" : "Shop Views"}</span>
                     <span className="text-sm font-black text-slate-800 dark:text-white">
-                      {listings.filter(item => item.sellerId === user.uid).reduce((sum, current) => sum + (current.views ?? 0), 0) + 18}
+                      {listings.filter(item => item.sellerId === user.uid).reduce((sum, current) => sum + (current.views ?? 0), 0)}
                     </span>
                   </div>
                 </div>
