@@ -1,8 +1,14 @@
 import React, { useState, useRef } from "react";
-import { auth, db } from "../firebase";
-import { signInAnonymously, signInWithCustomToken } from "firebase/auth";
-import { doc, setDoc } from "firebase/firestore";
-import { X, Phone, User, MapPin, Loader2, Sparkles, Camera } from "lucide-react";
+import { auth, db, googleProvider } from "../firebase";
+import {
+  signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
+  signOut,
+  User as FirebaseUser,
+} from "firebase/auth";
+import { doc, getDoc, setDoc } from "firebase/firestore";
+import { X, MapPin, Loader2, Sparkles, Camera } from "lucide-react";
 import { CITIES } from "../translations";
 import { SupportedLanguage } from "../types";
 import { sanitizeText, validateBanglaPhone } from "../utils/sanitizer";
@@ -62,34 +68,231 @@ const compressImageToBlob = async (file: File, maxWidth = 512, maxHeight = 512):
   });
 };
 
+// ছোট্ট Google "G" আইকন — lucide-react এ ব্র্যান্ড আইকন নেই তাই ইনলাইন SVG
+const GoogleIcon = () => (
+  <svg className="w-5 h-5" viewBox="0 0 48 48" aria-hidden="true">
+    <path fill="#FFC107" d="M43.611 20.083H42V20H24v8h11.303c-1.649 4.657-6.08 8-11.303 8-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 12.955 4 4 12.955 4 24s8.955 20 20 20 20-8.955 20-20c0-1.341-.138-2.65-.389-3.917z"/>
+    <path fill="#FF3D00" d="M6.306 14.691l6.571 4.819C14.655 15.108 18.961 12 24 12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 16.318 4 9.656 8.337 6.306 14.691z"/>
+    <path fill="#4CAF50" d="M24 44c5.166 0 9.86-1.977 13.409-5.192l-6.19-5.238C29.211 35.091 26.715 36 24 36c-5.202 0-9.619-3.317-11.283-7.946l-6.522 5.025C9.505 39.556 16.227 44 24 44z"/>
+    <path fill="#1976D2" d="M43.611 20.083H42V20H24v8h11.303a12.04 12.04 0 0 1-4.087 5.571l.003-.002 6.19 5.238C36.971 39.205 44 34 44 24c0-1.341-.138-2.65-.389-3.917z"/>
+  </svg>
+);
+
 export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModalProps) {
-  const [isLogin, setIsLogin] = useState(false);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  // --- Google দিয়ে সাইন-ইন করার পর, একদম নতুন ইউজার হলে প্রোফাইল সম্পূর্ণ করার ধাপ ---
+  const [step, setStep] = useState<"start" | "profile">("start");
+  const [googleUser, setGoogleUser] = useState<FirebaseUser | null>(null);
   const [displayName, setDisplayName] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
   const [city, setCity] = useState(CITIES[0]);
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
   const [profilePhotoFile, setProfilePhotoFile] = useState<File | null>(null);
   const [profilePhotoPreview, setProfilePhotoPreview] = useState<string | null>(null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // --- OTP ধাপের জন্য নতুন state ---
-  const [step, setStep] = useState<"form" | "otp">("form");
-  const [otpCode, setOtpCode] = useState("");
-  const [otpTempIdToken, setOtpTempIdToken] = useState("");
-  const [resendCooldown, setResendCooldown] = useState(0);
+  // Google auth সফল হওয়ার পর: আগের অ্যাকাউন্ট থাকলে সরাসরি লগইন করি,
+  // না থাকলে ফোন নম্বর/জেলা নেওয়ার জন্য প্রোফাইল ধাপ দেখাই।
+  const handlePostGoogleAuth = async (fbUser: FirebaseUser) => {
+    const userDocRef = doc(db, "users", fbUser.uid);
+    const userSnap = await getDoc(userDocRef);
 
+    if (userSnap.exists()) {
+      const existingData = userSnap.data() as any;
+      const sessionUser = {
+        uid: fbUser.uid,
+        displayName: existingData.displayName,
+        email: existingData.email || fbUser.email,
+        phoneNumber: exist
+cd ~/garibazar
+
+cat > src/firebase.ts << 'FIREBASE_EOF'
+import { initializeApp } from "firebase/app";
+import { getAuth, GoogleAuthProvider } from "firebase/auth";
+import { initializeFirestore } from "firebase/firestore";
+import { getStorage } from "firebase/storage";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyB8HnVfzI1YmP1X2r_lLWu-2YQKyKPTcdc",
+  authDomain: "garibazar-bd.firebaseapp.com",
+  projectId: "garibazar-bd",
+  storageBucket: "garibazar-bd.firebasestorage.app",
+  messagingSenderId: "466216231725",
+  appId: "1:466216231725:web:ef296db7e40221d4e269a4",
+  measurementId: "G-9SKYKBPRCE"
+};
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+
+export const auth = getAuth(app);
+
+// Google সাইন-ইন প্রোভাইডার — ফোন OTP এর বদলে ব্যবহার করা হচ্ছে (কোনো SMS গেটওয়ে লাগবে না)
+export const googleProvider = new GoogleAuthProvider();
+
+// Initialize Firestore
+export const db = initializeFirestore(app, {
+  experimentalAutoDetectLongPolling: true,
+});
+
+export const storage = getStorage(app);
+
+// অন্যান্য কম্পোনেন্টের বিল্ড এরর দূর করার জন্য এই ফাংশনটি এক্সপোর্ট করা হলো
+export const logAnalyticsEvent = (eventName: string, eventParams?: any) => {
+  console.log(`Analytics Event: ${eventName}`, eventParams);
+};
+
+export default app;
+FIREBASE_EOF
+
+cat > src/components/AuthModal.tsx << 'AUTHMODAL_EOF'
+import React, { useState, useRef } from "react";
+import { auth, db, googleProvider } from "../firebase";
+import {
+  signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
+  signOut,
+  User as FirebaseUser,
+} from "firebase/auth";
+import { doc, getDoc, setDoc } from "firebase/firestore";
+import { X, MapPin, Loader2, Sparkles, Camera } from "lucide-react";
+import { CITIES } from "../translations";
+import { SupportedLanguage } from "../types";
+import { sanitizeText, validateBanglaPhone } from "../utils/sanitizer";
+import { uploadToCloudinary } from "../utils/cloudinary";
+
+interface AuthModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  language: SupportedLanguage;
+  onAuthSuccess: (user: any) => void;
+}
+
+const PRESET_AVATARS = [
+  "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80"
+];
+
+// Resizes/compresses a picked profile photo client-side before it goes to Cloudinary,
+// so uploads stay fast on slow connections and don't waste storage.
+const compressImageToBlob = async (file: File, maxWidth = 512, maxHeight = 512): Promise<Blob> => {
+  const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+    const objectUrl = URL.createObjectURL(file);
+    const image = new Image();
+    image.onload = () => {
+      URL.revokeObjectURL(objectUrl);
+      resolve(image);
+    };
+    image.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new Error("Failed to load image for compression"));
+    };
+    image.src = objectUrl;
+  });
+
+  let { width, height } = img;
+  if (width > height) {
+    if (width > maxWidth) {
+      height = Math.round((height * maxWidth) / width);
+      width = maxWidth;
+    }
+  } else if (height > maxHeight) {
+    width = Math.round((width * maxHeight) / height);
+    height = maxHeight;
+  }
+
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Canvas context is null");
+  ctx.drawImage(img, 0, 0, width, height);
+
+  return await new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob((b) => {
+      if (!b) reject(new Error("Failed to convert canvas to Blob"));
+      else resolve(b);
+    }, "image/jpeg", 0.8);
+  });
+};
+
+// ছোট্ট Google "G" আইকন — lucide-react এ ব্র্যান্ড আইকন নেই তাই ইনলাইন SVG
+const GoogleIcon = () => (
+  <svg className="w-5 h-5" viewBox="0 0 48 48" aria-hidden="true">
+    <path fill="#FFC107" d="M43.611 20.083H42V20H24v8h11.303c-1.649 4.657-6.08 8-11.303 8-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 12.955 4 4 12.955 4 24s8.955 20 20 20 20-8.955 20-20c0-1.341-.138-2.65-.389-3.917z"/>
+    <path fill="#FF3D00" d="M6.306 14.691l6.571 4.819C14.655 15.108 18.961 12 24 12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 16.318 4 9.656 8.337 6.306 14.691z"/>
+    <path fill="#4CAF50" d="M24 44c5.166 0 9.86-1.977 13.409-5.192l-6.19-5.238C29.211 35.091 26.715 36 24 36c-5.202 0-9.619-3.317-11.283-7.946l-6.522 5.025C9.505 39.556 16.227 44 24 44z"/>
+    <path fill="#1976D2" d="M43.611 20.083H42V20H24v8h11.303a12.04 12.04 0 0 1-4.087 5.571l.003-.002 6.19 5.238C36.971 39.205 44 34 44 24c0-1.341-.138-2.65-.389-3.917z"/>
+  </svg>
+);
+
+export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModalProps) {
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  // --- Google দিয়ে সাইন-ইন করার পর, একদম নতুন ইউজার হলে প্রোফাইল সম্পূর্ণ করার ধাপ ---
+  const [step, setStep] = useState<"start" | "profile">("start");
+  const [googleUser, setGoogleUser] = useState<FirebaseUser | null>(null);
+  const [displayName, setDisplayName] = useState("");
+  const [phoneNumber, setPhoneNumber] = useState("");
+  const [city, setCity] = useState(CITIES[0]);
+  const [profilePhotoFile, setProfilePhotoFile] = useState<File | null>(null);
+  const [profilePhotoPreview, setProfilePhotoPreview] = useState<string | null>(null);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Google auth সফল হওয়ার পর: আগের অ্যাকাউন্ট থাকলে সরাসরি লগইন করি,
+  // না থাকলে ফোন নম্বর/জেলা নেওয়ার জন্য প্রোফাইল ধাপ দেখাই।
+  const handlePostGoogleAuth = async (fbUser: FirebaseUser) => {
+    const userDocRef = doc(db, "users", fbUser.uid);
+    const userSnap = await getDoc(userDocRef);
+
+    if (userSnap.exists()) {
+      const existingData = userSnap.data() as any;
+      const sessionUser = {
+        uid: fbUser.uid,
+        displayName: existingData.displayName,
+        email: existingData.email || fbUser.email,
+        phoneNumber: existingData.phoneNumber,
+        city: existingData.city,
+        profilePicture: existingData.profilePicture || fbUser.photoURL || PRESET_AVATARS[0],
+        simulatedCredits: existingData.simulatedCredits ?? 5000,
+        referralCode: existingData.referralCode,
+      };
+      localStorage.setItem("gari_bazar_session_user", JSON.stringify(sessionUser));
+      onAuthSuccess(sessionUser);
+      onClose();
+      return;
+    }
+
+    // নতুন ইউজার — প্রোফাইল সম্পূর্ণ করতে হবে (ফোন নম্বর, জেলা)
+    setGoogleUser(fbUser);
+    setDisplayName(fbUser.displayName || "");
+    setProfilePhotoPreview(fbUser.photoURL || null);
+    setStep("profile");
+  };
+
+  // রিডাইরেক্ট-ভিত্তিক সাইন-ইন হলে (popup ব্লক থাকা ব্রাউজার/ওয়েবভিউতে fallback),
+  // পেজ রিলোডের পর এখানে রেজাল্ট ধরে নিই।
   React.useEffect(() => {
-    if (resendCooldown <= 0) return;
-    const t = setTimeout(() => setResendCooldown((s) => s - 1), 1000);
-    return () => clearTimeout(t);
-  }, [resendCooldown]);
+    (async () => {
+      try {
+        const result = await getRedirectResult(auth);
+        if (result?.user) {
+          await handlePostGoogleAuth(result.user);
+        }
+      } catch (err) {
+        console.error("Redirect sign-in failed:", err);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   React.useEffect(() => {
     if (!isOpen) {
-      setStep("form");
-      setOtpCode("");
+      setStep("start");
       setError("");
     }
   }, [isOpen]);
@@ -115,157 +318,101 @@ export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModa
     setProfilePhotoPreview(URL.createObjectURL(file));
   };
 
-  // ধাপ ১: ফর্ম সাবমিট হলে প্রথমে OTP পাঠাই — সরাসরি login/create করি না
-  const handleSubmit = async (e: React.FormEvent) => {
+  // Google popup দিয়ে সাইন-ইন করি; popup ব্লক হলে redirect দিয়ে fallback করি
+  const handleGoogleSignIn = async () => {
+    setError("");
+    setLoading(true);
+    try {
+      const result = await signInWithPopup(auth, googleProvider);
+      await handlePostGoogleAuth(result.user);
+    } catch (err: any) {
+      const code = err?.code || "";
+      if (code === "auth/popup-closed-by-user" || code === "auth/cancelled-popup-request") {
+        // ইউজার নিজেই popup বন্ধ করেছে — এরর দেখানোর দরকার নেই
+      } else if (
+        code === "auth/popup-blocked" ||
+        code === "auth/operation-not-supported-in-this-environment"
+      ) {
+        try {
+          await signInWithRedirect(auth, googleProvider);
+          return; // পেজ রিডাইরেক্ট হবে
+        } catch (redirectErr) {
+          console.error(redirectErr);
+          setError(language === "bn" ? "Google সাইন-ইন করা যায়নি।" : "Could not sign in with Google.");
+        }
+      } else {
+        console.error(err);
+        setError(language === "bn" ? "Google সাইন-ইন ব্যর্থ হয়েছে। আবার চেষ্টা করুন।" : "Google sign-in failed. Please try again.");
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCancelProfileStep = async () => {
+    try { await signOut(auth); } catch { /* ignore */ }
+    setGoogleUser(null);
+    setStep("start");
+    setError("");
+  };
+
+  // নতুন ইউজারের প্রোফাইল (ফোন/জেলা/ছবি) সাবমিট করে Firestore-এ account তৈরি করি
+  const handleCompleteProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
-    const cleanPhone = phoneNumber.replace(/\D/g, "");
+    if (!googleUser) return;
 
-    if (cleanPhone.length !== 11) {
+    const cleanPhone = phoneNumber.replace(/\D/g, "");
+    if (!validateBanglaPhone(cleanPhone)) {
       setError(language === "bn" ? "সঠিক ১১ ডিজিটের মোবাইল নম্বর দিন" : "Enter a valid 11-digit phone number");
       return;
     }
 
     setLoading(true);
     try {
-      // ownership যাচাইয়ের জন্য anonymous session লাগবেই, backend request-এ পাঠানোর জন্য।
-      // account থাকা/না-থাকা চেকটাও এখন সার্ভারেই হয় (Admin SDK দিয়ে) — client থেকে
-      // সরাসরি অন্য কারো ফোন নম্বর দিয়ে Firestore query করা rules-এ নিষেধ (privacy রক্ষায়)।
-      const tempCredential = await signInAnonymously(auth);
-      const tempIdToken = await tempCredential.user.getIdToken();
+      const sanitizedDisplayName = sanitizeText(displayName || googleUser.displayName || "Gari Bazar Seller", 50);
+      const myReferralCode = `GB-${cleanPhone.slice(-4)}`;
 
-      const otpRes = await fetch("/api/auth/send-otp", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${tempIdToken}` },
-        body: JSON.stringify({ phoneNumber: cleanPhone, purpose: isLogin ? "login" : "register" }),
-      });
-      if (!otpRes.ok) {
-        const errData = await otpRes.json().catch(() => ({}));
-        throw new Error(errData.error || "OTP পাঠানো যায়নি।");
-      }
-
-      setOtpTempIdToken(tempIdToken);
-      setResendCooldown(60);
-      setStep("otp");
-    } catch (err: any) {
-      console.error(err);
-      setError(err?.message || (language === "bn" ? "কিছু একটা সমস্যা হয়েছে।" : "Something went wrong."));
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleResendOtp = async () => {
-    if (resendCooldown > 0) return;
-    setError("");
-    const cleanPhone = phoneNumber.replace(/\D/g, "");
-    try {
-      const otpRes = await fetch("/api/auth/send-otp", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${otpTempIdToken}` },
-        body: JSON.stringify({ phoneNumber: cleanPhone, purpose: isLogin ? "login" : "register" }),
-      });
-      if (!otpRes.ok) {
-        const errData = await otpRes.json().catch(() => ({}));
-        throw new Error(errData.error || "OTP পাঠানো যায়নি।");
-      }
-      setResendCooldown(60);
-    } catch (err: any) {
-      setError(err?.message || (language === "bn" ? "আবার OTP পাঠানো যায়নি।" : "Could not resend OTP."));
-    }
-  };
-
-  // ধাপ ২: ইউজার OTP দিলে যাচাই করি, তারপরই আসল login/account-creation করি
-  const handleVerifyOtp = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError("");
-    const cleanPhone = phoneNumber.replace(/\D/g, "");
-    const cleanCode = otpCode.replace(/\D/g, "");
-
-    if (cleanCode.length !== 6) {
-      setError(language === "bn" ? "৬ ডিজিটের OTP কোড দিন।" : "Enter the 6-digit OTP code.");
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const verifyRes = await fetch("/api/auth/verify-otp", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${otpTempIdToken}` },
-        body: JSON.stringify({ phoneNumber: cleanPhone, code: cleanCode, purpose: isLogin ? "login" : "register" }),
-      });
-      const verifyData = await verifyRes.json().catch(() => ({}));
-      if (!verifyRes.ok) {
-        throw new Error(verifyData.error || "OTP যাচাই ব্যর্থ হয়েছে।");
-      }
-
-      if (isLogin) {
-        // --- লগইন মোড: OTP-verified customToken দিয়ে আসল account-এ সাইন-ইন ---
-        const finalCredential = await signInWithCustomToken(auth, verifyData.customToken);
-        const realUid = finalCredential.user.uid;
-        const existingData = verifyData.existingData;
-
-        const sessionUser = {
-          uid: realUid,
-          displayName: existingData.displayName,
-          phoneNumber: existingData.phoneNumber,
-          city: existingData.city,
-          profilePicture: existingData.profilePicture || PRESET_AVATARS[0],
-          simulatedCredits: existingData.simulatedCredits ?? 5000,
-        };
-
-        localStorage.setItem("gari_bazar_session_user", JSON.stringify(sessionUser));
-        onAuthSuccess(sessionUser);
-        onClose();
-        return;
-      }
-
-      // --- নতুন প্রোফাইল তৈরি মোড: OTP verified, এখন anonymous uid দিয়েই account বানাই ---
-      {
-        const realUid = auth.currentUser!.uid;
-        const sanitizedDisplayName = sanitizeText(displayName || "Gari Bazar Seller", 50);
-        const myReferralCode = `GB-${cleanPhone.slice(-4)}`;
-
-        let uploadedPhotoUrl = PRESET_AVATARS[0];
-        if (profilePhotoFile) {
-          setUploadingPhoto(true);
-          try {
-            const compressedBlob = await compressImageToBlob(profilePhotoFile);
-            const uploadPromise = uploadToCloudinary(compressedBlob);
-            const timeoutPromise = new Promise<never>((_, reject) =>
-              setTimeout(() => reject(new Error("upload/timeout")), 60000)
-            );
-            uploadedPhotoUrl = await Promise.race([uploadPromise, timeoutPromise]);
-          } catch (photoErr: any) {
-            console.error("Profile photo upload failed:", photoErr);
-            setUploadingPhoto(false);
-            setLoading(false);
-            setError(
-              photoErr?.message === "upload/timeout"
-                ? (language === "bn" ? "ছবি আপলোড আটকে গেছে (Timeout)! আবার চেষ্টা করুন।" : "Photo upload timed out. Please try again.")
-                : (language === "bn" ? "ছবি আপলোড ব্যর্থ হয়েছে। আবার চেষ্টা করুন অথবা ছবি ছাড়াই এগিয়ে যান।" : "Photo upload failed. Try again or continue without a photo.")
-            );
-            return;
-          }
+      let uploadedPhotoUrl = googleUser.photoURL || PRESET_AVATARS[0];
+      if (profilePhotoFile) {
+        setUploadingPhoto(true);
+        try {
+          const compressedBlob = await compressImageToBlob(profilePhotoFile);
+          const uploadPromise = uploadToCloudinary(compressedBlob);
+          const timeoutPromise = new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error("upload/timeout")), 60000)
+          );
+          uploadedPhotoUrl = await Promise.race([uploadPromise, timeoutPromise]);
+        } catch (photoErr: any) {
+          console.error("Profile photo upload failed:", photoErr);
           setUploadingPhoto(false);
+          setLoading(false);
+          setError(
+            photoErr?.message === "upload/timeout"
+              ? (language === "bn" ? "ছবি আপলোড আটকে গেছে (Timeout)! আবার চেষ্টা করুন।" : "Photo upload timed out. Please try again.")
+              : (language === "bn" ? "ছবি আপলোড ব্যর্থ হয়েছে। আবার চেষ্টা করুন অথবা ছবি ছাড়াই এগিয়ে যান।" : "Photo upload failed. Try again or continue without a photo.")
+          );
+          return;
         }
-
-        const savedData = {
-          uid: realUid,
-          displayName: sanitizedDisplayName,
-          phoneNumber: cleanPhone,
-          city: sanitizeText(city, 50),
-          profilePicture: uploadedPhotoUrl,
-          createdAt: new Date().toISOString(),
-          simulatedCredits: 5000,
-          referralCode: myReferralCode,
-        };
-
-        await setDoc(doc(db, "users", realUid), savedData);
-        localStorage.setItem("gari_bazar_session_user", JSON.stringify(savedData));
-        onAuthSuccess(savedData);
-        onClose();
+        setUploadingPhoto(false);
       }
+
+      const savedData = {
+        uid: googleUser.uid,
+        displayName: sanitizedDisplayName,
+        email: googleUser.email,
+        phoneNumber: cleanPhone,
+        city: sanitizeText(city, 50),
+        profilePicture: uploadedPhotoUrl,
+        createdAt: new Date().toISOString(),
+        simulatedCredits: 5000,
+        referralCode: myReferralCode,
+      };
+
+      await setDoc(doc(db, "users", googleUser.uid), savedData);
+      localStorage.setItem("gari_bazar_session_user", JSON.stringify(savedData));
+      onAuthSuccess(savedData);
+      onClose();
     } catch (err) {
       console.error(err);
       setError(language === "bn" ? "কিছু একটা সমস্যা হয়েছে।" : "Something went wrong.");
@@ -283,65 +430,39 @@ export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModa
 
         <div className="text-center mb-6">
           <h2 className="text-xl font-black text-slate-900 dark:text-white">
-            {step === "otp"
-              ? (language === "bn" ? "OTP যাচাই করুন" : "Verify OTP")
-              : isLogin ? (language === "bn" ? "বিক্রেতা লগইন" : "Seller Login") : (language === "bn" ? "নতুন প্রোফাইল খুলুন" : "Create Profile")}
+            {step === "profile"
+              ? (language === "bn" ? "প্রোফাইল সম্পূর্ণ করুন" : "Complete Your Profile")
+              : (language === "bn" ? "স্বাগতম" : "Welcome")}
           </h2>
         </div>
 
-        {step === "form" && (
-          <div className="flex rounded-xl bg-slate-100 dark:bg-slate-950 p-1 mb-4">
-            <button type="button" onClick={() => setIsLogin(false)} className={`flex-1 py-2 text-xs font-bold rounded-lg ${!isLogin ? "bg-white dark:bg-slate-800 text-amber-600 shadow-sm" : "text-slate-500"}`}>
-              {language === "bn" ? "নতুন প্রোফাইল" : "Register"}
-            </button>
-            <button type="button" onClick={() => setIsLogin(true)} className={`flex-1 py-2 text-xs font-bold rounded-lg ${isLogin ? "bg-white dark:bg-slate-800 text-amber-600 shadow-sm" : "text-slate-500"}`}>
-              {language === "bn" ? "লগইন" : "Login"}
-            </button>
-          </div>
-        )}
-
         {error && <div className="p-3 bg-red-500/10 text-red-600 rounded-lg text-xs mb-3 text-center">{error}</div>}
 
-        {step === "otp" ? (
-          <form onSubmit={handleVerifyOtp} className="space-y-4">
+        {step === "start" ? (
+          <div className="space-y-4">
+            <p className="text-sm text-slate-500 dark:text-slate-400 text-center">
+              {language === "bn"
+                ? "গাড়ি বাজারে বিক্রি করতে বা কেনার জন্য Google দিয়ে সাইন-ইন করুন।"
+                : "Sign in with Google to buy or sell on Gari Bazar."}
+            </p>
+            <button
+              type="button"
+              onClick={handleGoogleSignIn}
+              disabled={loading}
+              className="w-full py-2.5 bg-white hover:bg-slate-50 disabled:opacity-60 text-slate-700 font-bold rounded-lg text-sm flex items-center justify-center gap-2 border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-white dark:hover:bg-slate-700"
+            >
+              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <GoogleIcon />}
+              {language === "bn" ? "Google দিয়ে চালিয়ে যান" : "Continue with Google"}
+            </button>
+          </div>
+        ) : (
+          <form onSubmit={handleCompleteProfile} className="space-y-4">
             <p className="text-xs text-slate-500 text-center">
               {language === "bn"
-                ? `01${phoneNumber.replace(/\D/g, "").slice(1)} নম্বরে একটি ৬ ডিজিটের কোড পাঠানো হয়েছে`
-                : `A 6-digit code was sent to ${phoneNumber}`}
+                ? "শেষ ধাপ! ক্রেতারা যেন আপনার সাথে যোগাযোগ করতে পারে, তাই একটা মোবাইল নম্বর ও জেলা দিন।"
+                : "Almost done! Add a phone number and district so buyers can contact you."}
             </p>
-            <div>
-              <label className="text-[10px] font-bold block mb-1 text-slate-500">{language === "bn" ? "OTP কোড *" : "OTP Code *"}</label>
-              <input
-                type="text"
-                inputMode="numeric"
-                required
-                maxLength={6}
-                value={otpCode}
-                onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ""))}
-                className="w-full px-3 py-2 text-center text-lg tracking-[0.5em] border rounded-lg dark:bg-slate-800 dark:border-slate-700 dark:text-white"
-                placeholder="______"
-              />
-            </div>
 
-            <button type="submit" disabled={loading} className="w-full py-2.5 bg-amber-500 hover:bg-amber-600 disabled:bg-amber-300 text-white font-bold rounded-lg text-sm flex items-center justify-center gap-2">
-              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-              {language === "bn" ? "নিশ্চিত করুন" : "Confirm"}
-            </button>
-
-            <div className="flex items-center justify-between text-xs">
-              <button type="button" onClick={() => { setStep("form"); setOtpCode(""); setError(""); }} className="text-slate-500 hover:underline">
-                {language === "bn" ? "← নম্বর পাল্টান" : "← Change number"}
-              </button>
-              <button type="button" onClick={handleResendOtp} disabled={resendCooldown > 0} className="text-amber-600 disabled:text-slate-400 font-bold hover:underline disabled:no-underline">
-                {resendCooldown > 0
-                  ? (language === "bn" ? `আবার পাঠান (${resendCooldown}s)` : `Resend (${resendCooldown}s)`)
-                  : (language === "bn" ? "আবার পাঠান" : "Resend OTP")}
-              </button>
-            </div>
-          </form>
-        ) : (
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {!isLogin && (
             <div className="flex justify-center mb-2">
               <button
                 type="button"
@@ -366,26 +487,24 @@ export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModa
               </button>
               <input type="file" ref={fileInputRef} onChange={handlePhotoSelect} accept="image/*" className="hidden" />
             </div>
-          )}
-          {!isLogin && (
+
             <div>
               <label className="text-[10px] font-bold block mb-1 text-slate-500">{language === "bn" ? "আপনার নাম *" : "Name *"}</label>
               <div className="relative">
-                <User className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
-                <input type="text" required value={displayName} onChange={(e) => setDisplayName(e.target.value)} className="w-full pl-9 pr-3 py-2 text-sm border rounded-lg dark:bg-slate-800 dark:border-slate-700 dark:text-white" placeholder="Rayhan" />
+                <input type="text" required value={displayName} onChange={(e) => setDisplayName(e.target.value)} className="w-full px-3 py-2 text-sm border rounded-lg dark:bg-slate-800 dark:border-slate-700 dark:text-white" placeholder="Rayhan" />
               </div>
             </div>
-          )}
 
-          <div>
-            <label className="text-[10px] font-bold block mb-1 text-slate-500">{language === "bn" ? "মোবাইল নম্বর *" : "Mobile Number *"}</label>
-            <div className="relative">
-              <Phone className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
-              <input type="tel" required value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value)} className="w-full pl-9 pr-3 py-2 text-sm border rounded-lg dark:bg-slate-800 dark:border-slate-700 dark:text-white" placeholder="01993878271" />
+            <div>
+              <label className="text-[10px] font-bold block mb-1 text-slate-500">{language === "bn" ? "মোবাইল নম্বর *" : "Mobile Number *"}</label>
+              <div className="relative">
+                <input type="tel" required value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value)} className="w-full px-3 py-2 text-sm border rounded-lg dark:bg-slate-800 dark:border-slate-700 dark:text-white" placeholder="01993878271" />
+              </div>
+              <p className="text-[10px] text-slate-400 mt-1">
+                {language === "bn" ? "এই নম্বরে OTP পাঠানো হবে না — শুধু যোগাযোগের জন্য দেখানো হবে।" : "No OTP is sent here — it's shown to buyers as your contact number."}
+              </p>
             </div>
-          </div>
 
-          {!isLogin && (
             <div>
               <label className="text-[10px] font-bold block mb-1 text-slate-500">{language === "bn" ? "জেলা *" : "District *"}</label>
               <div className="relative">
@@ -395,17 +514,18 @@ export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModa
                 </select>
               </div>
             </div>
-          )}
 
-          <button type="submit" disabled={loading} className="w-full py-2.5 bg-amber-500 hover:bg-amber-600 disabled:bg-amber-300 text-white font-bold rounded-lg text-sm flex items-center justify-center gap-2">
-            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-            {uploadingPhoto
-              ? (language === "bn" ? "ছবি আপলোড হচ্ছে..." : "Uploading photo...")
-              : isLogin
-                ? (language === "bn" ? "লগইন নিশ্চিত করুন" : "Confirm Login")
+            <button type="submit" disabled={loading} className="w-full py-2.5 bg-amber-500 hover:bg-amber-600 disabled:bg-amber-300 text-white font-bold rounded-lg text-sm flex items-center justify-center gap-2">
+              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+              {uploadingPhoto
+                ? (language === "bn" ? "ছবি আপলোড হচ্ছে..." : "Uploading photo...")
                 : (language === "bn" ? "প্রোফাইল তৈরি করুন" : "Create Profile")}
-          </button>
-        </form>
+            </button>
+
+            <button type="button" onClick={handleCancelProfileStep} className="w-full text-center text-xs text-slate-500 hover:underline">
+              {language === "bn" ? "← বাতিল করুন" : "← Cancel"}
+            </button>
+          </form>
         )}
       </div>
     </div>

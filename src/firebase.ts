@@ -1,5 +1,5 @@
 import { initializeApp } from "firebase/app";
-import { getAuth } from "firebase/auth";
+import { getAuth, GoogleAuthProvider } from "firebase/auth";
 import { initializeFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 
@@ -17,6 +17,9 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 
 export const auth = getAuth(app);
+
+// Google সাইন-ইন প্রোভাইডার — ফোন OTP এর বদলে ব্যবহার করা হচ্ছে (কোনো SMS গেটওয়ে লাগবে না)
+export const googleProvider = new GoogleAuthProvider();
 
 // Initialize Firestore
 export const db = initializeFirestore(app, {
