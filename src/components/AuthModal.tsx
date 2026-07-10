@@ -369,4 +369,4 @@ export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModa
       </div>
     </div>
   );
-}
+  }
