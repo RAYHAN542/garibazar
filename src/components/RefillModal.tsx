@@ -115,7 +115,7 @@ export function RefillModal({ isOpen, onClose, currentUser, language }: RefillMo
     setSuccess(false);
 
     if (amount <= 0) {
-      setError(language === "bn" ? "দয়া করে সঠিক পরিমাণ লিখুন" : "Please input a valid amount");
+      setError(language === "bn" ? "দয়া করে সঠিক পরিমাণ লিখুন" : "Please input a valid amount");
       return;
     }
     if (!senderNumber.trim()) {
@@ -138,7 +138,7 @@ export function RefillModal({ isOpen, onClose, currentUser, language }: RefillMo
     if (cleanTx.length < 8 || cleanTx.length > 12 || !isAlphanumeric || !hasLetters || !hasDigits || isBlacklisted || isRepetitive) {
       setError(
         language === "bn"
-          ? "ভুল ট্রানজেকশন আইডি! অনুগ্রহ করে সঠিক ৮-১২ সংখ্যার আলফানিউমেরিক আইডি লিখুন (যেমন: BKX9E837D2)। কোনো ডেমো বা প্লেইন টেক্সট গ্রহণযোগ্য নয়।"
+          ? "ভুল ট্রানজেকশন আইডি! অনুগ্রহ করে সঠিক ৮-১২ সংখ্যার আলফানিউমেরিক আইডি লিখুন (যেমন: BKX9E837D2)। কোনো ডেমো বা প্লেইন টেক্সট গ্রহণযোগ্য নয়।"
           : "Invalid Transaction ID! Please enter a valid 8-12 character alphanumeric ID (e.g. BKX9E837D2). Placeholder or plain text is not accepted."
       );
       return;
@@ -147,7 +147,7 @@ export function RefillModal({ isOpen, onClose, currentUser, language }: RefillMo
     if (!validateBanglaPhone(senderNumber)) {
       setError(
         language === "bn"
-          ? "দয়া করে সঠিক ১১ ডিজিট বাংলাদেশী মোবাইল নম্বর দিন (যেমন: ০১৭XXXXXXXX)"
+          ? "দয়া করে সঠিক ১১ ডিজিট বাংলাদেশী মোবাইল নম্বর দিন (যেমন: ০১৭XXXXXXXX)"
           : "Please enter a valid 11-digit Bangladeshi mobile number (e.g. 017XXXXXXXX)"
       );
       return;
@@ -299,7 +299,7 @@ export function RefillModal({ isOpen, onClose, currentUser, language }: RefillMo
 
     } catch (err: any) {
       console.error("Error finalizing instant gateway payment:", err);
-      setError(language === "bn" ? "পেমেন্ট সম্পন্ন হয়েছে কিন্তু ব্যালেন্স আপডেটে সমস্যা হয়েছে। অনুগ্রহ করে অ্যাডমিনের সাথে যোগাযোগ করুন।" : "Payment authorized but balance update failed. Admin has been notified.");
+      setError(language === "bn" ? "পেমেন্ট সম্পন্ন হয়েছে কিন্তু ব্যালেন্স আপডেটে সমস্যা হয়েছে। অনুগ্রহ করে অ্যাডমিনের সাথে যোগাযোগ করুন।" : "Payment authorized but balance update failed. Admin has been notified.");
     } finally {
       setLoading(false);
     }
@@ -324,20 +324,20 @@ export function RefillModal({ isOpen, onClose, currentUser, language }: RefillMo
     <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-55 overflow-y-auto">
       <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-xl w-full shadow-2xl border border-slate-200 dark:border-slate-800 relative overflow-hidden my-8 flex flex-col max-h-[90vh]">
         
-        {/* PROMINENT DEMO MODE WARNING BANNER */}
-        <div className="bg-amber-500 text-slate-950 px-5 py-3 font-black text-xs text-center shrink-0 flex flex-col items-center justify-center gap-1 border-b border-amber-600 shadow-sm animate-pulse z-10">
+        {/* SECURE REAL PAYMENT BANNER (UddoktaPay-verified) */}
+        <div className="bg-emerald-600 text-white px-5 py-3 font-black text-xs text-center shrink-0 flex flex-col items-center justify-center gap-1 border-b border-emerald-700 shadow-sm z-10">
           <div className="flex items-center gap-1.5 justify-center">
-            <span className="text-sm">⚠️</span>
+            <span className="text-sm">🔒</span>
             <span className="tracking-tight uppercase">
               {language === "bn"
-                ? "ডেমো মোড — এটা real payment বা রিচার্জ না।"
-                : "DEMO MODE — This is a simulated recharge."}
+                ? "নিরাপদ রিয়েল পেমেন্ট — UddoktaPay দ্বারা যাচাইকৃত"
+                : "Secure Real Payment — Verified via UddoktaPay"}
             </span>
           </div>
           <span className="text-[11px] font-extrabold opacity-90">
             {language === "bn"
-              ? "কোনো আসল টাকা কাটা হবে না।"
-              : "No real money will be charged or deducted."}
+              ? "পেমেন্ট সফল হলে আসল টাকা কাটা হবে এবং ব্যালেন্স যোগ হবে।"
+              : "Real money will be charged upon successful payment and credited to your balance."}
           </span>
         </div>
 
@@ -350,7 +350,7 @@ export function RefillModal({ isOpen, onClose, currentUser, language }: RefillMo
             </p>
             <p className="font-semibold mt-0.5">
               {language === "bn"
-                ? "প্লে স্টোর নীতি অনুযায়ী, অ্যান্ড্রয়েড অ্যাপের ভিতর ডিজিটাল সার্ভিস (যেমন বিজ্ঞাপন প্রমোশন বা বাজেট রিচার্জ) কেনার জন্য গুগল প্লে বিলিং ব্যবহার করা বাধ্যতামূলক। ম্যানুয়াল বিকাশ/নগদ পেমেন্ট শুধুমাত্র ওয়েব ব্রাউজারে প্রযোজ্য। অ্যান্ড্রয়েড অ্যাপ রিলিজের পূর্বে প্লে বিলিং এপিআই অ্যাক্টিভেট করুন।"
+                ? "প্লে স্টোর নীতি অনুযায়ী, অ্যান্ড্রয়েড অ্যাপের ভিতর ডিজিটাল সার্ভিস (যেমন বিজ্ঞাপন প্রমোশন বা বাজেট রিচার্জ) কেনার জন্য গুগল প্লে বিলিং ব্যবহার করা বাধ্যতামূলক। ম্যানুয়াল বিকাশ/নগদ পেমেন্ট শুধুমাত্র ওয়েব ব্রাউজারে প্রযোজ্য। অ্যান্ড্রয়েড অ্যাপ রিলিজের পূর্বে প্লে বিলিং এপিআই অ্যাক্টিভেট করুন।"
                 : "Per Google Play Developer Console requirements, all digital goods (ad credits, listings promotions) sold inside the Android package must be billed through Google Play Billing (IAP). Manual peer-to-peer transfers are gated for web compatibility."}
             </p>
           </div>
@@ -453,8 +453,8 @@ export function RefillModal({ isOpen, onClose, currentUser, language }: RefillMo
               </div>
               <p className="text-xs text-slate-550 dark:text-slate-350 leading-relaxed font-semibold">
                 {language === "bn" 
-                  ? "পেমেন্ট গেটওয়ে অপশন দিয়ে আপনি bKash/Nagad/Rocket এর যেকোনো অ্যাকাউন্ট অথবা ইন্টারফেস ব্যবহার করে সরাসরি মক পেমেন্ট করতে পারবেন। পেমেন্ট কনফার্ম হওয়া মাত্রই ব্যালেন্স ইনস্ট্যান্ট বেড়ে যাবে!"
-                  : "Using the secure online gateway option, you can mock-pay instantly via authentic bKash, Nagad, or Rocket themed web checkout pages. Refill adds credits to your account immediately with no admin wait!"}
+                  ? "এই অপশনে আপনি bKash/Nagad/Rocket দিয়ে UddoktaPay-এর নিরাপদ চেকআউট পেজে সরাসরি real পেমেন্ট করতে পারবেন। পেমেন্ট কনফার্ম হওয়া মাত্রই ব্যালেন্স ইনস্ট্যান্ট যোগ হয়ে যাবে!"
+                  : "This option redirects you to UddoktaPay's secure checkout page to pay instantly and securely via bKash, Nagad, or Rocket. Your balance is credited the moment payment is confirmed!"}
               </p>
             </div>
 
@@ -465,7 +465,7 @@ export function RefillModal({ isOpen, onClose, currentUser, language }: RefillMo
                 <CheckCircle2 className="w-4.5 h-4.5 text-emerald-500 shrink-0" />
                 <span>
                   {language === "bn"
-                    ? "অনলাইন গেটওয়ে পেমেন্ট সফল হয়েছে! ব্যালেন্স ইনস্ট্যান্ট রিচার্জ করা হয়েছে।"
+                    ? "অনলাইন গেটওয়ে পেমেন্ট সফল হয়েছে! ব্যালেন্স ইনস্ট্যান্ট রিচার্জ করা হয়েছে।"
                     : "Online checkout completed successfully! Credits have been instantly added to your wallet."}
                 </span>
               </div>
@@ -567,7 +567,7 @@ export function RefillModal({ isOpen, onClose, currentUser, language }: RefillMo
                 className="flex items-center gap-1 text-[11px] font-bold text-amber-500 hover:text-amber-600 bg-amber-500/10 hover:bg-amber-500/20 px-3 py-1.5 rounded-lg border border-amber-500/20"
               >
                 {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                {copied ? (language === "bn" ? "কপি হয়েছে" : "Copied") : (language === "bn" ? "কপি" : "Copy")}
+                {copied ? (language === "bn" ? "কপি হয়েছে" : "Copied") : (language === "bn" ? "কপি" : "Copy")}
               </button>
             </div>
 
@@ -640,7 +640,7 @@ export function RefillModal({ isOpen, onClose, currentUser, language }: RefillMo
                   <CheckCircle2 className="w-4.5 h-4.5 text-emerald-500 shrink-0" />
                   <span>
                     {language === "bn"
-                      ? "পেমেন্ট রিকোয়েস্ট পাঠানো হয়েছে! অ্যাডমিন কিছুক্ষণ পর সফল হলে ব্যালেন্স বাড়িয়ে দেবে।"
+                      ? "পেমেন্ট রিকোয়েস্ট পাঠানো হয়েছে! অ্যাডমিন কিছুক্ষণ পর সফল হলে ব্যালেন্স বাড়িয়ে দেবে।"
                       : "Refill request sent! Admin will verify and increase your ad wallet balance soon."}
                   </span>
                 </div>
@@ -654,7 +654,7 @@ export function RefillModal({ isOpen, onClose, currentUser, language }: RefillMo
                 {loading ? (
                   <Loader2 className="w-4 h-4 animate-spin text-slate-950" />
                 ) : (
-                  language === "bn" ? "রিফিল রিকোয়েস্ট সাবমিট করুন" : "Submit Refill Request"
+                  language === "bn" ? "রিফিল রিকোয়েস্ট সাবমিট করুন" : "Submit Refill Request"
                 )}
               </button>
             </form>
@@ -673,7 +673,7 @@ export function RefillModal({ isOpen, onClose, currentUser, language }: RefillMo
             </div>
           ) : requests.length === 0 ? (
             <p className="text-center text-[11px] text-slate-400 italic py-2">
-              {language === "bn" ? "এখনও কোনো রিচার্জের আবেদন করা হয়নি" : "No recharge applications submitted yet"}
+              {language === "bn" ? "এখনও কোনো রিচার্জের আবেদন করা হয়নি" : "No recharge applications submitted yet"}
             </p>
           ) : (
             <div className="max-h-36 overflow-y-auto space-y-2 pr-1" id="refill-requests-list">
