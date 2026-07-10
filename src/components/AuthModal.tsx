@@ -25,8 +25,6 @@ const PRESET_AVATARS = [
   "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80"
 ];
 
-// Resizes/compresses a picked profile photo client-side before it goes to Cloudinary,
-// so uploads stay fast on slow connections and don't waste storage.
 const compressImageToBlob = async (file: File, maxWidth = 512, maxHeight = 512): Promise<Blob> => {
   const img = await new Promise<HTMLImageElement>((resolve, reject) => {
     const objectUrl = URL.createObjectURL(file);
@@ -68,7 +66,6 @@ const compressImageToBlob = async (file: File, maxWidth = 512, maxHeight = 512):
   });
 };
 
-// ছোট্ট Google "G" আইকন — lucide-react এ ব্র্যান্ড আইকন নেই তাই ইনলাইন SVG
 const GoogleIcon = () => (
   <svg className="w-5 h-5" viewBox="0 0 48 48" aria-hidden="true">
     <path fill="#FFC107" d="M43.611 20.083H42V20H24v8h11.303c-1.649 4.657-6.08 8-11.303 8-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 12.955 4 4 12.955 4 24s8.955 20 20 20 20-8.955 20-20c0-1.341-.138-2.65-.389-3.917z"/>
@@ -82,7 +79,6 @@ export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModa
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // --- Google দিয়ে সাইন-ইন করার পর, একদম নতুন ইউজার হলে প্রোফাইল সম্পূর্ণ করার ধাপ ---
   const [step, setStep] = useState<"start" | "profile">("start");
   const [googleUser, setGoogleUser] = useState<FirebaseUser | null>(null);
   const [displayName, setDisplayName] = useState("");
@@ -93,158 +89,6 @@ export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModa
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Google auth সফল হওয়ার পর: আগের অ্যাকাউন্ট থাকলে সরাসরি লগইন করি,
-  // না থাকলে ফোন নম্বর/জেলা নেওয়ার জন্য প্রোফাইল ধাপ দেখাই।
-  const handlePostGoogleAuth = async (fbUser: FirebaseUser) => {
-    const userDocRef = doc(db, "users", fbUser.uid);
-    const userSnap = await getDoc(userDocRef);
-
-    if (userSnap.exists()) {
-      const existingData = userSnap.data() as any;
-      const sessionUser = {
-        uid: fbUser.uid,
-        displayName: existingData.displayName,
-        email: existingData.email || fbUser.email,
-        phoneNumber: exist
-cd ~/garibazar
-
-cat > src/firebase.ts << 'FIREBASE_EOF'
-import { initializeApp } from "firebase/app";
-import { getAuth, GoogleAuthProvider } from "firebase/auth";
-import { initializeFirestore } from "firebase/firestore";
-import { getStorage } from "firebase/storage";
-
-const firebaseConfig = {
-  apiKey: "AIzaSyB8HnVfzI1YmP1X2r_lLWu-2YQKyKPTcdc",
-  authDomain: "garibazar-bd.firebaseapp.com",
-  projectId: "garibazar-bd",
-  storageBucket: "garibazar-bd.firebasestorage.app",
-  messagingSenderId: "466216231725",
-  appId: "1:466216231725:web:ef296db7e40221d4e269a4",
-  measurementId: "G-9SKYKBPRCE"
-};
-
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
-
-export const auth = getAuth(app);
-
-// Google সাইন-ইন প্রোভাইডার — ফোন OTP এর বদলে ব্যবহার করা হচ্ছে (কোনো SMS গেটওয়ে লাগবে না)
-export const googleProvider = new GoogleAuthProvider();
-
-// Initialize Firestore
-export const db = initializeFirestore(app, {
-  experimentalAutoDetectLongPolling: true,
-});
-
-export const storage = getStorage(app);
-
-// অন্যান্য কম্পোনেন্টের বিল্ড এরর দূর করার জন্য এই ফাংশনটি এক্সপোর্ট করা হলো
-export const logAnalyticsEvent = (eventName: string, eventParams?: any) => {
-  console.log(`Analytics Event: ${eventName}`, eventParams);
-};
-
-export default app;
-FIREBASE_EOF
-
-cat > src/components/AuthModal.tsx << 'AUTHMODAL_EOF'
-import React, { useState, useRef } from "react";
-import { auth, db, googleProvider } from "../firebase";
-import {
-  signInWithPopup,
-  signInWithRedirect,
-  getRedirectResult,
-  signOut,
-  User as FirebaseUser,
-} from "firebase/auth";
-import { doc, getDoc, setDoc } from "firebase/firestore";
-import { X, MapPin, Loader2, Sparkles, Camera } from "lucide-react";
-import { CITIES } from "../translations";
-import { SupportedLanguage } from "../types";
-import { sanitizeText, validateBanglaPhone } from "../utils/sanitizer";
-import { uploadToCloudinary } from "../utils/cloudinary";
-
-interface AuthModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  language: SupportedLanguage;
-  onAuthSuccess: (user: any) => void;
-}
-
-const PRESET_AVATARS = [
-  "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80"
-];
-
-// Resizes/compresses a picked profile photo client-side before it goes to Cloudinary,
-// so uploads stay fast on slow connections and don't waste storage.
-const compressImageToBlob = async (file: File, maxWidth = 512, maxHeight = 512): Promise<Blob> => {
-  const img = await new Promise<HTMLImageElement>((resolve, reject) => {
-    const objectUrl = URL.createObjectURL(file);
-    const image = new Image();
-    image.onload = () => {
-      URL.revokeObjectURL(objectUrl);
-      resolve(image);
-    };
-    image.onerror = () => {
-      URL.revokeObjectURL(objectUrl);
-      reject(new Error("Failed to load image for compression"));
-    };
-    image.src = objectUrl;
-  });
-
-  let { width, height } = img;
-  if (width > height) {
-    if (width > maxWidth) {
-      height = Math.round((height * maxWidth) / width);
-      width = maxWidth;
-    }
-  } else if (height > maxHeight) {
-    width = Math.round((width * maxHeight) / height);
-    height = maxHeight;
-  }
-
-  const canvas = document.createElement("canvas");
-  canvas.width = width;
-  canvas.height = height;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) throw new Error("Canvas context is null");
-  ctx.drawImage(img, 0, 0, width, height);
-
-  return await new Promise<Blob>((resolve, reject) => {
-    canvas.toBlob((b) => {
-      if (!b) reject(new Error("Failed to convert canvas to Blob"));
-      else resolve(b);
-    }, "image/jpeg", 0.8);
-  });
-};
-
-// ছোট্ট Google "G" আইকন — lucide-react এ ব্র্যান্ড আইকন নেই তাই ইনলাইন SVG
-const GoogleIcon = () => (
-  <svg className="w-5 h-5" viewBox="0 0 48 48" aria-hidden="true">
-    <path fill="#FFC107" d="M43.611 20.083H42V20H24v8h11.303c-1.649 4.657-6.08 8-11.303 8-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 12.955 4 4 12.955 4 24s8.955 20 20 20 20-8.955 20-20c0-1.341-.138-2.65-.389-3.917z"/>
-    <path fill="#FF3D00" d="M6.306 14.691l6.571 4.819C14.655 15.108 18.961 12 24 12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 16.318 4 9.656 8.337 6.306 14.691z"/>
-    <path fill="#4CAF50" d="M24 44c5.166 0 9.86-1.977 13.409-5.192l-6.19-5.238C29.211 35.091 26.715 36 24 36c-5.202 0-9.619-3.317-11.283-7.946l-6.522 5.025C9.505 39.556 16.227 44 24 44z"/>
-    <path fill="#1976D2" d="M43.611 20.083H42V20H24v8h11.303a12.04 12.04 0 0 1-4.087 5.571l.003-.002 6.19 5.238C36.971 39.205 44 34 44 24c0-1.341-.138-2.65-.389-3.917z"/>
-  </svg>
-);
-
-export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModalProps) {
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
-
-  // --- Google দিয়ে সাইন-ইন করার পর, একদম নতুন ইউজার হলে প্রোফাইল সম্পূর্ণ করার ধাপ ---
-  const [step, setStep] = useState<"start" | "profile">("start");
-  const [googleUser, setGoogleUser] = useState<FirebaseUser | null>(null);
-  const [displayName, setDisplayName] = useState("");
-  const [phoneNumber, setPhoneNumber] = useState("");
-  const [city, setCity] = useState(CITIES[0]);
-  const [profilePhotoFile, setProfilePhotoFile] = useState<File | null>(null);
-  const [profilePhotoPreview, setProfilePhotoPreview] = useState<string | null>(null);
-  const [uploadingPhoto, setUploadingPhoto] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  // Google auth সফল হওয়ার পর: আগের অ্যাকাউন্ট থাকলে সরাসরি লগইন করি,
-  // না থাকলে ফোন নম্বর/জেলা নেওয়ার জন্য প্রোফাইল ধাপ দেখাই।
   const handlePostGoogleAuth = async (fbUser: FirebaseUser) => {
     const userDocRef = doc(db, "users", fbUser.uid);
     const userSnap = await getDoc(userDocRef);
@@ -267,15 +111,12 @@ export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModa
       return;
     }
 
-    // নতুন ইউজার — প্রোফাইল সম্পূর্ণ করতে হবে (ফোন নম্বর, জেলা)
     setGoogleUser(fbUser);
     setDisplayName(fbUser.displayName || "");
     setProfilePhotoPreview(fbUser.photoURL || null);
     setStep("profile");
   };
 
-  // রিডাইরেক্ট-ভিত্তিক সাইন-ইন হলে (popup ব্লক থাকা ব্রাউজার/ওয়েবভিউতে fallback),
-  // পেজ রিলোডের পর এখানে রেজাল্ট ধরে নিই।
   React.useEffect(() => {
     (async () => {
       try {
@@ -318,7 +159,6 @@ export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModa
     setProfilePhotoPreview(URL.createObjectURL(file));
   };
 
-  // Google popup দিয়ে সাইন-ইন করি; popup ব্লক হলে redirect দিয়ে fallback করি
   const handleGoogleSignIn = async () => {
     setError("");
     setLoading(true);
@@ -328,14 +168,14 @@ export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModa
     } catch (err: any) {
       const code = err?.code || "";
       if (code === "auth/popup-closed-by-user" || code === "auth/cancelled-popup-request") {
-        // ইউজার নিজেই popup বন্ধ করেছে — এরর দেখানোর দরকার নেই
+        // ইউজার নিজেই popup বন্ধ করেছে
       } else if (
         code === "auth/popup-blocked" ||
         code === "auth/operation-not-supported-in-this-environment"
       ) {
         try {
           await signInWithRedirect(auth, googleProvider);
-          return; // পেজ রিডাইরেক্ট হবে
+          return;
         } catch (redirectErr) {
           console.error(redirectErr);
           setError(language === "bn" ? "Google সাইন-ইন করা যায়নি।" : "Could not sign in with Google.");
@@ -356,7 +196,6 @@ export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModa
     setError("");
   };
 
-  // নতুন ইউজারের প্রোফাইল (ফোন/জেলা/ছবি) সাবমিট করে Firestore-এ account তৈরি করি
   const handleCompleteProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
