@@ -207,7 +207,7 @@ export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPromp
         price: parseFloat(cleanPrice) || 0,
         description: cleanDesc,
         location,
-        phone: cleanPhone,
+        contactNumber: cleanPhone,
         images: uploadedUrls,
         sellerId: currentUser.uid,
         sellerName: currentUser.displayName || "Rayhan",

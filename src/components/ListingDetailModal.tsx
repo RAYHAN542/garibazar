@@ -879,11 +879,11 @@ export function ListingDetailModal({ listing, language, currentUser, onClose, on
                   <div className="flex items-center gap-3 mt-1 flex-wrap">
                     <a 
                       id="detail-contact-tele"
-                      href={`tel:${listing.phone}`} 
+                      href={`tel:${listing.contactNumber}`} 
                       onClick={handleContactClick}
                       className="font-mono font-black text-xl text-amber-500 hover:text-amber-600 hover:underline block cursor-pointer"
                     >
-                      📞 {listing.phone}
+                      📞 {listing.contactNumber}
                     </a>
                   </div>
                 )}
