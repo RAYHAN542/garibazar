@@ -2723,8 +2723,8 @@ export default function App() {
                         </h4>
                         <p className="text-slate-400 text-xs mt-1.5 leading-relaxed">
                           {language === "bn"
-                            ? "সহজ উপায়ে আমাদের ডেমো ক্রেডিট ব্যালেন্স ব্যবহার করে আপনার যেকোনো কার পার্টস আইটেমকে মার্কেট ফিল্টারে অথবা আমাদের হোমপেইজের টপ স্লাইডারে স্পন্সর করে বুস্ট করান।"
-                            : "Use your simulated promotional wallet budget in real-time. Target direct local phone calls and place your listings prominently on our top slideshow shelves!"}
+                            ? "সহজ ও নিরাপদ UddoktaPay চেকআউটের মাধ্যমে পেমেন্ট করে আপনার যেকোনো কার পার্টস আইটেমকে মার্কেট ফিল্টারে অথবা আমাদের হোমপেইজের টপ স্লাইডারে স্পন্সর করে বুস্ট করান।"
+                            : "Pay securely via UddoktaPay checkout to sponsor and boost any of your car parts listings — get priority placement or a spot on our homepage top slider."}
                         </p>
                       </div>
                     </div>
@@ -3245,21 +3245,13 @@ export default function App() {
                               </div>
                             </div>
 
-                            <div className="grid grid-cols-2 gap-2 text-xs pt-1">
+                            <div className="grid grid-cols-1 gap-2 text-xs pt-1">
                               <div className="bg-white dark:bg-slate-900 border border-slate-150/80 dark:border-slate-800 p-2.5 rounded-xl shadow-xs">
                                 <span className="text-[9px] text-slate-400 font-bold uppercase block">
                                   {language === "bn" ? "ফোন নম্বর" : "Phone Number"}
                                 </span>
                                 <span className="font-extrabold text-slate-750 dark:text-slate-205 block mt-0.5 font-mono">
                                   {userMetadata?.phoneNumber || user?.phoneNumber || "—"}
-                                </span>
-                              </div>
-                              <div className="bg-white dark:bg-slate-900 border border-slate-150/80 dark:border-slate-800 p-2.5 rounded-xl shadow-xs">
-                                <span className="text-[9px] text-slate-400 font-bold uppercase block">
-                                  {language === "bn" ? "ব্যালেন্স" : "Ad Wallet Balance"}
-                                </span>
-                                <span className="font-extrabold text-amber-550 block mt-0.5 font-mono">
-                                  ৳{(userMetadata?.simulatedCredits ?? user?.simulatedCredits ?? 5000).toLocaleString("en-IN")}
                                 </span>
                               </div>
                             </div>
@@ -3657,7 +3649,7 @@ export default function App() {
           <p className="max-w-md mx-auto leading-relaxed text-[11px] text-slate-400">
             {language === "bn" 
               ? "গাড়ি ও বাইকের অরিজিনাল জেনুইন খুচরা যন্ত্রাংশের বিশ্বস্ত বাজার। স্পন্সরড বিজ্ঞাপনদাতাদের জন্য উন্নত অ্যাড ক্যাম্পেইন ও AI ডেসক্রিপশন জেনারেটর ইঞ্জিন।" 
-              : "Bangladesh's premium online car parts listings deck. Refill your promotional wallet to test live boosted sponsored ad placement in real-time."}
+              : "Bangladesh's premium online car parts marketplace. Boost your listings with secure, real-time sponsored ad placements."}
           </p>
           <div className="text-[10px] text-slate-400 flex flex-wrap gap-x-4 gap-y-1 justify-center pt-2">
             <span>© 2026 Gari Bazar Tech</span>
