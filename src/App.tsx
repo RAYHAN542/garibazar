@@ -2316,8 +2316,8 @@ export default function App() {
                   />
                 </Suspense>
 
-                {/* Dashboard Tab Toggles */}
-                <div className="flex overflow-x-auto no-scrollbar border-b border-slate-200 dark:border-slate-800" id="dash-tabs-bar">
+                {/* Dashboard Tab Toggles — compact pill বাটন, ছোট লেখা, সবগুলো এক স্ক্রিনে ধরার জন্য */}
+                <div className="flex gap-1.5 overflow-x-auto no-scrollbar pb-1" id="dash-tabs-bar">
                   <button
                     id="dash-subtab-inventory"
                     onClick={() => {
@@ -2325,14 +2325,14 @@ export default function App() {
                       setAdPromoSuccess(false);
                       setAdPromoError("");
                     }}
-                    className={`pb-3 px-4 text-sm font-bold border-b-2 transition-all flex items-center gap-2 cursor-pointer shrink-0 whitespace-nowrap ${
+                    className={`px-3 py-2 rounded-full text-[11px] font-bold transition-all flex items-center gap-1 cursor-pointer shrink-0 whitespace-nowrap ${
                       dashboardSubTab === 'inventory'
-                        ? 'border-amber-500 text-amber-500'
-                        : 'border-transparent text-slate-400 hover:text-slate-250 dark:hover:text-slate-250'
+                        ? 'bg-amber-500 text-slate-950 shadow-sm'
+                        : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'
                     }`}
                   >
-                    <Grid className="w-4 h-4" />
-                    {language === "bn" ? "আমার প্রোডাক্টস ও অর্ডার ট্র্যাকিং" : "My Parts & Order Inquiries"}
+                    <Grid className="w-3.5 h-3.5" />
+                    {language === "bn" ? "প্রোডাক্টস" : "Products"}
                   </button>
 
                   <button
@@ -2342,14 +2342,14 @@ export default function App() {
                       setAdPromoSuccess(false);
                       setAdPromoError("");
                     }}
-                    className={`pb-3 px-4 text-sm font-bold border-b-2 transition-all flex items-center gap-2 cursor-pointer shrink-0 whitespace-nowrap ${
+                    className={`px-3 py-2 rounded-full text-[11px] font-bold transition-all flex items-center gap-1 cursor-pointer shrink-0 whitespace-nowrap ${
                       dashboardSubTab === 'my-shop'
-                        ? 'border-amber-500 text-amber-500'
-                        : 'border-transparent text-slate-400 hover:text-slate-250 dark:hover:text-slate-250'
+                        ? 'bg-amber-500 text-slate-950 shadow-sm'
+                        : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'
                     }`}
                   >
-                    <ShoppingBag className="w-4 h-4 text-amber-500" />
-                    {language === "bn" ? "আমার দোকান 🛒" : "My Shop 🛒"}
+                    <ShoppingBag className="w-3.5 h-3.5" />
+                    {language === "bn" ? "দোকান" : "My Shop"}
                   </button>
 
                   <button
@@ -2359,15 +2359,15 @@ export default function App() {
                       setAdPromoSuccess(false);
                       setAdPromoError("");
                     }}
-                    className={`pb-3 px-4 text-sm font-bold border-b-2 transition-all flex items-center gap-2 cursor-pointer relative shrink-0 whitespace-nowrap ${
+                    className={`px-3 py-2 rounded-full text-[11px] font-bold transition-all flex items-center gap-1 cursor-pointer relative shrink-0 whitespace-nowrap ${
                       dashboardSubTab === 'ads'
-                        ? 'border-amber-500 text-amber-500'
-                        : 'border-transparent text-slate-400 hover:text-slate-250 dark:hover:text-slate-250'
+                        ? 'bg-amber-500 text-slate-950 shadow-sm'
+                        : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'
                     }`}
                   >
-                    <Sparkles className="w-4 h-4 text-amber-500 animate-pulse" />
-                    {language === "bn" ? "বিজ্ঞাপন ও ক্যাম্পেইন সেন্টার" : "Promote Ads Center"}
-                    <span className="absolute -top-1 -right-2 bg-gradient-to-r from-red-500 to-amber-500 text-white font-extrabold text-[8px] uppercase px-1 rounded-full animate-bounce scale-90">
+                    <Sparkles className="w-3.5 h-3.5" />
+                    {language === "bn" ? "বিজ্ঞাপন" : "Ads"}
+                    <span className="absolute -top-1.5 -right-1.5 bg-gradient-to-r from-red-500 to-amber-500 text-white font-extrabold text-[7px] uppercase px-1 rounded-full">
                       LIVE
                     </span>
                   </button>
@@ -2378,14 +2378,14 @@ export default function App() {
                       onClick={() => {
                         setDashboardSubTab('admin');
                       }}
-                      className={`pb-3 px-4 text-sm font-bold border-b-2 transition-all flex items-center gap-2 cursor-pointer relative shrink-0 whitespace-nowrap ${
+                      className={`px-3 py-2 rounded-full text-[11px] font-bold transition-all flex items-center gap-1 cursor-pointer shrink-0 whitespace-nowrap ${
                         dashboardSubTab === 'admin'
-                          ? 'border-red-500 text-red-500'
-                          : 'border-transparent text-slate-400 hover:text-slate-250 dark:hover:text-slate-250'
+                          ? 'bg-red-500 text-white shadow-sm'
+                          : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'
                       }`}
                     >
-                      <ShieldAlert className="w-4 h-4 text-red-500 animate-pulse" />
-                      {language === "bn" ? "অ্যাডমিন প্যানেল" : "Admin Panel"}
+                      <ShieldAlert className="w-3.5 h-3.5" />
+                      {language === "bn" ? "অ্যাডমিন" : "Admin"}
                     </button>
                   )}
 
@@ -2395,14 +2395,14 @@ export default function App() {
                       onClick={() => {
                         setDashboardSubTab('playstore-audit');
                       }}
-                      className={`pb-3 px-4 text-sm font-bold border-b-2 transition-all flex items-center gap-2 cursor-pointer relative shrink-0 whitespace-nowrap ${
+                      className={`px-3 py-2 rounded-full text-[11px] font-bold transition-all flex items-center gap-1 cursor-pointer shrink-0 whitespace-nowrap ${
                         dashboardSubTab === 'playstore-audit'
-                          ? 'border-amber-500 text-amber-500'
-                          : 'border-transparent text-slate-400 hover:text-slate-250 dark:hover:text-slate-250'
+                          ? 'bg-amber-500 text-slate-950 shadow-sm'
+                          : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'
                       }`}
                     >
-                      <Cpu className="w-4 h-4 text-amber-500" />
-                      {language === "bn" ? "প্লে স্টোর গতি ও সিকিউরিটি" : "Play Store & Scaling"}
+                      <Cpu className="w-3.5 h-3.5" />
+                      {language === "bn" ? "প্লে স্টোর" : "Play Store"}
                     </button>
                   )}
                 </div>
