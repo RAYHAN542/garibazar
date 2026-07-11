@@ -13,22 +13,19 @@ const firebaseConfig = {
   measurementId: "G-9SKYKBPRCE"
 };
 
-// Initialize Firebase
 const app = initializeApp(firebaseConfig);
 
 export const auth = getAuth(app);
 
-// Google সাইন-ইন প্রোভাইডার — ফোন OTP এর বদলে ব্যবহার করা হচ্ছে (কোনো SMS গেটওয়ে লাগবে না)
+// Google সাইন-ইন প্রোভাইডার — ফোন OTP এর বদলে ব্যবহার করা হচ্ছে (কোনো SMS গেটওয়ে/Blaze লাগবে না)
 export const googleProvider = new GoogleAuthProvider();
 
-// Initialize Firestore
 export const db = initializeFirestore(app, {
   experimentalAutoDetectLongPolling: true,
 });
 
 export const storage = getStorage(app);
 
-// অন্যান্য কম্পোনেন্টের বিল্ড এরর দূর করার জন্য এই ফাংশনটি এক্সপোর্ট করা হলো
 export const logAnalyticsEvent = (eventName: string, eventParams?: any) => {
   console.log(`Analytics Event: ${eventName}`, eventParams);
 };
