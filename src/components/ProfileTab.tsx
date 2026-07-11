@@ -79,14 +79,14 @@ export function ProfileTab({
                       <div>
                         <div className="flex items-center gap-1.5 flex-wrap">
                           <h2 className="text-lg sm:text-xl font-black text-slate-850 dark:text-white leading-none">
-                            {language === "bn" ? "গাড়ি বাজার" : "Gari Bazar"}
+                            {language === "bn" ? "গাড়ি বাজার" : "Gari Bazar"}
                           </h2>
                           <span className="text-[10px] sm:text-xs font-black bg-amber-500/10 text-amber-600 dark:text-amber-400 px-2 py-0.5 rounded-lg select-none">
                             {language === "bn" ? "প্রোফাইল" : "Profile"}
                           </span>
                         </div>
                         <p className="text-[10px] sm:text-xs text-slate-400 dark:text-slate-500 font-semibold mt-1">
-                          {language === "bn" ? "পার্টস ও গাড়ি বেচাকেনা" : "Auto Parts & Vehicles Trading"}
+                          {language === "bn" ? "পার্টস ও গাড়ি বেচাকেনা" : "Auto Parts & Vehicles Trading"}
                         </p>
                       </div>
                     </div>
@@ -144,10 +144,10 @@ export function ProfileTab({
                         </div>
                         <div>
                           <p className="text-sm sm:text-base font-extrabold text-slate-800 dark:text-slate-100">
-                            {language === "bn" ? "ব্যক্তিগত তথ্য (Personal info)" : "Personal info"}
+                            {language === "bn" ? "ব্যক্তিগত তথ্য" : "Personal info"}
                           </p>
                           <p className="text-xs text-slate-400 dark:text-slate-500 font-bold mt-0.5">
-                            {user ? (user.displayName || "Seller") : (language === "bn" ? "লগইন করতে এখানে চাপুন" : "Sign in to see info")}
+                            {user ? (user.displayName || "Seller") : (language === "bn" ? "লগইন করুন" : "Sign in to see info")}
                           </p>
                         </div>
                       </div>
@@ -185,7 +185,7 @@ export function ProfileTab({
                                   </span>
                                 </div>
                                 <p className="text-xs text-slate-400 dark:text-slate-500 font-bold mt-0.5 truncate">
-                                  {user.email || (language === "bn" ? "ইমেইল প্রদান করা হয়নি" : "No email linked")}
+                                  {user.email || (language === "bn" ? "ইমেইল প্রদান করা হয়নি" : "No email linked")}
                                 </p>
                               </div>
                             </div>
@@ -222,7 +222,7 @@ export function ProfileTab({
                           <div className="text-center py-2 space-y-3">
                             <p className="text-xs text-slate-500 dark:text-slate-450 leading-relaxed font-bold">
                               {language === "bn" 
-                                ? "গাড়ি বাজার অ্যাপে লগইন করতে দয়া করে নিচের বাটনে চাপুন।" 
+                                ? "গাড়ি বাজার অ্যাপে লগইন করতে দয়া করে নিচের বাটনে চাপুন।" 
                                 : "Please sign in to access your registered seller account details."}
                             </p>
                             <button
@@ -253,10 +253,10 @@ export function ProfileTab({
                         </div>
                         <div>
                           <p className="text-sm sm:text-base font-extrabold text-slate-800 dark:text-slate-100">
-                            {language === "bn" ? "আমার দোকান (My Shop)" : "My Shop"}
+                            {language === "bn" ? "আমার দোকান" : "My Shop"}
                           </p>
                           <p className="text-xs text-slate-400 dark:text-slate-500 font-bold mt-0.5">
-                            {user ? (language === "bn" ? "আপনার পাবলিক দোকান এবং লিস্টিং দেখুন" : "View your public shop and listings") : (language === "bn" ? "আপনার দোকান দেখতে লগইন করুন" : "Sign in to access your shop")}
+                            {user ? (language === "bn" ? "আপনার দোকান দেখুন" : "View your public shop and listings") : (language === "bn" ? "লগইন করুন" : "Sign in to access your shop")}
                           </p>
                         </div>
                       </div>
@@ -305,7 +305,7 @@ export function ProfileTab({
                             <div className="grid grid-cols-2 gap-2 text-xs pt-1">
                               <div className="bg-white dark:bg-slate-900 border border-slate-150/80 dark:border-slate-800 p-2.5 rounded-xl shadow-xs">
                                 <span className="text-[9px] text-slate-400 font-bold uppercase block">
-                                  {language === "bn" ? "মোট সক্রিয় পণ্য" : "Active Items"}
+                                  {language === "bn" ? "মোট সক্রিয় পণ্য" : "Active Items"}
                                 </span>
                                 <span className="font-extrabold text-slate-750 dark:text-slate-205 block mt-0.5 font-mono text-sm">
                                   {listings.filter(item => item.sellerId === user.uid && !item.isSold).length}
@@ -359,7 +359,7 @@ export function ProfileTab({
                           <div className="text-center py-2 space-y-3">
                             <p className="text-xs text-slate-500 dark:text-slate-450 leading-relaxed font-bold">
                               {language === "bn" 
-                                ? "আপনার দোকান পৃষ্ঠা দেখতে এবং কাস্টমাইজ করতে দয়া করে লগইন করুন।" 
+                                ? "আপনার দোকান পৃষ্ঠা দেখতে এবং কাস্টমাইজ করতে দয়া করে লগইন করুন।" 
                                 : "Please sign in to access and view your registered shop page."}
                             </p>
                             <div className="grid grid-cols-1 gap-2">
@@ -392,10 +392,10 @@ export function ProfileTab({
                         </div>
                         <div>
                           <p className="text-sm sm:text-base font-extrabold text-slate-800 dark:text-slate-100">
-                            {language === "bn" ? "ভাষা পরিবর্তন করুন (Change language)" : "Change language"}
+                            {language === "bn" ? "ভাষা পরিবর্তন" : "Change language"}
                           </p>
                           <p className="text-xs text-slate-400 dark:text-slate-500 font-bold mt-0.5">
-                            {language === "bn" ? "বাংলা ও ইংরেজি ভাষা নির্ধারণ করুন" : "Set app-wide language preference"}
+                            {language === "bn" ? "বাংলা বা ইংরেজি বেছে নিন" : "Set app-wide language preference"}
                           </p>
                         </div>
                       </div>
@@ -458,10 +458,10 @@ export function ProfileTab({
                       </div>
                       <div>
                         <p className="text-sm sm:text-base font-extrabold text-slate-800 dark:text-slate-100">
-                          {language === "bn" ? "ডার্ক মোড (Dark mode)" : "Dark mode"}
+                          {language === "bn" ? "ডার্ক মোড" : "Dark mode"}
                         </p>
                         <p className="text-xs text-slate-400 dark:text-slate-500 font-bold mt-0.5">
-                          {language === "bn" ? "আপনার চোখের সুবিধার্থে থিম পরিবর্তন করুন" : "Switch comfortable visual light/dark modes"}
+                          {language === "bn" ? "রাতে চোখের আরামের জন্য" : "Switch comfortable visual light/dark modes"}
                         </p>
                       </div>
                     </div>
@@ -495,10 +495,10 @@ export function ProfileTab({
                         </div>
                         <div>
                           <p className="text-sm sm:text-base font-extrabold text-slate-800 dark:text-slate-100">
-                            {language === "bn" ? "আমাদের টিম ও গাড়ি বাজার" : "Our Team & About"}
+                            {language === "bn" ? "আমাদের টিম" : "Our Team & About"}
                           </p>
                           <p className="text-xs text-slate-400 dark:text-slate-500 font-bold mt-0.5">
-                            {language === "bn" ? "অ্যাপ ডেভেলপমেন্ট টিম এবং লক্ষ্য" : "Meet the creators of Gari Bazar"}
+                            {language === "bn" ? "যারা অ্যাপ তৈরি করেছে" : "Meet the creators of Gari Bazar"}
                           </p>
                         </div>
                       </div>
@@ -521,7 +521,7 @@ export function ProfileTab({
                           </div>
                           <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed font-semibold">
                             {language === "bn"
-                              ? "গাড়ি বাজার অ্যাপটি বাংলাদেশে অটো পার্টস ও খুচরা যন্ত্রাংশের বেচাকেনাকে সহজ এবং ডিজিটাল করতে তৈরি করা হয়েছে। আমাদের মূল লক্ষ্য গ্রাহকদের নিরাপদ ও বিশ্বস্ত সেবা প্রদান করা।"
+                              ? "গাড়ি বাজার অ্যাপটি বাংলাদেশে অটো পার্টস ও খুচরা যন্ত্রাংশের বেচাকেনাকে সহজ এবং ডিজিটাল করতে তৈরি করা হয়েছে। আমাদের মূল লক্ষ্য গ্রাহকদের নিরাপদ ও বিশ্বস্ত সেবা প্রদান করা।"
                               : "Gari Bazar is built to simplify auto parts and vehicle accessories trading across Bangladesh. Our mission is to make P2P parts sourcing seamless, verified, and transparent."}
                           </p>
                           <div className="flex items-center gap-1.5 text-xs text-slate-400 dark:text-slate-555 pt-1 font-mono">
@@ -546,10 +546,10 @@ export function ProfileTab({
                         </div>
                         <div>
                           <p className="text-sm sm:text-base font-extrabold text-slate-800 dark:text-slate-100">
-                            {language === "bn" ? "শর্তাবলী ও পলিসি কেন্দ্র" : "Terms & Privacy Policies"}
+                            {language === "bn" ? "শর্তাবলী ও নিয়ম" : "Terms & Privacy Policies"}
                           </p>
                           <p className="text-xs text-slate-400 dark:text-slate-500 font-bold mt-0.5">
-                            {language === "bn" ? "প্লে স্টোর কমপ্লায়েন্স ও আইনি নীতিমালা" : "Play Store compliance rules and data usage"}
+                            {language === "bn" ? "নিয়ম ও শর্ত পড়ুন" : "Play Store compliance rules and data usage"}
                           </p>
                         </div>
                       </div>
@@ -563,7 +563,7 @@ export function ProfileTab({
                         <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-150 dark:border-slate-800/80 shadow-xs text-xs text-slate-500 dark:text-slate-400 space-y-3">
                           <div className="flex items-center gap-1.5 text-slate-800 dark:text-white font-bold">
                             <ShieldCheck className="w-4 h-4 text-emerald-500" />
-                            <span>{language === "bn" ? "প্লে স্টোর নীতিমালায় সংগতি" : "Fully Play Store Compliant"}</span>
+                            <span>{language === "bn" ? "প্লে স্টোর নীতিমালায় সংগতি" : "Fully Play Store Compliant"}</span>
                           </div>
                           <p className="leading-relaxed font-semibold">
                             {language === "bn"
@@ -595,10 +595,10 @@ export function ProfileTab({
                         </div>
                         <div>
                           <p className="text-sm sm:text-base font-extrabold text-slate-800 dark:text-slate-100">
-                            {language === "bn" ? "সাহায্য ও কন্টাক্ট সাপোর্ট" : "Help Desk & Customer Support"}
+                            {language === "bn" ? "সাহায্য কেন্দ্র" : "Help Desk & Customer Support"}
                           </p>
                           <p className="text-xs text-slate-400 dark:text-slate-500 font-bold mt-0.5">
-                            {language === "bn" ? "টিমের সাথে সরাসরি যোগাযোগ করুন" : "Reach out to support desk directly"}
+                            {language === "bn" ? "আমাদের সাথে যোগাযোগ করুন" : "Reach out to support desk directly"}
                           </p>
                         </div>
                       </div>
@@ -619,7 +619,7 @@ export function ProfileTab({
                               <Check className="w-4 h-4 text-emerald-500" />
                               <span>
                                 {language === "bn" 
-                                  ? "আপনার মেসেজটি সফলভাবে টিমের কাছে পাঠানো হয়েছে! ২৪ ঘণ্টার মধ্যে যোগাযোগ করা হবে।" 
+                                  ? "আপনার মেসেজটি সফলভাবে টিমের কাছে পাঠানো হয়েছে! ২৪ ঘণ্টার মধ্যে যোগাযোগ করা হবে।" 
                                   : "Support ticket opened successfully! We will get back to you within 24 hours."}
                               </span>
                             </div>
@@ -634,7 +634,7 @@ export function ProfileTab({
                                     type="text"
                                     value={supportName}
                                     onChange={(e) => setSupportName(e.target.value)}
-                                    placeholder={user?.displayName || (language === "bn" ? "যেমন: রায়হান" : "e.g. Rayhan")}
+                                    placeholder={user?.displayName || (language === "bn" ? "যেমন: রায়হান" : "e.g. Rayhan")}
                                     className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 py-1.5 px-3 rounded-xl text-xs focus:ring-1 focus:ring-amber-500 focus:outline-none dark:text-white font-semibold"
                                   />
                                 </div>
