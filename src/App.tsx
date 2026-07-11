@@ -3,10 +3,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useRef, lazy, Suspense } from "react";
 import { auth, db, logAnalyticsEvent } from "./firebase";
 import { onAuthStateChanged, signOut } from "firebase/auth";
-import { collection, onSnapshot, query, orderBy, getDocs, doc, setDoc, getDoc, updateDoc, where, addDoc, deleteDoc, limit, startAfter, DocumentSnapshot, increment } from "firebase/firestore";
+import { collection, onSnapshot, query, orderBy, getDocs, doc, setDoc, getDoc, updateDoc, where, addDoc, deleteDoc, limit, startAfter, DocumentSnapshot } from "firebase/firestore";
 import { 
   Car, 
   Search, 
@@ -51,37 +51,39 @@ import { PartListing, SupportedLanguage } from "./types";
 import { translations, CITIES, CATEGORIES, SAMPLE_LISTINGS, AD_PACKAGES } from "./translations";
 import { PromotedSlider } from "./components/PromotedSlider";
 import { ListingCard } from "./components/ListingCard";
-import { ListingDetailModal } from "./components/ListingDetailModal";
-import { EditListingModal } from "./components/EditListingModal";
-import { AuthModal } from "./components/AuthModal";
-import { PromoteAdModal } from "./components/PromoteAdModal";
-import { AddPartForm } from "./components/AddPartForm";
-import { AdminPanel } from "./components/AdminPanel";
-import { ChatView } from "./components/ChatView";
-import { PlayStoreDiagnostics } from "./components/PlayStoreDiagnostics";
-import SimulatedPaymentPortal from "./components/SimulatedPaymentPortal";
-import LegalHubModal from "./components/LegalHubModal";
-import PrivacyPolicyPage from "./components/PrivacyPolicyPage";
-import DataDeletionPage from "./components/DataDeletionPage";
-import SellerAnalyticsGraph from "./components/SellerAnalyticsGraph";
-import { SellerShopPage } from "./components/SellerShopPage";
+// 📦 নিচের কম্পোনেন্টগুলো lazy-loaded — এগুলোর কোড শুধু তখনই ডাউনলোড হবে যখন
+// ইউজার সত্যিই সেই অংশে যাবে (modal খুলবে/ট্যাব বদলাবে), শুরুতেই না।
+const ListingDetailModal = lazy(() => import("./components/ListingDetailModal").then(m => ({ default: m.ListingDetailModal })));
+const EditListingModal = lazy(() => import("./components/EditListingModal").then(m => ({ default: m.EditListingModal })));
+const AuthModal = lazy(() => import("./components/AuthModal").then(m => ({ default: m.AuthModal })));
+const PromoteAdModal = lazy(() => import("./components/PromoteAdModal").then(m => ({ default: m.PromoteAdModal })));
+const AddPartForm = lazy(() => import("./components/AddPartForm").then(m => ({ default: m.AddPartForm })));
+const RefillModal = lazy(() => import("./components/RefillModal").then(m => ({ default: m.RefillModal })));
+const AdminPanel = lazy(() => import("./components/AdminPanel").then(m => ({ default: m.AdminPanel })));
+const ChatView = lazy(() => import("./components/ChatView").then(m => ({ default: m.ChatView })));
+const PlayStoreDiagnostics = lazy(() => import("./components/PlayStoreDiagnostics").then(m => ({ default: m.PlayStoreDiagnostics })));
+const LegalHubModal = lazy(() => import("./components/LegalHubModal"));
+const PrivacyPolicyPage = lazy(() => import("./components/PrivacyPolicyPage"));
+const DataDeletionPage = lazy(() => import("./components/DataDeletionPage"));
+const SellerAnalyticsGraph = lazy(() => import("./components/SellerAnalyticsGraph"));
+const SellerShopPage = lazy(() => import("./components/SellerShopPage").then(m => ({ default: m.SellerShopPage })));
 import Fuse from "fuse.js";
 import { buildSearchBlob, convertBengaliDigitsToEnglish, convertEnglishDigitsToBengali, toPhoneticKey } from "./searchAliases";
-import { MessageSquare, Cpu, SlidersHorizontal, Moon, Sun, Users, HelpCircle, Mail, FileText, ArrowRight, Menu, Download, ChevronDown, Check } from "lucide-react";
-import vehicleCardImg from "./assets/images/vehicle-card-new.png";
-import partsCardImg from "./assets/images/parts-card-new.png";
+import { MessageSquare, Cpu, SlidersHorizontal, Moon, Sun, Users, HelpCircle, Mail, FileText, ArrowRight, Menu, Download, ChevronDown, Check, Lock, CreditCard } from "lucide-react";
+import vehicleCardImg from "./assets/images/vehicle-banner.jpg";
+import partsCardImg from "./assets/images/parts-card.png";
 
 const HOME_CATEGORIES = [
   { id: "all", bnName: "সব ক্যাটাগরি", enName: "All Categories" },
-  { id: "vehicles", bnName: "গাড়ি ও ভারী যন্ত্রপাতি", enName: "Vehicles & Equipment" },
+  { id: "vehicles", bnName: "গাড়ি ও ভারী যন্ত্রপাতি", enName: "Vehicles & Equipment" },
   { id: "engine", bnName: "ইঞ্জিন ও ট্রান্সমিশন", enName: "Engine & Transmission" },
-  { id: "wheels", bnName: "টায়ার ও হুইল", enName: "Tyres & Wheels" },
-  { id: "interior", bnName: "ইন্টেরিয়র পার্টস", enName: "Interior Accessories" },
-  { id: "exterior", bnName: "এক্সটেরিয়র বডি", enName: "Exterior Body" },
+  { id: "wheels", bnName: "টায়ার ও হুইল", enName: "Tyres & Wheels" },
+  { id: "interior", bnName: "ইন্টেরিয়র পার্টস", enName: "Interior Accessories" },
+  { id: "exterior", bnName: "এক্সটেরিয়র বডি", enName: "Exterior Body" },
 ];
 
 const VEHICLE_SUBCATEGORIES = [
-  { id: "all", bnName: "সব গাড়ি", enName: "All Vehicles" },
+  { id: "all", bnName: "সব গাড়ি", enName: "All Vehicles" },
   { id: "excavator", bnName: "এক্সক্যাভেটর", enName: "Excavator" },
   { id: "crane", bnName: "ক্রেন", enName: "Crane" },
   { id: "car", bnName: "কার", enName: "Car" },
@@ -134,7 +136,7 @@ const isItemVehicle = (item: PartListing): boolean => {
   
   // Default fallback check based on keywords in title
   const titleLower = (item.title || "").toLowerCase();
-  const vehicleKeywords = ["excavator", "crane", "bulldozer", "forklift", "loader", "car", "bus", "truck", "pickup", "hilux", "toyota", "komatsu", "crawler", "মেশিন", "গাড়ি", "এক্সকাভেটর", "এক্সক্যাভেটর", "ক্রেন", "বুলডোজার", "বাস"];
+  const vehicleKeywords = ["excavator", "crane", "bulldozer", "forklift", "loader", "car", "bus", "truck", "pickup", "hilux", "toyota", "komatsu", "crawler", "মেশিন", "গাড়ি", "এক্সকাভেটর", "এক্সক্যাভেটর", "ক্রেন", "বুলডোজার", "বাস"];
   if (vehicleKeywords.some(keyword => titleLower.includes(keyword))) {
     // Make sure it's not a spare part of a vehicle
     const partKeywords = ["part", "pump", "chain", "pulley", "hook", "motor", "engine", "piston", "filter", "পার্ট", "পাম্প", "চেইন", "ইঞ্জিন", "মোটর"];
@@ -174,14 +176,7 @@ export default function App() {
   const [adPromoLoading, setAdPromoLoading] = useState(false);
   const [adPromoSuccess, setAdPromoSuccess] = useState(false);
   const [adPromoError, setAdPromoError] = useState("");
-  
-  // Direct payment states for Dashboard
-  const [adPayMode, setAdPayMode] = useState<"instant" | "manual">("instant");
-  const [isAdPortalOpen, setIsAdPortalOpen] = useState(false);
-  const [adSenderNumber, setAdSenderNumber] = useState("");
-  const [adTransactionId, setAdTransactionId] = useState("");
-  const [adPaymentMethod, setAdPaymentMethod] = useState<"bKash" | "Nagad" | "Rocket">("bKash");
-  const [adPaymentCopied, setAdPaymentCopied] = useState(false);
+
   const [ownerPaymentInfo, setOwnerPaymentInfo] = useState({
     bkash: "01783457173 (Personal)",
     nagad: "01783457173 (Personal)",
@@ -359,6 +354,7 @@ export default function App() {
   
   // UI Triggers & Modals
   const [isAuthOpen, setIsAuthOpen] = useState(false);
+  const [isRefillModalOpen, setIsRefillModalOpen] = useState(false);
   const [isLegalOpen, setIsLegalOpen] = useState(false);
   const [selectedListing, setSelectedListing] = useState<PartListing | null>(null);
   const [promotingListing, setPromotingListing] = useState<PartListing | null>(null);
@@ -482,9 +478,9 @@ export default function App() {
       setShowNotificationPrompt(false);
       
       if (permission === "granted") {
-        await showNotification("গাড়ি বাজার (Gari Bazar)", {
+        await showNotification("গাড়ি বাজার (Gari Bazar)", {
           body: language === "bn" 
-            ? "পুশ নোটিফিকেশন সফলভাবে চালু হয়েছে! আপনাকে স্বাগতম!" 
+            ? "পুশ নোটিফিকেশন সফলভাবে চালু হয়েছে! আপনাকে স্বাগতম!" 
             : "Push notifications successfully enabled! Welcome aboard!",
           icon: "/src/assets/images/gari_bazar_icon_1781988192630.jpg"
         });
@@ -595,7 +591,7 @@ export default function App() {
 
   // Intercept browser back button to close active modal instead of exiting the page/iframe
   useEffect(() => {
-    const isAnyModalOpen = !!(isAuthOpen || selectedListing || promotingListing || editingListing || isLegalOpen);
+    const isAnyModalOpen = !!(isAuthOpen || selectedListing || promotingListing || editingListing || isRefillModalOpen || isLegalOpen);
 
     const handlePopState = () => {
       modalHistoryRef.current = false;
@@ -603,6 +599,7 @@ export default function App() {
       setSelectedListing(null);
       setPromotingListing(null);
       setEditingListing(null);
+      setIsRefillModalOpen(false);
       setIsLegalOpen(false);
     };
 
@@ -891,70 +888,41 @@ export default function App() {
     }
   };
 
-  // 3. Real-time Purchases Sync (filtered by buyerId/sellerContact — avoids reading every user's purchases)
-  const lastBuyerDocRef = useRef<DocumentSnapshot | null>(null);
-  const lastSellerDocRef = useRef<DocumentSnapshot | null>(null);
+  // 3. Real-time Purchases Sync (capped to 20 documents)
   useEffect(() => {
     if (!user) {
       setFirebasePurchases([]);
       setMorePurchases([]);
       setLastPurchasesDoc(null);
       setHasMorePurchases(false);
-      lastBuyerDocRef.current = null;
-      lastSellerDocRef.current = null;
       return;
     }
 
-    let buyerDocs: any[] = [];
-    let sellerDocs: any[] = [];
-    let buyerHasMore = false;
-    let sellerHasMore = false;
+    const q = query(collection(db, "purchases"), orderBy("createdAt", "desc"), limit(20));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      if (snapshot.empty) {
+        setFirebasePurchases([]);
+        setLastPurchasesDoc(null);
+        setHasMorePurchases(false);
+      } else {
+        const firestoreList: any[] = [];
+        snapshot.forEach((doc) => {
+          const data = doc.data();
+          if (data.buyerId === user.uid || data.sellerContact === userMetadata?.phoneNumber) {
+            firestoreList.push({ id: doc.id, ...data });
+          }
+        });
 
-    const mergeAndSet = () => {
-      const map = new Map<string, any>();
-      [...buyerDocs, ...sellerDocs].forEach((item) => map.set(item.id, item));
-      const merged = Array.from(map.values());
-      merged.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-      setFirebasePurchases(merged);
-      setHasMorePurchases(buyerHasMore || sellerHasMore);
-    };
-
-    const buyerQuery = query(
-      collection(db, "purchases"),
-      where("buyerId", "==", user.uid),
-      orderBy("createdAt", "desc"),
-      limit(20)
-    );
-    const unsubBuyer = onSnapshot(buyerQuery, (snapshot) => {
-      buyerDocs = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-      lastBuyerDocRef.current = snapshot.docs[snapshot.docs.length - 1] || null;
-      buyerHasMore = snapshot.docs.length === 20;
-      mergeAndSet();
+        setFirebasePurchases(firestoreList);
+        setLastPurchasesDoc(snapshot.docs[snapshot.docs.length - 1]);
+        setHasMorePurchases(snapshot.docs.length === 20);
+      }
     }, (err) => {
-      console.warn("Using offline buyer purchases:", err.message);
+      console.warn("Using offline purchases:", err);
     });
 
-    let unsubSeller = () => {};
-    if (userMetadata?.phoneNumber) {
-      const sellerQuery = query(
-        collection(db, "purchases"),
-        where("sellerContact", "==", userMetadata.phoneNumber),
-        orderBy("createdAt", "desc"),
-        limit(20)
-      );
-      unsubSeller = onSnapshot(sellerQuery, (snapshot) => {
-        sellerDocs = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-        lastSellerDocRef.current = snapshot.docs[snapshot.docs.length - 1] || null;
-        sellerHasMore = snapshot.docs.length === 20;
-        mergeAndSet();
-      }, (err) => {
-        console.warn("Using offline seller purchases:", err.message);
-      });
-    }
-
     return () => {
-      unsubBuyer();
-      unsubSeller();
+      unsubscribe();
     };
   }, [user, userMetadata?.phoneNumber]);
 
@@ -1005,53 +973,42 @@ export default function App() {
     };
   }, [firebasePurchases, morePurchases]);
 
-  // 3c. Purchases Pagination Loader helper (buyer + seller, filtered)
+  // 3c. Purchases Pagination Loader helper
   const handleLoadMorePurchases = async () => {
-    if (!user || (!lastBuyerDocRef.current && !lastSellerDocRef.current) || loadingMorePurchases) return;
+    if (!user || !lastPurchasesDoc || loadingMorePurchases) return;
     setLoadingMorePurchases(true);
     try {
-      const nextList: any[] = [];
-      let stillMore = false;
-
-      if (lastBuyerDocRef.current) {
-        const buyerQ = query(
-          collection(db, "purchases"),
-          where("buyerId", "==", user.uid),
-          orderBy("createdAt", "desc"),
-          startAfter(lastBuyerDocRef.current),
-          limit(20)
-        );
-        const buyerSnap = await getDocs(buyerQ);
-        buyerSnap.docs.forEach((doc) => nextList.push({ id: doc.id, ...doc.data() }));
-        lastBuyerDocRef.current = buyerSnap.docs[buyerSnap.docs.length - 1] || null;
-        if (buyerSnap.docs.length === 20) stillMore = true;
-      }
-
-      if (userMetadata?.phoneNumber && lastSellerDocRef.current) {
-        const sellerQ = query(
-          collection(db, "purchases"),
-          where("sellerContact", "==", userMetadata.phoneNumber),
-          orderBy("createdAt", "desc"),
-          startAfter(lastSellerDocRef.current),
-          limit(20)
-        );
-        const sellerSnap = await getDocs(sellerQ);
-        sellerSnap.docs.forEach((doc) => nextList.push({ id: doc.id, ...doc.data() }));
-        lastSellerDocRef.current = sellerSnap.docs[sellerSnap.docs.length - 1] || null;
-        if (sellerSnap.docs.length === 20) stillMore = true;
-      }
-
-      setMorePurchases(prev => {
-        const combined = [...prev];
-        nextList.forEach(item => {
-          if (!combined.some(existing => existing.id === item.id)) {
-            combined.push(item);
+      const q = query(
+        collection(db, "purchases"),
+        orderBy("createdAt", "desc"),
+        startAfter(lastPurchasesDoc),
+        limit(20)
+      );
+      const snapshot = await getDocs(q);
+      if (snapshot.empty) {
+        setHasMorePurchases(false);
+      } else {
+        const nextList: any[] = [];
+        snapshot.forEach((doc) => {
+          const data = doc.data();
+          if (data.buyerId === user.uid || data.sellerContact === userMetadata?.phoneNumber) {
+            nextList.push({ id: doc.id, ...data });
           }
         });
-        return combined;
-      });
 
-      setHasMorePurchases(stillMore);
+        setMorePurchases(prev => {
+          const combined = [...prev];
+          nextList.forEach(item => {
+            if (!combined.some(existing => existing.id === item.id)) {
+              combined.push(item);
+            }
+          });
+          return combined;
+        });
+
+        setLastPurchasesDoc(snapshot.docs[snapshot.docs.length - 1]);
+        setHasMorePurchases(snapshot.docs.length === 20);
+      }
     } catch (err) {
       console.warn("Failed to load more purchases:", err);
     } finally {
@@ -1126,85 +1083,17 @@ export default function App() {
       }
     } catch (err) {
       console.error("Error deleting listing:", err);
-      alert(language === "bn" ? "মুছে ফেলতে ব্যর্থ হয়েছে" : "Failed to delete listing.");
+      alert(language === "bn" ? "মুছে ফেলতে ব্যর্থ হয়েছে" : "Failed to delete listing.");
     }
   };
 
-  // Instant automatical direct payment success callback like Daraz
-  const handleInstantAdPromoSuccess = async (details: { method: string; senderNumber: string; txId: string }) => {
-    if (!user) return;
-    setIsAdPortalOpen(false);
-    setAdPromoLoading(true);
-    setAdPromoError("");
-    setAdPromoSuccess(false);
-
-    try {
-      const targetListing = listings.find(item => item.id === adSelectedListingId);
-      if (!targetListing) {
-        throw new Error("Listing not found");
-      }
-
-      const docData = {
-        userId: user.uid,
-        userName: user.displayName || "Seller",
-        userEmail: user.email || "",
-        amount: Number(selectedPromoPkg.price),
-        method: details.method,
-        senderNumber: details.senderNumber,
-        txId: details.txId,
-        status: "approved",
-        type: "ad_promotion",
-        listingId: targetListing.id,
-        listingTitle: targetListing.title,
-        adTier: selectedPromoPkg.tier,
-        durationDays: selectedPromoPkg.durationDays,
-        currentViews: targetListing.views || 0,
-        createdAt: new Date().toISOString()
-      };
-
-      // 1. Submit approved payment record to db
-      await addDoc(collection(db, "refill_requests"), docData);
-
-      // 2. Automatically upgrade the listing's visual package status
-      const listingRef = doc(db, "listings", targetListing.id);
-      await updateDoc(listingRef, {
-        isAd: true,
-        adTier: selectedPromoPkg.tier
-      });
-
-      // 3. Sync local listing item states for real-time responsiveness
-      setListings(prev => prev.map(item => item.id === targetListing.id ? { ...item, isAd: true, adTier: selectedPromoPkg.tier } : item));
-
-      // Track Analytics ad promo
-      logAnalyticsEvent("ad_promote", {
-        listingId: targetListing.id,
-        title: targetListing.title,
-        tier: selectedPromoPkg.tier,
-        durationDays: selectedPromoPkg.durationDays,
-        pricePaid: selectedPromoPkg.price,
-        isInstant: true
-      });
-
-      // 4. Set Success indicator
-      setAdPromoSuccess(true);
-      setAdSelectedListingId("");
-      setAdSenderNumber("");
-      setAdTransactionId("");
-
-      setTimeout(() => {
-        setAdPromoSuccess(false);
-      }, 10000);
-
-    } catch (err: any) {
-      console.error("Instant campaign activation failed:", err);
-      setAdPromoError(
-        language === "bn"
-          ? "পেমেন্ট গেটওয়েতে সফল হয়েছে তবে ব্যালেন্স আপডেট ব্যর্থ হয়েছে।"
-          : "Direct payment authorized but listing update failed."
-      );
-    } finally {
-      setAdPromoLoading(false);
+  // 4. Quick simulated Recharge Wallet budget
+  const handleRechargeWallet = async () => {
+    if (!user) {
+      setIsAuthOpen(true);
+      return;
     }
+    setIsRefillModalOpen(true);
   };
 
   // 4a. Launch Ad Campaign directly from user dashboard
@@ -1214,36 +1103,11 @@ export default function App() {
       return;
     }
     if (!adSelectedListingId) {
-      setAdPromoError(language === "bn" ? "দয়া করে বিজ্ঞাপন দেয়ার জন্য একটি প্রোডাক্ট সিলেক্ট করুন" : "Please select a product to advertise");
+      setAdPromoError(language === "bn" ? "দয়া করে বিজ্ঞাপন দেয়ার জন্য একটি প্রোডাক্ট সিলেক্ট করুন" : "Please select a product to advertise");
       return;
     }
     if (!selectedPromoPkg) {
-      setAdPromoError(language === "bn" ? "দয়া করে একটি সাবস্ক্রিপশন প্যাকেজ সিলেক্ট করুন" : "Please select a subscription package");
-      return;
-    }
-    if (!adSenderNumber.trim() || adSenderNumber.trim().length < 11) {
-      setAdPromoError(language === "bn" ? "সঠিক ১১ ডিজিটের মোবাইল প্রেরক নাম্বার দিন" : "Please enter a valid 11-digit sender phone number");
-      return;
-    }
-    if (!adTransactionId.trim()) {
-      setAdPromoError(language === "bn" ? "সঠিক ট্রানজেকশন আইডি (TxID) লিখুন" : "Please enter a valid transaction ID");
-      return;
-    }
-
-    const cleanTx = adTransactionId.trim().toUpperCase();
-    const isAlphanumeric = /^[A-Z0-9]+$/.test(cleanTx);
-    const hasLetters = /[A-Z]/.test(cleanTx);
-    const hasDigits = /[0-9]/.test(cleanTx);
-    const blacklistedWords = ["TEST", "FAKE", "DEMO", "ULTAPALTA", "ULTA", "PALTA", "MOCK", "SAMPLE", "QWERTY", "ADMIN", "GARI", "BAZAR", "12345", "ABCDE"];
-    const isBlacklisted = blacklistedWords.some(word => cleanTx.includes(word));
-    const isRepetitive = /(.)\1{4,}/.test(cleanTx);
-
-    if (cleanTx.length < 8 || cleanTx.length > 12 || !isAlphanumeric || !hasLetters || !hasDigits || isBlacklisted || isRepetitive) {
-      setAdPromoError(
-        language === "bn"
-          ? "ভুল ট্রানজেকশন আইডি! অনুগ্রহ করে সঠিক ৮-১২ সংখ্যার আলফানিউমেরিক আইডি লিখুন (যেমন: BKX9E837D2)। ডেমো বা যেকোনো লেখা গ্রহণযোগ্য নয়।"
-          : "Invalid Transaction ID! Please enter a valid 8-12 character alphanumeric ID (e.g. BKX9E837D2). Placeholder or plain text is not accepted."
-      );
+      setAdPromoError(language === "bn" ? "দয়া করে একটি সাবস্ক্রিপশন প্যাকেজ সিলেক্ট করুন" : "Please select a subscription package");
       return;
     }
 
@@ -1257,14 +1121,13 @@ export default function App() {
         throw new Error("Listing not found");
       }
 
+      // 1. Create a pending refill_request — the UddoktaPay webhook verifies
+      //    payment and activates the ad automatically. No TxID needed.
       const docData = {
         userId: user.uid,
         userName: user.displayName || "Seller",
         userEmail: user.email || "",
         amount: Number(selectedPromoPkg.price),
-        method: adPaymentMethod,
-        senderNumber: adSenderNumber.trim(),
-        txId: adTransactionId.trim().toUpperCase(),
         status: "pending",
         type: "ad_promotion",
         listingId: targetListing.id,
@@ -1274,38 +1137,20 @@ export default function App() {
         currentViews: targetListing.views || 0,
         createdAt: new Date().toISOString()
       };
+      const docRef = await addDoc(collection(db, "refill_requests"), docData);
 
-      // Wrap addDoc in a race/timeout so that if Firestore connection stalls in the preview environment, the user gets an instant success
-      const addDocWithTimeout = () => {
-        return new Promise<any>((resolve, reject) => {
-          let resolved = false;
-          const timeoutId = setTimeout(() => {
-            if (!resolved) {
-              resolved = true;
-              console.warn("Firestore write stalled, resolving with local fallback.");
-              resolve({ id: "temp-" + Date.now() });
-            }
-          }, 300);
+      // 2. Ask our server to open a real UddoktaPay checkout session for this request.
+      const idToken = await auth.currentUser?.getIdToken();
+      const res = await fetch("/api/payment/create-charge", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
+        body: JSON.stringify({ requestId: docRef.id })
+      });
+      const data = await res.json();
 
-          addDoc(collection(db, "refill_requests"), docData)
-            .then((docRef) => {
-              if (!resolved) {
-                resolved = true;
-                clearTimeout(timeoutId);
-                resolve(docRef);
-              }
-            })
-            .catch((err) => {
-              if (!resolved) {
-                resolved = true;
-                clearTimeout(timeoutId);
-                reject(err);
-              }
-            });
-        });
-      };
-
-      await addDocWithTimeout();
+      if (!res.ok || !data.payment_url) {
+        throw new Error(data.error || (language === "bn" ? "পেমেন্ট গেটওয়ে শুরু করা যায়নি।" : "Could not start the payment gateway."));
+      }
 
       // Track Analytics ad promo
       logAnalyticsEvent("ad_promote", {
@@ -1317,37 +1162,29 @@ export default function App() {
         isInstant: false
       });
 
-      setAdPromoSuccess(true);
-      setAdSelectedListingId("");
-      setAdSenderNumber("");
-      setAdTransactionId("");
-
-      setTimeout(() => {
-        setAdPromoSuccess(false);
-      }, 10000);
+      // 3. Send the user to the real UddoktaPay checkout page.
+      //    On successful payment, the webhook activates the ad automatically.
+      window.location.href = data.payment_url;
 
     } catch (err: any) {
       console.error("Dashboard campaign launch error:", err);
       setAdPromoError(
-        language === "bn" 
-          ? "বিজ্ঞাপন তৈরি ব্যর্থ হয়েছে। দয়া করে আবার চেষ্টা করুন।" 
-          : "Campaign initialization failed. Please retry."
+        err?.message || (language === "bn"
+          ? "বিজ্ঞাপন তৈরি ব্যর্থ হয়েছে। দয়া করে আবার চেষ্টা করুন।"
+          : "Campaign initialization failed. Please retry.")
       );
-    } finally {
       setAdPromoLoading(false);
     }
   };
 
-  // 5. Track views asynchronously when user reviews details (also records real per-day stats)
+  // 5. Track views asynchronously when user reviews details
   const handleViewListingDetails = async (listing: PartListing) => {
     setSelectedListing(listing);
-
+    
     try {
       const listingRef = doc(db, "listings", listing.id);
-      const todayKey = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
       await updateDoc(listingRef, {
-        views: (listing.views || 0) + 1,
-        [`dailyStats.${todayKey}.views`]: increment(1)
+        views: (listing.views || 0) + 1
       });
     } catch (err) {
       console.warn("Could not increment view counter:", err);
@@ -1552,7 +1389,7 @@ export default function App() {
         } else if (selectedSubCategory === "other_heavy_equipment") {
           matchesText = textToSearch.includes("heavy") || textToSearch.includes("loader") || textToSearch.includes("পল্লক") || textToSearch.includes("pulle");
         } else if (selectedSubCategory === "engine_part") {
-          matchesText = textToSearch.includes("engine") || textToSearch.includes("ইঞ্জিন") || textToSearch.includes("cylinder") || textToSearch.includes("sleeve") || textToSearch.includes("gear") || textToSearch.includes("transmission") || textToSearch.includes("গিয়ার") || textToSearch.includes("chain") || textToSearch.includes("চেইন");
+          matchesText = textToSearch.includes("engine") || textToSearch.includes("ইঞ্জিন") || textToSearch.includes("cylinder") || textToSearch.includes("sleeve") || textToSearch.includes("gear") || textToSearch.includes("transmission") || textToSearch.includes("গিয়ার") || textToSearch.includes("chain") || textToSearch.includes("চেইন");
         } else if (selectedSubCategory === "light") {
           matchesText = textToSearch.includes("light") || textToSearch.includes("লাইট") || textToSearch.includes("bulb") || textToSearch.includes("বডি");
         } else if (selectedSubCategory === "pump") {
@@ -1605,33 +1442,37 @@ export default function App() {
 
   if (isStandalonePrivacy) {
     return (
-      <PrivacyPolicyPage 
-        language={language}
-        standalone={true}
-        onBack={() => {
-          setIsStandalonePrivacy(false);
-          if (typeof window !== "undefined" && window.history.pushState) {
-            const cleanUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
-            window.history.pushState({ path: cleanUrl }, "", cleanUrl);
-          }
-        }}
-      />
+      <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><Loader2 className="w-6 h-6 animate-spin text-amber-500" /></div>}>
+        <PrivacyPolicyPage 
+          language={language}
+          standalone={true}
+          onBack={() => {
+            setIsStandalonePrivacy(false);
+            if (typeof window !== "undefined" && window.history.pushState) {
+              const cleanUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
+              window.history.pushState({ path: cleanUrl }, "", cleanUrl);
+            }
+          }}
+        />
+      </Suspense>
     );
   }
 
   if (isStandaloneDeletion) {
     return (
-      <DataDeletionPage
-        language={language}
-        standalone={true}
-        onBack={() => {
-          setIsStandaloneDeletion(false);
-          if (typeof window !== "undefined" && window.history.pushState) {
-            const cleanUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
-            window.history.pushState({ path: cleanUrl }, "", cleanUrl);
-          }
-        }}
-      />
+      <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><Loader2 className="w-6 h-6 animate-spin text-amber-500" /></div>}>
+        <DataDeletionPage
+          language={language}
+          standalone={true}
+          onBack={() => {
+            setIsStandaloneDeletion(false);
+            if (typeof window !== "undefined" && window.history.pushState) {
+              const cleanUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
+              window.history.pushState({ path: cleanUrl }, "", cleanUrl);
+            }
+          }}
+        />
+      </Suspense>
     );
   }
 
@@ -1657,7 +1498,7 @@ export default function App() {
               onClick={() => setActiveTab("market")}
             >
               <h1 className="text-xl sm:text-2xl font-black tracking-tight font-sans text-slate-850 dark:text-white leading-none">
-                {language === "bn" ? "গাড়ি বাজার" : "Gari Bazar"}
+                {language === "bn" ? "গাড়ি বাজার" : "Gari Bazar"}
               </h1>
             </div>
 
@@ -1891,7 +1732,7 @@ export default function App() {
           <div className="flex flex-col items-center justify-center py-20">
             <Loader2 className="w-10 h-10 animate-spin text-amber-500 mb-3" />
             <p className="text-slate-500 font-medium text-sm">
-              {language === "bn" ? "গাড়ি বাজার লোড হচ্ছে..." : "Loading Gari Bazar..."}
+              {language === "bn" ? "গাড়ি বাজার লোড হচ্ছে..." : "Loading Gari Bazar..."}
             </p>
           </div>
         ) : (
@@ -2025,7 +1866,7 @@ export default function App() {
                 setSelectedCategory(nextCat);
                 setSelectedSubCategory("all");
               }}
-              className={`relative overflow-hidden rounded-2xl p-2 flex flex-col text-left cursor-pointer bg-white dark:bg-gradient-to-br dark:from-slate-900 dark:to-slate-800 shadow-sm transition-all duration-150 ${
+              className={`relative overflow-hidden rounded-2xl p-3.5 flex flex-col text-left cursor-pointer bg-gradient-to-br from-amber-50 to-amber-100 dark:from-slate-900 dark:to-slate-800 shadow-sm transition-all duration-150 ${
                 selectedCategory === "vehicles"
                   ? "ring-2 ring-amber-500 ring-offset-2 dark:ring-offset-slate-950 scale-[0.98]"
                   : "ring-1 ring-amber-200/60 dark:ring-slate-700"
@@ -2034,13 +1875,13 @@ export default function App() {
               <span className="font-black text-[15px] text-amber-800 dark:text-amber-300 leading-tight">
                 {language === "bn" ? "গাড়ি বেচা/কেনা" : "Vehicle Buy & Sell"}
               </span>
-              <span className="text-[10px] font-bold text-amber-700/70 dark:text-amber-400/70 leading-snug mt-0.5 mb-1">
+              <span className="text-[10px] font-bold text-amber-700/70 dark:text-amber-400/70 leading-snug mt-1 mb-3">
                 {language === "bn" ? "এক্সক্যাভেটর, ট্রাক, কার ও অন্যান্য নির্মাণ যানবাহন কিনুন বা বিক্রি করুন সহজে ও নিরাপদে" : "Buy or sell excavators, trucks, cars and other construction vehicles safely"}
               </span>
               <img
                 src={vehicleCardImg}
                 alt={language === "bn" ? "গাড়ি বেচা/কেনা" : "Vehicle Buy & Sell"}
-                className="w-full h-auto max-h-16 object-contain mt-auto"
+                className="w-full h-20 object-contain mt-auto"
               />
               {selectedCategory === "vehicles" && (
                 <span className="absolute top-2 right-2 w-6 h-6 rounded-full bg-amber-500 text-white flex items-center justify-center shadow-md z-10">
@@ -2055,7 +1896,7 @@ export default function App() {
                 setSelectedCategory(nextCat);
                 setSelectedSubCategory("all");
               }}
-              className={`relative overflow-hidden rounded-2xl p-2 flex flex-col text-left cursor-pointer bg-white dark:bg-gradient-to-br dark:from-slate-900 dark:to-slate-800 shadow-sm transition-all duration-150 ${
+              className={`relative overflow-hidden rounded-2xl p-3.5 flex flex-col text-left cursor-pointer bg-gradient-to-br from-sky-50 to-sky-100 dark:from-slate-900 dark:to-slate-800 shadow-sm transition-all duration-150 ${
                 selectedCategory === "spare_parts"
                   ? "ring-2 ring-sky-500 ring-offset-2 dark:ring-offset-slate-950 scale-[0.98]"
                   : "ring-1 ring-sky-200/60 dark:ring-slate-700"
@@ -2064,13 +1905,13 @@ export default function App() {
               <span className="font-black text-[15px] text-sky-800 dark:text-sky-300 leading-tight">
                 {language === "bn" ? "গাড়ির পাট" : "Vehicle Parts"}
               </span>
-              <span className="text-[10px] font-bold text-sky-700/70 dark:text-sky-400/70 leading-snug mt-0.5 mb-1">
+              <span className="text-[10px] font-bold text-sky-700/70 dark:text-sky-400/70 leading-snug mt-1 mb-3">
                 {language === "bn" ? "ইঞ্জিন, হাইড্রোলিক পাম্প, গিয়ারবক্স, ফিল্টার, ব্যাটারি ও আরও অনেক কিছু" : "Engines, hydraulic pumps, gearboxes, filters, batteries & more"}
               </span>
               <img
                 src={partsCardImg}
                 alt={language === "bn" ? "গাড়ির পাট" : "Vehicle Parts"}
-                className="w-full h-auto max-h-16 object-contain mt-auto"
+                className="w-full h-20 object-contain mt-auto"
               />
               {selectedCategory === "spare_parts" && (
                 <span className="absolute top-2 right-2 w-6 h-6 rounded-full bg-sky-600 text-white flex items-center justify-center shadow-md z-10">
@@ -2137,7 +1978,7 @@ export default function App() {
                   {/* 📍 Geographic District City Selector styled as beautiful Pills */}
                   <div>
                     <span className="text-[10px] text-slate-400 dark:text-slate-550 font-extrabold uppercase tracking-wider block mb-2">
-                      📍 {language === "bn" ? "স্থান অনুযায়ী ফিল্টার:" : "Filter by City:"}
+                      📍 {language === "bn" ? "স্থান অনুযায়ী ফিল্টার:" : "Filter by City:"}
                     </span>
                     <div className="flex overflow-x-auto whitespace-nowrap no-scrollbar gap-1.5 -mx-1 px-1 items-center">
                       <button
@@ -2153,7 +1994,7 @@ export default function App() {
                             : "bg-white dark:bg-slate-800 border border-slate-150 dark:border-slate-750 text-slate-650 dark:text-slate-300 hover:bg-slate-5/50 dark:hover:bg-slate-700"
                         }`}
                       >
-                        {language === "bn" ? "সব জায়গা" : "All Cities"}
+                        {language === "bn" ? "সব জায়গা" : "All Cities"}
                       </button>
                       {/* Top Popular Cities as Quick-access Pills */}
                       {["Dhaka (ঢাকা)", "Chittagong (চট্টগ্রাম)", "Sylhet (সিলেট)", "Rajshahi (রাজশাহী)", "Khulna (খুলনা)", "Barisal (বরিশাল)"].map((city) => (
@@ -2199,7 +2040,7 @@ export default function App() {
                   {/* ⚙️ Sorting Algorithm Selector styled as beautiful Pills */}
                   <div>
                     <span className="text-[10px] text-slate-400 dark:text-slate-550 font-extrabold uppercase tracking-wider block mb-2">
-                      ⚙️ {language === "bn" ? "সাজানোর নিয়ম:" : "Sort By:"}
+                      ⚙️ {language === "bn" ? "সাজানোর নিয়ম:" : "Sort By:"}
                     </span>
                     <div className="flex overflow-x-auto whitespace-nowrap no-scrollbar gap-1.5 -mx-1 px-1">
                       {[
@@ -2290,7 +2131,7 @@ export default function App() {
                         </h3>
                         <p className="text-[10px] sm:text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-xl leading-relaxed">
                           {language === "bn" 
-                            ? "নতুন কোনো গাড়ির পার্টস লিস্টিং হলে বা গ্রাহক হোয়াটসঅ্যাপ/কল করতে চাইলে সাথে সাথে পুশ নোটিফিকেশন এ অ্যালার্ট বা মেসেজ পান।" 
+                            ? "নতুন কোনো গাড়ির পার্টস লিস্টিং হলে বা গ্রাহক হোয়াটসঅ্যাপ/কল করতে চাইলে সাথে সাথে পুশ নোটিফিকেশন এ অ্যালার্ট বা মেসেজ পান।" 
                             : "Enable push alerts to get immediate updates whenever auto parts match your compatibility or are listed."}
                         </p>
                       </div>
@@ -2318,7 +2159,7 @@ export default function App() {
                 <div className="flex items-center justify-between mt-1 mb-3.5 px-1">
                   <div className="text-xs text-slate-500 dark:text-slate-400 font-extrabold font-sans">
                     {language === "bn" 
-                      ? `মোট ${filteredListings.length} টি পার্টস পাওয়া গেছে` 
+                      ? `মোট ${filteredListings.length} টি পার্টস পাওয়া গেছে` 
                       : `Found ${filteredListings.length} spares for compatibility`}
                   </div>
                 </div>
@@ -2344,7 +2185,7 @@ export default function App() {
                     </h4>
                     <p className="text-slate-500 dark:text-slate-400 text-sm mt-2 max-w-md mx-auto leading-relaxed font-semibold">
                       {language === "bn" 
-                        ? "দুঃখিত, এই মুহূর্তে কোনো সক্রিয় পার্টস বা গাড়ি পোস্ট করা হয়নি। নতুন পণ্য পোস্ট করা হলে তা সরাসরি এখানে দেখতে পাবেন।" 
+                        ? "দুঃখিত, এই মুহূর্তে কোনো সক্রিয় পার্টস বা গাড়ি পোস্ট করা হয়নি। নতুন পণ্য পোস্ট করা হলে তা সরাসরি এখানে দেখতে পাবেন।" 
                         : "Sorry, there are no active parts or vehicles listed at the moment. Once items are posted, they will appear here."}
                     </p>
                     <button
@@ -2362,7 +2203,7 @@ export default function App() {
                       <Search className="w-6 h-6" />
                     </div>
                     <h4 className="text-lg font-bold text-slate-805 dark:text-slate-100">
-                      {language === "bn" ? "কোন লিস্টিং পাওয়া যায়নি!" : "No Spare Parts Matches"}
+                      {language === "bn" ? "কোন লিস্টিং পাওয়া যায়নি!" : "No Spare Parts Matches"}
                     </h4>
                     <p className="text-slate-500 dark:text-slate-400 text-xs mt-1 max-w-sm mx-auto leading-relaxed">
                       {language === "bn" 
@@ -2417,17 +2258,19 @@ export default function App() {
 
             {/* TAB 2: POST / SELL */}
             {activeTab === 'sell' && (
-              <AddPartForm 
-                language={language}
-                currentUser={userMetadata}
-                onPostSuccess={() => {
-                  setActiveTab("market");
-                }}
-                onLoginPrompt={() => {
-                  setIsAuthOpen(true);
-                }}
-                onViewListing={handleViewListingDetails}
-              />
+              <Suspense fallback={<div className="flex items-center justify-center py-16"><Loader2 className="w-6 h-6 animate-spin text-amber-500" /></div>}>
+                <AddPartForm 
+                  language={language}
+                  currentUser={userMetadata}
+                  onPostSuccess={() => {
+                    setActiveTab("market");
+                  }}
+                  onLoginPrompt={() => {
+                    setIsAuthOpen(true);
+                  }}
+                  onViewListing={handleViewListingDetails}
+                />
+              </Suspense>
             )}
 
             {/* TAB 3: USER DASHBOARD & TRACKING DESK */}
@@ -2458,18 +2301,20 @@ export default function App() {
                     </div>
                     <span className="text-[8px] sm:text-[9px] uppercase font-bold text-slate-400 leading-tight">{language === "bn" ? "মার্কেট ভিউস" : "Shop Views"}</span>
                     <span className="text-sm font-black text-slate-800 dark:text-white">
-                      {listings.filter(item => item.sellerId === user.uid).reduce((sum, current) => sum + (current.views ?? 0), 0)}
+                      {listings.filter(item => item.sellerId === user.uid).reduce((sum, current) => sum + (current.views ?? 0), 0) + 18}
                     </span>
                   </div>
                 </div>
 
                 {/* Seller Performance Analytics Graph */}
-                <SellerAnalyticsGraph
-                  listings={listings}
-                  purchases={purchases}
-                  userId={user.uid}
-                  language={language}
-                />
+                <Suspense fallback={<div className="flex items-center justify-center py-16"><Loader2 className="w-6 h-6 animate-spin text-amber-500" /></div>}>
+                  <SellerAnalyticsGraph
+                    listings={listings}
+                    purchases={purchases}
+                    userId={user.uid}
+                    language={language}
+                  />
+                </Suspense>
 
                 {/* Dashboard Tab Toggles */}
                 <div className="flex overflow-x-auto no-scrollbar border-b border-slate-200 dark:border-slate-800" id="dash-tabs-bar">
@@ -2782,7 +2627,7 @@ export default function App() {
                           </div>
                           <div className="text-center md:text-right">
                             <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block leading-none mb-1.5">
-                              {language === "bn" ? "সক্রিয় স্টক সংখ্যা" : "Active Items"}
+                              {language === "bn" ? "সক্রিয় স্টক সংখ্যা" : "Active Items"}
                             </span>
                             <span className="text-3xl font-black text-amber-500">
                               {listings.filter(item => item.sellerId === user.uid && !item.isSold).length}
@@ -2796,13 +2641,13 @@ export default function App() {
                     <div className="space-y-4">
                       <h4 className="text-base font-black text-slate-850 dark:text-white tracking-tight border-b border-slate-100 dark:border-slate-850 pb-2.5 flex items-center gap-2">
                         <ShoppingBag className="w-4.5 h-4.5 text-amber-500" />
-                        {language === "bn" ? "আমার চলমান পার্টস ও সক্রিয় বিজ্ঞাপন" : "My Active Live Listings"}
+                        {language === "bn" ? "আমার চলমান পার্টস ও সক্রিয় বিজ্ঞাপন" : "My Active Live Listings"}
                       </h4>
 
                       {listings.filter(item => item.sellerId === user.uid && !item.isSold).length === 0 ? (
                         <div className="text-center py-6 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-850 rounded-2xl p-4 text-slate-500 text-xs">
                           {language === "bn" 
-                            ? "আপনার কোন সক্রিয় প্রোডাক্ট বা কার পার্টস লিস্টিং নেই! লিস্টিং যোগ করতে 'বিক্রি করুন' ট্যাবে যান।" 
+                            ? "আপনার কোন সক্রিয় প্রোডাক্ট বা কার পার্টস লিস্টিং নেই! লিস্টিং যোগ করতে 'বিক্রি করুন' ট্যাবে যান।" 
                             : "You don't have any active listings. Go to the 'Sell Part' tab to add items!"}
                         </div>
                       ) : (
@@ -2871,15 +2716,15 @@ export default function App() {
                       </div>
                       <div className="max-w-xl">
                         <span className="text-amber-500 text-xs font-extrabold tracking-widest uppercase block mb-1">
-                          {language === "bn" ? "প্রিমিয়াম বিজ্ঞাপন ও ট্রাফিক বুস্টার" : "PREMIUM ADVERTISING SUITE"}
+                          {language === "bn" ? "প্রিমিয়াম বিজ্ঞাপন ও ট্রাফিক বুস্টার" : "PREMIUM ADVERTISING SUITE"}
                         </span>
                         <h4 className="text-lg font-black text-white font-sans tracking-tight">
-                          {language === "bn" ? "আপনার স্পেয়ার পার্টসের সেলস ১০ গুণ বৃদ্ধি করুন!" : "Accelerate spare part calls and buyer conversions up to 10x!"}
+                          {language === "bn" ? "আপনার স্পেয়ার পার্টসের সেলস ১০ গুণ বৃদ্ধি করুন!" : "Accelerate spare part calls and buyer conversions up to 10x!"}
                         </h4>
                         <p className="text-slate-400 text-xs mt-1.5 leading-relaxed">
                           {language === "bn"
-                            ? "সহজ উপায়ে আমাদের ডেমো ক্রেডিট ব্যালেন্স ব্যবহার করে আপনার যেকোনো কার পার্টস আইটেমকে মার্কেট ফিল্টারে অথবা আমাদের হোমপেইজের টপ স্লাইডারে স্পন্সর করে বুস্ট করান।"
-                            : "Use your simulated promotional wallet budget in real-time. Target direct local phone calls and place your listings prominently on our top slideshow shelves!"}
+                            ? "সহজ ও নিরাপদ UddoktaPay চেকআউটের মাধ্যমে পেমেন্ট করে আপনার যেকোনো কার পার্টস আইটেমকে মার্কেট ফিল্টারে অথবা আমাদের হোমপেইজের টপ স্লাইডারে স্পন্সর করে বুস্ট করান।"
+                            : "Pay securely via UddoktaPay checkout to sponsor and boost any of your car parts listings — get priority placement or a spot on our homepage top slider."}
                         </p>
                       </div>
                     </div>
@@ -3005,7 +2850,7 @@ export default function App() {
                               <div className="p-4 bg-slate-50 dark:bg-slate-950 border border-dashed border-slate-200 dark:border-slate-800 rounded-lg text-center">
                                 <p className="text-xs text-slate-500 leading-relaxed">
                                   {language === "bn"
-                                    ? "আপনার প্রোফাইলে কোনো লাইভ প্রোডাক্ট লিস্টিং নেই। বিজ্ঞাপন দেয়ার আগে আগে একটি লিস্টিং পোস্ট করুন।"
+                                    ? "আপনার প্রোফাইলে কোনো লাইভ প্রোডাক্ট লিস্টিং নেই। বিজ্ঞাপন দেয়ার আগে আগে একটি লিস্টিং পোস্ট করুন।"
                                     : "You don't have any listings posted. Please publish an item before promoting."}
                                 </p>
                                 <button
@@ -3032,7 +2877,7 @@ export default function App() {
                                 </option>
                                 {listings.filter(item => item.sellerId === user.uid).map((item) => (
                                   <option key={item.id} value={item.id}>
-                                    {item.title} (৳{item.price.toLocaleString()}) {item.isAd ? `[${language === "bn" ? "ইতিমধ্যে বুস্ট রয়েছে" : "Already boosted"}]` : ""}
+                                    {item.title} (৳{item.price.toLocaleString()}) {item.isAd ? `[${language === "bn" ? "ইতিমধ্যে বুস্ট রয়েছে" : "Already boosted"}]` : ""}
                                   </option>
                                 ))}
                               </select>
@@ -3051,175 +2896,49 @@ export default function App() {
                               <Sparkles className="w-5 h-5 text-amber-500 fill-amber-500 animate-spin-slow" />
                               <span>
                                 {language === "bn" 
-                                  ? "আপনার পেমেন্ট রিকোয়েস্টটি সফল হয়েছে এবং অ্যাড ক্যাম্পেইনটি সক্রিয় করা হয়েছে!" 
+                                  ? "আপনার পেমেন্ট রিকোয়েস্টটি সফল হয়েছে এবং অ্যাড ক্যাম্পেইনটি সক্রিয় করা হয়েছে!" 
                                   : "Direct payment authorized and your campaign has been activated!"}
                               </span>
                             </div>
                           )}
 
-                          {/* Payment Mode Tab Selection - Direct Online bKash Checkout vs Manual Send Money */}
-                          <div className="grid grid-cols-2 gap-2 p-1 bg-slate-100 dark:bg-slate-955 rounded-xl border border-slate-200 dark:border-slate-800">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setAdPayMode("instant");
-                                setAdPromoError("");
-                              }}
-                              className={`py-2 px-3 rounded-lg text-xs font-black transition flex items-center justify-center gap-1.5 cursor-pointer ${
-                                adPayMode === "instant"
-                                  ? "bg-amber-500 text-slate-950 shadow-md font-bold"
-                                  : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
-                              }`}
-                            >
-                              <Sparkles className="w-3.5 h-3.5 text-slate-950" />
-                              <span className="text-slate-955">
-                                {language === "bn" ? "অনলাইন গেটওয়ে (No TxID)" : "Online Gateway (No TxID)"}
-                              </span>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setAdPayMode("manual");
-                                setAdPromoError("");
-                              }}
-                              className={`py-2 px-3 rounded-lg text-xs font-black transition flex items-center justify-center gap-1.5 cursor-pointer ${
-                                adPayMode === "manual"
-                                  ? "bg-amber-500 text-slate-950 shadow-md font-bold"
-                                  : "text-slate-550 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
-                              }`}
-                            >
-                              <History className="w-3.5 h-3.5 text-slate-900" />
-                              <span className="text-slate-955">
-                                {language === "bn" ? "ম্যানুয়ালি সেন্ড মানি (TxID)" : "Manual Pay (TxID)"}
-                              </span>
-                            </button>
+                          {/* Payment: Real UddoktaPay Checkout — auto-activates ad, no TxID needed */}
+                          <div className="p-4 bg-emerald-500/5 border border-emerald-500/15 rounded-2xl space-y-2">
+                            <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 font-bold text-xs uppercase tracking-wide">
+                              <Lock className="w-4 h-4 text-emerald-500" />
+                              <span>{language === "bn" ? "UddoktaPay দ্বারা যাচাইকৃত" : "Verified via UddoktaPay"}</span>
+                            </div>
+                            <p className="text-xs text-slate-550 dark:text-slate-350 leading-relaxed font-semibold">
+                              {language === "bn"
+                                ? "নিচের বাটনে ট্যাপ করলে bKash/Nagad/Rocket-এর নিরাপদ চেকআউট পেজে যাবেন। পেমেন্ট সফল হওয়া মাত্রই বিজ্ঞাপনটি স্বয়ংক্রিয়ভাবে লাইভ হয়ে যাবে — কোনো TxID লিখতে হবে না।"
+                                : "Tapping the button below takes you to a secure bKash/Nagad/Rocket checkout page. As soon as payment is confirmed, your ad goes live automatically — no TxID needed."}
+                            </p>
                           </div>
 
-                          {adPayMode === "instant" ? (
-                            /* INSTANT ONLINE DIRECT CHECKOUT GATEWAY */
-                            <div className="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-4">
-                              <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-3.5 text-xs text-amber-600 dark:text-amber-450 space-y-1">
-                                <p className="font-extrabold uppercase tracking-wider">
-                                  ⚡ {language === "bn" ? "সরাসরি অনলাইন পেমেন্ট" : "Direct Online Checkout"}
-                                </p>
-                                <p className="text-slate-650 dark:text-slate-350 leading-relaxed">
-                                  {language === "bn"
-                                    ? "কোনো ম্যানুয়াল সেন্ড মানি বা ট্রানজেকশন আইডি কপি-পেস্ট লাগবে না! নিচের বাটনে ক্লিক করে সরাসরি মোবাইল নম্বর, OTP এবং PIN দিয়ে আপনার অনলাইন পেমেন্ট সম্পন্ন করুন। সাথে সাথে বিজ্ঞাপনটি বুস্ট হয়ে যাবে!"
-                                    : "No manual send money or TxID copy-paste required! Simply click below to input mobile, OTP, and PIN to activate. Fast and fully automated!"}
-                                </p>
-                              </div>
-
-                              <button
-                                type="button"
-                                disabled={adPromoLoading || !adSelectedListingId}
-                                onClick={() => {
-                                  if (!adSelectedListingId) {
-                                    setAdPromoError(language === "bn" ? "দয়া করে বিজ্ঞাপন দেয়ার জন্য একটি প্রোডাক্ট সিলেক্ট করুন" : "Please select a product to advertise");
-                                    return;
-                                  }
-                                  setIsAdPortalOpen(true);
-                                }}
-                                className="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-black py-3.5 rounded-xl transition text-xs flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed uppercase cursor-pointer"
-                              >
-                                {adPromoLoading ? (
-                                  <>
-                                    <Loader2 className="w-4 h-4 animate-spin text-slate-950" />
-                                    <span>{language === "bn" ? "রিকোয়েস্ট প্রসেস হচ্ছে..." : "Processing..."}</span>
-                                  </>
-                                ) : (
-                                  <>
-                                    <Sparkles className="w-4 h-4 text-slate-950 fill-slate-950" />
-                                    <span>
-                                      {language === "bn" ? "অনলাইন পেমেন্ট গেটওয়ে দিয়ে পে করুন" : "Pay via Online Checkout Portal"}
-                                    </span>
-                                  </>
-                                )}
-                              </button>
-                            </div>
-                          ) : (
-                            /* MANUAL PAY WITH SENDER & TXID MANUALLY COPIED */
-                            <div className="space-y-4 pt-2 border-t border-slate-100 dark:border-slate-800">
-                              {/* Payment method selector & entries */}
-                              <div className="space-y-3">
-                                <label className="text-xs font-bold text-slate-705 dark:text-slate-350 block">
-                                  {language === "bn" ? "পেমেন্ট মেথড সিলেক্ট করুন:" : "Select Payment Method:"}
-                                </label>
-                                
-                                <div className="grid grid-cols-3 gap-2">
-                                  {(["bKash", "Nagad", "Rocket"] as const).map((method) => {
-                                    const isSel = adPaymentMethod === method;
-                                    return (
-                                      <button
-                                        type="button"
-                                        key={method}
-                                        onClick={() => setAdPaymentMethod(method)}
-                                        className={`py-2 px-3 rounded-xl border text-[11px] font-black uppercase tracking-wider transition cursor-pointer flex items-center justify-center gap-1.5 ${
-                                          isSel
-                                            ? "bg-slate-900 dark:bg-white text-white dark:text-slate-950 border-transparent shadow"
-                                            : "bg-slate-50 dark:bg-slate-955 border-slate-200 dark:border-slate-800 text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
-                                        }`}
-                                      >
-                                        {method}
-                                      </button>
-                                    );
-                                  })}
-                                </div>
-
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-                                  <div className="space-y-1.5">
-                                    <label className="text-[10px] font-black text-slate-505 dark:text-slate-400 uppercase tracking-widest block">
-                                      {language === "bn" ? "প্রেরক নাম্বার (Sender No)" : "Your Mobile Number"}
-                                    </label>
-                                    <input
-                                      type="text"
-                                      maxLength={11}
-                                      value={adSenderNumber}
-                                      onChange={(e) => setAdSenderNumber(e.target.value.replace(/[^0-9]/g, ""))}
-                                      placeholder="e.g. 01XXXXXXXXX"
-                                      className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-955 border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-bold font-mono focus:outline-none focus:ring-1 focus:ring-amber-400 text-slate-800 dark:text-white"
-                                    />
-                                  </div>
-
-                                  <div className="space-y-1.5">
-                                    <label className="text-[10px] font-black text-slate-505 dark:text-slate-400 uppercase tracking-widest block">
-                                      {language === "bn" ? "ট্রানজেকশন আইডি (TxID)" : "Transaction ID (TxID)"}
-                                    </label>
-                                    <input
-                                      type="text"
-                                      value={adTransactionId}
-                                      onChange={(e) => setAdTransactionId(e.target.value.replace(/[^a-zA-Z0-9]/g, ""))}
-                                      placeholder="e.g. 7X38AB91CF"
-                                      className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-955 border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-bold font-mono uppercase focus:outline-none focus:ring-1 focus:ring-amber-400 text-slate-800 dark:text-white"
-                                    />
-                                  </div>
-                                </div>
-                              </div>
-
-                              {/* Trigger CTA */}
-                              <div className="pt-2 border-t border-slate-100 dark:border-slate-800">
-                                <button
-                                  id="dash-launch-campaign-btn"
-                                  disabled={adPromoLoading || !adSelectedListingId}
-                                  onClick={handleDashboardPromoSubmit}
-                                  className="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-black py-3 rounded-xl transition text-xs flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed uppercase cursor-pointer"
-                                >
-                                  {adPromoLoading ? (
-                                    <>
-                                      <Loader2 className="w-4 h-4 animate-spin text-slate-950" />
-                                      <span>{language === "bn" ? "রিকোয়েস্ট প্রসেস হচ্ছে..." : "Processing..."}</span>
-                                    </>
-                                  ) : (
-                                    <>
-                                      <Send className="w-4 h-4 text-slate-950" />
-                                      <span>
-                                        {language === "bn" ? "পেমেন্ট রিকোয়েস্ট সম্পন্ন করুন" : "Pay & Submit Ad Request"}
-                                      </span>
-                                    </>
-                                  )}
-                                </button>
-                              </div>
-                            </div>
-                          )}
+                          <div className="pt-2 border-t border-slate-100 dark:border-slate-800">
+                            <button
+                              id="dash-launch-campaign-btn"
+                              disabled={adPromoLoading || !adSelectedListingId}
+                              onClick={handleDashboardPromoSubmit}
+                              className="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-black py-3.5 rounded-xl transition text-xs flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed uppercase cursor-pointer"
+                            >
+                              {adPromoLoading ? (
+                                <>
+                                  <Loader2 className="w-4 h-4 animate-spin text-slate-950" />
+                                  <span>{language === "bn" ? "প্রসেস হচ্ছে..." : "Processing..."}</span>
+                                </>
+                              ) : (
+                                <>
+                                  <CreditCard className="w-4 h-4 text-slate-950" />
+                                  <span>
+                                    {language === "bn"
+                                      ? `৳${(selectedPromoPkg?.price || 0).toLocaleString()} পেমেন্ট করুন`
+                                      : `Pay ৳${(selectedPromoPkg?.price || 0).toLocaleString()}`}
+                                  </span>
+                                </>
+                              )}
+                            </button>
+                          </div>
 
                         </div>
                       </div>
@@ -3227,45 +2946,14 @@ export default function App() {
                       {/* Right Block: Live Invoice Estimation Ledger */}
                       <div className="lg:col-span-5 space-y-4">
                         <h5 className="text-xs uppercase font-extrabold text-slate-400 tracking-wider">
-                          {language === "bn" ? "পেমেন্ট গাইড ও ইনভয়েস বিল" : "CAMPAIGN INVOICE REPORT"}
+                          {language === "bn" ? "পেমেন্ট গাইড ও ইনভয়েস বিল" : "CAMPAIGN INVOICE REPORT"}
                         </h5>
 
                         <div className="bg-slate-900 border border-slate-800 text-white rounded-2xl p-5 space-y-5 font-sans relative">
-                          
-                          <div className="flex flex-col gap-2 pb-3 border-b border-slate-800">
-                            <span className="text-[10px] uppercase font-bold text-slate-400 block">
-                              {language === "bn" ? `আমাদের পার্সোনাল ${adPaymentMethod} নাম্বার:` : `Receiver ${adPaymentMethod} Number:`}
-                            </span>
-                            <div className="flex items-center justify-between">
-                              <span className="text-sm font-extrabold text-amber-400 font-mono select-all">
-                                {adPaymentMethod === 'bKash' 
-                                  ? ownerPaymentInfo.bkash 
-                                  : adPaymentMethod === 'Nagad' 
-                                  ? ownerPaymentInfo.nagad 
-                                  : ownerPaymentInfo.rocket}
-                              </span>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  let num = adPaymentMethod === 'bKash' 
-                                    ? ownerPaymentInfo.bkash 
-                                    : adPaymentMethod === 'Nagad' 
-                                    ? ownerPaymentInfo.nagad 
-                                    : ownerPaymentInfo.rocket;
-                                  navigator.clipboard.writeText(num.split(" ")[0]);
-                                  setAdPaymentCopied(true);
-                                  setTimeout(() => setAdPaymentCopied(false), 2000);
-                                }}
-                                className="p-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-slate-300 transition cursor-pointer"
-                                title="Copy Number"
-                              >
-                                {adPaymentCopied ? (
-                                  <Check className="w-3.5 h-3.5 text-emerald-400" />
-                                ) : (
-                                  <Copy className="w-3.5 h-3.5" />
-                                )}
-                              </button>
-                            </div>
+
+                          <div className="flex items-center gap-2 pb-3 border-b border-slate-800 text-emerald-400 text-xs font-bold uppercase tracking-wide">
+                            <Lock className="w-4 h-4" />
+                            <span>{language === "bn" ? "নিরাপদ UddoktaPay চেকআউট" : "Secure UddoktaPay Checkout"}</span>
                           </div>
 
                           <div className="space-y-2">
@@ -3280,7 +2968,7 @@ export default function App() {
 
                             <div className="flex justify-between text-xs">
                               <span className="text-slate-405 font-medium">
-                                {language === "bn" ? "বিজ্ঞাপনের মেয়াদকাল:" : "Ad Spot Duration:"}
+                                {language === "bn" ? "বিজ্ঞাপনের মেয়াদকাল:" : "Ad Spot Duration:"}
                               </span>
                               <span className="font-semibold text-amber-400">
                                 {selectedPromoPkg?.durationDays || "0"} {language === "bn" ? "দিন" : "days"} ({selectedPromoPkg ? selectedPromoPkg.durationDays * 24 : 0} {language === "bn" ? "ঘণ্টা" : "hours"})
@@ -3301,17 +2989,17 @@ export default function App() {
                             <div className="p-3.5 bg-slate-950/40 border border-slate-800/80 rounded-xl text-[10px] text-slate-400 leading-normal space-y-1.5">
                               <div className="flex items-center gap-1.5 font-bold text-amber-400 uppercase tracking-wider">
                                 <ShieldCheck className="w-4 h-4 text-emerald-500 shrink-0" />
-                                <span>{language === "bn" ? "দিকনির্দেশনাবলী:" : "Simple Directions:"}</span>
+                                <span>{language === "bn" ? "কীভাবে কাজ করে:" : "How it works:"}</span>
                               </div>
                               <p>
-                                {language === "bn" 
-                                  ? `১. নির্বাচিত মোবাইল ব্যাংকিং চ্যানেলের নাম্বারে ৳${(selectedPromoPkg?.price || 0).toLocaleString()} টাকা "Send Money" করুন।`
-                                  : `1. Send exact amount of ৳${(selectedPromoPkg?.price || 0).toLocaleString()} BDT on the displayed number via Send Money.`}
+                                {language === "bn"
+                                  ? "বামের বাটনে ট্যাপ করে UddoktaPay-এর নিরাপদ bKash/Nagad/Rocket চেকআউট পেজে পেমেন্ট সম্পন্ন করুন।"
+                                  : "Tap the button on the left to complete payment via UddoktaPay's secure bKash/Nagad/Rocket checkout."}
                               </p>
                               <p>
-                                {language === "bn" 
-                                  ? `২. টাকা পাঠানোর পর আপনার ১১ ডিজিটের মোবাইল নম্বর এবং TrxID বসিয়ে সাবমিট করুন। আমাদের মালিক ভেরিফাই করলেই লাইভ শুরু হবে!`
-                                  : `2. Write down your sender phone number & Transaction ID (TxID) in the left form and submit. Real-time review takes 5 minutes.`}
+                                {language === "bn"
+                                  ? "পেমেন্ট নিশ্চিত হওয়া মাত্রই বিজ্ঞাপনটি স্বয়ংক্রিয়ভাবে লাইভ হয়ে যাবে — কোনো অপেক্ষা বা ম্যানুয়াল ভেরিফিকেশন লাগবে না।"
+                                  : "As soon as payment is confirmed, your ad goes live automatically — no waiting, no manual verification."}
                               </p>
                             </div>
                           </div>
@@ -3378,11 +3066,15 @@ export default function App() {
                 )}
 
                 {dashboardSubTab === 'admin' && isUserAdmin && (
-                  <AdminPanel language={language} currentUser={userMetadata || user} listings={listings} isUserAdmin={isUserAdmin} />
+                  <Suspense fallback={<div className="flex items-center justify-center py-16"><Loader2 className="w-6 h-6 animate-spin text-amber-500" /></div>}>
+                    <AdminPanel language={language} currentUser={userMetadata || user} listings={listings} isUserAdmin={isUserAdmin} />
+                  </Suspense>
                 )}
 
                 {dashboardSubTab === 'playstore-audit' && (
-                  <PlayStoreDiagnostics language={language} />
+                  <Suspense fallback={<div className="flex items-center justify-center py-16"><Loader2 className="w-6 h-6 animate-spin text-amber-500" /></div>}>
+                    <PlayStoreDiagnostics language={language} />
+                  </Suspense>
                 )}
 
               </div>
@@ -3391,13 +3083,15 @@ export default function App() {
             {/* TAB: CHAT / MESSAGES */}
             {activeTab === 'chats' && (
               <div className="animate-fade-in">
-                <ChatView
-                  currentUser={user}
-                  language={language}
-                  onLoginPrompt={() => setIsAuthOpen(true)}
-                  initialListingToChat={initialListingToChat}
-                  onClearInitialListing={() => setInitialListingToChat(null)}
-                />
+                <Suspense fallback={<div className="flex items-center justify-center py-16"><Loader2 className="w-6 h-6 animate-spin text-amber-500" /></div>}>
+                  <ChatView
+                    currentUser={user}
+                    language={language}
+                    onLoginPrompt={() => setIsAuthOpen(true)}
+                    initialListingToChat={initialListingToChat}
+                    onClearInitialListing={() => setInitialListingToChat(null)}
+                  />
+                </Suspense>
               </div>
             )}
 
@@ -3412,7 +3106,7 @@ export default function App() {
                     </h3>
                     <p className="text-xs text-slate-400 dark:text-slate-500 font-bold mt-1">
                       {language === "bn" 
-                        ? "আপনার সেভ করে রাখা খুচরা যন্ত্রাংশ এবং গাড়ির বিজ্ঞাপনসমূহ এখানে দেখতে পাবেন।" 
+                        ? "আপনার সেভ করে রাখা খুচরা যন্ত্রাংশ এবং গাড়ির বিজ্ঞাপনসমূহ এখানে দেখতে পাবেন।" 
                         : "Browse vehicle accessories and heavy equipments you have saved for later."}
                     </p>
                   </div>
@@ -3425,11 +3119,11 @@ export default function App() {
                     </div>
                     <div>
                       <p className="text-sm font-extrabold text-slate-700 dark:text-slate-300">
-                        {language === "bn" ? "কোনো বুকমার্ক পাওয়া যায়নি" : "No saved items yet"}
+                        {language === "bn" ? "কোনো বুকমার্ক পাওয়া যায়নি" : "No saved items yet"}
                       </p>
                       <p className="text-xs text-slate-450 mt-1">
                         {language === "bn" 
-                          ? "মার্কেটপ্লেস থেকে যেকোনো লিস্টিংয়ের বুকমার্ক আইকনে ক্লিক করে এখানে সেভ করে রাখতে পারেন।" 
+                          ? "মার্কেটপ্লেস থেকে যেকোনো লিস্টিংয়ের বুকমার্ক আইকনে ক্লিক করে এখানে সেভ করে রাখতে পারেন।" 
                           : "Explore auto parts or vehicle advertisements and tap the bookmark icon to save them here."}
                       </p>
                     </div>
@@ -3475,14 +3169,14 @@ export default function App() {
                     <div>
                       <div className="flex items-center gap-1.5 flex-wrap">
                         <h2 className="text-lg sm:text-xl font-black text-slate-850 dark:text-white leading-none">
-                          {language === "bn" ? "গাড়ি বাজার" : "Gari Bazar"}
+                          {language === "bn" ? "গাড়ি বাজার" : "Gari Bazar"}
                         </h2>
                         <span className="text-[10px] sm:text-xs font-black bg-amber-500/10 text-amber-600 dark:text-amber-400 px-2 py-0.5 rounded-lg select-none">
                           {language === "bn" ? "প্রোফাইল" : "Profile"}
                         </span>
                       </div>
                       <p className="text-[10px] sm:text-xs text-slate-400 dark:text-slate-500 font-semibold mt-1">
-                        {language === "bn" ? "পার্টস ও গাড়ি বেচাকেনা" : "Auto Parts & Vehicles Trading"}
+                        {language === "bn" ? "পার্টস ও গাড়ি বেচাকেনা" : "Auto Parts & Vehicles Trading"}
                       </p>
                     </div>
                   </div>
@@ -3546,7 +3240,7 @@ export default function App() {
                                   </span>
                                 </div>
                                 <p className="text-xs text-slate-400 dark:text-slate-500 font-bold mt-0.5 truncate">
-                                  {user.email || (language === "bn" ? "ইমেইল প্রদান করা হয়নি" : "No email linked")}
+                                  {user.email || (language === "bn" ? "ইমেইল প্রদান করা হয়নি" : "No email linked")}
                                 </p>
                               </div>
                             </div>
@@ -3575,7 +3269,7 @@ export default function App() {
                           <div className="text-center py-2 space-y-3">
                             <p className="text-xs text-slate-500 dark:text-slate-450 leading-relaxed font-bold">
                               {language === "bn" 
-                                ? "গাড়ি বাজার অ্যাপে লগইন করতে দয়া করে নিচের বাটনে চাপুন।" 
+                                ? "গাড়ি বাজার অ্যাপে লগইন করতে দয়া করে নিচের বাটনে চাপুন।" 
                                 : "Please sign in to access your registered seller account details."}
                             </p>
                             <button
@@ -3741,7 +3435,7 @@ export default function App() {
                         </div>
                         <div>
                           <p className="text-sm sm:text-base font-extrabold text-slate-800 dark:text-slate-100">
-                            {language === "bn" ? "আমাদের টিম ও গাড়ি বাজার" : "Our Team & About"}
+                            {language === "bn" ? "আমাদের টিম ও গাড়ি বাজার" : "Our Team & About"}
                           </p>
                           <p className="text-xs text-slate-400 dark:text-slate-500 font-bold mt-0.5">
                             {language === "bn" ? "অ্যাপ ডেভেলপমেন্ট টিম এবং লক্ষ্য" : "Meet the creators of Gari Bazar"}
@@ -3767,7 +3461,7 @@ export default function App() {
                           </div>
                           <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed font-semibold">
                             {language === "bn"
-                              ? "গাড়ি বাজার অ্যাপটি বাংলাদেশে অটো পার্টস ও খুচরা যন্ত্রাংশের বেচাকেনাকে সহজ এবং ডিজিটাল করতে তৈরি করা হয়েছে। আমাদের মূল লক্ষ্য গ্রাহকদের নিরাপদ ও বিশ্বস্ত সেবা প্রদান করা।"
+                              ? "গাড়ি বাজার অ্যাপটি বাংলাদেশে অটো পার্টস ও খুচরা যন্ত্রাংশের বেচাকেনাকে সহজ এবং ডিজিটাল করতে তৈরি করা হয়েছে। আমাদের মূল লক্ষ্য গ্রাহকদের নিরাপদ ও বিশ্বস্ত সেবা প্রদান করা।"
                               : "Gari Bazar is built to simplify auto parts and vehicle accessories trading across Bangladesh. Our mission is to make P2P parts sourcing seamless, verified, and transparent."}
                           </p>
                           <div className="flex items-center gap-1.5 text-xs text-slate-400 dark:text-slate-555 pt-1 font-mono">
@@ -3809,7 +3503,7 @@ export default function App() {
                         <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-150 dark:border-slate-800/80 shadow-xs text-xs text-slate-500 dark:text-slate-400 space-y-3">
                           <div className="flex items-center gap-1.5 text-slate-800 dark:text-white font-bold">
                             <ShieldCheck className="w-4 h-4 text-emerald-500" />
-                            <span>{language === "bn" ? "প্লে স্টোর নীতিমালায় সংগতি" : "Fully Play Store Compliant"}</span>
+                            <span>{language === "bn" ? "প্লে স্টোর নীতিমালায় সংগতি" : "Fully Play Store Compliant"}</span>
                           </div>
                           <p className="leading-relaxed font-semibold">
                             {language === "bn"
@@ -3865,7 +3559,7 @@ export default function App() {
                               <Check className="w-4 h-4 text-emerald-500" />
                               <span>
                                 {language === "bn" 
-                                  ? "আপনার মেসেজটি সফলভাবে টিমের কাছে পাঠানো হয়েছে! ২৪ ঘণ্টার মধ্যে যোগাযোগ করা হবে।" 
+                                  ? "আপনার মেসেজটি সফলভাবে টিমের কাছে পাঠানো হয়েছে! ২৪ ঘণ্টার মধ্যে যোগাযোগ করা হবে।" 
                                   : "Support ticket opened successfully! We will get back to you within 24 hours."}
                               </span>
                             </div>
@@ -3880,7 +3574,7 @@ export default function App() {
                                     type="text"
                                     value={supportName}
                                     onChange={(e) => setSupportName(e.target.value)}
-                                    placeholder={user?.displayName || (language === "bn" ? "যেমন: রায়হান" : "e.g. Rayhan")}
+                                    placeholder={user?.displayName || (language === "bn" ? "যেমন: রায়হান" : "e.g. Rayhan")}
                                     className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 py-1.5 px-3 rounded-xl text-xs focus:ring-1 focus:ring-amber-500 focus:outline-none dark:text-white font-semibold"
                                   />
                                 </div>
@@ -3950,12 +3644,12 @@ export default function App() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center space-y-3">
           <div className="flex items-center gap-1.5 justify-center text-slate-300 font-bold">
             <Car className="w-4 h-4 text-amber-500" />
-            <span>{language === "bn" ? "গাড়ি বাজার লিমিটেড" : "Gari Bazar Auto Parts Marketplace"}</span>
+            <span>{language === "bn" ? "গাড়ি বাজার লিমিটেড" : "Gari Bazar Auto Parts Marketplace"}</span>
           </div>
           <p className="max-w-md mx-auto leading-relaxed text-[11px] text-slate-400">
             {language === "bn" 
-              ? "গাড়ি ও বাইকের অরিজিনাল জেনুইন খুচরা যন্ত্রাংশের বিশ্বস্ত বাজার। স্পন্সরড বিজ্ঞাপনদাতাদের জন্য উন্নত অ্যাড ক্যাম্পেইন ও AI ডেসক্রিপশন জেনারেটর ইঞ্জিন।" 
-              : "Bangladesh's premium online car parts listings deck. Refill your promotional wallet to test live boosted sponsored ad placement in real-time."}
+              ? "গাড়ি ও বাইকের অরিজিনাল জেনুইন খুচরা যন্ত্রাংশের বিশ্বস্ত বাজার। স্পন্সরড বিজ্ঞাপনদাতাদের জন্য উন্নত অ্যাড ক্যাম্পেইন ও AI ডেসক্রিপশন জেনারেটর ইঞ্জিন।" 
+              : "Bangladesh's premium online car parts marketplace. Boost your listings with secure, real-time sponsored ad placements."}
           </p>
           <div className="text-[10px] text-slate-400 flex flex-wrap gap-x-4 gap-y-1 justify-center pt-2">
             <span>© 2026 Gari Bazar Tech</span>
@@ -3971,6 +3665,7 @@ export default function App() {
       </footer>
 
       {/* All interactive floating dialogs & Modals */}
+      <Suspense fallback={null}>
       
       {/* 1. Auth Modals */}
       <AuthModal 
@@ -4034,16 +3729,13 @@ export default function App() {
         />
       )}
 
-      {/* 5. Simulated Direct Payment Portal for Campaign Promotions */}
-      {isAdPortalOpen && (
-        <SimulatedPaymentPortal
-          isOpen={isAdPortalOpen}
-          amount={Number(selectedPromoPkg?.price || 0)}
-          language={language}
-          onClose={() => setIsAdPortalOpen(false)}
-          onSuccess={handleInstantAdPromoSuccess}
-        />
-      )}
+      {/* 4. Refill Ad Budget Wallet */}
+      <RefillModal
+        isOpen={isRefillModalOpen}
+        onClose={() => setIsRefillModalOpen(false)}
+        currentUser={userMetadata || user}
+        language={language}
+      />
 
       {/* 6. Edit Listing Modal for Sellers */}
       <EditListingModal
@@ -4089,6 +3781,7 @@ export default function App() {
           }}
         />
       )}
+      </Suspense>
 
     </div>
   );

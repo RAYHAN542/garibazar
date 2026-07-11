@@ -42,25 +42,25 @@ export const translations: Record<'en' | 'bn', TranslationSet> = {
     statsTotalSales: "Simulated Ad Credits",
   },
   bn: {
-    appName: "ডিচইট গাড়ি ও হেভি ইকুইপমেন্ট",
-    appSub: "বাংলাদেশ ও ঢাকার সর্ববৃহৎ হেভি মেশিনারি, গাড়ি ও খুচরা যন্ত্রাংশের বিশ্বস্ত মার্কেটপ্লেস",
-    searchPlaceholder: "এক্সেভেটর, ডোজার, ক্রেন, গাড়ি বা খুচরা পার্টস লিখে খুঁজুন...",
+    appName: "ডিচইট গাড়ি ও হেভি ইকুইপমেন্ট",
+    appSub: "বাংলাদেশ ও ঢাকার সর্ববৃহৎ হেভি মেশিনারি, গাড়ি ও খুচরা যন্ত্রাংশের বিশ্বস্ত মার্কেটপ্লেস",
+    searchPlaceholder: "এক্সেভেটর, ডোজার, ক্রেন, গাড়ি বা খুচরা পার্টস লিখে খুঁজুন...",
     categoryAll: "সব ক্যাটাগরি",
     sellBtn: "মেশিন ও পার্টস বিক্রি করুন",
-    buyTitle: "বিক্রির জন্য সকল গাড়ি, ভারী যন্ত্রপাতি ও খুচরা পার্টস",
-    adsTitle: "স্পন্সরড হেভি ইকুইপমেন্ট ও প্রিমিয়াম ডিল্স",
-    adsSubtitle: "প্রিমিয়াম সেলফ-বুস্টেড অ্যাড ও বিশ্বস্ত ডিলারদের ডিলসমূহ",
+    buyTitle: "বিক্রির জন্য সকল গাড়ি, ভারী যন্ত্রপাতি ও খুচরা পার্টস",
+    adsTitle: "স্পন্সরড হেভি ইকুইপমেন্ট ও প্রিমিয়াম ডিল্স",
+    adsSubtitle: "প্রিমিয়াম সেলফ-বুস্টেড অ্যাড ও বিশ্বস্ত ডিলারদের ডিলসমূহ",
     promoteBtn: "লিস্টিং বুস্ট ও অ্যাড দিন",
     priceLabel: "দাম",
     modelLabel: "মডেল, স্পেসিফিকেশন ও অবস্থা",
     sellerLabel: "বিক্রেতা",
     contactBtn: "কল করুন",
-    whatsappBtn: "হোয়াটসঅ্যাপ করুন",
+    whatsappBtn: "হোয়াটসঅ্যাপ করুন",
     smsBtn: "বার্তা পাঠান",
     detailsTitle: "যন্ত্রপাতির বিবরণ ও বিক্রেতার তথ্য",
-    aiBtn: "AI দিয়ে স্পেসিফিকেশন তৈরি করুন",
+    aiBtn: "AI দিয়ে স্পেসিফিকেশন তৈরি করুন",
     aiLoading: "🤖 AI বিবরণ ও স্পেসিফিকেশন সাজাচ্ছে...",
-    addPartTitle: "আপনার গাড়ি, ভারী যন্ত্রপাতি বা খুচরা যন্ত্রাংশ বিক্রি করুন",
+    addPartTitle: "আপনার গাড়ি, ভারী যন্ত্রপাতি বা খুচরা যন্ত্রাংশ বিক্রি করুন",
     formTitle: "যন্ত্রবাতি বা পার্টসের নাম",
     formCategory: "ক্যাটাগরি",
     formModel: "মডেল, কোম্পানি এবং সন",
@@ -78,8 +78,8 @@ export const translations: Record<'en' | 'bn', TranslationSet> = {
     statsTitle: "মার্কেটপ্লেস পরিসংখ্যান",
     statsActive: "চলমান লিস্টিং",
     statsViews: "ক্রেতার আগ্রহ ও স্পর্শ",
-    statsAds: "সক্রিয় বুস্টেড বিজ্ঞাপন",
-    statsTotalSales: "সিমুলেট বুস্ট আয়",
+    statsAds: "সক্রিয় বুস্টেড বিজ্ঞাপন",
+    statsTotalSales: "সিমুলেট বুস্ট আয়",
   }
 };
 
@@ -151,7 +151,7 @@ export const CITIES = [
 ];
 
 export const CATEGORIES = [
-  { id: "vehicles", labelEn: "Cars, Buses & Heavy Equipment", labelBn: "গাড়ি, বাস ও হেভি ইকুইপমেন্ট" },
+  { id: "vehicles", labelEn: "Cars, Buses & Heavy Equipment", labelBn: "গাড়ি, বাস ও হেভি ইকুইপমেন্ট" },
   { id: "spare_parts", labelEn: "Spare Parts & Machinery", labelBn: "খুচরা পার্টস ও ক্যাটাগরি" }
 ];
 
@@ -316,7 +316,7 @@ export const AD_PACKAGES: AdPackage[] = [
   {
     id: "pkg-premium",
     nameEn: "Premium Machine Highlights",
-    nameBn: "প্রিমিয়াম স্লাইডার বিজ্ঞাপন",
+    nameBn: "প্রিমিয়াম স্লাইডার বিজ্ঞাপন",
     price: 500,
     durationDays: 6,
     benefitsEn: [
@@ -354,5 +354,21 @@ export const AD_PACKAGES: AdPackage[] = [
       "১২ দিন ব্যাপী সর্বোচ্চ স্তরের ১০x কাভারেজ"
     ],
     tier: "featured"
+  },
+  {
+    id: "pkg-test",
+    nameEn: "Quick Test Boost",
+    nameBn: "কুইক টেস্ট বুস্ট",
+    price: 20,
+    durationDays: 1,
+    benefitsEn: [
+      "For testing the real payment flow with a small amount",
+      "1 day of basic promoted visibility"
+    ],
+    benefitsBn: [
+      "রিয়েল পেমেন্ট ফ্লো অল্প টাকায় টেস্ট করার জন্য",
+      "১ দিনের বেসিক প্রমোটেড ভিজিবিলিটি"
+    ],
+    tier: "basic"
   }
 ];
