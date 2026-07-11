@@ -9,7 +9,7 @@ interface PromotedSliderProps {
 }
 
 export function PromotedSlider({ listings, language, onViewListing }: PromotedSliderProps) {
-  const promotedListings = listings.filter((item) => item.isAd && (item.adTier === "premium" || item.adTier === "featured"));
+  const promotedListings = listings.filter((item) => item.isAd && (item.adTier === "basic" || item.adTier === "premium" || item.adTier === "featured"));
   const [currentIndex, setCurrentIndex] = useState(0);
 
   // Reset index if out of bounds due to updated listings count
