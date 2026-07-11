@@ -62,7 +62,6 @@ const RefillModal = lazy(() => import("./components/RefillModal").then(m => ({ d
 const AdminPanel = lazy(() => import("./components/AdminPanel").then(m => ({ default: m.AdminPanel })));
 const ChatView = lazy(() => import("./components/ChatView").then(m => ({ default: m.ChatView })));
 const PlayStoreDiagnostics = lazy(() => import("./components/PlayStoreDiagnostics").then(m => ({ default: m.PlayStoreDiagnostics })));
-const SimulatedPaymentPortal = lazy(() => import("./components/SimulatedPaymentPortal"));
 const LegalHubModal = lazy(() => import("./components/LegalHubModal"));
 const PrivacyPolicyPage = lazy(() => import("./components/PrivacyPolicyPage"));
 const DataDeletionPage = lazy(() => import("./components/DataDeletionPage"));
@@ -70,7 +69,7 @@ const SellerAnalyticsGraph = lazy(() => import("./components/SellerAnalyticsGrap
 const SellerShopPage = lazy(() => import("./components/SellerShopPage").then(m => ({ default: m.SellerShopPage })));
 import Fuse from "fuse.js";
 import { buildSearchBlob, convertBengaliDigitsToEnglish, convertEnglishDigitsToBengali, toPhoneticKey } from "./searchAliases";
-import { MessageSquare, Cpu, SlidersHorizontal, Moon, Sun, Users, HelpCircle, Mail, FileText, ArrowRight, Menu, Download, ChevronDown, Check } from "lucide-react";
+import { MessageSquare, Cpu, SlidersHorizontal, Moon, Sun, Users, HelpCircle, Mail, FileText, ArrowRight, Menu, Download, ChevronDown, Check, Lock, CreditCard } from "lucide-react";
 import vehicleCardImg from "./assets/images/vehicle-banner.jpg";
 import partsCardImg from "./assets/images/parts-card.png";
 
@@ -177,14 +176,7 @@ export default function App() {
   const [adPromoLoading, setAdPromoLoading] = useState(false);
   const [adPromoSuccess, setAdPromoSuccess] = useState(false);
   const [adPromoError, setAdPromoError] = useState("");
-  
-  // Direct payment states for Dashboard
-  const [adPayMode, setAdPayMode] = useState<"instant" | "manual">("manual"); // "instant" gateway disabled (unverified) — manual admin-verified payment only
-  const [isAdPortalOpen, setIsAdPortalOpen] = useState(false);
-  const [adSenderNumber, setAdSenderNumber] = useState("");
-  const [adTransactionId, setAdTransactionId] = useState("");
-  const [adPaymentMethod, setAdPaymentMethod] = useState<"bKash" | "Nagad" | "Rocket">("bKash");
-  const [adPaymentCopied, setAdPaymentCopied] = useState(false);
+
   const [ownerPaymentInfo, setOwnerPaymentInfo] = useState({
     bkash: "01783457173 (Personal)",
     nagad: "01783457173 (Personal)",
@@ -1104,83 +1096,6 @@ export default function App() {
     setIsRefillModalOpen(true);
   };
 
-  // Instant automatical direct payment success callback like Daraz
-  const handleInstantAdPromoSuccess = async (details: { method: string; senderNumber: string; txId: string }) => {
-    if (!user) return;
-    setIsAdPortalOpen(false);
-    setAdPromoLoading(true);
-    setAdPromoError("");
-    setAdPromoSuccess(false);
-
-    try {
-      const targetListing = listings.find(item => item.id === adSelectedListingId);
-      if (!targetListing) {
-        throw new Error("Listing not found");
-      }
-
-      const docData = {
-        userId: user.uid,
-        userName: user.displayName || "Seller",
-        userEmail: user.email || "",
-        amount: Number(selectedPromoPkg.price),
-        method: details.method,
-        senderNumber: details.senderNumber,
-        txId: details.txId,
-        status: "approved",
-        type: "ad_promotion",
-        listingId: targetListing.id,
-        listingTitle: targetListing.title,
-        adTier: selectedPromoPkg.tier,
-        durationDays: selectedPromoPkg.durationDays,
-        currentViews: targetListing.views || 0,
-        createdAt: new Date().toISOString()
-      };
-
-      // 1. Submit approved payment record to db
-      await addDoc(collection(db, "refill_requests"), docData);
-
-      // 2. Automatically upgrade the listing's visual package status
-      const listingRef = doc(db, "listings", targetListing.id);
-      await updateDoc(listingRef, {
-        isAd: true,
-        adTier: selectedPromoPkg.tier
-      });
-
-      // 3. Sync local listing item states for real-time responsiveness
-      setListings(prev => prev.map(item => item.id === targetListing.id ? { ...item, isAd: true, adTier: selectedPromoPkg.tier } : item));
-
-      // Track Analytics ad promo
-      logAnalyticsEvent("ad_promote", {
-        listingId: targetListing.id,
-        title: targetListing.title,
-        tier: selectedPromoPkg.tier,
-        durationDays: selectedPromoPkg.durationDays,
-        pricePaid: selectedPromoPkg.price,
-        isInstant: true
-      });
-
-      // 4. Set Success indicator
-      setAdPromoSuccess(true);
-      setAdSelectedListingId("");
-      setAdSenderNumber("");
-      setAdTransactionId("");
-
-      setTimeout(() => {
-        setAdPromoSuccess(false);
-      }, 10000);
-
-    } catch (err: any) {
-      console.error("Instant campaign activation failed:", err);
-      setAdPromoError(
-        language === "bn"
-          ? "পেমেন্ট গেটওয়েতে সফল হয়েছে তবে ব্যালেন্স আপডেট ব্যর্থ হয়েছে।"
-          : "Direct payment authorized but listing update failed."
-      );
-    } finally {
-      setAdPromoLoading(false);
-    }
-  };
-
   // 4a. Launch Ad Campaign directly from user dashboard
   const handleDashboardPromoSubmit = async () => {
     if (!user) {
@@ -1195,31 +1110,6 @@ export default function App() {
       setAdPromoError(language === "bn" ? "দয়া করে একটি সাবস্ক্রিপশন প্যাকেজ সিলেক্ট করুন" : "Please select a subscription package");
       return;
     }
-    if (!adSenderNumber.trim() || adSenderNumber.trim().length < 11) {
-      setAdPromoError(language === "bn" ? "সঠিক ১১ ডিজিটের মোবাইল প্রেরক নাম্বার দিন" : "Please enter a valid 11-digit sender phone number");
-      return;
-    }
-    if (!adTransactionId.trim()) {
-      setAdPromoError(language === "bn" ? "সঠিক ট্রানজেকশন আইডি (TxID) লিখুন" : "Please enter a valid transaction ID");
-      return;
-    }
-
-    const cleanTx = adTransactionId.trim().toUpperCase();
-    const isAlphanumeric = /^[A-Z0-9]+$/.test(cleanTx);
-    const hasLetters = /[A-Z]/.test(cleanTx);
-    const hasDigits = /[0-9]/.test(cleanTx);
-    const blacklistedWords = ["TEST", "FAKE", "DEMO", "ULTAPALTA", "ULTA", "PALTA", "MOCK", "SAMPLE", "QWERTY", "ADMIN", "GARI", "BAZAR", "12345", "ABCDE"];
-    const isBlacklisted = blacklistedWords.some(word => cleanTx.includes(word));
-    const isRepetitive = /(.)\1{4,}/.test(cleanTx);
-
-    if (cleanTx.length < 8 || cleanTx.length > 12 || !isAlphanumeric || !hasLetters || !hasDigits || isBlacklisted || isRepetitive) {
-      setAdPromoError(
-        language === "bn"
-          ? "ভুল ট্রানজেকশন আইডি! অনুগ্রহ করে সঠিক ৮-১২ সংখ্যার আলফানিউমেরিক আইডি লিখুন (যেমন: BKX9E837D2)। ডেমো বা যেকোনো লেখা গ্রহণযোগ্য নয়।"
-          : "Invalid Transaction ID! Please enter a valid 8-12 character alphanumeric ID (e.g. BKX9E837D2). Placeholder or plain text is not accepted."
-      );
-      return;
-    }
 
     setAdPromoLoading(true);
     setAdPromoError("");
@@ -1231,14 +1121,13 @@ export default function App() {
         throw new Error("Listing not found");
       }
 
+      // 1. Create a pending refill_request — the UddoktaPay webhook verifies
+      //    payment and activates the ad automatically. No TxID needed.
       const docData = {
         userId: user.uid,
         userName: user.displayName || "Seller",
         userEmail: user.email || "",
         amount: Number(selectedPromoPkg.price),
-        method: adPaymentMethod,
-        senderNumber: adSenderNumber.trim(),
-        txId: adTransactionId.trim().toUpperCase(),
         status: "pending",
         type: "ad_promotion",
         listingId: targetListing.id,
@@ -1248,38 +1137,20 @@ export default function App() {
         currentViews: targetListing.views || 0,
         createdAt: new Date().toISOString()
       };
+      const docRef = await addDoc(collection(db, "refill_requests"), docData);
 
-      // Wrap addDoc in a race/timeout so that if Firestore connection stalls in the preview environment, the user gets an instant success
-      const addDocWithTimeout = () => {
-        return new Promise<any>((resolve, reject) => {
-          let resolved = false;
-          const timeoutId = setTimeout(() => {
-            if (!resolved) {
-              resolved = true;
-              console.warn("Firestore write stalled, resolving with local fallback.");
-              resolve({ id: "temp-" + Date.now() });
-            }
-          }, 300);
+      // 2. Ask our server to open a real UddoktaPay checkout session for this request.
+      const idToken = await auth.currentUser?.getIdToken();
+      const res = await fetch("/api/payment/create-charge", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
+        body: JSON.stringify({ requestId: docRef.id })
+      });
+      const data = await res.json();
 
-          addDoc(collection(db, "refill_requests"), docData)
-            .then((docRef) => {
-              if (!resolved) {
-                resolved = true;
-                clearTimeout(timeoutId);
-                resolve(docRef);
-              }
-            })
-            .catch((err) => {
-              if (!resolved) {
-                resolved = true;
-                clearTimeout(timeoutId);
-                reject(err);
-              }
-            });
-        });
-      };
-
-      await addDocWithTimeout();
+      if (!res.ok || !data.payment_url) {
+        throw new Error(data.error || (language === "bn" ? "পেমেন্ট গেটওয়ে শুরু করা যায়নি।" : "Could not start the payment gateway."));
+      }
 
       // Track Analytics ad promo
       logAnalyticsEvent("ad_promote", {
@@ -1291,23 +1162,17 @@ export default function App() {
         isInstant: false
       });
 
-      setAdPromoSuccess(true);
-      setAdSelectedListingId("");
-      setAdSenderNumber("");
-      setAdTransactionId("");
-
-      setTimeout(() => {
-        setAdPromoSuccess(false);
-      }, 10000);
+      // 3. Send the user to the real UddoktaPay checkout page.
+      //    On successful payment, the webhook activates the ad automatically.
+      window.location.href = data.payment_url;
 
     } catch (err: any) {
       console.error("Dashboard campaign launch error:", err);
       setAdPromoError(
-        language === "bn" 
-          ? "বিজ্ঞাপন তৈরি ব্যর্থ হয়েছে। দয়া করে আবার চেষ্টা করুন।" 
-          : "Campaign initialization failed. Please retry."
+        err?.message || (language === "bn"
+          ? "বিজ্ঞাপন তৈরি ব্যর্থ হয়েছে। দয়া করে আবার চেষ্টা করুন।"
+          : "Campaign initialization failed. Please retry.")
       );
-    } finally {
       setAdPromoLoading(false);
     }
   };
@@ -3037,139 +2902,43 @@ export default function App() {
                             </div>
                           )}
 
-                          {/* Payment Method: Manual Send Money & TxID (Admin-Verified) — fake "instant" gateway removed */}
-                          <div className="flex items-center justify-center gap-1.5 p-2.5 bg-amber-500 text-slate-950 rounded-xl shadow-md font-black text-xs">
-                            <History className="w-3.5 h-3.5 text-slate-950" />
-                            <span>
-                              {language === "bn" ? "ম্যানুয়ালি সেন্ড মানি (TxID)" : "Manual Pay (TxID)"}
-                            </span>
+                          {/* Payment: Real UddoktaPay Checkout — auto-activates ad, no TxID needed */}
+                          <div className="p-4 bg-emerald-500/5 border border-emerald-500/15 rounded-2xl space-y-2">
+                            <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 font-bold text-xs uppercase tracking-wide">
+                              <Lock className="w-4 h-4 text-emerald-500" />
+                              <span>{language === "bn" ? "UddoktaPay দ্বারা যাচাইকৃত" : "Verified via UddoktaPay"}</span>
+                            </div>
+                            <p className="text-xs text-slate-550 dark:text-slate-350 leading-relaxed font-semibold">
+                              {language === "bn"
+                                ? "নিচের বাটনে ট্যাপ করলে bKash/Nagad/Rocket-এর নিরাপদ চেকআউট পেজে যাবেন। পেমেন্ট সফল হওয়া মাত্রই বিজ্ঞাপনটি স্বয়ংক্রিয়ভাবে লাইভ হয়ে যাবে — কোনো TxID লিখতে হবে না।"
+                                : "Tapping the button below takes you to a secure bKash/Nagad/Rocket checkout page. As soon as payment is confirmed, your ad goes live automatically — no TxID needed."}
+                            </p>
                           </div>
 
-                          {adPayMode === "instant" ? (
-                            /* INSTANT ONLINE DIRECT CHECKOUT GATEWAY */
-                            <div className="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-4">
-                              <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-3.5 text-xs text-amber-600 dark:text-amber-450 space-y-1">
-                                <p className="font-extrabold uppercase tracking-wider">
-                                  ⚡ {language === "bn" ? "সরাসরি অনলাইন পেমেন্ট" : "Direct Online Checkout"}
-                                </p>
-                                <p className="text-slate-650 dark:text-slate-350 leading-relaxed">
-                                  {language === "bn"
-                                    ? "কোনো ম্যানুয়াল সেন্ড মানি বা ট্রানজেকশন আইডি কপি-পেস্ট লাগবে না! নিচের বাটনে ক্লিক করে সরাসরি মোবাইল নম্বর, OTP এবং PIN দিয়ে আপনার অনলাইন পেমেন্ট সম্পন্ন করুন। সাথে সাথে বিজ্ঞাপনটি বুস্ট হয়ে যাবে!"
-                                    : "No manual send money or TxID copy-paste required! Simply click below to input mobile, OTP, and PIN to activate. Fast and fully automated!"}
-                                </p>
-                              </div>
-
-                              <button
-                                type="button"
-                                disabled={adPromoLoading || !adSelectedListingId}
-                                onClick={() => {
-                                  if (!adSelectedListingId) {
-                                    setAdPromoError(language === "bn" ? "দয়া করে বিজ্ঞাপন দেয়ার জন্য একটি প্রোডাক্ট সিলেক্ট করুন" : "Please select a product to advertise");
-                                    return;
-                                  }
-                                  setIsAdPortalOpen(true);
-                                }}
-                                className="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-black py-3.5 rounded-xl transition text-xs flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed uppercase cursor-pointer"
-                              >
-                                {adPromoLoading ? (
-                                  <>
-                                    <Loader2 className="w-4 h-4 animate-spin text-slate-950" />
-                                    <span>{language === "bn" ? "রিকোয়েস্ট প্রসেস হচ্ছে..." : "Processing..."}</span>
-                                  </>
-                                ) : (
-                                  <>
-                                    <Sparkles className="w-4 h-4 text-slate-950 fill-slate-950" />
-                                    <span>
-                                      {language === "bn" ? "অনলাইন পেমেন্ট গেটওয়ে দিয়ে পে করুন" : "Pay via Online Checkout Portal"}
-                                    </span>
-                                  </>
-                                )}
-                              </button>
-                            </div>
-                          ) : (
-                            /* MANUAL PAY WITH SENDER & TXID MANUALLY COPIED */
-                            <div className="space-y-4 pt-2 border-t border-slate-100 dark:border-slate-800">
-                              {/* Payment method selector & entries */}
-                              <div className="space-y-3">
-                                <label className="text-xs font-bold text-slate-705 dark:text-slate-350 block">
-                                  {language === "bn" ? "পেমেন্ট মেথড সিলেক্ট করুন:" : "Select Payment Method:"}
-                                </label>
-                                
-                                <div className="grid grid-cols-3 gap-2">
-                                  {(["bKash", "Nagad", "Rocket"] as const).map((method) => {
-                                    const isSel = adPaymentMethod === method;
-                                    return (
-                                      <button
-                                        type="button"
-                                        key={method}
-                                        onClick={() => setAdPaymentMethod(method)}
-                                        className={`py-2 px-3 rounded-xl border text-[11px] font-black uppercase tracking-wider transition cursor-pointer flex items-center justify-center gap-1.5 ${
-                                          isSel
-                                            ? "bg-slate-900 dark:bg-white text-white dark:text-slate-950 border-transparent shadow"
-                                            : "bg-slate-50 dark:bg-slate-955 border-slate-200 dark:border-slate-800 text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
-                                        }`}
-                                      >
-                                        {method}
-                                      </button>
-                                    );
-                                  })}
-                                </div>
-
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-                                  <div className="space-y-1.5">
-                                    <label className="text-[10px] font-black text-slate-505 dark:text-slate-400 uppercase tracking-widest block">
-                                      {language === "bn" ? "প্রেরক নাম্বার (Sender No)" : "Your Mobile Number"}
-                                    </label>
-                                    <input
-                                      type="text"
-                                      maxLength={11}
-                                      value={adSenderNumber}
-                                      onChange={(e) => setAdSenderNumber(e.target.value.replace(/[^0-9]/g, ""))}
-                                      placeholder="e.g. 01XXXXXXXXX"
-                                      className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-955 border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-bold font-mono focus:outline-none focus:ring-1 focus:ring-amber-400 text-slate-800 dark:text-white"
-                                    />
-                                  </div>
-
-                                  <div className="space-y-1.5">
-                                    <label className="text-[10px] font-black text-slate-505 dark:text-slate-400 uppercase tracking-widest block">
-                                      {language === "bn" ? "ট্রানজেকশন আইডি (TxID)" : "Transaction ID (TxID)"}
-                                    </label>
-                                    <input
-                                      type="text"
-                                      value={adTransactionId}
-                                      onChange={(e) => setAdTransactionId(e.target.value.replace(/[^a-zA-Z0-9]/g, ""))}
-                                      placeholder="e.g. 7X38AB91CF"
-                                      className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-955 border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-bold font-mono uppercase focus:outline-none focus:ring-1 focus:ring-amber-400 text-slate-800 dark:text-white"
-                                    />
-                                  </div>
-                                </div>
-                              </div>
-
-                              {/* Trigger CTA */}
-                              <div className="pt-2 border-t border-slate-100 dark:border-slate-800">
-                                <button
-                                  id="dash-launch-campaign-btn"
-                                  disabled={adPromoLoading || !adSelectedListingId}
-                                  onClick={handleDashboardPromoSubmit}
-                                  className="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-black py-3 rounded-xl transition text-xs flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed uppercase cursor-pointer"
-                                >
-                                  {adPromoLoading ? (
-                                    <>
-                                      <Loader2 className="w-4 h-4 animate-spin text-slate-950" />
-                                      <span>{language === "bn" ? "রিকোয়েস্ট প্রসেস হচ্ছে..." : "Processing..."}</span>
-                                    </>
-                                  ) : (
-                                    <>
-                                      <Send className="w-4 h-4 text-slate-950" />
-                                      <span>
-                                        {language === "bn" ? "পেমেন্ট রিকোয়েস্ট সম্পন্ন করুন" : "Pay & Submit Ad Request"}
-                                      </span>
-                                    </>
-                                  )}
-                                </button>
-                              </div>
-                            </div>
-                          )}
+                          <div className="pt-2 border-t border-slate-100 dark:border-slate-800">
+                            <button
+                              id="dash-launch-campaign-btn"
+                              disabled={adPromoLoading || !adSelectedListingId}
+                              onClick={handleDashboardPromoSubmit}
+                              className="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-black py-3.5 rounded-xl transition text-xs flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed uppercase cursor-pointer"
+                            >
+                              {adPromoLoading ? (
+                                <>
+                                  <Loader2 className="w-4 h-4 animate-spin text-slate-950" />
+                                  <span>{language === "bn" ? "প্রসেস হচ্ছে..." : "Processing..."}</span>
+                                </>
+                              ) : (
+                                <>
+                                  <CreditCard className="w-4 h-4 text-slate-950" />
+                                  <span>
+                                    {language === "bn"
+                                      ? `৳${(selectedPromoPkg?.price || 0).toLocaleString()} পেমেন্ট করুন`
+                                      : `Pay ৳${(selectedPromoPkg?.price || 0).toLocaleString()}`}
+                                  </span>
+                                </>
+                              )}
+                            </button>
+                          </div>
 
                         </div>
                       </div>
@@ -3181,41 +2950,10 @@ export default function App() {
                         </h5>
 
                         <div className="bg-slate-900 border border-slate-800 text-white rounded-2xl p-5 space-y-5 font-sans relative">
-                          
-                          <div className="flex flex-col gap-2 pb-3 border-b border-slate-800">
-                            <span className="text-[10px] uppercase font-bold text-slate-400 block">
-                              {language === "bn" ? `আমাদের পার্সোনাল ${adPaymentMethod} নাম্বার:` : `Receiver ${adPaymentMethod} Number:`}
-                            </span>
-                            <div className="flex items-center justify-between">
-                              <span className="text-sm font-extrabold text-amber-400 font-mono select-all">
-                                {adPaymentMethod === 'bKash' 
-                                  ? ownerPaymentInfo.bkash 
-                                  : adPaymentMethod === 'Nagad' 
-                                  ? ownerPaymentInfo.nagad 
-                                  : ownerPaymentInfo.rocket}
-                              </span>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  let num = adPaymentMethod === 'bKash' 
-                                    ? ownerPaymentInfo.bkash 
-                                    : adPaymentMethod === 'Nagad' 
-                                    ? ownerPaymentInfo.nagad 
-                                    : ownerPaymentInfo.rocket;
-                                  navigator.clipboard.writeText(num.split(" ")[0]);
-                                  setAdPaymentCopied(true);
-                                  setTimeout(() => setAdPaymentCopied(false), 2000);
-                                }}
-                                className="p-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-slate-300 transition cursor-pointer"
-                                title="Copy Number"
-                              >
-                                {adPaymentCopied ? (
-                                  <Check className="w-3.5 h-3.5 text-emerald-400" />
-                                ) : (
-                                  <Copy className="w-3.5 h-3.5" />
-                                )}
-                              </button>
-                            </div>
+
+                          <div className="flex items-center gap-2 pb-3 border-b border-slate-800 text-emerald-400 text-xs font-bold uppercase tracking-wide">
+                            <Lock className="w-4 h-4" />
+                            <span>{language === "bn" ? "নিরাপদ UddoktaPay চেকআউট" : "Secure UddoktaPay Checkout"}</span>
                           </div>
 
                           <div className="space-y-2">
@@ -3251,17 +2989,17 @@ export default function App() {
                             <div className="p-3.5 bg-slate-950/40 border border-slate-800/80 rounded-xl text-[10px] text-slate-400 leading-normal space-y-1.5">
                               <div className="flex items-center gap-1.5 font-bold text-amber-400 uppercase tracking-wider">
                                 <ShieldCheck className="w-4 h-4 text-emerald-500 shrink-0" />
-                                <span>{language === "bn" ? "দিকনির্দেশনাবলী:" : "Simple Directions:"}</span>
+                                <span>{language === "bn" ? "কীভাবে কাজ করে:" : "How it works:"}</span>
                               </div>
                               <p>
-                                {language === "bn" 
-                                  ? `১. নির্বাচিত মোবাইল ব্যাংকিং চ্যানেলের নাম্বারে ৳${(selectedPromoPkg?.price || 0).toLocaleString()} টাকা "Send Money" করুন।`
-                                  : `1. Send exact amount of ৳${(selectedPromoPkg?.price || 0).toLocaleString()} BDT on the displayed number via Send Money.`}
+                                {language === "bn"
+                                  ? "বামের বাটনে ট্যাপ করে UddoktaPay-এর নিরাপদ bKash/Nagad/Rocket চেকআউট পেজে পেমেন্ট সম্পন্ন করুন।"
+                                  : "Tap the button on the left to complete payment via UddoktaPay's secure bKash/Nagad/Rocket checkout."}
                               </p>
                               <p>
-                                {language === "bn" 
-                                  ? `২. টাকা পাঠানোর পর আপনার ১১ ডিজিটের মোবাইল নম্বর এবং TrxID বসিয়ে সাবমিট করুন। আমাদের মালিক ভেরিফাই করলেই লাইভ শুরু হবে!`
-                                  : `2. Write down your sender phone number & Transaction ID (TxID) in the left form and submit. Real-time review takes 5 minutes.`}
+                                {language === "bn"
+                                  ? "পেমেন্ট নিশ্চিত হওয়া মাত্রই বিজ্ঞাপনটি স্বয়ংক্রিয়ভাবে লাইভ হয়ে যাবে — কোনো অপেক্ষা বা ম্যানুয়াল ভেরিফিকেশন লাগবে না।"
+                                  : "As soon as payment is confirmed, your ad goes live automatically — no waiting, no manual verification."}
                               </p>
                             </div>
                           </div>
@@ -4006,17 +3744,6 @@ export default function App() {
         currentUser={userMetadata || user}
         language={language}
       />
-
-      {/* 5. Simulated Direct Payment Portal for Campaign Promotions */}
-      {isAdPortalOpen && (
-        <SimulatedPaymentPortal
-          isOpen={isAdPortalOpen}
-          amount={Number(selectedPromoPkg?.price || 0)}
-          language={language}
-          onClose={() => setIsAdPortalOpen(false)}
-          onSuccess={handleInstantAdPromoSuccess}
-        />
-      )}
 
       {/* 6. Edit Listing Modal for Sellers */}
       <EditListingModal
