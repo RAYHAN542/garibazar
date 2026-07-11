@@ -2367,7 +2367,7 @@ export default function App() {
                   >
                     <Sparkles className="w-3.5 h-3.5" />
                     {language === "bn" ? "বিজ্ঞাপন" : "Ads"}
-                    <span className="absolute -top-1.5 -right-1.5 bg-gradient-to-r from-red-500 to-amber-500 text-white font-extrabold text-[7px] uppercase px-1 rounded-full">
+                    <span className="bg-gradient-to-r from-red-500 to-amber-500 text-white font-extrabold text-[7px] uppercase px-1 py-0.5 rounded-full leading-none">
                       LIVE
                     </span>
                   </button>
