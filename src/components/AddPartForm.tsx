@@ -279,23 +279,6 @@ export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPromp
         <div className="grid grid-cols-2 gap-3">
           <button
             type="button"
-            onClick={() => { setActiveTab("part"); setError(null); }}
-            className={`relative rounded-2xl border-2 px-3 py-3.5 flex flex-col items-center gap-1.5 transition-all ${
-              activeTab === "part" ? "border-sky-500 bg-sky-50 shadow-sm" : "border-gray-200 bg-white hover:border-gray-300"
-            }`}
-          >
-            {activeTab === "part" && (
-              <span className="absolute -top-2 -right-2 w-5 h-5 rounded-full bg-sky-500 text-white flex items-center justify-center shadow-sm">
-                <Check className="w-3 h-3" strokeWidth={3} />
-              </span>
-            )}
-            <img src={partsCardImg} alt="" className="w-full h-14 object-contain" />
-            <span className={`text-xs font-bold text-center leading-tight ${activeTab === "part" ? "text-sky-700" : "text-gray-500"}`}>
-              {language === "bn" ? "কার পার্টস কেনা/বেচা" : "Car Parts"}
-            </span>
-          </button>
-          <button
-            type="button"
             onClick={() => { setActiveTab("vehicle"); setError(null); }}
             className={`relative rounded-2xl border-2 px-3 py-3.5 flex flex-col items-center gap-1.5 transition-all ${
               activeTab === "vehicle" ? "border-amber-500 bg-amber-50 shadow-sm" : "border-gray-200 bg-white hover:border-gray-300"
@@ -308,7 +291,24 @@ export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPromp
             )}
             <img src={vehicleCardImg} alt="" className="w-full h-14 object-contain" />
             <span className={`text-xs font-bold text-center leading-tight ${activeTab === "vehicle" ? "text-amber-700" : "text-gray-500"}`}>
-              {language === "bn" ? "গাড়ি ও হেভি ইকুইপমেন্ট" : "Vehicles & Heavy Equipment"}
+              {language === "bn" ? "গাড়ি বেচা/কেনা" : "Vehicle Buy & Sell"}
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={() => { setActiveTab("part"); setError(null); }}
+            className={`relative rounded-2xl border-2 px-3 py-3.5 flex flex-col items-center gap-1.5 transition-all ${
+              activeTab === "part" ? "border-sky-500 bg-sky-50 shadow-sm" : "border-gray-200 bg-white hover:border-gray-300"
+            }`}
+          >
+            {activeTab === "part" && (
+              <span className="absolute -top-2 -right-2 w-5 h-5 rounded-full bg-sky-500 text-white flex items-center justify-center shadow-sm">
+                <Check className="w-3 h-3" strokeWidth={3} />
+              </span>
+            )}
+            <img src={partsCardImg} alt="" className="w-full h-14 object-contain" />
+            <span className={`text-xs font-bold text-center leading-tight ${activeTab === "part" ? "text-sky-700" : "text-gray-500"}`}>
+              {language === "bn" ? "গাড়ির পাট" : "Vehicle Parts"}
             </span>
           </button>
         </div>
