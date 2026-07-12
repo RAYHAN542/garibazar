@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { SupportedLanguage } from "../types";
-import { Camera, Loader2, AlertTriangle, X } from "lucide-react";
+import { Camera, Loader2, AlertTriangle, X, Check } from "lucide-react";
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "../firebase";
 import { sanitizeText, validatePriceInput } from "../utils/sanitizer";
@@ -231,15 +231,6 @@ export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPromp
 
   return (
     <div className="max-w-2xl mx-auto bg-white p-4 rounded-xl shadow-sm">
-      <div className="flex gap-2 mb-6 bg-gray-100 p-1 rounded-lg">
-        <button type="button" onClick={() => { setActiveTab("part"); setError(null); }} className={`flex-1 py-2 rounded-md font-medium text-sm flex items-center justify-center gap-2 ${activeTab === "part" ? "bg-white text-orange-600 shadow-sm" : "text-gray-600"}`}>
-          🔧 {language === "bn" ? "কার পার্টস কেনা/বেচা" : "Car Parts"}
-        </button>
-        <button type="button" onClick={() => { setActiveTab("vehicle"); setError(null); }} className={`flex-1 py-2 rounded-md font-medium text-sm flex items-center justify-center gap-2 ${activeTab === "vehicle" ? "bg-white text-orange-600 shadow-sm" : "text-gray-600"}`}>
-          🚜 {language === "bn" ? "গাড়ি ও হেভি ইকুইপমেন্ট" : "Vehicles & Heavy Equipment"}
-        </button>
-      </div>
-
       {error && (
         <div className="mb-4 bg-red-50 text-red-600 p-3 rounded-lg flex items-center gap-2 text-sm">
           <AlertTriangle className="w-4 h-4 flex-shrink-0" />
@@ -281,6 +272,43 @@ export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPromp
             )}
           </div>
           <input type="file" ref={fileInputRef} onChange={handleImageSelect} multiple accept="image/*" className="hidden" />
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <button
+            type="button"
+            onClick={() => { setActiveTab("part"); setError(null); }}
+            className={`relative rounded-2xl border-2 px-3 py-3.5 flex flex-col items-center gap-1.5 transition-all ${
+              activeTab === "part" ? "border-sky-500 bg-sky-50 shadow-sm" : "border-gray-200 bg-white hover:border-gray-300"
+            }`}
+          >
+            {activeTab === "part" && (
+              <span className="absolute -top-2 -right-2 w-5 h-5 rounded-full bg-sky-500 text-white flex items-center justify-center shadow-sm">
+                <Check className="w-3 h-3" strokeWidth={3} />
+              </span>
+            )}
+            <span className="text-2xl leading-none">🔧</span>
+            <span className={`text-xs font-bold text-center leading-tight ${activeTab === "part" ? "text-sky-700" : "text-gray-500"}`}>
+              {language === "bn" ? "কার পার্টস কেনা/বেচা" : "Car Parts"}
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={() => { setActiveTab("vehicle"); setError(null); }}
+            className={`relative rounded-2xl border-2 px-3 py-3.5 flex flex-col items-center gap-1.5 transition-all ${
+              activeTab === "vehicle" ? "border-amber-500 bg-amber-50 shadow-sm" : "border-gray-200 bg-white hover:border-gray-300"
+            }`}
+          >
+            {activeTab === "vehicle" && (
+              <span className="absolute -top-2 -right-2 w-5 h-5 rounded-full bg-amber-500 text-white flex items-center justify-center shadow-sm">
+                <Check className="w-3 h-3" strokeWidth={3} />
+              </span>
+            )}
+            <span className="text-2xl leading-none">🚜</span>
+            <span className={`text-xs font-bold text-center leading-tight ${activeTab === "vehicle" ? "text-amber-700" : "text-gray-500"}`}>
+              {language === "bn" ? "গাড়ি ও হেভি ইকুইপমেন্ট" : "Vehicles & Heavy Equipment"}
+            </span>
+          </button>
         </div>
 
           <div>
