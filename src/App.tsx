@@ -668,6 +668,69 @@ export default function App() {
     }
   }, []);
 
+  // 1b. Fallback: Firebase's own auth state listener.
+  // getRedirectResult() inside AuthModal can miss the result after a Google
+  // sign-in redirect (slow chunk load, WebView storage quirks, etc). This
+  // listener is the safety net — whenever Firebase reports a signed-in user
+  // but we don't have a local session for them yet, we build one here so the
+  // user never gets stuck "signed in with Google" but "logged out" in the app.
+  useEffect(() => {
+    const unsubscribeAuth = onAuthStateChanged(auth, async (fbUser) => {
+      if (!fbUser) return;
+
+      const alreadyHaveSession = !!localStorage.getItem("gari_bazar_session_user");
+      if (alreadyHaveSession) return;
+
+      try {
+        const userDocRef = doc(db, "users", fbUser.uid);
+        const userSnap = await getDoc(userDocRef);
+
+        let sessionUser: any;
+        if (userSnap.exists()) {
+          const existingData = userSnap.data() as any;
+          sessionUser = {
+            uid: fbUser.uid,
+            displayName: existingData.displayName,
+            email: existingData.email || fbUser.email,
+            phoneNumber: existingData.phoneNumber,
+            city: existingData.city,
+            profilePicture: existingData.profilePicture || fbUser.photoURL,
+            simulatedCredits: existingData.simulatedCredits ?? 5000,
+            referralCode: existingData.referralCode,
+          };
+        } else {
+          // No Firestore profile yet (e.g. brand-new Google user whose
+          // redirect result was missed before the profile step ran).
+          // Create a minimal profile so they aren't left in limbo; they can
+          // still fill in phone/city later from their Profile tab.
+          sessionUser = {
+            uid: fbUser.uid,
+            displayName: fbUser.displayName || "",
+            email: fbUser.email || "",
+            phoneNumber: "",
+            city: "",
+            profilePicture: fbUser.photoURL || "",
+            simulatedCredits: 5000,
+          };
+          await setDoc(userDocRef, sessionUser, { merge: true });
+        }
+
+        localStorage.setItem("gari_bazar_session_user", JSON.stringify(sessionUser));
+        setUser({
+          uid: sessionUser.uid,
+          displayName: sessionUser.displayName,
+          email: sessionUser.email,
+          photoURL: sessionUser.profilePicture,
+        });
+        setUserMetadata(sessionUser);
+      } catch (err) {
+        console.error("Auth state fallback sync failed:", err);
+      }
+    });
+
+    return () => unsubscribeAuth();
+  }, []);
+
   // Fetch dynamic payment info from database for the dashboard
   useEffect(() => {
     const docRef = doc(db, "settings", "payment_info");
