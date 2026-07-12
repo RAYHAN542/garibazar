@@ -42,7 +42,11 @@ function getTimeAgo(createdAt: any, language: SupportedLanguage): string {
 
 export function ListingCard({ listing, language, onViewDetails, onPromoteClick }: ListingCardProps) {
   const isAd = listing.isAd;
-  const isVehicle = listing.category === "vehicles";
+  const isVehicle = (listing as any).type === "vehicle"
+    ? true
+    : (listing as any).type === "part"
+    ? false
+    : listing.category === "vehicles";
   const categoryLabel = isVehicle
     ? (language === "bn" ? "গাড়ি" : "Vehicle")
     : (language === "bn" ? "পার্ট" : "Part");

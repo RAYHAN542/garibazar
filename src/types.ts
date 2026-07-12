@@ -3,6 +3,7 @@ export interface PartListing {
   title: string;
   category: string;
   subCategory?: string;
+  type?: string; // 'vehicle' | 'part' - set at creation, authoritative for badge/filtering
   brand?: string;
   model: string;
   price: number; // in BDT (৳)

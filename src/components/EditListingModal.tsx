@@ -48,7 +48,7 @@ export function EditListingModal({
     if (!price.trim() || !model.trim() || !title.trim() || !location.trim() || !description.trim()) {
       setError(
         language === "bn"
-          ? "দয়া করে প্রয়োজনীয় সব তথ্য প্রদান করুন"
+          ? "দয়া করে প্রয়োজনীয় সব তথ্য প্রদান করুন"
           : "Please specify title, price, model, location, and description"
       );
       return;
@@ -113,8 +113,8 @@ export function EditListingModal({
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-slate-150 dark:border-slate-800">
           <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-wider font-sans">
-            {listing.category === "vehicles"
-              ? (language === "bn" ? "গাড়ি ও ভারী যন্ত্রপাতি সম্পাদনা" : "Edit Vehicle Listing")
+            {((listing as any).type === "vehicle" || listing.category === "vehicles")
+              ? (language === "bn" ? "গাড়ি ও ভারী যন্ত্রপাতি সম্পাদনা" : "Edit Vehicle Listing")
               : (language === "bn" ? "পার্ট লিস্ট সম্পাদনা" : "Edit Part Listing")}
           </h3>
           <button
@@ -137,8 +137,8 @@ export function EditListingModal({
           <div className="space-y-4 max-h-[360px] overflow-y-auto pr-1">
             <div>
               <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block mb-1">
-                {listing.category === "vehicles"
-                  ? (language === "bn" ? "গাড়ি/যন্ত্রপাতির নাম বা টাইটেল *" : "Vehicle / Equipment Title *")
+                {((listing as any).type === "vehicle" || listing.category === "vehicles")
+                  ? (language === "bn" ? "গাড়ি/যন্ত্রপাতির নাম বা টাইটেল *" : "Vehicle / Equipment Title *")
                   : (language === "bn" ? "পার্ট লিস্টিং টাইটেল *" : "Part Listing Title *")}
               </label>
               <input
@@ -161,15 +161,15 @@ export function EditListingModal({
                   onChange={(e) => setCategory(e.target.value)}
                   className="w-full px-3 py-2.5 border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 rounded-xl text-xs text-slate-900 dark:text-white font-bold focus:outline-none"
                 >
-                  {listing.category === "vehicles" ? (
-                    <option value="vehicles">{language === "bn" ? "গাড়ি ও হেভি ইকুইপমেন্ট" : "Vehicles & Equipment"}</option>
+                  {((listing as any).type === "vehicle" || listing.category === "vehicles") ? (
+                    <option value="vehicles">{language === "bn" ? "গাড়ি ও হেভি ইকুইপমেন্ট" : "Vehicles & Equipment"}</option>
                   ) : (
                     <>
                       <option value="general">{language === "bn" ? "সাধারণ পার্টস (General)" : "General Parts"}</option>
                       <option value="engine">{language === "bn" ? "ইঞ্জিন পার্টস (Engine)" : "Engine & Transmission"}</option>
-                      <option value="wheels">{language === "bn" ? "টায়ার ও হুইল (Wheels)" : "Tyres & Wheels"}</option>
-                      <option value="interior">{language === "bn" ? "ইন্টেরিয়র পার্টস (Interior)" : "Interior Accessories"}</option>
-                      <option value="exterior">{language === "bn" ? "এক্সটেরিয়র বডি (Exterior)" : "Exterior Body"}</option>
+                      <option value="wheels">{language === "bn" ? "টায়ার ও হুইল (Wheels)" : "Tyres & Wheels"}</option>
+                      <option value="interior">{language === "bn" ? "ইন্টেরিয়র পার্টস (Interior)" : "Interior Accessories"}</option>
+                      <option value="exterior">{language === "bn" ? "এক্সটেরিয়র বডি (Exterior)" : "Exterior Body"}</option>
                     </>
                   )}
                 </select>
@@ -193,7 +193,7 @@ export function EditListingModal({
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block mb-1">
-                  {listing.category === "vehicles"
+                  {((listing as any).type === "vehicle" || listing.category === "vehicles")
                     ? (language === "bn" ? "দাম (টাকা) *" : "Price (BDT / ৳) *")
                     : (language === "bn" ? "কার পার্টস এর দাম (টাকা) *" : "Price (BDT / ৳) *")}
                 </label>
@@ -207,10 +207,10 @@ export function EditListingModal({
                 />
               </div>
 
-              {listing.category !== "vehicles" ? (
+              {!((listing as any).type === "vehicle" || listing.category === "vehicles") ? (
                 <div>
                   <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block mb-1">
-                    {language === "bn" ? "গাড়ির মডেল কি *" : "Compatible Car Model *"}
+                    {language === "bn" ? "গাড়ির মডেল কি *" : "Compatible Car Model *"}
                   </label>
                   <input
                     type="text"

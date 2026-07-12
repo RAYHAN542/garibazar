@@ -123,6 +123,9 @@ const checkIsProduction = (): boolean => {
 
 const isItemVehicle = (item: PartListing): boolean => {
   if (!item) return false;
+  // Authoritative signal: set once at posting time in AddPartForm.tsx
+  if ((item as any).type === "vehicle") return true;
+  if ((item as any).type === "part") return false;
   if (item.category === "vehicles") return true;
   if (item.category === "spare_parts") return false;
   
