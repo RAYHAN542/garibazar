@@ -314,17 +314,40 @@ export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPromp
         </div>
 
           <div>
-            <label className="block text-xs font-semibold text-gray-700 mb-1">{language === "bn" ? "১. মূল্য (BDT) *" : "1. Price (BDT) *"}</label>
+            <label className="block text-xs font-semibold text-gray-700 mb-1">
+              {activeTab === "part"
+                ? (language === "bn" ? "১. পার্টসের মূল্য (BDT) *" : "1. Part Price (BDT) *")
+                : (language === "bn" ? "১. গাড়ির মূল্য (BDT) *" : "1. Vehicle Price (BDT) *")}
+            </label>
             <input type="number" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="৳" className="w-full px-3 py-2 border rounded-lg text-sm bg-white text-gray-900 focus:outline-none focus:border-orange-500" required />
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-semibold text-gray-700 mb-1">{language === "bn" ? "২. মডেল *" : "2. Model *"}</label>
-              <input type="text" value={model} onChange={(e) => setModel(e.target.value)} placeholder={language === "bn" ? "যেমন: টয়োটা এক্সিও ২০১৮" : "e.g. Toyota Axio 2018"} className="w-full px-3 py-2 border rounded-lg text-sm bg-white text-gray-900 focus:outline-none focus:border-orange-500" required />
+              <label className="block text-xs font-semibold text-gray-700 mb-1">
+                {activeTab === "part"
+                  ? (language === "bn" ? "২. পার্টসের নাম *" : "2. Part Name *")
+                  : (language === "bn" ? "২. গাড়ির মডেল *" : "2. Vehicle Model *")}
+              </label>
+              <input
+                type="text"
+                value={model}
+                onChange={(e) => setModel(e.target.value)}
+                placeholder={
+                  activeTab === "part"
+                    ? (language === "bn" ? "যেমন: ব্রেক প্যাড, ইঞ্জিন অয়েল ফিল্টার" : "e.g. Brake Pad, Engine Oil Filter")
+                    : (language === "bn" ? "যেমন: টয়োটা এক্সিও ২০১৮" : "e.g. Toyota Axio 2018")
+                }
+                className="w-full px-3 py-2 border rounded-lg text-sm bg-white text-gray-900 focus:outline-none focus:border-orange-500"
+                required
+              />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-gray-700 mb-1">{language === "bn" ? "৩. ক্যাটাগরি *" : "3. Category *"}</label>
+              <label className="block text-xs font-semibold text-gray-700 mb-1">
+                {activeTab === "part"
+                  ? (language === "bn" ? "৩. পার্টস ক্যাটাগরি *" : "3. Part Category *")
+                  : (language === "bn" ? "৩. গাড়ির ক্যাটাগরি *" : "3. Vehicle Category *")}
+              </label>
               <select value={category} onChange={(e) => setCategory(e.target.value)} className="w-full px-3 py-2 border rounded-lg text-sm bg-white text-gray-900 focus:outline-none focus:border-orange-500" required>
                 <option value="">{language === "bn" ? "-- সিলেক্ট করুন --" : "-- Select --"}</option>
                 {activeTab === "part" ? (
@@ -356,18 +379,41 @@ export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPromp
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-gray-700 mb-1">{language === "bn" ? "৪. মোবাইল নাম্বার *" : "4. Mobile Number *"}</label>
+            <label className="block text-xs font-semibold text-gray-700 mb-1">
+              {activeTab === "part"
+                ? (language === "bn" ? "৪. পার্টস বিক্রেতার মোবাইল নাম্বার *" : "4. Part Seller's Mobile Number *")
+                : (language === "bn" ? "৪. গাড়ি বিক্রেতার মোবাইল নাম্বার *" : "4. Vehicle Seller's Mobile Number *")}
+            </label>
             <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} className="w-full px-3 py-2 border rounded-lg text-sm bg-white text-gray-900 focus:outline-none focus:border-orange-500" required />
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-gray-700 mb-1">{language === "bn" ? "৫. লোকেশন / ঠিকানা *" : "5. Location *"}</label>
+            <label className="block text-xs font-semibold text-gray-700 mb-1">
+              {activeTab === "part"
+                ? (language === "bn" ? "৫. পার্টসের অবস্থান / ঠিকানা *" : "5. Part Location *")
+                : (language === "bn" ? "৫. গাড়ির অবস্থান / ঠিকানা *" : "5. Vehicle Location *")}
+            </label>
             <input type="text" value={location} onChange={(e) => setLocation(e.target.value)} placeholder={language === "bn" ? "যেমন: ঢাকা, চট্টগ্রাম" : "e.g. Dhaka"} className="w-full px-3 py-2 border rounded-lg text-sm bg-white text-gray-900 focus:outline-none focus:border-orange-500" required />
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-gray-700 mb-1">{language === "bn" ? "৬. বিস্তারিত বিবরণ *" : "6. Description *"}</label>
-            <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} placeholder={language === "bn" ? "পণ্যটির অবস্থা এবং বিস্তারিত লিখুন..." : "Describe item condition..."} className="w-full px-3 py-2 border rounded-lg text-sm bg-white text-gray-900 focus:outline-none focus:border-orange-500" required />
+            <label className="block text-xs font-semibold text-gray-700 mb-1">
+              {activeTab === "part"
+                ? (language === "bn" ? "৬. পার্টসের বিস্তারিত বিবরণ *" : "6. Part Description *")
+                : (language === "bn" ? "৬. গাড়ির বিস্তারিত বিবরণ *" : "6. Vehicle Description *")}
+            </label>
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              rows={3}
+              placeholder={
+                activeTab === "part"
+                  ? (language === "bn" ? "পার্টসের অবস্থা এবং বিস্তারিত লিখুন..." : "Describe part condition...")
+                  : (language === "bn" ? "গাড়ির অবস্থা এবং বিস্তারিত লিখুন..." : "Describe vehicle condition...")
+              }
+              className="w-full px-3 py-2 border rounded-lg text-sm bg-white text-gray-900 focus:outline-none focus:border-orange-500"
+              required
+            />
           </div>
 
         <button type="submit" disabled={isSubmitting || images.some(img => img.status === "uploading")} className="w-full py-3 bg-orange-500 text-white font-semibold rounded-xl text-sm shadow-sm hover:bg-orange-600 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2">
