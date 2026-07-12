@@ -420,14 +420,4 @@ export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPromp
           {isSubmitting ? (
             <>
               <Loader2 className="w-4 h-4 animate-spin" />
-              <span>{language === "bn" ? "লিস্টিং আপলোড হচ্ছে..." : "Submitting..."}</span>
-            </>
-          ) : (
-            <span>{language === "bn" ? "বিজ্ঞাপনটি পোস্ট করুন" : "Submit Advertisement"}</span>
-          )}
-        </button>
-      </form>
-    </div>
-  );
-  }
-                      
+              <span>{language === "bn" ? "লিস্টিং আপলোড হচ্ছ
