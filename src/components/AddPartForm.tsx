@@ -4,6 +4,8 @@ import { Camera, Loader2, AlertTriangle, X, Check } from "lucide-react";
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "../firebase";
 import { sanitizeText, validatePriceInput } from "../utils/sanitizer";
+import vehicleCardImg from "../assets/images/vehicle-card-new.png";
+import partsCardImg from "../assets/images/parts-card-new.png";
 
 interface AddPartFormProps {
   language: SupportedLanguage;
@@ -287,7 +289,7 @@ export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPromp
                 <Check className="w-3 h-3" strokeWidth={3} />
               </span>
             )}
-            <span className="text-2xl leading-none">🔧</span>
+            <img src={partsCardImg} alt="" className="w-full h-14 object-contain" />
             <span className={`text-xs font-bold text-center leading-tight ${activeTab === "part" ? "text-sky-700" : "text-gray-500"}`}>
               {language === "bn" ? "কার পার্টস কেনা/বেচা" : "Car Parts"}
             </span>
@@ -304,7 +306,7 @@ export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPromp
                 <Check className="w-3 h-3" strokeWidth={3} />
               </span>
             )}
-            <span className="text-2xl leading-none">🚜</span>
+            <img src={vehicleCardImg} alt="" className="w-full h-14 object-contain" />
             <span className={`text-xs font-bold text-center leading-tight ${activeTab === "vehicle" ? "text-amber-700" : "text-gray-500"}`}>
               {language === "bn" ? "গাড়ি ও হেভি ইকুইপমেন্ট" : "Vehicles & Heavy Equipment"}
             </span>

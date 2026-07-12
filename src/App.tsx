@@ -70,6 +70,8 @@ const SellerShopPage = lazy(() => import("./components/SellerShopPage").then(m =
 import Fuse from "fuse.js";
 import { buildSearchBlob, convertBengaliDigitsToEnglish, convertEnglishDigitsToBengali, toPhoneticKey } from "./searchAliases";
 import { MessageSquare, Cpu, SlidersHorizontal, Moon, Sun, Users, HelpCircle, Mail, FileText, ArrowRight, Menu, Download, ChevronDown, Lock, CreditCard } from "lucide-react";
+import vehicleCardImg from "./assets/images/vehicle-card-new.png";
+import partsCardImg from "./assets/images/parts-card-new.png";
 
 const HOME_CATEGORIES = [
   { id: "all", bnName: "সব ক্যাটাগরি", enName: "All Categories" },
@@ -1891,21 +1893,28 @@ export default function App() {
                 setSelectedCategory(nextCat);
                 setSelectedSubCategory("all");
               }}
-              className={`relative rounded-2xl border-2 px-3 py-4 flex flex-col items-center gap-1.5 cursor-pointer transition-all duration-150 bg-white dark:bg-gradient-to-br dark:from-slate-900 dark:to-slate-800 ${
+              className={`relative overflow-hidden rounded-2xl p-2 flex flex-col text-left cursor-pointer bg-white dark:bg-gradient-to-br dark:from-slate-900 dark:to-slate-800 shadow-sm transition-all duration-150 ${
                 selectedCategory === "vehicles"
-                  ? "border-amber-500 bg-amber-50 dark:bg-amber-500/10 shadow-sm scale-[0.98]"
-                  : "border-amber-200/60 dark:border-slate-700 hover:border-amber-300"
+                  ? "ring-2 ring-amber-500 ring-offset-2 dark:ring-offset-slate-950 scale-[0.98]"
+                  : "ring-1 ring-amber-200/60 dark:ring-slate-700"
               }`}
             >
-              {selectedCategory === "vehicles" && (
-                <span className="absolute -top-2 -right-2 w-5 h-5 rounded-full bg-amber-500 text-white flex items-center justify-center shadow-sm z-10">
-                  <Check className="w-3 h-3" strokeWidth={3} />
-                </span>
-              )}
-              <span className="text-2xl leading-none">🚗</span>
-              <span className="text-xs font-bold text-center leading-tight text-amber-800 dark:text-amber-300">
+              <span className="font-black text-[15px] text-amber-800 dark:text-amber-300 leading-tight">
                 {language === "bn" ? "গাড়ি বেচা/কেনা" : "Vehicle Buy & Sell"}
               </span>
+              <span className="text-[10px] font-bold text-amber-700/70 dark:text-amber-400/70 leading-snug mt-0.5 mb-1">
+                {language === "bn" ? "এক্সক্যাভেটর, ট্রাক, কার ও অন্যান্য নির্মাণ যানবাহন কিনুন বা বিক্রি করুন সহজে ও নিরাপদে" : "Buy or sell excavators, trucks, cars and other construction vehicles safely"}
+              </span>
+              <img
+                src={vehicleCardImg}
+                alt={language === "bn" ? "গাড়ি বেচা/কেনা" : "Vehicle Buy & Sell"}
+                className="w-full h-auto max-h-28 object-contain mt-auto"
+              />
+              {selectedCategory === "vehicles" && (
+                <span className="absolute top-2 right-2 w-6 h-6 rounded-full bg-amber-500 text-white flex items-center justify-center shadow-md z-10">
+                  <Check className="w-3.5 h-3.5" />
+                </span>
+              )}
             </button>
 
             <button
@@ -1914,21 +1923,28 @@ export default function App() {
                 setSelectedCategory(nextCat);
                 setSelectedSubCategory("all");
               }}
-              className={`relative rounded-2xl border-2 px-3 py-4 flex flex-col items-center gap-1.5 cursor-pointer transition-all duration-150 bg-white dark:bg-gradient-to-br dark:from-slate-900 dark:to-slate-800 ${
+              className={`relative overflow-hidden rounded-2xl p-2 flex flex-col text-left cursor-pointer bg-white dark:bg-gradient-to-br dark:from-slate-900 dark:to-slate-800 shadow-sm transition-all duration-150 ${
                 selectedCategory === "spare_parts"
-                  ? "border-sky-500 bg-sky-50 dark:bg-sky-500/10 shadow-sm scale-[0.98]"
-                  : "border-sky-200/60 dark:border-slate-700 hover:border-sky-300"
+                  ? "ring-2 ring-sky-500 ring-offset-2 dark:ring-offset-slate-950 scale-[0.98]"
+                  : "ring-1 ring-sky-200/60 dark:ring-slate-700"
               }`}
             >
-              {selectedCategory === "spare_parts" && (
-                <span className="absolute -top-2 -right-2 w-5 h-5 rounded-full bg-sky-600 text-white flex items-center justify-center shadow-sm z-10">
-                  <Check className="w-3 h-3" strokeWidth={3} />
-                </span>
-              )}
-              <span className="text-2xl leading-none">🔧</span>
-              <span className="text-xs font-bold text-center leading-tight text-sky-800 dark:text-sky-300">
+              <span className="font-black text-[15px] text-sky-800 dark:text-sky-300 leading-tight">
                 {language === "bn" ? "গাড়ির পাট" : "Vehicle Parts"}
               </span>
+              <span className="text-[10px] font-bold text-sky-700/70 dark:text-sky-400/70 leading-snug mt-0.5 mb-1">
+                {language === "bn" ? "ইঞ্জিন, হাইড্রোলিক পাম্প, গিয়ারবক্স, ফিল্টার, ব্যাটারি ও আরও অনেক কিছু" : "Engines, hydraulic pumps, gearboxes, filters, batteries & more"}
+              </span>
+              <img
+                src={partsCardImg}
+                alt={language === "bn" ? "গাড়ির পাট" : "Vehicle Parts"}
+                className="w-full h-auto max-h-28 object-contain mt-auto"
+              />
+              {selectedCategory === "spare_parts" && (
+                <span className="absolute top-2 right-2 w-6 h-6 rounded-full bg-sky-600 text-white flex items-center justify-center shadow-md z-10">
+                  <Check className="w-3.5 h-3.5" />
+                </span>
+              )}
             </button>
           </div>
 
