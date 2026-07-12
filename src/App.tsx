@@ -150,10 +150,38 @@ const isItemVehicle = (item: PartListing): boolean => {
 };
 
 export default function App() {
-  const [language, setLanguage] = useState<SupportedLanguage>("bn"); // DEFAULT to Bengali as requested
-  const [activeTab, setActiveTab] = useState<'market' | 'saved' | 'sell' | 'my-dashboard' | 'chats' | 'profile'>('market');
+  const [language, setLanguage] = useState<SupportedLanguage>(() => {
+    try {
+      const saved = localStorage.getItem("gari_bazar_language");
+      if (saved === "bn" || saved === "en") return saved as SupportedLanguage;
+    } catch (e) {}
+    return "bn"; // DEFAULT to Bengali as requested
+  });
+  const [activeTab, setActiveTab] = useState<'market' | 'saved' | 'sell' | 'my-dashboard' | 'chats' | 'profile'>(() => {
+    try {
+      const saved = localStorage.getItem("gari_bazar_active_tab");
+      const validTabs = ['market', 'saved', 'sell', 'my-dashboard', 'chats', 'profile'];
+      if (saved && validTabs.includes(saved)) {
+        return saved as 'market' | 'saved' | 'sell' | 'my-dashboard' | 'chats' | 'profile';
+      }
+    } catch (e) {}
+    return 'market';
+  });
   const [savedListingIds, setSavedListingIds] = useState<string[]>([]);
   const [initialListingToChat, setInitialListingToChat] = useState<PartListing | null>(null);
+  
+  // Persist language & active tab so a reload keeps the user where they were
+  useEffect(() => {
+    try {
+      localStorage.setItem("gari_bazar_language", language);
+    } catch (e) {}
+  }, [language]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("gari_bazar_active_tab", activeTab);
+    } catch (e) {}
+  }, [activeTab]);
   
   // Dashboard Sub-tab & Ad promotions center states
   const [dashboardSubTab, setDashboardSubTab] = useState<'inventory' | 'ads' | 'admin' | 'playstore-audit' | 'my-shop'>('inventory');
