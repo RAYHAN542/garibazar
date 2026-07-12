@@ -161,7 +161,24 @@ export default function App() {
     setLanguageState(lang);
     localStorage.setItem("gari_bazar_language", lang);
   };
-  const [activeTab, setActiveTab] = useState<'market' | 'saved' | 'sell' | 'my-dashboard' | 'chats' | 'profile'>('market');
+  const [activeTab, setActiveTab] = useState<'market' | 'saved' | 'sell' | 'my-dashboard' | 'chats' | 'profile'>(() => {
+    const validTabs = ['market', 'saved', 'sell', 'my-dashboard', 'chats', 'profile'];
+    const stored = localStorage.getItem("gari_bazar_active_tab");
+    const hasSession = !!localStorage.getItem("gari_bazar_session_user");
+    if (stored && validTabs.includes(stored)) {
+      // Tabs that require a logged-in user shouldn't be restored for a logged-out session
+      if ((stored === 'my-dashboard' || stored === 'profile' || stored === 'chats') && !hasSession) {
+        return 'market';
+      }
+      return stored as 'market' | 'saved' | 'sell' | 'my-dashboard' | 'chats' | 'profile';
+    }
+    return 'market';
+  });
+
+  // Persist the active tab so a reload keeps the user on the same page instead of resetting to Market
+  useEffect(() => {
+    localStorage.setItem("gari_bazar_active_tab", activeTab);
+  }, [activeTab]);
   const [savedListingIds, setSavedListingIds] = useState<string[]>([]);
   const [initialListingToChat, setInitialListingToChat] = useState<PartListing | null>(null);
   
