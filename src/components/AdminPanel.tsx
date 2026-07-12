@@ -41,7 +41,14 @@ interface AdminPanelProps {
   isUserAdmin: boolean;
 }
 
-export function AdminPanel({ language, currentUser, listings, isUserAdmin }: AdminPanelProps) {
+export function AdminPanel({ language, currentUser, listings: listingsProp, isUserAdmin }: AdminPanelProps) {
+  // Local mirror of the listings prop so we can optimistically remove
+  // deleted items instantly without waiting for a full page reload.
+  const [listings, setListings] = useState<any[]>(listingsProp);
+  useEffect(() => {
+    setListings(listingsProp);
+  }, [listingsProp]);
+
   // Enforce secure lock immediately
   if (!isUserAdmin) {
     return (
@@ -261,6 +268,9 @@ export function AdminPanel({ language, currentUser, listings, isUserAdmin }: Adm
 
     try {
       await deleteDoc(doc(db, "listings", listingId));
+      // Remove instantly from the local list so the admin sees the
+      // updated count/grid without needing to reload the page.
+      setListings((prev) => prev.filter((l) => l.id !== listingId));
       setActionSuccessMsg(
         language === "bn"
           ? "লিস্টিংটি সফলভাবে গেটওয়ে ও ডাটাবেস থেকে মুছে ফেলা হয়েছে!"
@@ -613,9 +623,17 @@ export function AdminPanel({ language, currentUser, listings, isUserAdmin }: Adm
                     <div className="p-4 space-y-3">
                       <div className="flex gap-3">
                         <img
-                          src={item.image}
+                          src={
+                            item.image ||
+                            (item.images && item.images.length > 0 ? item.images[0] : "") ||
+                            "https://images.unsplash.com/photo-1506015391300-4802dc74de2e?w=200&auto=format&fit=crop&q=60"
+                          }
                           alt={item.title}
                           referrerPolicy="no-referrer"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).src =
+                              "https://images.unsplash.com/photo-1506015391300-4802dc74de2e?w=200&auto=format&fit=crop&q=60";
+                          }}
                           className="w-16 h-16 rounded-xl object-cover border border-slate-250 dark:border-slate-800 bg-slate-100 shrink-0"
                         />
                         <div className="min-w-0 flex-1">
