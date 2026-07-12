@@ -88,6 +88,26 @@ const compressImageToBlob = async (file: File, maxWidth = 1200, maxHeight = 1200
   }
 };
 
+// Maps the specific dropdown selection to the parent category the rest of the
+// app (filters, tabs) actually understands: "vehicles" or one of the parts buckets.
+const PART_CATEGORY_MAP: Record<string, string> = {
+  Engine: "engine",
+  Suspension: "general",
+  Body: "exterior",
+  Interior: "interior",
+  Electrical: "general",
+  other: "general"
+};
+
+// Maps the specific vehicle selection to the subCategory id used for sub-filtering.
+const VEHICLE_SUBCATEGORY_MAP: Record<string, string> = {
+  Car: "car",
+  Excavator: "excavator",
+  Truck: "other_heavy_equipment",
+  Forklift: "forklift",
+  other: "other_heavy_equipment"
+};
+
 export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPrompt, onViewListing }: AddPartFormProps) {
   const [activeTab, setActiveTab] = useState<"part" | "vehicle">("part");
   const [title, setTitle] = useState("");
@@ -199,11 +219,21 @@ export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPromp
       const cleanPhone = phone ? sanitizeText(phone) : "";
       const cleanPrice = price ? validatePriceInput(price) : "0";
 
+    // Normalize the specific selection into the parent category ("vehicles" or a
+    // parts bucket) and a subCategory id, matching what the rest of the app expects
+    // for filtering listings into the correct tab.
+    const parentCategory = activeTab === "vehicle" ? "vehicles" : (PART_CATEGORY_MAP[category] || "general");
+    const normalizedSubCategory = activeTab === "vehicle"
+      ? (VEHICLE_SUBCATEGORY_MAP[category] || "other_heavy_equipment")
+      : category.toLowerCase();
+
     const collectionName = "listings";
       const docRef = await addDoc(collection(db, collectionName), {
         title: cleanTitle,
         model: model,
-        category,
+        category: parentCategory,
+        subCategory: normalizedSubCategory,
+        partCategory: category,
         brand: cleanBrand,
         condition,
         price: parseFloat(cleanPrice) || 0,
@@ -219,7 +249,7 @@ export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPromp
       });
 
       if (onViewListing) {
-        onViewListing({ id: docRef.id, title, price, images: uploadedUrls, location, category, type: activeTab });
+        onViewListing({ id: docRef.id, title, price, images: uploadedUrls, location, category: parentCategory, subCategory: normalizedSubCategory, type: activeTab });
       }
       window.dispatchEvent(new Event("gari_bazar_refreshed_data"));
       onPostSuccess();
@@ -420,4 +450,14 @@ export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPromp
           {isSubmitting ? (
             <>
               <Loader2 className="w-4 h-4 animate-spin" />
-              <span>{language === "bn" ? "লিস্টিং আপলোড হচ্ছ
+              <span>{language === "bn" ? "লিস্টিং আপলোড হচ্ছে..." : "Submitting..."}</span>
+            </>
+          ) : (
+            <span>{language === "bn" ? "বিজ্ঞাপনটি পোস্ট করুন" : "Submit Advertisement"}</span>
+          )}
+        </button>
+      </form>
+    </div>
+  );
+  }
+                      
