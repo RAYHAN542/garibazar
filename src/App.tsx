@@ -1811,7 +1811,7 @@ export default function App() {
                     {/* মোবাইলে হেডার বাদ দেওয়ার পর, 🔔 নোটিফিকেশন বাটন সার্চ বারের পাশে বসানো হলো */}
                     <button
                       type="button"
-                      onClick={() => setShowNotificationPrompt(true)}
+                      onClick={() => setActiveTab('chats')}
                       className="md:hidden relative p-3 w-11 h-11 rounded-2xl border bg-white dark:bg-slate-900 border-slate-150 dark:border-slate-800 text-slate-600 dark:text-slate-300 flex items-center justify-center cursor-pointer shrink-0"
                       title={language === "bn" ? "নোটিফিকেশন" : "Notifications"}
                     >
