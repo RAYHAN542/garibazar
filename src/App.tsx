@@ -123,9 +123,6 @@ const checkIsProduction = (): boolean => {
 
 const isItemVehicle = (item: PartListing): boolean => {
   if (!item) return false;
-  // Authoritative signal: set once at posting time in AddPartForm.tsx
-  if ((item as any).type === "vehicle") return true;
-  if ((item as any).type === "part") return false;
   if (item.category === "vehicles") return true;
   if (item.category === "spare_parts") return false;
   
@@ -153,32 +150,8 @@ const isItemVehicle = (item: PartListing): boolean => {
 };
 
 export default function App() {
-  const [language, setLanguageState] = useState<SupportedLanguage>(() => {
-    const stored = localStorage.getItem("gari_bazar_language");
-    return stored === "en" || stored === "bn" ? stored : "bn"; // DEFAULT to Bengali as requested
-  });
-  const setLanguage = (lang: SupportedLanguage) => {
-    setLanguageState(lang);
-    localStorage.setItem("gari_bazar_language", lang);
-  };
-  const [activeTab, setActiveTab] = useState<'market' | 'saved' | 'sell' | 'my-dashboard' | 'chats' | 'profile'>(() => {
-    const validTabs = ['market', 'saved', 'sell', 'my-dashboard', 'chats', 'profile'];
-    const stored = localStorage.getItem("gari_bazar_active_tab");
-    const hasSession = !!localStorage.getItem("gari_bazar_session_user");
-    if (stored && validTabs.includes(stored)) {
-      // Tabs that require a logged-in user shouldn't be restored for a logged-out session
-      if ((stored === 'my-dashboard' || stored === 'profile' || stored === 'chats') && !hasSession) {
-        return 'market';
-      }
-      return stored as 'market' | 'saved' | 'sell' | 'my-dashboard' | 'chats' | 'profile';
-    }
-    return 'market';
-  });
-
-  // Persist the active tab so a reload keeps the user on the same page instead of resetting to Market
-  useEffect(() => {
-    localStorage.setItem("gari_bazar_active_tab", activeTab);
-  }, [activeTab]);
+  const [language, setLanguage] = useState<SupportedLanguage>("bn"); // DEFAULT to Bengali as requested
+  const [activeTab, setActiveTab] = useState<'market' | 'saved' | 'sell' | 'my-dashboard' | 'chats' | 'profile'>('market');
   const [savedListingIds, setSavedListingIds] = useState<string[]>([]);
   const [initialListingToChat, setInitialListingToChat] = useState<PartListing | null>(null);
   
@@ -666,69 +639,6 @@ export default function App() {
         console.error("Local session parsing failed:", err);
       }
     }
-  }, []);
-
-  // 1b. Fallback: Firebase's own auth state listener.
-  // getRedirectResult() inside AuthModal can miss the result after a Google
-  // sign-in redirect (slow chunk load, WebView storage quirks, etc). This
-  // listener is the safety net — whenever Firebase reports a signed-in user
-  // but we don't have a local session for them yet, we build one here so the
-  // user never gets stuck "signed in with Google" but "logged out" in the app.
-  useEffect(() => {
-    const unsubscribeAuth = onAuthStateChanged(auth, async (fbUser) => {
-      if (!fbUser) return;
-
-      const alreadyHaveSession = !!localStorage.getItem("gari_bazar_session_user");
-      if (alreadyHaveSession) return;
-
-      try {
-        const userDocRef = doc(db, "users", fbUser.uid);
-        const userSnap = await getDoc(userDocRef);
-
-        let sessionUser: any;
-        if (userSnap.exists()) {
-          const existingData = userSnap.data() as any;
-          sessionUser = {
-            uid: fbUser.uid,
-            displayName: existingData.displayName,
-            email: existingData.email || fbUser.email,
-            phoneNumber: existingData.phoneNumber,
-            city: existingData.city,
-            profilePicture: existingData.profilePicture || fbUser.photoURL,
-            simulatedCredits: existingData.simulatedCredits ?? 5000,
-            referralCode: existingData.referralCode,
-          };
-        } else {
-          // No Firestore profile yet (e.g. brand-new Google user whose
-          // redirect result was missed before the profile step ran).
-          // Create a minimal profile so they aren't left in limbo; they can
-          // still fill in phone/city later from their Profile tab.
-          sessionUser = {
-            uid: fbUser.uid,
-            displayName: fbUser.displayName || "",
-            email: fbUser.email || "",
-            phoneNumber: "",
-            city: "",
-            profilePicture: fbUser.photoURL || "",
-            simulatedCredits: 5000,
-          };
-          await setDoc(userDocRef, sessionUser, { merge: true });
-        }
-
-        localStorage.setItem("gari_bazar_session_user", JSON.stringify(sessionUser));
-        setUser({
-          uid: sessionUser.uid,
-          displayName: sessionUser.displayName,
-          email: sessionUser.email,
-          photoURL: sessionUser.profilePicture,
-        });
-        setUserMetadata(sessionUser);
-      } catch (err) {
-        console.error("Auth state fallback sync failed:", err);
-      }
-    });
-
-    return () => unsubscribeAuth();
   }, []);
 
   // Fetch dynamic payment info from database for the dashboard
@@ -1273,9 +1183,20 @@ export default function App() {
     
     try {
       const listingRef = doc(db, "listings", listing.id);
+      const newViews = (listing.views || 0) + 1;
       await updateDoc(listingRef, {
-        views: (listing.views || 0) + 1
+        views: newViews
       });
+      // Reflect the new view count immediately in local state so the
+      // updated number shows right away without needing an app reload.
+      setListings((prev) =>
+        prev.map((item) =>
+          item.id === listing.id ? { ...item, views: newViews } : item
+        )
+      );
+      setSelectedListing((prev) =>
+        prev && prev.id === listing.id ? { ...prev, views: newViews } : prev
+      );
     } catch (err) {
       console.warn("Could not increment view counter:", err);
     }
@@ -1567,7 +1488,7 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-100 flex flex-col font-sans transition-colors duration-300 overflow-x-hidden w-full">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-100 flex flex-col font-sans transition-colors duration-300">
       
       {/* Offline Alert Banner in Bengali */}
       {isOffline && (
@@ -1874,7 +1795,7 @@ export default function App() {
                     {/* মোবাইলে হেডার বাদ দেওয়ার পর, 🔔 নোটিফিকেশন বাটন সার্চ বারের পাশে বসানো হলো */}
                     <button
                       type="button"
-                      onClick={() => setActiveTab('chats')}
+                      onClick={() => setShowNotificationPrompt(true)}
                       className="md:hidden relative p-3 w-11 h-11 rounded-2xl border bg-white dark:bg-slate-900 border-slate-150 dark:border-slate-800 text-slate-600 dark:text-slate-300 flex items-center justify-center cursor-pointer shrink-0"
                       title={language === "bn" ? "নোটিফিকেশন" : "Notifications"}
                     >
@@ -3289,10 +3210,10 @@ export default function App() {
                         </div>
                         <div>
                           <p className="text-sm sm:text-base font-extrabold text-slate-800 dark:text-slate-100">
-                            {language === "bn" ? "আমার তথ্য" : "My Info"}
+                            {language === "bn" ? "ব্যক্তিগত তথ্য (Personal info)" : "Personal info"}
                           </p>
                           <p className="text-xs text-slate-400 dark:text-slate-500 font-bold mt-0.5">
-                            {user ? (user.displayName || "Seller") : (language === "bn" ? "এখানে চাপুন" : "Tap to view")}
+                            {user ? (user.displayName || "Seller") : (language === "bn" ? "লগইন করতে এখানে চাপুন" : "Sign in to see info")}
                           </p>
                         </div>
                       </div>
@@ -3397,10 +3318,10 @@ export default function App() {
                         </div>
                         <div>
                           <p className="text-sm sm:text-base font-extrabold text-slate-800 dark:text-slate-100">
-                            {language === "bn" ? "আমার দোকান" : "My Shop"}
+                            {language === "bn" ? "আমার দোকান (My Shop)" : "My Shop"}
                           </p>
                           <p className="text-xs text-slate-400 dark:text-slate-500 font-bold mt-0.5">
-                            {user ? (language === "bn" ? "আপনার পণ্য দেখুন" : "See your items") : (language === "bn" ? "লগইন করুন" : "Sign in first")}
+                            {user ? (language === "bn" ? "আপনার পাবলিক দোকান এবং লিস্টিং দেখুন" : "View your public shop and listings") : (language === "bn" ? "আপনার দোকান দেখতে লগইন করুন" : "Sign in to access your shop")}
                           </p>
                         </div>
                       </div>
@@ -3422,10 +3343,10 @@ export default function App() {
                         </div>
                         <div>
                           <p className="text-sm sm:text-base font-extrabold text-slate-800 dark:text-slate-100">
-                            {language === "bn" ? "ভাষা" : "Language"}
+                            {language === "bn" ? "ভাষা পরিবর্তন করুন (Change language)" : "Change language"}
                           </p>
                           <p className="text-xs text-slate-400 dark:text-slate-500 font-bold mt-0.5">
-                            {language === "bn" ? "বাংলা বা ইংরেজি বাছাই করুন" : "Choose Bangla or English"}
+                            {language === "bn" ? "বাংলা ও ইংরেজি ভাষা নির্ধারণ করুন" : "Set app-wide language preference"}
                           </p>
                         </div>
                       </div>
@@ -3488,10 +3409,10 @@ export default function App() {
                       </div>
                       <div>
                         <p className="text-sm sm:text-base font-extrabold text-slate-800 dark:text-slate-100">
-                          {language === "bn" ? "ডার্ক মোড" : "Dark mode"}
+                          {language === "bn" ? "ডার্ক মোড (Dark mode)" : "Dark mode"}
                         </p>
                         <p className="text-xs text-slate-400 dark:text-slate-500 font-bold mt-0.5">
-                          {language === "bn" ? "রাতে চোখের আরামের জন্য" : "Easier on your eyes at night"}
+                          {language === "bn" ? "আপনার চোখের সুবিধার্থে থিম পরিবর্তন করুন" : "Switch comfortable visual light/dark modes"}
                         </p>
                       </div>
                     </div>
@@ -3525,10 +3446,10 @@ export default function App() {
                         </div>
                         <div>
                           <p className="text-sm sm:text-base font-extrabold text-slate-800 dark:text-slate-100">
-                            {language === "bn" ? "আমাদের সম্পর্কে" : "About Us"}
+                            {language === "bn" ? "আমাদের টিম ও গাড়ি বাজার" : "Our Team & About"}
                           </p>
                           <p className="text-xs text-slate-400 dark:text-slate-500 font-bold mt-0.5">
-                            {language === "bn" ? "কারা বানিয়েছে জানুন" : "Who made this app"}
+                            {language === "bn" ? "অ্যাপ ডেভেলপমেন্ট টিম এবং লক্ষ্য" : "Meet the creators of Gari Bazar"}
                           </p>
                         </div>
                       </div>
@@ -3576,10 +3497,10 @@ export default function App() {
                         </div>
                         <div>
                           <p className="text-sm sm:text-base font-extrabold text-slate-800 dark:text-slate-100">
-                            {language === "bn" ? "নিয়মকানুন" : "Rules"}
+                            {language === "bn" ? "শর্তাবলী ও পলিসি কেন্দ্র" : "Terms & Privacy Policies"}
                           </p>
                           <p className="text-xs text-slate-400 dark:text-slate-500 font-bold mt-0.5">
-                            {language === "bn" ? "অ্যাপ ব্যবহারের নিয়ম" : "App rules and privacy"}
+                            {language === "bn" ? "প্লে স্টোর কমপ্লায়েন্স ও আইনি নীতিমালা" : "Play Store compliance rules and data usage"}
                           </p>
                         </div>
                       </div>
@@ -3721,29 +3642,6 @@ export default function App() {
                   </div>
 
                 </div>
-
-                {/* Footer info card — only shown on Profile page */}
-                <div className="bg-slate-950 rounded-3xl text-slate-500 text-xs py-8 px-4 text-center space-y-3">
-                  <div className="flex items-center gap-1.5 justify-center text-slate-300 font-bold">
-                    <Car className="w-4 h-4 text-amber-500" />
-                    <span>{language === "bn" ? "গাড়ি বাজার লিমিটেড" : "Gari Bazar Auto Parts Marketplace"}</span>
-                  </div>
-                  <p className="max-w-md mx-auto leading-relaxed text-[11px] text-slate-400">
-                    {language === "bn"
-                      ? "গাড়ি ও বাইকের অরিজিনাল জেনুইন খুচরা যন্ত্রাংশের বিশ্বস্ত বাজার। স্পন্সরড বিজ্ঞাপনদাতাদের জন্য উন্নত অ্যাড ক্যাম্পেইন ও AI ডেসক্রিপশন জেনারেটর ইঞ্জিন।"
-                      : "Bangladesh's premium online car parts marketplace. Boost your listings with secure, real-time sponsored ad placements."}
-                  </p>
-                  <div className="text-[10px] text-slate-400 flex flex-wrap gap-x-4 gap-y-1 justify-center pt-2">
-                    <span>© 2026 Gari Bazar Tech</span>
-                    <span>•</span>
-                    <button
-                      onClick={() => setIsLegalOpen(true)}
-                      className="hover:text-amber-500 font-bold underline transition-colors cursor-pointer"
-                    >
-                      {language === "bn" ? "🔒 আইনি পলিসি ও প্রাইভেসি কেন্দ্র" : "🔒 Legal Policies & Privacy Hub"}
-                    </button>
-                  </div>
-                </div>
               </div>
             )}
 
@@ -3751,6 +3649,31 @@ export default function App() {
         )}
 
       </main>
+
+      {/* 5. Footer with credit/disclaimers */}
+      <footer className="bg-slate-950 border-t border-slate-900 text-slate-500 text-xs py-8 pb-28 md:pb-8 mt-12">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center space-y-3">
+          <div className="flex items-center gap-1.5 justify-center text-slate-300 font-bold">
+            <Car className="w-4 h-4 text-amber-500" />
+            <span>{language === "bn" ? "গাড়ি বাজার লিমিটেড" : "Gari Bazar Auto Parts Marketplace"}</span>
+          </div>
+          <p className="max-w-md mx-auto leading-relaxed text-[11px] text-slate-400">
+            {language === "bn" 
+              ? "গাড়ি ও বাইকের অরিজিনাল জেনুইন খুচরা যন্ত্রাংশের বিশ্বস্ত বাজার। স্পন্সরড বিজ্ঞাপনদাতাদের জন্য উন্নত অ্যাড ক্যাম্পেইন ও AI ডেসক্রিপশন জেনারেটর ইঞ্জিন।" 
+              : "Bangladesh's premium online car parts marketplace. Boost your listings with secure, real-time sponsored ad placements."}
+          </p>
+          <div className="text-[10px] text-slate-400 flex flex-wrap gap-x-4 gap-y-1 justify-center pt-2">
+            <span>© 2026 Gari Bazar Tech</span>
+            <span>•</span>
+            <button 
+              onClick={() => setIsLegalOpen(true)}
+              className="hover:text-amber-500 font-bold underline transition-colors cursor-pointer"
+            >
+              {language === "bn" ? "🔒 আইনি পলিসি ও প্রাইভেসি কেন্দ্র" : "🔒 Legal Policies & Privacy Hub"}
+            </button>
+          </div>
+        </div>
+      </footer>
 
       {/* All interactive floating dialogs & Modals */}
       <Suspense fallback={null}>
