@@ -3,6 +3,7 @@ import { PartListing, SupportedLanguage } from "../types";
 import { X, Eye, MapPin, Sparkles, Play, SquarePlay, Heart, Flag, ShieldAlert, CheckCircle2, RotateCcw, ChevronLeft, ChevronRight, Loader2, ShoppingBag, Star, User, MessageSquare, Calendar, Send } from "lucide-react";
 import { doc, getDoc, updateDoc, collection, addDoc, query, where, getDocs, increment } from "firebase/firestore";
 import { db, logAnalyticsEvent } from "../firebase";
+import { getOptimizedImageUrl } from "../utils/cloudinary";
 
 interface ListingDetailModalProps {
   listing: PartListing;
@@ -21,6 +22,38 @@ export function ListingDetailModal({ listing, language, currentUser, onClose, on
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   
   const modalImages = listing.images && listing.images.length > 0 ? listing.images : [listing.image];
+
+  // Track which images have already finished loading so we can show a spinner only while waiting
+  const [loadedImageIndexes, setLoadedImageIndexes] = useState<Set<number>>(new Set());
+
+  // Preload every image in the carousel in the background so arrow navigation is instant instead of waiting for each image to download.
+  // Preload order starts from the currently active image, then expands outward to its neighbours first,
+  // since those are the images the user is most likely to navigate to next.
+  useEffect(() => {
+    setLoadedImageIndexes(new Set());
+    const order: number[] = [];
+    for (let offset = 0; offset < modalImages.length; offset++) {
+      const forward = (activeImageIndex + offset) % modalImages.length;
+      if (!order.includes(forward)) order.push(forward);
+      const backward = (activeImageIndex - offset + modalImages.length) % modalImages.length;
+      if (!order.includes(backward)) order.push(backward);
+    }
+    order.forEach((idx) => {
+      const src = modalImages[idx];
+      if (!src) return;
+      const preloadImg = new Image();
+      preloadImg.onload = () => {
+        setLoadedImageIndexes((prev) => {
+          if (prev.has(idx)) return prev;
+          const next = new Set(prev);
+          next.add(idx);
+          return next;
+        });
+      };
+      preloadImg.src = getOptimizedImageUrl(src, 1000);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [listing.id]);
   
   // Favorites bookmark tracking
   const [isFavorite, setIsFavorite] = useState<boolean>(() => {
@@ -477,12 +510,25 @@ export function ListingDetailModal({ listing, language, currentUser, onClose, on
             ) : (
               <>
                 <img
-                  src={modalImages[activeImageIndex]}
+                  src={getOptimizedImageUrl(modalImages[activeImageIndex], 1000)}
                   alt={listing.title}
                   className="w-full h-full object-cover transition-all duration-300"
                   referrerPolicy="no-referrer"
-                  loading="lazy"
+                  loading="eager"
+                  onLoad={() => {
+                    setLoadedImageIndexes((prev) => {
+                      if (prev.has(activeImageIndex)) return prev;
+                      const next = new Set(prev);
+                      next.add(activeImageIndex);
+                      return next;
+                    });
+                  }}
                 />
+                {!loadedImageIndexes.has(activeImageIndex) && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-slate-950/30">
+                    <Loader2 className="w-7 h-7 text-white animate-spin" />
+                  </div>
+                )}
                 <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-slate-950/85 to-transparent pointer-events-none"></div>
                 
                 {/* Image Navigator Overlay */}
