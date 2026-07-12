@@ -153,7 +153,14 @@ const isItemVehicle = (item: PartListing): boolean => {
 };
 
 export default function App() {
-  const [language, setLanguage] = useState<SupportedLanguage>("bn"); // DEFAULT to Bengali as requested
+  const [language, setLanguageState] = useState<SupportedLanguage>(() => {
+    const stored = localStorage.getItem("gari_bazar_language");
+    return stored === "en" || stored === "bn" ? stored : "bn"; // DEFAULT to Bengali as requested
+  });
+  const setLanguage = (lang: SupportedLanguage) => {
+    setLanguageState(lang);
+    localStorage.setItem("gari_bazar_language", lang);
+  };
   const [activeTab, setActiveTab] = useState<'market' | 'saved' | 'sell' | 'my-dashboard' | 'chats' | 'profile'>('market');
   const [savedListingIds, setSavedListingIds] = useState<string[]>([]);
   const [initialListingToChat, setInitialListingToChat] = useState<PartListing | null>(null);
