@@ -159,18 +159,16 @@ export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModa
     setProfilePhotoPreview(URL.createObjectURL(file));
   };
 
-  const isMobileDevice = () => /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
-
   const handleGoogleSignIn = async () => {
     setError("");
     setLoading(true);
     try {
-      if (isMobileDevice()) {
-        // On mobile, redirect is far more reliable than a popup window,
-        // which needs a second window plus cross-window messaging that can hang on slower connections.
-        await signInWithRedirect(auth, googleProvider);
-        return;
-      }
+      // Popup first on every device. signInWithRedirect depends on Firebase's
+      // authDomain (garibazar-bd.firebaseapp.com) sharing storage/cookies with
+      // this app's real hosting domain to hand back the result — Chrome's
+      // third-party storage partitioning breaks that bridge, which is why
+      // redirect sign-in was silently failing to persist. Popup avoids that
+      // entirely since it completes and resolves in the same tab session.
       const result = await signInWithPopup(auth, googleProvider);
       await handlePostGoogleAuth(result.user);
     } catch (err: any) {
