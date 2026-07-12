@@ -1,6 +1,0 @@
-
-              {category === "other" && (
-                <div className="mt-2">
-                  <input type="text" value={customCategory} onChange={(e) => setCustomCategory(e.target.value)} placeholder={language === "bn" ? "আপনার আইটেমের নাম লিখুন" : "Type your item name"} className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:border-orange-500" required />
-                </div>
-              )}

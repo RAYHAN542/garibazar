@@ -1,6 +1,0 @@
-{
-  "name": "Gari Bazar",
-  "description": "গাড়ির পার্টস কেনা-বেচার বিশ্বস্ত অনলাইন প্ল্যাটফর্ম। A modern marketplace to buy and sell car parts with promoted ad campaigns.",
-  "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
-}
