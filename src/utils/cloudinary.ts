@@ -41,3 +41,12 @@ export const uploadToCloudinary = async (file: File | Blob): Promise<string> => 
   }
 };
 
+
+// Returns a resized + auto-compressed version of a Cloudinary URL so images load faster.
+// Falls back to the original URL untouched if it isn't a Cloudinary URL.
+export const getOptimizedImageUrl = (url: string | undefined | null, width = 1000): string => {
+  if (!url) return "";
+  if (!url.includes("res.cloudinary.com") || !url.includes("/upload/")) return url;
+  if (url.includes("/upload/q_auto") || url.includes("/upload/f_auto")) return url;
+  return url.replace("/upload/", `/upload/f_auto,q_auto,w_${width}/`);
+};
