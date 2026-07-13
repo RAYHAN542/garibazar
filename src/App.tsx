@@ -2194,14 +2194,16 @@ export default function App() {
                   </div>
                 )}
 
-                {/* Filter count indicators */}
-                <div className="flex items-center justify-between mt-1 mb-3.5 px-1">
-                  <div className="text-xs text-slate-500 dark:text-slate-400 font-extrabold font-sans">
-                    {language === "bn" 
-                      ? `মোট ${filteredListings.length} টি পার্টস পাওয়া গেছে` 
-                      : `Found ${filteredListings.length} spares for compatibility`}
+                {/* Filter count indicators - admin only, so a new marketplace doesn't look sparse to regular users */}
+                {isUserAdmin && (
+                  <div className="flex items-center justify-between mt-1 mb-3.5 px-1">
+                    <div className="text-xs text-slate-500 dark:text-slate-400 font-extrabold font-sans">
+                      {language === "bn" 
+                        ? `মোট ${filteredListings.length} টি পার্টস পাওয়া গেছে` 
+                        : `Found ${filteredListings.length} spares for compatibility`}
+                    </div>
                   </div>
-                </div>
+                )}
 
                 {/* Sponsored / Ads Spotlight Header if any */}
                 {filteredListings.some((item) => item.isAd) && (
@@ -2257,6 +2259,7 @@ export default function App() {
       key={listing.id}
       listing={listing}
       language={language}
+      isAdmin={isUserAdmin}
       onViewDetails={handleViewListingDetails}
       onPromoteClick={(item) => {
         if (!user) {
@@ -2696,6 +2699,7 @@ export default function App() {
                               key={listing.id}
                               listing={listing}
                               language={language}
+                              isAdmin={true}
                               onViewDetails={handleViewListingDetails}
                               onPromoteClick={() => {}}
                             />
@@ -3181,6 +3185,7 @@ export default function App() {
                         key={listing.id}
                         listing={listing}
                         language={language}
+                        isAdmin={isUserAdmin}
                         onViewDetails={handleViewListingDetails}
                         onPromoteClick={(item) => {
                           if (!user) {
