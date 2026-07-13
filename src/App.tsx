@@ -1350,6 +1350,21 @@ export default function App() {
       let matchedItems: any[] = [];
       const seenIds = new Set<string>();
       
+      // Word-boundary aware substring check. Plain alphabetic queries (real
+      // words like "car", "bus", "cat") require a true word boundary so they
+      // don't match inside unrelated words like "cargo" or "carefully" -
+      // alphanumeric/model-style queries (like "320", "e70") keep the old
+      // loose substring behavior since that's needed for "320" -> "320B".
+      const isPureAlpha = (s: string) => /^[a-z]+$/i.test(s) || /^[\u0980-\u09FF]+$/.test(s);
+      const smartIncludes = (haystack: string, needle: string): boolean => {
+        if (!needle) return false;
+        if (!isPureAlpha(needle)) return haystack.includes(needle);
+        const escaped = needle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        const boundary = "[^a-zA-Z\\u0980-\\u09FF]";
+        const re = new RegExp(`(^|${boundary})${escaped}($|${boundary})`, "i");
+        return re.test(haystack);
+      };
+
       // 1. Direct Case-Insensitive Substring matches - highly precise & reliable for short numbers (like '320' -> '320 B')
       for (const item of enrichedListings) {
         const titleLoc = (item.title || "").toLowerCase();
@@ -1362,11 +1377,11 @@ export default function App() {
         for (const opt of searchOptions) {
           const optLower = opt.toLowerCase();
           if (
-            titleLoc.includes(optLower) ||
-            brandLoc.includes(optLower) ||
-            modelLoc.includes(optLower) ||
-            descLoc.includes(optLower) ||
-            blobLoc.includes(optLower)
+            smartIncludes(titleLoc, optLower) ||
+            smartIncludes(brandLoc, optLower) ||
+            smartIncludes(modelLoc, optLower) ||
+            smartIncludes(descLoc, optLower) ||
+            smartIncludes(blobLoc, optLower)
           ) {
             isDirectMatch = true;
             break;
