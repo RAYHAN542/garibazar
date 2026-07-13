@@ -1380,8 +1380,13 @@ export default function App() {
       }
       
       // 2. Fuzzy fallback matching via Fuse.js
+      // Skip very short tokens (<= 3 chars) here - fuzzy edit-distance matching
+      // on short strings is too imprecise (e.g. "car" ~ "cat") and causes
+      // false positives like a "Car" search pulling in every CAT-branded
+      // excavator listing. Exact substring matching above already covers
+      // short exact terms reliably.
       for (const q of searchOptions) {
-        if (!q.trim()) continue;
+        if (!q.trim() || q.trim().length <= 3) continue;
         const results = fuseInstance.search(q);
         for (const res of results) {
           if (!seenIds.has(res.item.id)) {
