@@ -451,5 +451,34 @@ export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPromp
           <div>
             <label className="block text-xs font-semibold text-gray-700 mb-1">
               {activeTab === "part"
-                ? (language ===sed -i 's/{listing.category}/{(listing as any).partCategory || listing.category}/' src/components/ListingDetailModal.tsx
+                ? (language === "bn" ? "৬. পার্টসের বিস্তারিত বিবরণ *" : "6. Part Description *")
+                : (language === "bn" ? "৬. গাড়ির বিস্তারিত বিবরণ *" : "6. Vehicle Description *")}
+            </label>
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              rows={3}
+              placeholder={
+                activeTab === "part"
+                  ? (language === "bn" ? "পার্টসের অবস্থা এবং বিস্তারিত লিখুন..." : "Describe part condition...")
+                  : (language === "bn" ? "গাড়ির অবস্থা এবং বিস্তারিত লিখুন..." : "Describe vehicle condition...")
+              }
+              className="w-full px-3 py-2 border rounded-lg text-sm bg-white text-gray-900 focus:outline-none focus:border-orange-500"
+              required
+            />
+          </div>
 
+        <button type="submit" disabled={isSubmitting || images.some(img => img.status === "uploading")} className="w-full py-3 bg-orange-500 text-white font-semibold rounded-xl text-sm shadow-sm hover:bg-orange-600 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2">
+          {isSubmitting ? (
+            <>
+              <Loader2 className="w-4 h-4 animate-spin" />
+              <span>{language === "bn" ? "লিস্টিং আপলোড হচ্ছে..." : "Submitting..."}</span>
+            </>
+          ) : (
+            <span>{language === "bn" ? "বিজ্ঞাপনটি পোস্ট করুন" : "Submit Advertisement"}</span>
+          )}
+        </button>
+      </form>
+    </div>
+  );
+}
