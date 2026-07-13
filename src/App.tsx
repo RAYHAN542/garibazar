@@ -5,8 +5,8 @@
 
 import { useState, useEffect, useMemo, useRef, lazy, Suspense } from "react";
 import { auth, db, logAnalyticsEvent } from "./firebase";
-import { onAuthStateChanged, signOut } from "firebase/auth";
-import { collection, onSnapshot, query, orderBy, getDocs, doc, setDoc, getDoc, updateDoc, where, addDoc, deleteDoc, limit, startAfter, DocumentSnapshot } from "firebase/firestore";
+import { signOut } from "firebase/auth";
+import { collection, onSnapshot, query, orderBy, getDocs, doc, getDoc, updateDoc, where, addDoc, deleteDoc, limit, startAfter, DocumentSnapshot } from "firebase/firestore";
 import { 
   Car, 
   Search, 
@@ -69,7 +69,7 @@ const SellerAnalyticsGraph = lazy(() => import("./components/SellerAnalyticsGrap
 const SellerShopPage = lazy(() => import("./components/SellerShopPage").then(m => ({ default: m.SellerShopPage })));
 import Fuse from "fuse.js";
 import { buildSearchBlob, convertBengaliDigitsToEnglish, convertEnglishDigitsToBengali, toPhoneticKey } from "./searchAliases";
-import { MessageSquare, Cpu, SlidersHorizontal, Moon, Sun, Users, HelpCircle, Mail, FileText, ArrowRight, Menu, Download, ChevronDown, Lock, CreditCard } from "lucide-react";
+import { MessageSquare, Cpu, SlidersHorizontal, Moon, Sun, Users, HelpCircle, Mail, FileText, Menu, ChevronDown, Lock, CreditCard } from "lucide-react";
 import vehicleCardImg from "./assets/images/vehicle-card-new.png";
 import partsCardImg from "./assets/images/parts-card-new.png";
 
