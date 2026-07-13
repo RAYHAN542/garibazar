@@ -69,38 +69,34 @@ export default async function handler(req: any, res: any) {
       return res.status(400).json({ error: "সঠিক পরিমাণ নেই।" });
     }
 
-    // 3. Look up the user's profile for name/phone (used as billing info)
+    // 3. Look up the user's profile for phone (passed through as metadata)
     const userSnap = await db.collection("users").doc(uid).get();
     const userData = userSnap.exists ? (userSnap.data() as any) : {};
-    const displayName = userData.displayName || "Gari Bazar User";
     const phoneNumber = userData.phoneNumber || "";
-    // UddoktaPay requires an email; users in this app only have phone numbers, so synthesize one.
-    const syntheticEmail = `${phoneNumber || uid}@garibazar.app`;
 
-    // 4. Create the charge with the configured payment gateway (UddoktaPay, RupantorPay, or
-    // any compatible fork). The header name differs slightly between providers, so it's
-    // configurable via env var instead of hardcoded - switching providers is then just an
-    // env var change, no code change needed.
-    const apiKeyHeaderName = process.env.PAYMENT_API_KEY_HEADER || "RT-UDDOKTAPAY-API-KEY";
-    const checkoutUrl = new URL("api/checkout-v2", baseUrl).toString();
+    // 4. Create the charge with RupantorPay. Their checkout endpoint lives at
+    // /api/payment/checkout (NOT /api/checkout-v2 - that's a UddoktaPay path and doesn't
+    // exist on RupantorPay, which is why every request here was failing). RupantorPay also
+    // requires an X-CLIENT header carrying your site's domain, in addition to the X-API-KEY.
+    const apiKeyHeaderName = process.env.PAYMENT_API_KEY_HEADER || "X-API-KEY";
+    const checkoutUrl = new URL("api/payment/checkout", baseUrl).toString();
     const uddoktaRes = await fetch(checkoutUrl, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         [apiKeyHeaderName]: apiKey,
+        "X-CLIENT": new URL(SITE_URL).hostname,
       },
       body: JSON.stringify({
-        full_name: displayName,
-        email: syntheticEmail,
         amount: String(amount),
         metadata: {
           requestId,
           uid,
+          phone: phoneNumber,
         },
-        redirect_url: `${SITE_URL}/?payment=success`,
+        success_url: `${SITE_URL}/?payment=success`,
         cancel_url: `${SITE_URL}/?payment=cancel`,
         webhook_url: `${SITE_URL}/api/payment/webhook`,
-        return_type: "GET",
       }),
     });
 

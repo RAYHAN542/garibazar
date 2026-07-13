@@ -31,7 +31,7 @@ export default async function handler(req: any, res: any) {
     }
 
     // 1. Verify this webhook really came from the configured payment gateway
-    const apiKeyHeaderName = (process.env.PAYMENT_API_KEY_HEADER || "RT-UDDOKTAPAY-API-KEY").toLowerCase();
+    const apiKeyHeaderName = (process.env.PAYMENT_API_KEY_HEADER || "X-API-KEY").toLowerCase();
     const headerKey = req.headers[apiKeyHeaderName];
     if (!headerKey || headerKey !== apiKey) {
       return res.status(401).json({ error: "Unauthorized webhook." });
