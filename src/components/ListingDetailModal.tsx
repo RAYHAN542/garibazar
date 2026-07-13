@@ -361,91 +361,6 @@ export function ListingDetailModal({ listing, language, currentUser, onClose, on
     }
   };
 
-  // Dynamic specs extraction for Deep Technical Analysis of vehicles and parts
-  const getTechnicalAnalysis = () => {
-    const text = (listing.title + " " + listing.model + " " + listing.description).toLowerCase();
-    
-    if (text.includes("excavator") || text.includes("excavater") || text.includes("েক্সক্যাভেটর")) {
-      return {
-        type: "excavator",
-        label: language === "bn" ? "এক্সক্যাভেটর (Excavator)" : "Excavator",
-        hours: text.includes("4500") ? "4,500 Hrs" : "3,200 Hrs",
-        engine: "CAT C7.1 ACERT / Cummins 6BTA",
-        weight: "21,500 kg (Heavy Duty)",
-        capacity: "1.2 - 1.5 m³ Bucket",
-        hydraulics: 92,
-        undercarriage: 88,
-        engineHealth: 94,
-        verdictEn: "Highly recommended for massive earthmoving, soil grading, and foundation work. Hydraulic pumps show exceptional compression efficiency.",
-        verdictBn: "মাটি কাটা এবং হেভি ফাউন্ডেশন কাজের জন্য অত্যন্ত উপযুক্ত। হাইড্রোলিক পাম্পের কাজের চাপ ও কার্যকারিতা চমৎকার।"
-      };
-    }
-    if (text.includes("dozer") || text.includes("ডোজার")) {
-      return {
-        type: "dozer",
-        label: language === "bn" ? "ডোজার (Dozer)" : "Crawler Dozer",
-        hours: "5,100 Hrs",
-        engine: "CAT C9 ACERT / Komatsu SAA6D",
-        weight: "18,600 kg",
-        capacity: "Semi-U Blade (4.3 m³)",
-        hydraulics: 84,
-        undercarriage: 75,
-        engineHealth: 88,
-        verdictEn: "Good blade tension and high pushing force. Splay pins show minimal clearance. Track chains are rating at 75% life cycle.",
-        verdictBn: "ব্লেড গ্রিপ ও মাটি ঠেলার ক্ষমতা দারুণ। ট্র্যাক চেইন প্রায় ৭৫% লাইফ সাইকেল অবশিষ্ট আছে, যা দীর্ঘমেয়াদী ব্যবহারের নিশ্চয়তা দেয়।"
-      };
-    }
-    if (text.includes("crane") || text.includes("ক্রেন")) {
-      return {
-        type: "crane",
-        label: language === "bn" ? "ক্রেন (Heavy Crane)" : "Heavy Construction Crane",
-        hours: "1,950 Hrs",
-        engine: "Mitsubishi 6D24 / Isuzu 6WG1",
-        weight: "25,000 kg (Lifting Capacity: 15-25 Tons)",
-        capacity: "31 Meter Telescopic Boom",
-        hydraulics: 95,
-        undercarriage: 90,
-        engineHealth: 96,
-        verdictEn: "Outriggers and hydraulic stabilizers are immaculate. Forged lock pulley and load charts fully certified up to late 2027.",
-        verdictBn: "আউটরিগার্স এবং স্পিনিং পুলি পারফেক্ট কন্ডিশনে আছে। ১২ টন পর্যন্ত শতভাগ লোড সার্টিফাইড করা হয়েছে।"
-      };
-    }
-    if (text.includes("wheel loader") || text.includes("হুইল লোডার") || text.includes("loader")) {
-      return {
-        type: "loader",
-        label: language === "bn" ? "হুইল লোডার (Wheel Loader)" : "Wheel Loader",
-        hours: "3,800 Hrs",
-        engine: "Deutz TD226B / Weichai WD10",
-        weight: "16,500 kg",
-        capacity: "3.0 m³ High Dump Bucket",
-        hydraulics: 89,
-        undercarriage: 85,
-        engineHealth: 91,
-        verdictEn: "Tire lugs show generous depth (85%). Quick transmission shifts on reverse load cycles. Zero piston oil emissions.",
-        verdictBn: "টায়ার থ্রেড ৮৫% ফ্রেশ আছে। গিয়ার শিফটিং অত্যন্ত স্মুথ এবং ইঞ্জিনে কোনো রিং-পিস্টন বা মোবিল লিকিং নেই।"
-      };
-    }
-    if (text.includes("car") || text.includes("gari") || text.includes("গাড়ি") || text.includes("বাস") || text.includes("bus")) {
-      const isBus = text.includes("bus") || text.includes("বাস");
-      return {
-        type: isBus ? "bus" : "car",
-        label: isBus ? (language === "bn" ? "বাস ও যাত্রীবাহী" : "Commercial Bus / Coach") : (language === "bn" ? "প্রাইভেট কার / সেডান" : "Passenger Vehicle"),
-        hours: "Mileage: 64,000 km",
-        engine: isBus ? "Hino J08C Diesel Engine" : "Toyota 1NZ-FE VVT-i",
-        weight: isBus ? "11,500 kg" : "1,240 kg",
-        capacity: isBus ? "40+ Seats Configuration" : "5 Passengers",
-        hydraulics: 90,
-        undercarriage: 88,
-        engineHealth: 95,
-        verdictEn: "Rigorous engine block leak test passed. Transmission torque ratios are perfect. Air conditioning and electronic boards are fully active.",
-        verdictBn: "ইঞ্জিন কম্প্রেশন এবং সাইলেন্সার গ্যাস নিখুঁতভাবে পরীক্ষা করা হয়েছে। গিয়ারবক্স টর্ক রেশিও দারুণ এবং এসি ফুল পাওয়ারে কাজ করছে।"
-      };
-    }
-    return null;
-  };
-
-  const techReport = getTechnicalAnalysis();
-
   return (
     <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex justify-center items-start sm:items-center p-0 sm:p-4 z-[60] overflow-y-auto">
       <div className="bg-white dark:bg-slate-900 w-full min-h-screen sm:min-h-fit sm:max-w-2xl shadow-2xl border-0 sm:border border-slate-200 dark:border-slate-800 relative overflow-hidden sm:rounded-2xl sm:my-8">
@@ -455,7 +370,7 @@ export function ListingDetailModal({ listing, language, currentUser, onClose, on
           <div className="bg-gradient-to-r from-amber-500 to-orange-500 py-1.5 px-4 text-xs font-bold text-slate-950 flex items-center gap-1.5 justify-center">
             <Sparkles className="w-3.5 h-3.5 fill-slate-950" />
             {language === "bn" 
-              ? "বিজ্ঞাপিত বা প্রিমিয়াম বুস্টেড প্রডাক্ট" 
+              ? "বিজ্ঞাপিত বা প্রিমিয়াম বুস্টেড প্রডাক্ট" 
               : "Promoted Special Spotlight Listing"}
           </div>
         )}
@@ -588,10 +503,10 @@ export function ListingDetailModal({ listing, language, currentUser, onClose, on
                 <ShieldAlert className="w-5 h-5 text-red-500 shrink-0 animate-bounce" />
                 <div>
                   <h4 className="text-xs font-black text-red-500 uppercase tracking-tight">
-                    {language === "bn" ? "এই প্রোডাক্টটি বিক্রি হয়ে গেছে" : "This Spare Part is Sold"}
+                    {language === "bn" ? "এই প্রোডাক্টটি বিক্রি হয়ে গেছে" : "This Spare Part is Sold"}
                   </h4>
                   <p className="text-[10px] text-slate-500 font-semibold leading-normal mt-0.5">
-                    {language === "bn" ? "বিক্রেতা এই প্রোডাক্টটি বিক্রয় সম্পন্ন হিসেবে চিহ্নিত করেছেন। কোনো নতুন কল করার প্রয়োজন নেই।" : "The seller has marked this post as SOLD. Please do not call this number."}
+                    {language === "bn" ? "বিক্রেতা এই প্রোডাক্টটি বিক্রয় সম্পন্ন হিসেবে চিহ্নিত করেছেন। কোনো নতুন কল করার প্রয়োজন নেই।" : "The seller has marked this post as SOLD. Please do not call this number."}
                   </p>
                 </div>
               </div>
@@ -645,104 +560,13 @@ export function ListingDetailModal({ listing, language, currentUser, onClose, on
                 </p>
               </div>
 
-              {techReport && (
-                <div className="mt-4 p-4 rounded-xl bg-gradient-to-br from-amber-500/10 via-slate-900 to-black border-2 border-amber-500/30 shadow-lg relative overflow-hidden space-y-4">
-                  {/* Subtle pulsing background highlights */}
-                  <div className="absolute top-0 right-0 w-16 h-16 bg-amber-500/10 rounded-full blur-xl animate-pulse pointer-events-none"></div>
-                  
-                  <div className="flex items-center justify-between border-b border-amber-550/20 pb-2.5">
-                    <div className="flex items-center gap-1.5">
-                      <Sparkles className="w-4.5 h-4.5 text-amber-400 animate-pulse" />
-                      <h4 className="font-extrabold text-[12px] sm:text-xs text-amber-400 uppercase tracking-wider font-mono">
-                        {language === "bn" ? "🔧 টেকনিক্যাল বিশ্লেষণ ও অডিট রিপোর্ট" : "🔧 Gari Bazar Technical Evaluation"}
-                      </h4>
-                    </div>
-                    <span className="bg-amber-400 text-slate-900 font-black text-[9px] uppercase px-2 py-0.5 rounded-full font-mono">
-                      DEEP ANALYZED
-                    </span>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 text-xs text-slate-300">
-                    <div className="space-y-1 bg-slate-950/70 p-2.5 rounded-lg border border-slate-800">
-                      <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wide block">{language === "bn" ? "ইকুইপমেন্ট ক্যাটাগরি" : "Equipment Class"}</span>
-                      <p className="font-extrabold text-amber-400">{techReport.label}</p>
-                    </div>
-
-                    <div className="space-y-1 bg-slate-950/70 p-2.5 rounded-lg border border-slate-800">
-                      <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wide block">{language === "bn" ? "মোট কাজের সময়কাল" : "Operating Lifetime"}</span>
-                      <p className="font-extrabold text-white">{techReport.hours}</p>
-                    </div>
-
-                    <div className="space-y-1 bg-slate-950/70 p-2.5 rounded-lg border border-slate-800">
-                      <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wide block">{language === "bn" ? "ইঞ্জিন ধরণ" : "Engine Spec"}</span>
-                      <p className="font-extrabold text-slate-205 text-white">{techReport.engine}</p>
-                    </div>
-
-                    <div className="space-y-1 bg-slate-950/70 p-2.5 rounded-lg border border-slate-800">
-                      <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wide block">{language === "bn" ? "ক্ষমতা ও ক্ষমতা মেট্রিক্স" : "Operating Metrics"}</span>
-                      <p className="font-extrabold text-slate-205 text-white">{techReport.weight} • {techReport.capacity}</p>
-                    </div>
-                  </div>
-
-                  {/* Quantitative gauges */}
-                  <div className="space-y-3 pt-1 border-t border-slate-800/80">
-                    {/* Gauge 1 */}
-                    <div className="space-y-1">
-                      <div className="flex justify-between text-[11px] font-bold">
-                        <span className="text-slate-350">{language === "bn" ? "ইঞ্জিন কম্প্রেশন ও সিলিন্ডার অডিট" : "Engine Health Index"}</span>
-                        <span className="text-amber-450 text-amber-400 font-mono font-extrabold">{techReport.engineHealth}%</span>
-                      </div>
-                      <div className="w-full bg-slate-950 h-1.5 rounded-full overflow-hidden border border-slate-800">
-                        <div className="bg-gradient-to-r from-amber-600 to-amber-400 h-full rounded-full" style={{ width: `${techReport.engineHealth}%` }}></div>
-                      </div>
-                    </div>
-
-                    {/* Gauge 2 */}
-                    <div className="space-y-1">
-                      <div className="flex justify-between text-[11px] font-bold">
-                        <span className="text-slate-350">
-                          {techReport.type === "car" || techReport.type === "bus" 
-                            ? (language === "bn" ? "সাসপেনশন ও স্টিয়ারিং কন্ডিশন" : "Chassis & Suspension Fit")
-                            : (language === "bn" ? "হাইড্রোলিক প্রেসার ও সিল রেটিং" : "Hydraulic Pressure Rating")}
-                        </span>
-                        <span className="text-amber-450 text-amber-400 font-mono font-extrabold">{techReport.hydraulics}%</span>
-                      </div>
-                      <div className="w-full bg-slate-950 h-1.5 rounded-full overflow-hidden border border-slate-800">
-                        <div className="bg-gradient-to-r from-amber-600 to-amber-400 h-full rounded-full" style={{ width: `${techReport.hydraulics}%` }}></div>
-                      </div>
-                    </div>
-
-                    {/* Gauge 3 */}
-                    <div className="space-y-1">
-                      <div className="flex justify-between text-[11px] font-bold">
-                        <span className="text-slate-350">
-                          {techReport.type === "car" || techReport.type === "bus" || techReport.type === "loader"
-                            ? (language === "bn" ? "টায়ার লাইফ ও গ্রিপ রেটিং" : "Tire Thread Rating")
-                            : (language === "bn" ? "ক্রলার ট্র্যাক ও আন্ডারক্যারেজ লাইফ" : "Undercarriage Track Chain Life")}
-                        </span>
-                        <span className="text-amber-450 text-amber-400 font-mono font-extrabold">{techReport.undercarriage}%</span>
-                      </div>
-                      <div className="w-full bg-slate-950 h-1.5 rounded-full overflow-hidden border border-slate-800">
-                        <div className="bg-gradient-to-r from-amber-600 to-amber-400 h-full rounded-full" style={{ width: `${techReport.undercarriage}%` }}></div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Verdict block */}
-                  <div className="bg-amber-500/5 border border-amber-500/25 p-3 rounded-lg text-[11px] text-slate-300 leading-relaxed font-semibold">
-                    <span className="font-extrabold text-amber-400 block mb-1">📢 {language === "bn" ? "বিশেষজ্ঞ টেকনিক্যাল মন্তব্য (Verdict)" : "Technical Expert Inspection Verdict"}</span>
-                    {language === "bn" ? techReport.verdictBn : techReport.verdictEn}
-                  </div>
-                </div>
-              )}
-
               {/* Spares description details block */}
               <div className="mt-3">
                 <span className="text-slate-400 text-[10px] uppercase font-bold tracking-wider block mb-1">
                   {language === "bn" ? "প্রোডাক্টের বিবরণ" : "Parts Detail Description"}
                 </span>
                 <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed font-sans bg-slate-50/55 dark:bg-slate-955/30 p-3.5 rounded-xl border border-slate-100 dark:border-slate-850">
-                  {listing.description || (language === "bn" ? "কোনো টেকনিকাল বিবরণ দেওয়া হয়নি।" : "No technical description provided.")}
+                  {listing.description || (language === "bn" ? "কোনো টেকনিকাল বিবরণ দেওয়া হয়নি।" : "No technical description provided.")}
                 </p>
               </div>
 
@@ -845,7 +669,7 @@ export function ListingDetailModal({ listing, language, currentUser, onClose, on
 
                 {submitReviewSuccess && (
                   <div className="p-2.5 bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-[11px] rounded-lg font-bold">
-                    {language === "bn" ? "আপনার গুরুত্বপূর্ণ রিভিউটি সফলভাবে পোস্ট হয়েছে!" : "Thank you! Seller feedback published successfully."}
+                    {language === "bn" ? "আপনার গুরুত্বপূর্ণ রিভিউটি সফলভাবে পোস্ট হয়েছে!" : "Thank you! Seller feedback published successfully."}
                   </div>
                 )}
 
@@ -944,7 +768,7 @@ export function ListingDetailModal({ listing, language, currentUser, onClose, on
                   <div className="w-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-450 py-3 px-5 rounded-xl font-bold text-xs text-center flex items-center justify-center gap-2">
                     <CheckCircle2 className="w-4 h-4 text-emerald-500 animate-pulse" />
                     <span>
-                      {language === "bn" ? "ড্যাশবোর্ডে সফলভাবে যুক্ত হয়েছে!" : "Successfully added to dashboard!"}
+                      {language === "bn" ? "ড্যাশবোর্ডে সফলভাবে যুক্ত হয়েছে!" : "Successfully added to dashboard!"}
                     </span>
                   </div>
                 ) : (
@@ -1030,7 +854,7 @@ export function ListingDetailModal({ listing, language, currentUser, onClose, on
                     onClick={() => setSelectedReason("spam")}
                     className={`p-2 rounded-lg border text-left transition ${selectedReason === "spam" ? "border-amber-500 bg-amber-500/10 text-amber-500" : "border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-650"}`}
                   >
-                    ⚠️ {language === "bn" ? "ভুয়া বা স্প্যাম পোস্ট" : "Fake Price / Spam"}
+                    ⚠️ {language === "bn" ? "ভুয়া বা স্প্যাম পোস্ট" : "Fake Price / Spam"}
                   </button>
                   <button 
                     type="button"
@@ -1076,7 +900,7 @@ export function ListingDetailModal({ listing, language, currentUser, onClose, on
                 <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
                 <span>
                   {language === "bn" 
-                    ? "অভিযোগটি সফলভাবে প্রশাসনের কাছে পাঠানো হয়েছে। ধন্যবাদ!" 
+                    ? "অভিযোগটি সফলভাবে প্রশাসনের কাছে পাঠানো হয়েছে। ধন্যবাদ!" 
                     : "Abuse report registered successfully. Post will be moderated."}
                 </span>
               </div>
