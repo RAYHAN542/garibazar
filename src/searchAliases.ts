@@ -1,4 +1,22 @@
 export const SEARCH_ALIAS_GROUPS: string[][] = [
+  // Generic vehicle-type terms (English / Bangla variants) - so a plain
+  // listing like "গাড়ি বিক্রি হবে" (no brand/model mentioned) is still
+  // found by an English "car" search, and vice versa.
+  ["car", "গাড়ি", "গারি", "কার"],
+  ["truck", "ট্রাক", "লরি", "lorry"],
+  ["bus", "বাস"],
+  ["bike", "motorcycle", "motorbike", "বাইক", "মোটরসাইকেল", "মোটর সাইকেল"],
+  ["pickup", "pickup van", "পিকআপ", "পিক আপ"],
+  ["jeep", "জিপ"],
+  ["microbus", "micro bus", "মাইক্রোবাস", "মাইক্রো বাস"],
+  ["cng", "সিএনজি", "অটো", "auto rickshaw", "অটোরিকশা"],
+  ["excavator", "এক্সক্যাভেটর", "এক্সকাভেটর", "ভেকু"],
+  ["crane", "ক্রেন"],
+  ["bulldozer", "dozer", "বুলডোজার", "ডোজার"],
+  ["forklift", "ফর্কলিফট", "ফর্কলিফ্ট"],
+  ["loader", "লোডার"],
+  ["tractor", "ট্রাক্টর"],
+
   // Common Parts and Spares (English / Bangla variants)
   ["headlight", "head light", "হেডলাইট", "হেড লাইট", "লাইট", "light"],
   ["brake pad", "brake", "ব্রেক", "ব্রেক প্যাড", "প্যাড", "pad"],
@@ -185,11 +203,26 @@ export function buildSearchBlob(parts: (string | undefined)[]): string {
 
   const collectedAliases = new Set<string>();
 
+  // Word-boundary aware check for alias-group triggers. Plain alphabetic
+  // variants (real words like "car", "bus") require a true word boundary
+  // so a truck listing mentioning "cargo" doesn't get tagged as a "car"
+  // just because the letters happen to appear in sequence. Numeric/mixed
+  // variants (like "e70", "320") keep the old loose substring behavior.
+  const isPureAlphaWord = (s: string) => /^[a-z]+$/i.test(s) || /^[\u0980-\u09FF]+$/.test(s);
+  const hasAliasMatch = (text: string, variant: string): boolean => {
+    const v = variant.toLowerCase();
+    if (!isPureAlphaWord(v)) return text.includes(v);
+    const escaped = v.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const boundary = "[^a-zA-Z\\u0980-\\u09FF]";
+    const re = new RegExp(`(^|${boundary})${escaped}($|${boundary})`, "i");
+    return re.test(text);
+  };
+
   // If any keyword in a group is found in rawText, add all keywords of that group to aliases
   for (const group of SEARCH_ALIAS_GROUPS) {
     let matchesGroup = false;
     for (const variant of group) {
-      if (rawText.includes(variant.toLowerCase())) {
+      if (hasAliasMatch(rawText, variant)) {
         matchesGroup = true;
         break;
       }
