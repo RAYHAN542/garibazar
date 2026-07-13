@@ -2371,7 +2371,7 @@ export default function App() {
                     </div>
                     <span className="text-[8px] sm:text-[9px] uppercase font-bold text-slate-400 leading-tight">{language === "bn" ? "মার্কেট ভিউস" : "Shop Views"}</span>
                     <span className="text-sm font-black text-slate-800 dark:text-white">
-                      {listings.filter(item => item.sellerId === user.uid).reduce((sum, current) => sum + (current.views ?? 0), 0) + 18}
+                      {listings.filter(item => item.sellerId === user.uid).reduce((sum, current) => sum + (current.views ?? 0), 0)}
                     </span>
                   </div>
                 </div>
