@@ -69,10 +69,15 @@ export default async function handler(req: any, res: any) {
       return res.status(400).json({ error: "সঠিক পরিমাণ নেই।" });
     }
 
-    // 3. Look up the user's profile for phone (passed through as metadata)
+    // 3. Look up the user's profile for name/phone. RupantorPay's Parameter Details table
+    // lists fullname and email as required fields, even though their sample cURL omits them -
+    // the checkout page's own JS likely expects these to render the receipt/payment page,
+    // which would explain a "Pay" button that does nothing when they're missing.
     const userSnap = await db.collection("users").doc(uid).get();
     const userData = userSnap.exists ? (userSnap.data() as any) : {};
+    const displayName = userData.displayName || "Gari Bazar User";
     const phoneNumber = userData.phoneNumber || "";
+    const syntheticEmail = `${phoneNumber || uid}@garibazar.app`;
 
     // 4. Create the charge with RupantorPay. Their checkout endpoint lives at
     // /api/payment/checkout (NOT /api/checkout-v2 - that's a UddoktaPay path and doesn't
@@ -80,6 +85,7 @@ export default async function handler(req: any, res: any) {
     // requires an X-CLIENT header carrying your site's domain, in addition to the X-API-KEY.
     const apiKeyHeaderName = process.env.PAYMENT_API_KEY_HEADER || "X-API-KEY";
     const checkoutUrl = new URL("api/payment/checkout", baseUrl).toString();
+    const metaPayload = { requestId, uid, phone: phoneNumber };
     const uddoktaRes = await fetch(checkoutUrl, {
       method: "POST",
       headers: {
@@ -88,12 +94,13 @@ export default async function handler(req: any, res: any) {
         "X-CLIENT": new URL(SITE_URL).hostname,
       },
       body: JSON.stringify({
+        fullname: displayName,
+        email: syntheticEmail,
         amount: String(amount),
-        metadata: {
-          requestId,
-          uid,
-          phone: phoneNumber,
-        },
+        // Docs table calls this field "meta_data", their sample cURL calls it "metadata" -
+        // send both so the webhook gets requestId/uid back regardless of which one they read.
+        metadata: metaPayload,
+        meta_data: metaPayload,
         success_url: `${SITE_URL}/?payment=success`,
         cancel_url: `${SITE_URL}/?payment=cancel`,
         webhook_url: `${SITE_URL}/api/payment/webhook`,
@@ -130,4 +137,4 @@ export default async function handler(req: any, res: any) {
     console.error("create-charge failed:", err);
     return res.status(500).json({ error: "সার্ভারে সমস্যা হয়েছে।", detail: String(err?.message || err) });
   }
-      }
+  }
