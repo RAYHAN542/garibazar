@@ -9,6 +9,7 @@ interface ListingCardProps {
   language: SupportedLanguage;
   onViewDetails: (listing: PartListing) => any;
   onPromoteClick: (listing: PartListing) => any;
+  isAdmin?: boolean;
 }
 
 function getTimeAgo(createdAt: any, language: SupportedLanguage): string {
@@ -40,7 +41,7 @@ function getTimeAgo(createdAt: any, language: SupportedLanguage): string {
   }
 }
 
-export function ListingCard({ listing, language, onViewDetails, onPromoteClick }: ListingCardProps) {
+export function ListingCard({ listing, language, onViewDetails, onPromoteClick, isAdmin }: ListingCardProps) {
   const isAd = listing.isAd;
   const isVehicle = (listing as any).type === "vehicle"
     ? true
@@ -95,8 +96,12 @@ export function ListingCard({ listing, language, onViewDetails, onPromoteClick }
         <div className="flex items-center gap-1 text-[10.5px] text-slate-500 dark:text-slate-400 font-semibold truncate">
           <MapPin className="w-3 h-3 text-amber-500 shrink-0" />
           <span className="truncate">{listing.location}</span>
-          <span className="mx-1 text-slate-300 dark:text-slate-700">•</span>
-          <span className="whitespace-nowrap">{getTimeAgo(listing.createdAt, language)}</span>
+          {isAdmin && (
+            <>
+              <span className="mx-1 text-slate-300 dark:text-slate-700">•</span>
+              <span className="whitespace-nowrap">{getTimeAgo(listing.createdAt, language)}</span>
+            </>
+          )}
         </div>
 
         <div className="flex items-center justify-between mt-1">

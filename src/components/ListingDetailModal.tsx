@@ -618,7 +618,7 @@ export function ListingDetailModal({ listing, language, currentUser, onClose, on
             <div>
               <div className="flex items-center gap-2 mb-1.5 flex-wrap">
                 <span className="bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs px-2.5 py-0.5 rounded-md font-bold uppercase tracking-tight">
-                  {listing.category}
+                  {(listing as any).partCategory || listing.category}
                 </span>
                 {(listing.id.startsWith("local-") || listing.id.startsWith("temp-") || listing.id.startsWith("part-") || (listing as any).isDemo === true) && (
                   <span className="bg-amber-500/10 dark:bg-amber-400/10 text-amber-600 dark:text-amber-400 text-[10px] px-2 py-0.5 rounded-md font-extrabold uppercase tracking-tight border border-amber-500/20 flex items-center gap-1">
