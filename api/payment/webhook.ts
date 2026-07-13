@@ -30,8 +30,9 @@ export default async function handler(req: any, res: any) {
       return res.status(500).json({ error: "পেমেন্ট গেটওয়ে কনফিগার করা নেই।" });
     }
 
-    // 1. Verify this webhook really came from UddoktaPay
-    const headerKey = req.headers["rt-uddoktapay-api-key"];
+    // 1. Verify this webhook really came from the configured payment gateway
+    const apiKeyHeaderName = (process.env.PAYMENT_API_KEY_HEADER || "RT-UDDOKTAPAY-API-KEY").toLowerCase();
+    const headerKey = req.headers[apiKeyHeaderName];
     if (!headerKey || headerKey !== apiKey) {
       return res.status(401).json({ error: "Unauthorized webhook." });
     }

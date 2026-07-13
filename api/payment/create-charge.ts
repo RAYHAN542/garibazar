@@ -77,13 +77,17 @@ export default async function handler(req: any, res: any) {
     // UddoktaPay requires an email; users in this app only have phone numbers, so synthesize one.
     const syntheticEmail = `${phoneNumber || uid}@garibazar.app`;
 
-    // 4. Create the charge with UddoktaPay
+    // 4. Create the charge with the configured payment gateway (UddoktaPay, RupantorPay, or
+    // any compatible fork). The header name differs slightly between providers, so it's
+    // configurable via env var instead of hardcoded - switching providers is then just an
+    // env var change, no code change needed.
+    const apiKeyHeaderName = process.env.PAYMENT_API_KEY_HEADER || "RT-UDDOKTAPAY-API-KEY";
     const checkoutUrl = new URL("api/checkout-v2", baseUrl).toString();
     const uddoktaRes = await fetch(checkoutUrl, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "RT-UDDOKTAPAY-API-KEY": apiKey,
+        [apiKeyHeaderName]: apiKey,
       },
       body: JSON.stringify({
         full_name: displayName,
