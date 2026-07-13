@@ -2766,8 +2766,8 @@ export default function App() {
                         </h4>
                         <p className="text-slate-400 text-xs mt-1.5 leading-relaxed">
                           {language === "bn"
-                            ? "সহজ ও নিরাপদ UddoktaPay চেকআউটের মাধ্যমে পেমেন্ট করে আপনার যেকোনো কার পার্টস আইটেমকে মার্কেট ফিল্টারে অথবা আমাদের হোমপেইজের টপ স্লাইডারে স্পন্সর করে বুস্ট করান।"
-                            : "Pay securely via UddoktaPay checkout to sponsor and boost any of your car parts listings — get priority placement or a spot on our homepage top slider."}
+                            ? "সহজ ও নিরাপদ চেকআউটের মাধ্যমে পেমেন্ট করে আপনার যেকোনো কার পার্টস আইটেমকে মার্কেট ফিল্টারে অথবা আমাদের হোমপেইজের টপ স্লাইডারে স্পন্সর করে বুস্ট করান।"
+                            : "Pay securely via checkout to sponsor and boost any of your car parts listings — get priority placement or a spot on our homepage top slider."}
                         </p>
                       </div>
                     </div>
@@ -2949,7 +2949,7 @@ export default function App() {
                           <div className="p-4 bg-emerald-500/5 border border-emerald-500/15 rounded-2xl space-y-2">
                             <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 font-bold text-xs uppercase tracking-wide">
                               <Lock className="w-4 h-4 text-emerald-500" />
-                              <span>{language === "bn" ? "UddoktaPay দ্বারা যাচাইকৃত" : "Verified via UddoktaPay"}</span>
+                              <span>{language === "bn" ? "bKash/Nagad/Rocket দ্বারা যাচাইকৃত" : "Verified via bKash/Nagad/Rocket"}</span>
                             </div>
                             <p className="text-xs text-slate-550 dark:text-slate-350 leading-relaxed font-semibold">
                               {language === "bn"
@@ -2996,7 +2996,7 @@ export default function App() {
 
                           <div className="flex items-center gap-2 pb-3 border-b border-slate-800 text-emerald-400 text-xs font-bold uppercase tracking-wide">
                             <Lock className="w-4 h-4" />
-                            <span>{language === "bn" ? "নিরাপদ UddoktaPay চেকআউট" : "Secure UddoktaPay Checkout"}</span>
+                            <span>{language === "bn" ? "নিরাপদ পেমেন্ট চেকআউট" : "Secure Payment Checkout"}</span>
                           </div>
 
                           <div className="space-y-2">
@@ -3036,8 +3036,8 @@ export default function App() {
                               </div>
                               <p>
                                 {language === "bn"
-                                  ? "বামের বাটনে ট্যাপ করে UddoktaPay-এর নিরাপদ bKash/Nagad/Rocket চেকআউট পেজে পেমেন্ট সম্পন্ন করুন।"
-                                  : "Tap the button on the left to complete payment via UddoktaPay's secure bKash/Nagad/Rocket checkout."}
+                                  ? "বামের বাটনে ট্যাপ করে নিরাপদ bKash/Nagad/Rocket চেকআউট পেজে পেমেন্ট সম্পন্ন করুন।"
+                                  : "Tap the button on the left to complete payment via the secure bKash/Nagad/Rocket checkout."}
                               </p>
                               <p>
                                 {language === "bn"
