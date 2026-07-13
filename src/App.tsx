@@ -417,6 +417,7 @@ export default function App() {
   );
 
   const prevListingsIdRef = useRef<Set<string>>(new Set());
+  const sessionStartTimeRef = useRef<number>(Date.now());
 
   // 📲 PWA Install Prompt — একবার লগইন/রেজিস্টার করলে আর দেখানো হবে না
   const [deferredInstallPrompt, setDeferredInstallPrompt] = useState<any>(null);
@@ -530,7 +531,11 @@ export default function App() {
       const addedListings = listings.filter(l => !prevListingsIdRef.current.has(l.id));
       
       // Notify for each newly added listing if it's from another seller
+      // AND it was actually created after this session started (prevents Load More
+      // pagination from re-triggering notifications for old, already-existing listings)
       addedListings.forEach(newListing => {
+        const createdAtMs = newListing.createdAt ? new Date(newListing.createdAt).getTime() : 0;
+        if (createdAtMs <= sessionStartTimeRef.current) return;
         if (newListing.sellerId !== user?.uid) {
           showNotification(language === "bn" ? "নতুন পার্টস বিক্রির বিজ্ঞাপন!" : "New Part Advert Listed!", {
             body: `🚗 ${newListing.title} - ৳${newListing.price.toLocaleString("en-IN")} (${newListing.location})`,
