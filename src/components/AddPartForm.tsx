@@ -249,7 +249,29 @@ export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPromp
       });
 
       if (onViewListing) {
-        onViewListing({ id: docRef.id, title, price, images: uploadedUrls, location, category: parentCategory, subCategory: normalizedSubCategory, type: activeTab });
+        onViewListing({
+          id: docRef.id,
+          title: cleanTitle,
+          price: parseFloat(cleanPrice) || 0,
+          images: uploadedUrls,
+          location,
+          category: parentCategory,
+          subCategory: normalizedSubCategory,
+          partCategory: category,
+          brand: cleanBrand,
+          model,
+          condition,
+          description: cleanDesc,
+          contactNumber: cleanPhone,
+          sellerId: currentUser.uid,
+          sellerName: currentUser.displayName || "Rayhan",
+          views: 0,
+          clicks: 0,
+          isAd: false,
+          adTier: "none",
+          createdAt: new Date().toISOString(),
+          type: activeTab
+        });
       }
       window.dispatchEvent(new Event("gari_bazar_refreshed_data"));
       onPostSuccess();
