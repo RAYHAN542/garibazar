@@ -790,7 +790,10 @@ export default function App() {
           const data = docSnap.data();
           const isDemo = docSnap.id.startsWith("local-") || docSnap.id.startsWith("temp-") || docSnap.id.startsWith("part-") || data.isDemo === true;
           if (!isProduction || !isDemo) {
-            list.push({ id: docSnap.id, ...data } as PartListing);
+            const normalizedCreatedAt = data.createdAt && typeof data.createdAt.toDate === "function"
+              ? data.createdAt.toDate().toISOString()
+              : data.createdAt;
+            list.push({ id: docSnap.id, ...data, createdAt: normalizedCreatedAt } as PartListing);
           }
         });
         
@@ -899,7 +902,11 @@ export default function App() {
       } else {
         const nextList: PartListing[] = [];
         snapshot.forEach((doc) => {
-          nextList.push({ id: doc.id, ...doc.data() } as PartListing);
+          const data = doc.data();
+          const normalizedCreatedAt = data.createdAt && typeof data.createdAt.toDate === "function"
+            ? data.createdAt.toDate().toISOString()
+            : data.createdAt;
+          nextList.push({ id: doc.id, ...data, createdAt: normalizedCreatedAt } as PartListing);
         });
         
         setMoreListings(prev => {
