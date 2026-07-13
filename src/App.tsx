@@ -3688,7 +3688,8 @@ export default function App() {
 
       </main>
 
-      {/* 5. Footer with credit/disclaimers */}
+      {/* 5. Footer with credit/disclaimers - Profile tab only */}
+      {activeTab === 'profile' && (
       <footer className="bg-slate-950 border-t border-slate-900 text-slate-500 text-xs py-8 pb-28 md:pb-8 mt-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center space-y-3">
           <div className="flex items-center gap-1.5 justify-center text-slate-300 font-bold">
@@ -3712,6 +3713,7 @@ export default function App() {
           </div>
         </div>
       </footer>
+      )}
 
       {/* All interactive floating dialogs & Modals */}
       <Suspense fallback={null}>
