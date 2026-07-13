@@ -100,11 +100,29 @@ export default async function handler(req: any, res: any) {
       }),
     });
 
-    const uddoktaData = await uddoktaRes.json().catch(() => ({}));
+    const rawBody = await uddoktaRes.text();
+    let uddoktaData: any = {};
+    try {
+      uddoktaData = rawBody ? JSON.parse(rawBody) : {};
+    } catch {
+      // Response wasn't JSON (likely an HTML error page from a wrong URL/method) -
+      // rawBody below still gets logged so we can see what actually came back.
+    }
 
     if (!uddoktaRes.ok || !uddoktaData?.payment_url) {
-      console.error("UddoktaPay create-charge failed:", uddoktaData);
-      return res.status(502).json({ error: "পেমেন্ট গেটওয়ে থেকে সাড়া পাওয়া যায়নি।", detail: uddoktaData });
+      console.error(
+        "RupantorPay create-charge failed:",
+        JSON.stringify({
+          url: checkoutUrl,
+          status: uddoktaRes.status,
+          statusText: uddoktaRes.statusText,
+          rawBody: rawBody.slice(0, 1000),
+        })
+      );
+      return res.status(502).json({
+        error: "পেমেন্ট গেটওয়ে থেকে সাড়া পাওয়া যায়নি।",
+        detail: { status: uddoktaRes.status, body: rawBody.slice(0, 500) },
+      });
     }
 
     return res.status(200).json({ payment_url: uddoktaData.payment_url });
@@ -112,4 +130,4 @@ export default async function handler(req: any, res: any) {
     console.error("create-charge failed:", err);
     return res.status(500).json({ error: "সার্ভারে সমস্যা হয়েছে।", detail: String(err?.message || err) });
   }
-}
+      }
