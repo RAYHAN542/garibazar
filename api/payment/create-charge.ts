@@ -69,42 +69,60 @@ export default async function handler(req: any, res: any) {
       return res.status(400).json({ error: "সঠিক পরিমাণ নেই।" });
     }
 
-    // 3. Look up the user's profile for name/phone (used as billing info)
+    // 3. Look up the user's profile for phone (passed through as metadata)
     const userSnap = await db.collection("users").doc(uid).get();
     const userData = userSnap.exists ? (userSnap.data() as any) : {};
-    const displayName = userData.displayName || "Gari Bazar User";
     const phoneNumber = userData.phoneNumber || "";
-    // UddoktaPay requires an email; users in this app only have phone numbers, so synthesize one.
-    const syntheticEmail = `${phoneNumber || uid}@garibazar.app`;
 
-    // 4. Create the charge with UddoktaPay
-    const checkoutUrl = new URL("api/checkout-v2", baseUrl).toString();
+    // 4. Create the charge with RupantorPay. Their checkout endpoint lives at
+    // /api/payment/checkout (NOT /api/checkout-v2 - that's a UddoktaPay path and doesn't
+    // exist on RupantorPay, which is why every request here was failing). RupantorPay also
+    // requires an X-CLIENT header carrying your site's domain, in addition to the X-API-KEY.
+    const apiKeyHeaderName = process.env.PAYMENT_API_KEY_HEADER || "X-API-KEY";
+    const checkoutUrl = new URL("api/payment/checkout", baseUrl).toString();
     const uddoktaRes = await fetch(checkoutUrl, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "RT-UDDOKTAPAY-API-KEY": apiKey,
+        [apiKeyHeaderName]: apiKey,
+        "X-CLIENT": new URL(SITE_URL).hostname,
       },
       body: JSON.stringify({
-        full_name: displayName,
-        email: syntheticEmail,
         amount: String(amount),
         metadata: {
           requestId,
           uid,
+          phone: phoneNumber,
         },
-        redirect_url: `${SITE_URL}/?payment=success`,
+        success_url: `${SITE_URL}/?payment=success`,
         cancel_url: `${SITE_URL}/?payment=cancel`,
         webhook_url: `${SITE_URL}/api/payment/webhook`,
-        return_type: "GET",
       }),
     });
 
-    const uddoktaData = await uddoktaRes.json().catch(() => ({}));
+    const rawBody = await uddoktaRes.text();
+    let uddoktaData: any = {};
+    try {
+      uddoktaData = rawBody ? JSON.parse(rawBody) : {};
+    } catch {
+      // Response wasn't JSON (likely an HTML error page from a wrong URL/method) -
+      // rawBody below still gets logged so we can see what actually came back.
+    }
 
     if (!uddoktaRes.ok || !uddoktaData?.payment_url) {
-      console.error("UddoktaPay create-charge failed:", uddoktaData);
-      return res.status(502).json({ error: "পেমেন্ট গেটওয়ে থেকে সাড়া পাওয়া যায়নি।", detail: uddoktaData });
+      console.error(
+        "RupantorPay create-charge failed:",
+        JSON.stringify({
+          url: checkoutUrl,
+          status: uddoktaRes.status,
+          statusText: uddoktaRes.statusText,
+          rawBody: rawBody.slice(0, 1000),
+        })
+      );
+      return res.status(502).json({
+        error: "পেমেন্ট গেটওয়ে থেকে সাড়া পাওয়া যায়নি।",
+        detail: { status: uddoktaRes.status, body: rawBody.slice(0, 500) },
+      });
     }
 
     return res.status(200).json({ payment_url: uddoktaData.payment_url });
