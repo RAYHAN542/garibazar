@@ -49,6 +49,24 @@ export function AdminPanel({ language, currentUser, listings: listingsProp, isUs
     setListings(listingsProp);
   }, [listingsProp]);
 
+  // Admin needs the REAL, complete count/list of every listing in the database —
+  // not just whatever the Market page happens to have paginated in via "Load More".
+  // This is a dedicated, independent real-time listener so it's always accurate.
+  const [adminListings, setAdminListings] = useState<any[]>([]);
+  useEffect(() => {
+    const q = query(collection(db, "listings"), orderBy("createdAt", "desc"));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const all: any[] = [];
+      snapshot.forEach((docSnap) => {
+        all.push({ id: docSnap.id, ...docSnap.data() });
+      });
+      setAdminListings(all);
+    }, (err) => {
+      console.error("Could not fetch full listings count for admin:", err);
+    });
+    return () => unsubscribe();
+  }, []);
+
   // Enforce secure lock immediately
   if (!isUserAdmin) {
     return (
@@ -346,7 +364,7 @@ export function AdminPanel({ language, currentUser, listings: listingsProp, isUs
   const totalRevenue = requests
     .filter((req) => req.status === "approved")
     .reduce((sum, req) => sum + (Number(req.amount) || 0), 0);
-  const totalListings = listings?.length || 0;
+  const totalListings = adminListings?.length || 0;
   const pendingRequestsCount = requests.filter(r => r.status === 'pending').length;
 
   return (
@@ -591,8 +609,8 @@ export function AdminPanel({ language, currentUser, listings: listingsProp, isUs
                 <Flag className={`w-3.5 h-3.5 ${showOnlyReported ? "text-red-500 animate-pulse" : "text-slate-450"}`} />
                 <span>
                   {language === "bn" 
-                    ? `অভিযোগ প্রাপ্ত বিজ্ঞাপন (${listings.filter(i => (i.reportCount || 0) > 0).length})` 
-                    : `Reported Only (${listings.filter(i => (i.reportCount || 0) > 0).length})`}
+                    ? `অভিযোগ প্রাপ্ত বিজ্ঞাপন (${adminListings.filter(i => (i.reportCount || 0) > 0).length})` 
+                    : `Reported Only (${adminListings.filter(i => (i.reportCount || 0) > 0).length})`}
                 </span>
               </button>
 
@@ -633,7 +651,7 @@ export function AdminPanel({ language, currentUser, listings: listingsProp, isUs
           {/* Filtered Posts Grid */}
           {(() => {
             const queryClean = listingsSearch.toLowerCase().trim();
-            let filtered = listings.filter(item => 
+            let filtered = adminListings.filter(item => 
               item.title?.toLowerCase().includes(queryClean) ||
               item.category?.toLowerCase().includes(queryClean) ||
               item.location?.toLowerCase().includes(queryClean) ||
