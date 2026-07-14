@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { ShieldAlert, Loader2 } from "lucide-react";
+import { getOptimizedImageUrl } from "../utils/cloudinary";
 
 interface ImageWithFallbackProps {
   id?: string;
@@ -7,9 +8,10 @@ interface ImageWithFallbackProps {
   alt: string;
   className?: string;
   isAd?: boolean;
+  width?: number;
 }
 
-export function ImageWithFallback({ id, src, alt, className = "", isAd = false }: ImageWithFallbackProps) {
+export function ImageWithFallback({ id, src, alt, className = "", isAd = false, width = 500 }: ImageWithFallbackProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
@@ -31,7 +33,7 @@ export function ImageWithFallback({ id, src, alt, className = "", isAd = false }
       )}
       <img
         id={id}
-        src={src}
+        src={getOptimizedImageUrl(src, width)}
         alt={alt}
         className={`w-full h-full object-cover transition-opacity duration-200 ${loading ? "opacity-0 absolute inset-0" : "opacity-100"} ${className}`}
         onLoad={() => setLoading(false)}
