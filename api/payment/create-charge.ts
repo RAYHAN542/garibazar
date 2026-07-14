@@ -16,7 +16,7 @@ if (!getApps().length) {
   }
 }
 
-const SITE_URL = "https://garibazar.vercel.app";
+const SITE_URL = "https://garibazar.shop";
 
 export default async function handler(req: any, res: any) {
   if (req.method !== "POST") {
