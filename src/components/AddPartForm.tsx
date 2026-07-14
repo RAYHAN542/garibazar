@@ -197,7 +197,7 @@ export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPromp
       return;
     }
 
-    if (!category || !price || !location || !phone) {
+    if (!category || !location || !phone) {
       setError(language === "bn" ? "অনুগ্রহ করে সব বাধ্যতামূলক ঘর পূরণ করুন" : "Please fill all required fields");
       return;
     }
@@ -368,10 +368,10 @@ export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPromp
           <div>
             <label className="block text-xs font-semibold text-gray-700 mb-1">
               {activeTab === "part"
-                ? (language === "bn" ? "১. পার্টসের মূল্য (BDT) *" : "1. Part Price (BDT) *")
-                : (language === "bn" ? "১. গাড়ির মূল্য (BDT) *" : "1. Vehicle Price (BDT) *")}
+                ? (language === "bn" ? "১. পার্টসের মূল্য (BDT) (ঐচ্ছিক)" : "1. Part Price (BDT) (Optional)")
+                : (language === "bn" ? "১. গাড়ির মূল্য (BDT) (ঐচ্ছিক)" : "1. Vehicle Price (BDT) (Optional)")}
             </label>
-            <input type="number" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="৳" className="w-full px-3 py-2 border rounded-lg text-sm bg-white text-gray-900 focus:outline-none focus:border-orange-500" required />
+            <input type="number" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="৳" className="w-full px-3 py-2 border rounded-lg text-sm bg-white text-gray-900 focus:outline-none focus:border-orange-500" />
           </div>
 
           <div className="grid grid-cols-2 gap-3">

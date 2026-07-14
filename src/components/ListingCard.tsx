@@ -106,7 +106,9 @@ export function ListingCard({ listing, language, onViewDetails, onPromoteClick, 
 
         <div className="flex items-center justify-between mt-1">
           <span className="text-sm font-black text-amber-600 dark:text-amber-400 tracking-tight">
-            ৳{listing.price.toLocaleString("en-IN")}
+            {listing.price
+              ? `৳${listing.price.toLocaleString("en-IN")}`
+              : (language === "bn" ? "মূল্য জানতে যোগাযোগ করুন" : "Price on Request")}
           </span>
           <span className="flex items-center gap-1 text-[10px] text-slate-400 font-bold">
             <Eye className="w-3.5 h-3.5" />
