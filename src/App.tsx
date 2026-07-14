@@ -938,7 +938,7 @@ export default function App() {
       return;
     }
 
-    const q = query(collection(db, "purchases"), orderBy("createdAt", "desc"), limit(20));
+    const q = query(collection(db, "purchases"), where("buyerId", "==", user.uid), orderBy("createdAt", "desc"), limit(20));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       if (snapshot.empty) {
         setFirebasePurchases([]);
