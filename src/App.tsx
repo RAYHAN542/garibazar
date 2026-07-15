@@ -5,6 +5,7 @@
 
 import { useState, useEffect, useMemo, useRef, lazy, Suspense } from "react";
 import { auth, db, logAnalyticsEvent } from "./firebase";
+import { logger } from "./utils/logger";
 import { signOut } from "firebase/auth";
 import { collection, onSnapshot, query, orderBy, getDocs, doc, getDoc, updateDoc, where, addDoc, deleteDoc, limit, startAfter, DocumentSnapshot } from "firebase/firestore";
 import { 
@@ -472,7 +473,7 @@ export default function App() {
       const refCode = searchParams.get("ref");
       if (refCode) {
         localStorage.setItem("gari_bazar_prefilled_referral", refCode.toUpperCase());
-        console.log("Captured prefilled referral code:", refCode);
+        logger.debug("Captured prefilled referral code:", refCode);
       }
     }
   }, []);
@@ -776,10 +777,10 @@ export default function App() {
       
       if (snapshot.empty) {
         if (isProduction) {
-          console.log("Firestore empty in production. No listings to show.");
+          logger.debug("Firestore empty in production. No listings to show.");
           setFirebaseListings([]);
         } else {
-          console.log("Firestore empty. Fallback to offline mock car parts listings.");
+          logger.debug("Firestore empty. Fallback to offline mock car parts listings.");
           setFirebaseListings(SAMPLE_LISTINGS as PartListing[]);
         }
         setHasMoreListings(false);
@@ -1066,7 +1067,7 @@ export default function App() {
     );
 
     if (expiredAds.length > 0) {
-      console.log(`Resetting ${expiredAds.length} expired ad promotions...`);
+      logger.debug(`Resetting ${expiredAds.length} expired ad promotions...`);
       expiredAds.forEach(async (item) => {
         try {
           const isLocal = item.id.startsWith("local-") || item.id.startsWith("temp-");
