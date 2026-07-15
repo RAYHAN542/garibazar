@@ -38,7 +38,7 @@ service cloud.firestore {
       allow create: if isSignedIn() &&
                     request.resource.data.sellerId == request.auth.uid &&
                     request.resource.data.price is number &&
-                    request.resource.data.price >= 1 &&
+                    request.resource.data.price >= 0 &&
                     request.resource.data.price <= 99999999 &&
                     request.resource.data.title is string &&
                     request.resource.data.title.size() > 0 &&
