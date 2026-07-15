@@ -9,3 +9,4 @@ coverage/
 .env.local
 firebase-applet-config.json
 archive/
+src/**/*.txt
