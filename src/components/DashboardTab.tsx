@@ -681,13 +681,13 @@ export default function DashboardTab({
                                   setAdPromoSuccess(false);
                                   setAdPromoError("");
                                 }}
-                                className="w-full bg-slate-50 dark:bg-slate-955 border border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-100 rounded-xl px-3 py-2.5 text-xs outline-none focus:ring-1 focus:ring-amber-500/30 font-semibold cursor-pointer"
+                                className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-100 rounded-xl px-3 py-2.5 text-xs outline-none focus:ring-1 focus:ring-amber-500/30 font-semibold cursor-pointer"
                               >
-                                <option value="">
+                                <option value="" className="bg-white text-slate-900">
                                   {language === "bn" ? "---একটি প্রোডাক্ট সিলেক্ট করুন---" : "---Choose a Posted Car Part---"}
                                 </option>
                                 {listings.filter(item => item.sellerId === user.uid).map((item) => (
-                                  <option key={item.id} value={item.id}>
+                                  <option key={item.id} value={item.id} className="bg-white text-slate-900">
                                     {item.title} (৳{item.price.toLocaleString()}) {item.isAd ? `[${language === "bn" ? "ইতিমধ্যে বুস্ট রয়েছে" : "Already boosted"}]` : ""}
                                   </option>
                                 ))}
