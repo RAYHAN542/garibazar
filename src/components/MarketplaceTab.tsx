@@ -4,6 +4,9 @@ import { PromotedSlider } from "./PromotedSlider";
 import { CITIES } from "../translations";
 import { PartListing, SupportedLanguage, TranslationSet } from "../types";
 import type { ActiveTab } from "./HeaderNav";
+import { logAnalyticsEvent } from "../firebase";
+import vehicleCardImg from "../assets/images/vehicle-card-new.png";
+import partsCardImg from "../assets/images/parts-card-new.png";
 
 const VEHICLE_SUBCATEGORIES = [
   { id: "all", bnName: "সব গাড়ি", enName: "All Vehicles" },
