@@ -631,7 +631,7 @@ export default function App() {
 
   // Intercept browser back button to close active modal instead of exiting the page/iframe
   useEffect(() => {
-    const isAnyModalOpen = !!(isAuthOpen || selectedListing || promotingListing || editingListing || isRefillModalOpen || isLegalOpen);
+    const isAnyModalOpen = !!(isAuthOpen || promotingListing || editingListing || isRefillModalOpen || isLegalOpen);
 
     const handlePopState = () => {
       modalHistoryRef.current = false;
@@ -659,7 +659,7 @@ export default function App() {
     return () => {
       window.removeEventListener("popstate", handlePopState);
     };
-  }, [isAuthOpen, selectedListing, promotingListing, editingListing, isRefillModalOpen, isLegalOpen]);
+  }, [isAuthOpen, promotingListing, editingListing, isRefillModalOpen, isLegalOpen]);
 
   // 1. Custom Passwordless Profile Authentication Listener & Real-time Firestore Sync
   useEffect(() => {
@@ -1224,29 +1224,32 @@ export default function App() {
     }
   };
 
-  // 5. Track views asynchronously when user reviews details
+  // 5. Open the listing detail page via a REAL browser navigation (full URL
+  // change), not just a client-side state update. Facebook/Instagram's in-app
+  // browser back button ignores purely virtual (pushState-only) history, but
+  // it does respect genuine page navigations -- the same way it works on any
+  // normal multi-page website. This trades a brief reload for a back button
+  // that reliably works.
   const handleViewListingDetails = async (listing: PartListing) => {
-    setSelectedListing(listing);
-    
+    // Fire-and-forget the view counter -- the page is about to navigate away,
+    // so we don't wait for this to finish.
     try {
       const listingRef = doc(db, "listings", listing.id);
-      const newViews = (listing.views || 0) + 1;
-      await updateDoc(listingRef, {
-        views: newViews
-      });
-      // Reflect the new view count immediately in local state so the
-      // updated number shows right away without needing an app reload.
-      setListings((prev) =>
-        prev.map((item) =>
-          item.id === listing.id ? { ...item, views: newViews } : item
-        )
-      );
-      setSelectedListing((prev) =>
-        prev && prev.id === listing.id ? { ...prev, views: newViews } : prev
-      );
+      updateDoc(listingRef, { views: (listing.views || 0) + 1 }).catch(() => {});
     } catch (err) {
       console.warn("Could not increment view counter:", err);
     }
+
+    const url = `${window.location.origin}${window.location.pathname}?listing=${encodeURIComponent(listing.id)}`;
+    window.location.href = url;
+  };
+
+  // Close the listing detail page the same way it was opened: a real
+  // navigation back to the clean home URL, so the "ফিরে যান" button and any
+  // future back-button presses land on a genuine, reloadable page.
+  const closeListingDetail = () => {
+    const cleanUrl = window.location.origin + window.location.pathname;
+    window.location.href = cleanUrl;
   };
 
   // 6. Sign out trigger
@@ -2312,7 +2315,7 @@ export default function App() {
           language={language}
           currentUser={userMetadata || user}
           isAdmin={isUserAdmin}
-          onClose={() => setSelectedListing(null)}
+          onClose={closeListingDetail}
           onPurchaseAdded={() => {
             // updates purchases data automatically via firestore listener
           }}
