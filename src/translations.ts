@@ -299,7 +299,7 @@ export const AD_PACKAGES: AdPackage[] = [
     id: "pkg-basic",
     nameEn: "Basic Machine Boost",
     nameBn: "বেসিক মেশিন বুস্ট",
-    price: 300,
+    price: 199,
     durationDays: 3,
     benefitsEn: [
       "Displays 'Promoted' badge on machinery card",
@@ -317,7 +317,7 @@ export const AD_PACKAGES: AdPackage[] = [
     id: "pkg-premium",
     nameEn: "Premium Machine Highlights",
     nameBn: "প্রিমিয়াম স্লাইডার বিজ্ঞাপন",
-    price: 500,
+    price: 399,
     durationDays: 6,
     benefitsEn: [
       "Featured in the Home Machinery Showcase Slideshow",
@@ -337,7 +337,7 @@ export const AD_PACKAGES: AdPackage[] = [
     id: "pkg-featured",
     nameEn: "Sponsor Gold Spotlight",
     nameBn: "গোল্ড ক্যাটাগরি স্পটলাইট বিজ্ঞাপন",
-    price: 1000,
+    price: 699,
     durationDays: 12,
     benefitsEn: [
       "Top premium listing card with flashing glowing machine borders",
@@ -354,21 +354,5 @@ export const AD_PACKAGES: AdPackage[] = [
       "১২ দিন ব্যাপী সর্বোচ্চ স্তরের ১০x কাভারেজ"
     ],
     tier: "featured"
-  },
-  {
-    id: "pkg-test",
-    nameEn: "Quick Test Boost",
-    nameBn: "কুইক টেস্ট বুস্ট",
-    price: 20,
-    durationDays: 1,
-    benefitsEn: [
-      "For testing the real payment flow with a small amount",
-      "1 day of basic promoted visibility"
-    ],
-    benefitsBn: [
-      "রিয়েল পেমেন্ট ফ্লো অল্প টাকায় টেস্ট করার জন্য",
-      "১ দিনের বেসিক প্রমোটেড ভিজিবিলিটি"
-    ],
-    tier: "basic"
   }
 ];
