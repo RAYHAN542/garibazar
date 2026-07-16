@@ -664,6 +664,14 @@ export default function App() {
   useEffect(() => {
     if (typeof window === "undefined") return;
     window.history.replaceState({ garibazarAnchor: true, ...window.history.state }, "");
+    // Also push one extra buffer entry right away. Without this, a fresh page
+    // load (e.g. arriving via a shared Facebook link) starts with only ONE
+    // history entry -- so the very first back-button/gesture press after
+    // opening a listing can land right on the edge of the stack and some
+    // Android back-gesture implementations close the whole tab/app instead
+    // of stepping back within the page. This buffer entry gives every
+    // modal's pushState a safe extra step of room underneath it.
+    window.history.pushState({ garibazarHome: true }, "");
   }, []);
 
   // Ref to track if we pushed a modal state
