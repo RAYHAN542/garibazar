@@ -1,8 +1,12 @@
 export const SEARCH_ALIAS_GROUPS: string[][] = [
-  // Generic vehicle-type terms (English / Bangla variants) - so a plain
-  // listing like "গাড়ি বিক্রি হবে" (no brand/model mentioned) is still
-  // found by an English "car" search, and vice versa.
-  ["car", "গাড়ি", "গারি", "কার"],
+  // "car" is kept specific (English car <-> বাংলা কার) so a "Car" search
+  // shows actual cars, not every truck/excavator listing that happens to
+  // use the generic Bangla word "গাড়ি" (vehicle) in its description.
+  ["car", "কার"],
+  // Generic vehicle-type term (Bangla "গাড়ি"/"গারি" covers any vehicle -
+  // car, truck, bus, excavator etc.) - matched against English "vehicle",
+  // not "car", to avoid over-matching a specific "car" search.
+  ["vehicle", "গাড়ি", "গারি"],
   ["truck", "ট্রাক", "লরি", "lorry"],
   ["bus", "বাস"],
   ["bike", "motorcycle", "motorbike", "বাইক", "মোটরসাইকেল", "মোটর সাইকেল"],
