@@ -649,7 +649,7 @@ export default function App() {
     return () => {
       window.removeEventListener("popstate", handlePopState);
     };
-  }, [isAuthOpen, selectedListing, promotingListing]);
+  }, [isAuthOpen, selectedListing, promotingListing, editingListing, isRefillModalOpen, isLegalOpen]);
 
   // 1. Custom Passwordless Profile Authentication Listener & Real-time Firestore Sync
   useEffect(() => {
