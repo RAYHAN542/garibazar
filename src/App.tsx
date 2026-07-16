@@ -366,7 +366,6 @@ export default function App() {
   const [editingListing, setEditingListing] = useState<PartListing | null>(null);
   const [isStandalonePrivacy, setIsStandalonePrivacy] = useState(false);
   const [isStandaloneDeletion, setIsStandaloneDeletion] = useState(false);
-  const [showInAppBrowserBanner, setShowInAppBrowserBanner] = useState(false);
 
   // Synchronize saved Listing IDs from localStorage when activeTab shifts or selectedListing toggles
   useEffect(() => {
@@ -616,22 +615,6 @@ export default function App() {
   }, []);
 
   const activeTranslations = translations[language];
-
-  // Detect Facebook / Instagram / Messenger's built-in in-app browser.
-  // These in-app browsers have their OWN back button (top bar) that, on many
-  // app versions, closes the mini-browser directly instead of asking the page
-  // to go back one step in its JS history -- so our pushState/popstate modal
-  // trick below can't intercept it. The reliable fix is to nudge the visitor
-  // to open the site in their real browser (Chrome/Safari), where our back
-  // button handling works normally.
-  useEffect(() => {
-    if (typeof navigator === "undefined") return;
-    const ua = navigator.userAgent || "";
-    const isInAppBrowser = /FBAN|FBAV|FB_IAB|Instagram|Messenger/i.test(ua);
-    if (isInAppBrowser && !sessionStorage.getItem("gari_bazar_hide_iab_banner")) {
-      setShowInAppBrowserBanner(true);
-    }
-  }, []);
 
   // Push one harmless "anchor" history entry as soon as the app boots, before
   // any modal ever opens. This guarantees there is always at least one extra
@@ -1574,44 +1557,6 @@ export default function App() {
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-100 flex flex-col font-sans transition-colors duration-300">
       
-      {/* Facebook/Instagram in-app browser notice -- their own back button often
-          exits the mini-browser instead of going back a step on the site.
-          The button below opens Chrome directly on Android (one tap, no menus). */}
-      {showInAppBrowserBanner && (
-        <div className="bg-amber-50 dark:bg-amber-950/40 border-b border-amber-300 dark:border-amber-800 text-amber-900 dark:text-amber-200 text-[12px] py-1.5 px-3 flex items-center justify-between gap-2 sticky top-0 z-50">
-          <div className="flex items-center gap-1.5 min-w-0">
-            <Globe className="w-3.5 h-3.5 shrink-0" />
-            <span className="truncate">ভালোভাবে ব্যবহারের জন্য ব্রাউজারে খুলুন</span>
-          </div>
-          <div className="flex items-center gap-1 shrink-0">
-            <button
-              onClick={() => {
-                const currentUrl = window.location.href;
-                const isAndroid = /Android/i.test(navigator.userAgent || "");
-                if (isAndroid) {
-                  const urlNoScheme = currentUrl.replace(/^https?:\/\//, "");
-                  window.location.href = `intent://${urlNoScheme}#Intent;scheme=https;package=com.android.chrome;end`;
-                } else {
-                  window.alert('উপরে ডান দিকের ⋯ মেনু থেকে "Open in Browser" চাপুন।');
-                }
-              }}
-              className="bg-amber-500 hover:bg-amber-600 active:bg-amber-600 text-white text-[11px] font-bold px-3 py-1 rounded-md transition-colors"
-            >
-              খুলুন
-            </button>
-            <button
-              onClick={() => {
-                setShowInAppBrowserBanner(false);
-                try { sessionStorage.setItem("gari_bazar_hide_iab_banner", "1"); } catch {}
-              }}
-              className="p-1 hover:bg-amber-500/20 rounded-full transition-colors"
-              aria-label="Dismiss"
-            >
-              <X className="w-3.5 h-3.5" />
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* Offline Alert Banner in Bengali */}
       {isOffline && (
