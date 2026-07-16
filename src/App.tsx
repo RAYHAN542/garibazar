@@ -2280,6 +2280,7 @@ export default function App() {
           listing={selectedListing}
           language={language}
           currentUser={userMetadata || user}
+          isAdmin={isUserAdmin}
           onClose={() => setSelectedListing(null)}
           onPurchaseAdded={() => {
             // updates purchases data automatically via firestore listener

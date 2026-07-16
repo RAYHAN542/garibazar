@@ -14,9 +14,10 @@ interface ListingDetailModalProps {
   onLoginPrompt?: () => void;
   onInitiateSellerChat?: (listing: PartListing) => void;
   onViewSellerShop?: (sellerId: string, fallbackName: string, fallbackPhoto?: string, fallbackLocation?: string, fallbackContact?: string) => void;
+  isAdmin?: boolean;
 }
 
-export function ListingDetailModal({ listing, language, currentUser, onClose, onPurchaseAdded, onLoginPrompt, onInitiateSellerChat, onViewSellerShop }: ListingDetailModalProps) {
+export function ListingDetailModal({ listing, language, currentUser, onClose, onPurchaseAdded, onLoginPrompt, onInitiateSellerChat, onViewSellerShop, isAdmin = false }: ListingDetailModalProps) {
   const [isPlayingVideo, setIsPlayingVideo] = useState(false);
   const [showPhoneNumber, setShowPhoneNumber] = useState(false);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
@@ -704,38 +705,54 @@ export function ListingDetailModal({ listing, language, currentUser, onClose, on
 
             {/* 3. Seller number / Seller information */}
             <div className="p-4 bg-slate-50 dark:bg-slate-950 border border-slate-150 dark:border-slate-850 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <div 
-                className={`flex items-center gap-3 ${onViewSellerShop ? "cursor-pointer hover:opacity-85 active:scale-98 transition-all group/seller" : ""}`}
-                onClick={() => {
-                  if (onViewSellerShop) {
-                    onViewSellerShop(
-                      listing.sellerId || "unregistered",
-                      listing.sellerName,
-                      (listing as any).sellerPhoto || "",
-                      listing.location || "Dhaka",
-                      listing.contactNumber || ""
-                    );
-                  }
-                }}
-              >
-                <div className="w-12 h-12 rounded-full bg-gradient-to-tr from-amber-500 to-orange-500 text-slate-955 font-black text-lg flex items-center justify-center uppercase shadow-md shadow-amber-500/10 group-hover/seller:rotate-6 transition-transform">
-                  {listing.sellerName?.charAt(0)?.toUpperCase() || "S"}
-                </div>
-                <div>
-                  <span className="text-slate-400 text-[10px] uppercase font-bold tracking-wider block">
-                    {language === "bn" ? "বিক্রেতার নাম (দোকান দেখুন 🛒)" : "Seller Name (View Shop 🛒)"}
-                  </span>
-                  <p className="font-extrabold text-slate-850 dark:text-white text-base group-hover/seller:text-amber-500 transition-colors">
-                    {listing.sellerName}
-                  </p>
-                  <div className="flex items-center gap-0.5 mt-0.5">
-                    {[1, 2, 3, 4, 5].map(star => (
-                      <Star key={star} className={`w-3 h-3 ${star <= (listing.sellerRating || 5) ? "fill-amber-400 text-amber-400" : "fill-slate-700 text-slate-700"}`} />
-                    ))}
-                    <span className="text-[10px] text-slate-500 font-bold ml-1">({listing.sellerReviewCount || Math.floor(Math.random() * 10) + 1})</span>
+              {isAdmin ? (
+                <div 
+                  className={`flex items-center gap-3 ${onViewSellerShop ? "cursor-pointer hover:opacity-85 active:scale-98 transition-all group/seller" : ""}`}
+                  onClick={() => {
+                    if (onViewSellerShop) {
+                      onViewSellerShop(
+                        listing.sellerId || "unregistered",
+                        listing.sellerName,
+                        (listing as any).sellerPhoto || "",
+                        listing.location || "Dhaka",
+                        listing.contactNumber || ""
+                      );
+                    }
+                  }}
+                >
+                  <div className="w-12 h-12 rounded-full bg-gradient-to-tr from-amber-500 to-orange-500 text-slate-955 font-black text-lg flex items-center justify-center uppercase shadow-md shadow-amber-500/10 group-hover/seller:rotate-6 transition-transform">
+                    {listing.sellerName?.charAt(0)?.toUpperCase() || "S"}
+                  </div>
+                  <div>
+                    <span className="text-slate-400 text-[10px] uppercase font-bold tracking-wider block">
+                      {language === "bn" ? "বিক্রেতার নাম (দোকান দেখুন 🛒)" : "Seller Name (View Shop 🛒)"}
+                    </span>
+                    <p className="font-extrabold text-slate-850 dark:text-white text-base group-hover/seller:text-amber-500 transition-colors">
+                      {listing.sellerName}
+                    </p>
+                    <div className="flex items-center gap-0.5 mt-0.5">
+                      {[1, 2, 3, 4, 5].map(star => (
+                        <Star key={star} className={`w-3 h-3 ${star <= (listing.sellerRating || 5) ? "fill-amber-400 text-amber-400" : "fill-slate-700 text-slate-700"}`} />
+                      ))}
+                      <span className="text-[10px] text-slate-500 font-bold ml-1">({listing.sellerReviewCount || Math.floor(Math.random() * 10) + 1})</span>
+                    </div>
                   </div>
                 </div>
-              </div>
+              ) : (
+                <div className="flex items-center gap-3">
+                  <div>
+                    <span className="text-slate-400 text-[10px] uppercase font-bold tracking-wider block">
+                      {language === "bn" ? "বিক্রেতা রেটিং" : "Seller Rating"}
+                    </span>
+                    <div className="flex items-center gap-0.5 mt-1">
+                      {[1, 2, 3, 4, 5].map(star => (
+                        <Star key={star} className={`w-3 h-3 ${star <= (listing.sellerRating || 5) ? "fill-amber-400 text-amber-400" : "fill-slate-700 text-slate-700"}`} />
+                      ))}
+                      <span className="text-[10px] text-slate-500 font-bold ml-1">({listing.sellerReviewCount || Math.floor(Math.random() * 10) + 1})</span>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               <div className="border-t sm:border-t-0 sm:border-l border-slate-200 dark:border-slate-800 pt-3 sm:pt-0 sm:pl-4 flex-1">
                 <span className="text-slate-400 text-[10px] uppercase font-bold tracking-wider block">
