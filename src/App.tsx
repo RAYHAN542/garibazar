@@ -366,6 +366,7 @@ export default function App() {
   const [editingListing, setEditingListing] = useState<PartListing | null>(null);
   const [isStandalonePrivacy, setIsStandalonePrivacy] = useState(false);
   const [isStandaloneDeletion, setIsStandaloneDeletion] = useState(false);
+  const [showInAppBrowserBanner, setShowInAppBrowserBanner] = useState(false);
 
   // Synchronize saved Listing IDs from localStorage when activeTab shifts or selectedListing toggles
   useEffect(() => {
@@ -615,6 +616,32 @@ export default function App() {
   }, []);
 
   const activeTranslations = translations[language];
+
+  // Detect Facebook / Instagram / Messenger's built-in in-app browser.
+  // These in-app browsers have their OWN back button (top bar) that, on many
+  // app versions, closes the mini-browser directly instead of asking the page
+  // to go back one step in its JS history -- so our pushState/popstate modal
+  // trick below can't intercept it. The reliable fix is to nudge the visitor
+  // to open the site in their real browser (Chrome/Safari), where our back
+  // button handling works normally.
+  useEffect(() => {
+    if (typeof navigator === "undefined") return;
+    const ua = navigator.userAgent || "";
+    const isInAppBrowser = /FBAN|FBAV|FB_IAB|Instagram|Messenger/i.test(ua);
+    if (isInAppBrowser && !sessionStorage.getItem("gari_bazar_hide_iab_banner")) {
+      setShowInAppBrowserBanner(true);
+    }
+  }, []);
+
+  // Push one harmless "anchor" history entry as soon as the app boots, before
+  // any modal ever opens. This guarantees there is always at least one extra
+  // step of same-site history underneath any modal's pushState, so a single
+  // back press never has a chance of falling straight through to whatever
+  // was open before the site (e.g. the Facebook feed).
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.history.replaceState({ garibazarAnchor: true, ...window.history.state }, "");
+  }, []);
 
   // Ref to track if we pushed a modal state
   const modalHistoryRef = useRef<boolean>(false);
@@ -1547,6 +1574,30 @@ export default function App() {
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-100 flex flex-col font-sans transition-colors duration-300">
       
+      {/* Facebook/Instagram in-app browser notice -- their own back button often
+          exits the mini-browser instead of going back a step on the site. */}
+      {showInAppBrowserBanner && (
+        <div className="bg-amber-500 text-slate-900 text-[13px] py-2.5 px-4 flex items-center justify-between gap-2 sticky top-0 z-50 shadow-md">
+          <div className="flex items-center gap-2">
+            <Globe className="w-4 h-4 shrink-0" />
+            <span>
+              সেরা অভিজ্ঞতার জন্য এবং ব্যাক বাটন ঠিকমতো কাজ করার জন্য, উপরের ⋯ মেনু থেকে{" "}
+              <b>"ব্রাউজারে খুলুন" (Open in Browser)</b> চাপুন।
+            </span>
+          </div>
+          <button
+            onClick={() => {
+              setShowInAppBrowserBanner(false);
+              try { sessionStorage.setItem("gari_bazar_hide_iab_banner", "1"); } catch {}
+            }}
+            className="shrink-0 p-1 hover:bg-amber-600/40 rounded-full transition-colors"
+            aria-label="Dismiss"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
       {/* Offline Alert Banner in Bengali */}
       {isOffline && (
         <div className="bg-red-600 text-white font-bold text-[13px] py-2.5 px-4 flex items-center justify-center gap-2 sticky top-0 z-50 shadow-md animate-pulse">

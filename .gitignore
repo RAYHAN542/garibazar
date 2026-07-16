@@ -10,3 +10,4 @@ coverage/
 firebase-applet-config.json
 archive/
 src/**/*.txt
+.vercel
