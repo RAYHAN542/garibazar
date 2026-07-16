@@ -7,7 +7,7 @@ import { useState, useEffect, useMemo, useRef, lazy, Suspense } from "react";
 import { auth, db, logAnalyticsEvent } from "./firebase";
 import { logger } from "./utils/logger";
 import { signOut } from "firebase/auth";
-import { collection, onSnapshot, query, orderBy, getDocs, doc, getDoc, updateDoc, where, addDoc, deleteDoc, limit, startAfter, DocumentSnapshot } from "firebase/firestore";
+import { collection, onSnapshot, query, orderBy, getDocs, doc, getDoc, updateDoc, where, addDoc, deleteDoc, limit, startAfter, DocumentSnapshot, increment } from "firebase/firestore";
 import { 
   Car, 
   Search, 
@@ -671,7 +671,7 @@ export default function App() {
 
   // Intercept browser back button to close active modal instead of exiting the page/iframe
   useEffect(() => {
-    const isAnyModalOpen = !!(isAuthOpen || promotingListing || editingListing || isRefillModalOpen || isLegalOpen);
+    const isAnyModalOpen = !!(isAuthOpen || selectedListing || promotingListing || editingListing || isRefillModalOpen || isLegalOpen);
 
     const handlePopState = () => {
       modalHistoryRef.current = false;
@@ -699,7 +699,7 @@ export default function App() {
     return () => {
       window.removeEventListener("popstate", handlePopState);
     };
-  }, [isAuthOpen, promotingListing, editingListing, isRefillModalOpen, isLegalOpen]);
+  }, [isAuthOpen, selectedListing, promotingListing, editingListing, isRefillModalOpen, isLegalOpen]);
 
   // 1. Custom Passwordless Profile Authentication Listener & Real-time Firestore Sync
   useEffect(() => {
@@ -1264,38 +1264,34 @@ export default function App() {
     }
   };
 
-  // 5. Open the listing detail page via a REAL browser navigation (full URL
-  // change), not just a client-side state update. Facebook/Instagram's in-app
-  // browser back button ignores purely virtual (pushState-only) history, but
-  // it does respect genuine page navigations -- the same way it works on any
-  // normal multi-page website. This trades a brief reload for a back button
-  // that reliably works.
+  // 5. Open the listing detail page instantly, client-side (no page reload).
+  // Shows whatever listing was tapped -- including ones from "Load More" --
+  // since it's already in memory. Back button is handled by the modal
+  // history effect above (isAnyModalOpen / handlePopState).
   const handleViewListingDetails = async (listing: PartListing) => {
-    // Fire-and-forget the view counter -- the page is about to navigate away,
-    // so we don't wait for this to finish.
+    setSelectedListing(listing);
+
     try {
       const listingRef = doc(db, "listings", listing.id);
-      updateDoc(listingRef, { views: (listing.views || 0) + 1 }).catch(() => {});
+      const newViews = (listing.views || 0) + 1;
+      await updateDoc(listingRef, { views: increment(1) });
+      setListings((prev) =>
+        prev.map((item) =>
+          item.id === listing.id ? { ...item, views: newViews } : item
+        )
+      );
+      setSelectedListing((prev) =>
+        prev && prev.id === listing.id ? { ...prev, views: newViews } : prev
+      );
     } catch (err) {
       console.warn("Could not increment view counter:", err);
     }
-
-    // Stash the listing data we already have in memory so the next page load
-    // can show it instantly, without waiting on any network request.
-    try {
-      sessionStorage.setItem("gari_bazar_cached_listing", JSON.stringify(listing));
-    } catch {}
-
-    const url = `${window.location.origin}${window.location.pathname}?listing=${encodeURIComponent(listing.id)}`;
-    window.location.href = url;
   };
 
-  // Close the listing detail page the same way it was opened: a real
-  // navigation back to the clean home URL, so the "ফিরে যান" button and any
-  // future back-button presses land on a genuine, reloadable page.
+  // Close the listing detail page -- just clear the selection. The modal
+  // history effect pops the history entry it pushed when the listing opened.
   const closeListingDetail = () => {
-    const cleanUrl = window.location.origin + window.location.pathname;
-    window.location.href = cleanUrl;
+    setSelectedListing(null);
   };
 
   // 6. Sign out trigger
