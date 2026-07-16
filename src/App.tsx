@@ -385,6 +385,26 @@ export default function App() {
     return listings.filter((item) => savedListingIds.includes(item.id));
   }, [listings, savedListingIds]);
 
+  // Open a specific listing when arriving via a shared link (?listing=<id>).
+  // Only runs once per page load, and only after the target listing has actually loaded in.
+  const [hasOpenedSharedListing, setHasOpenedSharedListing] = useState(false);
+  useEffect(() => {
+    if (hasOpenedSharedListing) return;
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const sharedListingId = params.get("listing");
+    if (!sharedListingId) return;
+
+    const target = listings.find((item) => item.id === sharedListingId);
+    if (target) {
+      setSelectedListing(target);
+      setHasOpenedSharedListing(true);
+      // Clean the URL so re-opening/closing the modal doesn't re-trigger this
+      const cleanUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
+      window.history.replaceState({}, "", cleanUrl);
+    }
+  }, [listings, hasOpenedSharedListing]);
+
   // Push Notifications (FCM) and Analytics integration states
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>(
     typeof window !== "undefined" && "Notification" in window ? Notification.permission : "default"

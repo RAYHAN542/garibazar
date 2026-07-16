@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { PartListing, SupportedLanguage } from "../types";
-import { X, Eye, MapPin, Sparkles, Play, SquarePlay, Heart, Flag, ShieldAlert, CheckCircle2, RotateCcw, ChevronLeft, ChevronRight, Loader2, ShoppingBag, Star, User, MessageSquare, Calendar, Send } from "lucide-react";
+import { X, Eye, MapPin, Sparkles, Play, SquarePlay, Heart, Flag, ShieldAlert, CheckCircle2, RotateCcw, ChevronLeft, ChevronRight, Loader2, ShoppingBag, Star, User, MessageSquare, Calendar, Send, Share2 } from "lucide-react";
 import { doc, getDoc, updateDoc, collection, addDoc, query, where, getDocs, increment } from "firebase/firestore";
 import { db, logAnalyticsEvent } from "../firebase";
 import { getOptimizedImageUrl } from "../utils/cloudinary";
@@ -83,6 +83,34 @@ export function ListingDetailModal({ listing, language, currentUser, onClose, on
 
   const [isAddingToDashboard, setIsAddingToDashboard] = useState(false);
   const [addToDashboardSuccess, setAddToDashboardSuccess] = useState(false);
+
+  // Share state (shows "Link Copied" feedback when Web Share API isn't available)
+  const [shareCopied, setShareCopied] = useState(false);
+
+  const handleShareListing = async () => {
+    const shareUrl = `${window.location.origin}${window.location.pathname}?listing=${listing.id}`;
+    const shareTitle = listing.title;
+    const shareText = language === "bn"
+      ? `গাড়ি বাজারে দেখুন: ${listing.title}`
+      : `Check this out on Gari Bazar: ${listing.title}`;
+
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: shareTitle, text: shareText, url: shareUrl });
+        return;
+      }
+    } catch (e) {
+      // user cancelled share sheet or it failed silently — fall through to clipboard copy
+    }
+
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      setShareCopied(true);
+      setTimeout(() => setShareCopied(false), 2000);
+    } catch (e) {
+      console.error("Could not copy share link:", e);
+    }
+  };
 
   // Seller Trust/Reviews Rating Integration
   const [reviews, setReviews] = useState<any[]>([]);
@@ -830,6 +858,25 @@ export function ListingDetailModal({ listing, language, currentUser, onClose, on
                   </button>
                 </div>
               )}
+
+              {/* Share Option */}
+              <button
+                type="button"
+                onClick={handleShareListing}
+                className={`px-4 py-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer border ${
+                  shareCopied
+                    ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-500"
+                    : "bg-white border-slate-200 text-slate-505 hover:bg-slate-50 hover:text-amber-600 dark:bg-slate-900 dark:border-slate-800 dark:text-slate-400 dark:hover:bg-slate-850 dark:hover:text-amber-400"
+                }`}
+              >
+                {shareCopied ? <CheckCircle2 className="w-4 h-4" /> : <Share2 className="w-4 h-4" />}
+                <span>
+                  {shareCopied
+                    ? (language === "bn" ? "লিংক কপি হয়েছে!" : "Link Copied!")
+                    : (language === "bn" ? "শেয়ার করুন" : "Share")
+                  }
+                </span>
+              </button>
 
               {/* Report Option */}
               {!isOwner && (
