@@ -59,9 +59,9 @@ export class ErrorBoundary extends React.Component<Props, State> {
               </p>
             </div>
 
-            {(this.state.error && (
+            {(this.state.error && import.meta.env.DEV && (
               <div className="text-left bg-slate-950/80 p-4 rounded-xl border border-slate-800 font-mono text-[11px] text-slate-400">
-                <span className="font-bold text-red-500">Error:</span> {this.state.error.message}
+                <span className="font-bold text-red-500">Error (dev only):</span> {this.state.error.message}
               </div>
             ))}
 

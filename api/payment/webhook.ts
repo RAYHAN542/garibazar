@@ -109,6 +109,6 @@ export default async function handler(req: any, res: any) {
     console.error("payment webhook failed:", err);
     // Still return 200 for "not found"/duplicate cases so UddoktaPay doesn't retry forever;
     // return 500 only for genuine unexpected failures worth a retry.
-    return res.status(500).json({ error: String(err?.message || err) });
+    return res.status(500).json({ error: "Webhook processing failed." });
   }
 }

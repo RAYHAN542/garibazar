@@ -137,7 +137,7 @@ export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPromp
       const formData = new FormData();
       formData.append("image", blob, file.name);
 
-      const response = await fetch("https://api.imgbb.com/1/upload?key=9d3bd22c0692e730c5caf7813788f541", {
+      const response = await fetch(`https://api.imgbb.com/1/upload?key=${import.meta.env.VITE_IMGBB_API_KEY}`, {
         method: "POST",
         body: formData
       });

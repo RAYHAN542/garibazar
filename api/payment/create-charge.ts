@@ -104,12 +104,12 @@ export default async function handler(req: any, res: any) {
 
     if (!uddoktaRes.ok || !uddoktaData?.payment_url) {
       console.error("UddoktaPay create-charge failed:", uddoktaData);
-      return res.status(502).json({ error: "পেমেন্ট গেটওয়ে থেকে সাড়া পাওয়া যায়নি।", detail: uddoktaData });
+      return res.status(502).json({ error: "পেমেন্ট গেটওয়ে থেকে সাড়া পাওয়া যায়নি।" });
     }
 
     return res.status(200).json({ payment_url: uddoktaData.payment_url });
   } catch (err: any) {
     console.error("create-charge failed:", err);
-    return res.status(500).json({ error: "সার্ভারে সমস্যা হয়েছে।", detail: String(err?.message || err) });
+    return res.status(500).json({ error: "সার্ভারে সমস্যা হয়েছে।" });
   }
 }

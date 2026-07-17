@@ -28,6 +28,7 @@ function escapeHtml(str: string) {
 export default async function handler(req: any, res: any) {
   const id = (req.query?.id || "").toString();
   const appUrl = id ? `${SITE_URL}/?listing=${id}` : SITE_URL;
+  const shareUrl = id ? `${SITE_URL}/l/${id}` : SITE_URL;
   const userAgent = req.headers["user-agent"] || "";
   const isCrawler = CRAWLER_UA.test(userAgent);
 
@@ -69,13 +70,12 @@ export default async function handler(req: any, res: any) {
 <meta property="og:title" content="${escapeHtml(title)}" />
 <meta property="og:description" content="${escapeHtml(description)}" />
 <meta property="og:type" content="website" />
-<meta property="og:url" content="${escapeHtml(appUrl)}" />
+<meta property="og:url" content="${escapeHtml(shareUrl)}" />
 <meta property="og:image" content="${escapeHtml(image)}" />
 <meta name="twitter:card" content="summary_large_image" />
 <meta name="twitter:title" content="${escapeHtml(title)}" />
 <meta name="twitter:description" content="${escapeHtml(description)}" />
 <meta name="twitter:image" content="${escapeHtml(image)}" />
-<meta http-equiv="refresh" content="0; url=${escapeHtml(appUrl)}" />
 </head>
 <body>
 <a href="${escapeHtml(appUrl)}">${escapeHtml(title)}</a>
