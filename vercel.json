@@ -1,5 +1,6 @@
 {
   "rewrites": [
+    { "source": "/l/:id", "destination": "/api/share-listing?id=:id" },
     { "source": "/(.*)", "destination": "/index.html" }
   ],
   "headers": [

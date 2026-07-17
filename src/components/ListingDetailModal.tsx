@@ -88,7 +88,7 @@ export function ListingDetailModal({ listing, language, currentUser, onClose, on
   const [shareCopied, setShareCopied] = useState(false);
 
   const handleShareListing = async () => {
-    const shareUrl = `${window.location.origin}${window.location.pathname}?listing=${listing.id}`;
+    const shareUrl = `${window.location.origin}/l/${listing.id}`;
     const shareTitle = listing.title;
     const shareText = language === "bn"
       ? `গাড়ি বাজারে দেখুন: ${listing.title}`
