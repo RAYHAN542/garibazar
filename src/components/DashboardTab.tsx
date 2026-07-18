@@ -249,7 +249,7 @@ export default function DashboardTab({
                                 <div className="min-w-0">
                                   <h5 className="text-sm font-bold text-slate-850 dark:text-white truncate">{item.title}</h5>
                                   <div className="text-[11px] text-slate-400 mt-0.5 flex gap-2">
-                                    <span>৳{item.price.toLocaleString("en-IN")}</span>
+                                    <span>{item.price ? `৳${item.price.toLocaleString("en-IN")}` : (language === "bn" ? "মূল্য জানতে যোগাযোগ করুন" : "Price on Request")}</span>
                                     <span>•</span>
                                     <span>👁️ {item.views || 0} views</span>
                                   </div>
@@ -341,7 +341,7 @@ export default function DashboardTab({
                               </div>
 
                               <div className="flex sm:flex-col items-end justify-between sm:justify-center border-t sm:border-0 border-slate-100 dark:border-slate-850 pt-2 sm:pt-0">
-                                <span className="text-xs font-black text-amber-500">৳{item.price.toLocaleString("en-IN")}</span>
+                                <span className="text-xs font-black text-amber-500">{item.price ? `৳${item.price.toLocaleString("en-IN")}` : (language === "bn" ? "মূল্য জানতে যোগাযোগ করুন" : "Price on Request")}</span>
                                 <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-450 mt-1 flex items-center gap-1">
                                   <ShieldCheck className="w-3.5 h-3.5" />
                                   {item.status || "Pending Delivery"}
@@ -688,7 +688,7 @@ export default function DashboardTab({
                                 </option>
                                 {listings.filter(item => item.sellerId === user.uid).map((item) => (
                                   <option key={item.id} value={item.id} className="bg-white text-slate-900">
-                                    {item.title} (৳{item.price.toLocaleString()}) {item.isAd ? `[${language === "bn" ? "ইতিমধ্যে বুস্ট রয়েছে" : "Already boosted"}]` : ""}
+                                    {item.title} ({item.price ? `৳${item.price.toLocaleString()}` : (language === "bn" ? "মূল্য জানতে যোগাযোগ করুন" : "Price on Request")}) {item.isAd ? `[${language === "bn" ? "ইতিমধ্যে বুস্ট রয়েছে" : "Already boosted"}]` : ""}
                                   </option>
                                 ))}
                               </select>
@@ -847,7 +847,7 @@ export default function DashboardTab({
                                 <div className="min-w-0">
                                   <h5 className="text-xs font-bold text-slate-850 dark:text-white truncate">{item.title}</h5>
                                   <div className="text-[10px] text-slate-400 mt-1 flex gap-2">
-                                    <span className="font-semibold text-amber-500">৳{item.price.toLocaleString()}</span>
+                                    <span className="font-semibold text-amber-500">{item.price ? `৳${item.price.toLocaleString()}` : (language === "bn" ? "মূল্য জানতে যোগাযোগ করুন" : "Price on Request")}</span>
                                     <span>•</span>
                                     <span>👀 {item.views || 0} views</span>
                                   </div>
