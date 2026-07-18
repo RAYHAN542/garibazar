@@ -10,7 +10,6 @@ import type { ActiveTab } from "./HeaderNav";
 
 const AdminPanel = lazy(() => import("./AdminPanel").then(m => ({ default: m.AdminPanel })));
 const PlayStoreDiagnostics = lazy(() => import("./PlayStoreDiagnostics").then(m => ({ default: m.PlayStoreDiagnostics })));
-const SellerAnalyticsGraph = lazy(() => import("./SellerAnalyticsGraph"));
 
 type DashboardSubTab = 'inventory' | 'ads' | 'admin' | 'playstore-audit' | 'my-shop';
 
@@ -88,21 +87,13 @@ export default function DashboardTab({
               <div className="space-y-4 animate-fade-in">
 
                 {/* 2. Marketing Analytics cards */}
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-2 gap-2">
                   <div className="bg-white dark:bg-slate-900 rounded-xl p-2.5 border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col items-center text-center gap-1">
                     <div className="p-1.5 bg-blue-500/10 text-blue-500 rounded-lg">
                       <Grid className="w-3.5 h-3.5" />
                     </div>
                     <span className="text-[8px] sm:text-[9px] uppercase font-bold text-slate-400 leading-tight">{activeTranslations.statsActive}</span>
                     <span className="text-sm font-black text-slate-800 dark:text-white">{listings.filter(item => item.sellerId === user.uid).length}</span>
-                  </div>
-
-                  <div className="bg-white dark:bg-slate-900 rounded-xl p-2.5 border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col items-center text-center gap-1">
-                    <div className="p-1.5 bg-emerald-500/10 text-emerald-500 rounded-lg">
-                      <ShoppingBag className="w-3.5 h-3.5" />
-                    </div>
-                    <span className="text-[8px] sm:text-[9px] uppercase font-bold text-slate-400 leading-tight">{language === "bn" ? "ক্রুস ট্র্যাক" : "Tracked Orders"}</span>
-                    <span className="text-sm font-black text-slate-800 dark:text-white">{purchases.filter(item => item.buyerId === user.uid).length}</span>
                   </div>
 
                   <div className="bg-white dark:bg-slate-900 rounded-xl p-2.5 border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col items-center text-center gap-1">
@@ -115,16 +106,6 @@ export default function DashboardTab({
                     </span>
                   </div>
                 </div>
-
-                {/* Seller Performance Analytics Graph */}
-                <Suspense fallback={<div className="flex items-center justify-center py-16"><Loader2 className="w-6 h-6 animate-spin text-amber-500" /></div>}>
-                  <SellerAnalyticsGraph
-                    listings={listings}
-                    purchases={purchases}
-                    userId={user.uid}
-                    language={language}
-                  />
-                </Suspense>
 
                 {/* Dashboard Tab Toggles — compact pill বাটন, ছোট লেখা, সবগুলো এক স্ক্রিনে ধরার জন্য */}
                 <div className="flex gap-1.5 overflow-x-auto no-scrollbar pb-1" id="dash-tabs-bar">
