@@ -71,6 +71,7 @@ interface MarketplaceTabProps {
   setShowNotificationPrompt: (v: boolean) => void;
   notificationPermission: NotificationPermission;
   handleRequestNotificationPermission: () => Promise<void>;
+  setIsLotteryOpen: (v: boolean) => void;
 }
 
 /**
@@ -115,6 +116,7 @@ export default function MarketplaceTab({
   setShowNotificationPrompt,
   notificationPermission,
   handleRequestNotificationPermission,
+  setIsLotteryOpen,
 }: MarketplaceTabProps) {
   return (
               <div>
@@ -447,6 +449,7 @@ export default function MarketplaceTab({
                   listings={filteredListings} 
                   language={language}
                   onViewListing={handleViewListingDetails}
+                  onOpenLottery={() => setIsLotteryOpen(true)}
                 />
 
                 {/* 📲 PWA Install Prompt Banner — লগইন/রেজিস্টার করলে চিরতরে বন্ধ হয়ে যায় */}

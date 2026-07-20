@@ -1,4 +1,4 @@
-import { Suspense, lazy } from "react";
+import { Suspense, lazy, useEffect } from "react";
 import {
   Grid, ShoppingBag, Eye, Sparkles, ShieldAlert, ShieldCheck, Loader2,
   ChevronDown, Cpu, CreditCard, Lock, MapPin, Star, Zap,
@@ -83,6 +83,14 @@ export default function DashboardTab({
   setAdPromoError,
   handleDashboardPromoSubmit,
 }: DashboardTabProps) {
+  // 🔒 "Ads" (paid boost campaign) sub-tab is admin-only now — Sell পার্টস বুস্ট এখন ফ্রী লটারির
+  // মাধ্যমে হয়, তাই এই পেইড ক্যাম্পেইন প্যানেল সাধারণ ইউজারদের থেকে hide রাখা হচ্ছে।
+  useEffect(() => {
+    if (dashboardSubTab === 'ads' && !isUserAdmin) {
+      setDashboardSubTab('inventory');
+    }
+  }, [dashboardSubTab, isUserAdmin, setDashboardSubTab]);
+
   return (
               <div className="space-y-4 animate-fade-in">
 
@@ -143,25 +151,27 @@ export default function DashboardTab({
                     {language === "bn" ? "দোকান" : "My Shop"}
                   </button>
 
-                  <button
-                    id="dash-subtab-ads"
-                    onClick={() => {
-                      setDashboardSubTab('ads');
-                      setAdPromoSuccess(false);
-                      setAdPromoError("");
-                    }}
-                    className={`px-3 py-2 rounded-full text-[11px] font-bold transition-all flex items-center gap-1 cursor-pointer relative shrink-0 whitespace-nowrap ${
-                      dashboardSubTab === 'ads'
-                        ? 'bg-amber-500 text-slate-950 shadow-sm'
-                        : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'
-                    }`}
-                  >
-                    <Sparkles className="w-3.5 h-3.5" />
-                    {language === "bn" ? "বিজ্ঞাপন" : "Ads"}
-                    <span className="bg-gradient-to-r from-red-500 to-amber-500 text-white font-extrabold text-[7px] uppercase px-1 py-0.5 rounded-full leading-none">
-                      LIVE
-                    </span>
-                  </button>
+                  {isUserAdmin && (
+                    <button
+                      id="dash-subtab-ads"
+                      onClick={() => {
+                        setDashboardSubTab('ads');
+                        setAdPromoSuccess(false);
+                        setAdPromoError("");
+                      }}
+                      className={`px-3 py-2 rounded-full text-[11px] font-bold transition-all flex items-center gap-1 cursor-pointer relative shrink-0 whitespace-nowrap ${
+                        dashboardSubTab === 'ads'
+                          ? 'bg-amber-500 text-slate-950 shadow-sm'
+                          : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'
+                      }`}
+                    >
+                      <Sparkles className="w-3.5 h-3.5" />
+                      {language === "bn" ? "বিজ্ঞাপন" : "Ads"}
+                      <span className="bg-gradient-to-r from-red-500 to-amber-500 text-white font-extrabold text-[7px] uppercase px-1 py-0.5 rounded-full leading-none">
+                        LIVE
+                      </span>
+                    </button>
+                  )}
 
                   {isUserAdmin && (
                     <button
@@ -243,16 +253,18 @@ export default function DashboardTab({
                                     {item.adTier} Ad Live
                                   </span>
                                 ) : (
-                                  <button
-                                    id={`dash-boost-btn-${item.id}`}
-                                    onClick={() => {
-                                      setDashboardSubTab('ads');
-                                      setAdSelectedListingId(item.id);
-                                    }}
-                                    className="text-[10px] font-bold bg-amber-500 hover:bg-amber-600 text-slate-950 px-2.5 py-1.5 rounded transition cursor-pointer"
-                                  >
-                                    {language === "bn" ? "বিজ্ঞাপন দিন" : "Promote"}
-                                  </button>
+                                  isUserAdmin && (
+                                    <button
+                                      id={`dash-boost-btn-${item.id}`}
+                                      onClick={() => {
+                                        setDashboardSubTab('ads');
+                                        setAdSelectedListingId(item.id);
+                                      }}
+                                      className="text-[10px] font-bold bg-amber-500 hover:bg-amber-600 text-slate-950 px-2.5 py-1.5 rounded transition cursor-pointer"
+                                    >
+                                      {language === "bn" ? "বিজ্ঞাপন দিন" : "Promote"}
+                                    </button>
+                                  )
                                 )}
 
                                 <button
@@ -497,7 +509,7 @@ export default function DashboardTab({
                   </div>
                 )}
 
-                {dashboardSubTab === 'ads' && (
+                {dashboardSubTab === 'ads' && isUserAdmin && (
                   /* Option B: Live Ad Campaign & Boost Manager Panel */
                   <div className="space-y-5 animate-fade-in" id="ads-campaign-suite">
                     

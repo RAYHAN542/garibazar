@@ -59,6 +59,7 @@ const ListingDetailModal = lazy(() => import("./components/ListingDetailModal").
 const EditListingModal = lazy(() => import("./components/EditListingModal").then(m => ({ default: m.EditListingModal })));
 const AuthModal = lazy(() => import("./components/AuthModal").then(m => ({ default: m.AuthModal })));
 const PromoteAdModal = lazy(() => import("./components/PromoteAdModal").then(m => ({ default: m.PromoteAdModal })));
+const LotteryModal = lazy(() => import("./components/LotteryModal").then(m => ({ default: m.LotteryModal })));
 const AddPartForm = lazy(() => import("./components/AddPartForm").then(m => ({ default: m.AddPartForm })));
 const RefillModal = lazy(() => import("./components/RefillModal").then(m => ({ default: m.RefillModal })));
 const AdminPanel = lazy(() => import("./components/AdminPanel").then(m => ({ default: m.AdminPanel })));
@@ -363,6 +364,7 @@ export default function App() {
   const [isLegalOpen, setIsLegalOpen] = useState(false);
   const [selectedListing, setSelectedListing] = useState<PartListing | null>(null);
   const [promotingListing, setPromotingListing] = useState<PartListing | null>(null);
+  const [isLotteryOpen, setIsLotteryOpen] = useState(false);
   const [editingListing, setEditingListing] = useState<PartListing | null>(null);
   const [isStandalonePrivacy, setIsStandalonePrivacy] = useState(false);
   const [isStandaloneDeletion, setIsStandaloneDeletion] = useState(false);
@@ -713,7 +715,7 @@ export default function App() {
 
   // Intercept browser back button to close active modal instead of exiting the page/iframe
   useEffect(() => {
-    const isAnyModalOpen = !!(isAuthOpen || selectedListing || promotingListing || editingListing || isRefillModalOpen || isLegalOpen);
+    const isAnyModalOpen = !!(isAuthOpen || selectedListing || promotingListing || editingListing || isRefillModalOpen || isLegalOpen || isLotteryOpen);
 
     const handlePopState = () => {
       modalHistoryRef.current = false;
@@ -741,7 +743,7 @@ export default function App() {
     return () => {
       window.removeEventListener("popstate", handlePopState);
     };
-  }, [isAuthOpen, selectedListing, promotingListing, editingListing, isRefillModalOpen, isLegalOpen]);
+  }, [isAuthOpen, selectedListing, promotingListing, editingListing, isRefillModalOpen, isLegalOpen, isLotteryOpen]);
 
   // 1. Custom Passwordless Profile Authentication Listener & Real-time Firestore Sync
   useEffect(() => {
@@ -1725,6 +1727,7 @@ export default function App() {
                   setShowNotificationPrompt={setShowNotificationPrompt}
                   notificationPermission={notificationPermission}
                   handleRequestNotificationPermission={handleRequestNotificationPermission}
+                  setIsLotteryOpen={setIsLotteryOpen}
                 />
               </Suspense>
             )}
@@ -2434,6 +2437,19 @@ export default function App() {
           onPromotionSuccess={() => {
             // listing gets updated automatically via listener hook
           }}
+        />
+      )}
+
+      {/* 3b. Free daily "Boost Ads" lottery — 1-in-100 win chance, one spin per user per day */}
+      {isLotteryOpen && (
+        <LotteryModal
+          isOpen={isLotteryOpen}
+          onClose={() => setIsLotteryOpen(false)}
+          language={language}
+          currentUser={user}
+          userMetadata={userMetadata}
+          listings={listings}
+          setIsAuthOpen={setIsAuthOpen}
         />
       )}
 

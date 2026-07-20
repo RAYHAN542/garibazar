@@ -1,14 +1,15 @@
 import { useState, useEffect, useRef } from "react";
 import { PartListing, SupportedLanguage } from "../types";
-import { MapPin, ArrowRight } from "lucide-react";
+import { MapPin, ArrowRight, Gift } from "lucide-react";
 
 interface PromotedSliderProps {
   listings: PartListing[];
   language: SupportedLanguage;
   onViewListing: (listing: PartListing) => void;
+  onOpenLottery: () => void;
 }
 
-export function PromotedSlider({ listings, language, onViewListing }: PromotedSliderProps) {
+export function PromotedSlider({ listings, language, onViewListing, onOpenLottery }: PromotedSliderProps) {
   const promotedListings = listings.filter((item) => item.isAd && (item.adTier === "basic" || item.adTier === "premium" || item.adTier === "featured"));
   const [currentIndex, setCurrentIndex] = useState(0);
 
@@ -68,15 +69,7 @@ export function PromotedSlider({ listings, language, onViewListing }: PromotedSl
     onViewListing(currentItem);
   };
 
-  if (promotedListings.length === 0) {
-    return null;
-  }
-
   const currentItem = promotedListings[currentIndex] || promotedListings[0];
-
-  if (!currentItem) {
-    return null;
-  }
 
   const toBanglaNumber = (num: number): string => {
     const banglaDigits = ["০", "১", "২", "৩", "৪", "৫", "৬", "৭", "৮", "৯"];
@@ -85,14 +78,26 @@ export function PromotedSlider({ listings, language, onViewListing }: PromotedSl
 
   return (
     <div className="mb-4 w-full max-w-xl mx-auto animate-fade-in">
-      {/* Title with rocket icon */}
-      <div className="mb-2 flex items-center gap-1.5 px-0.5">
-        <span className="text-sm">🚀</span>
-        <h3 className="text-[12px] font-black font-sans text-slate-800 dark:text-slate-100 tracking-tight">
-          {language === "bn" ? "বুস্ট বিজ্ঞাপন" : "Boost Ads"}
-        </h3>
+      {/* Title with rocket icon + free daily lottery CTA */}
+      <div className="mb-2 flex items-center justify-between gap-2 px-0.5">
+        <div className="flex items-center gap-1.5 min-w-0">
+          <span className="text-base">🚀</span>
+          <h3 className="text-sm sm:text-base font-black font-sans text-slate-800 dark:text-slate-100 tracking-tight truncate">
+            {language === "bn" ? "বুস্ট বিজ্ঞাপন" : "Boost Ads"}
+          </h3>
+        </div>
+        <button
+          id="open-lottery-btn"
+          onClick={onOpenLottery}
+          className="shrink-0 flex items-center gap-1 bg-gradient-to-r from-amber-400 to-orange-500 hover:from-amber-500 hover:to-orange-600 text-slate-950 font-black text-[10px] sm:text-xs px-3 py-1.5 rounded-full shadow-md transition cursor-pointer"
+        >
+          <Gift className="w-3.5 h-3.5" />
+          {language === "bn" ? "ফ্রী বুস্ট লটারি" : "Free Boost Lottery"}
+        </button>
       </div>
 
+      {currentItem && (
+      <>
       {/* Main Slide Card — swipeable */}
       <div
         onClick={handleCardClick}
@@ -177,6 +182,8 @@ export function PromotedSlider({ listings, language, onViewListing }: PromotedSl
             />
           ))}
         </div>
+      )}
+      </>
       )}
     </div>
   );
