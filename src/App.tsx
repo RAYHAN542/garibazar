@@ -6,6 +6,7 @@
 import { useState, useEffect, useMemo, useRef, lazy, Suspense } from "react";
 import { auth, db, logAnalyticsEvent } from "./firebase";
 import { logger } from "./utils/logger";
+import { trackEvent } from "./utils/trackEvent";
 import { signOut } from "firebase/auth";
 import { collection, onSnapshot, query, orderBy, getDocs, doc, getDoc, updateDoc, where, addDoc, deleteDoc, limit, startAfter, DocumentSnapshot, increment } from "firebase/firestore";
 import { 
@@ -386,6 +387,22 @@ export default function App() {
   const savedListings = useMemo(() => {
     return listings.filter((item) => savedListingIds.includes(item.id));
   }, [listings, savedListingIds]);
+
+  // Track a site visit once per browser session (not once per page load --
+  // opening/closing a listing now does a real reload, and we don't want that
+  // to inflate visit counts). Anonymous, IP-based, feeds the admin panel's
+  // "Visitors & Logins" tab.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      if (!sessionStorage.getItem("gari_bazar_visit_tracked")) {
+        sessionStorage.setItem("gari_bazar_visit_tracked", "1");
+        trackEvent("visit");
+      }
+    } catch {
+      trackEvent("visit");
+    }
+  }, []);
 
   // Open a specific listing when arriving via a shared link (?listing=<id>)
   // or via our own real-navigation listing open. Runs once per page load.

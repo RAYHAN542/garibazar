@@ -134,6 +134,19 @@ service cloud.firestore {
       allow update, delete: if isAdmin();
     }
 
+    // ---------- SITE VISIT / LOGIN / SIGNUP ANALYTICS ----------
+    // Written only by the /api/track-event serverless function (Admin SDK),
+    // which bypasses these rules -- keeps visitor IP/location data from
+    // being writable or readable by anyone except an admin.
+    match /site_visits/{visitId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+    match /analytics_stats/{statId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
     // ---------- Everything else: locked down ----------
     match /{document=**} {
       allow read, write: if false;

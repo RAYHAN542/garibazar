@@ -9,7 +9,8 @@ import {
   getDoc, 
   setDoc, 
   updateDoc,
-  deleteDoc 
+  deleteDoc,
+  limit
 } from "firebase/firestore";
 import { 
   ShieldAlert, 
@@ -30,7 +31,11 @@ import {
   TrendingUp,
   Grid,
   Inbox,
-  Flag
+  Flag,
+  Activity,
+  Globe,
+  Users,
+  MapPin
 } from "lucide-react";
 import { SupportedLanguage } from "../types";
 
@@ -98,7 +103,12 @@ export function AdminPanel({ language, currentUser, listings: listingsProp, isUs
   const [actionSuccessMsg, setActionSuccessMsg] = useState("");
 
   // Sub-tabs for the Admin Panel itself to make it exceptionally organized and professional
-  const [adminSubTab, setAdminSubTab] = useState<"requests" | "listings" | "settings" | "tickets">("requests");
+  const [adminSubTab, setAdminSubTab] = useState<"requests" | "listings" | "settings" | "tickets" | "analytics">("requests");
+
+  // Visitor / login / signup analytics states
+  const [visitEvents, setVisitEvents] = useState<any[]>([]);
+  const [loadingVisits, setLoadingVisits] = useState(true);
+  const [analyticsStats, setAnalyticsStats] = useState<{ totalVisits?: number; totalLogins?: number; totalSignups?: number }>({});
 
   // Support tickets states
   const [ticketsList, setTicketsList] = useState<any[]>([]);
@@ -192,6 +202,40 @@ export function AdminPanel({ language, currentUser, listings: listingsProp, isUs
     }, (err) => {
       console.error("Could not fetch support tickets:", err);
       setLoadingTickets(false);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  // Live summary counters -- total visits / logins / signups (one small doc,
+  // kept up to date atomically by the /api/track-event serverless function).
+  useEffect(() => {
+    const unsub = onSnapshot(doc(db, "analytics_stats", "summary"), (docSnap) => {
+      setAnalyticsStats(docSnap.exists() ? (docSnap.data() as any) : {});
+    }, (err) => {
+      console.error("Could not fetch analytics summary:", err);
+    });
+    return () => unsub();
+  }, []);
+
+  // Recent visit/login/signup log, most recent first.
+  useEffect(() => {
+    const q = query(
+      collection(db, "site_visits"),
+      orderBy("createdAt", "desc"),
+      limit(200)
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const list: any[] = [];
+      snapshot.forEach((doc) => {
+        list.push({ id: doc.id, ...doc.data() });
+      });
+      setVisitEvents(list);
+      setLoadingVisits(false);
+    }, (err) => {
+      console.error("Could not fetch site visits:", err);
+      setLoadingVisits(false);
     });
 
     return () => unsubscribe();
@@ -484,6 +528,17 @@ export function AdminPanel({ language, currentUser, listings: listingsProp, isUs
           {language === "bn"
             ? `সাপোর্ট টিকেট (${ticketsList.filter(t => t.status !== "resolved").length})`
             : `Support Tickets (${ticketsList.filter(t => t.status !== "resolved").length})`}
+        </button>
+
+        <button
+          onClick={() => setAdminSubTab("analytics")}
+          className={`pb-2.5 px-4 font-bold text-xs uppercase tracking-wider border-b-2 transition-all cursor-pointer whitespace-nowrap ${
+            adminSubTab === "analytics"
+              ? "border-amber-500 text-amber-500"
+              : "border-transparent text-slate-400 hover:text-slate-300"
+          }`}
+        >
+          {language === "bn" ? "ভিজিটর ও লগইন" : "Visitors & Logins"}
         </button>
       </div>
 
@@ -875,6 +930,90 @@ export function AdminPanel({ language, currentUser, listings: listingsProp, isUs
                       )}
                     </div>
                   </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+      ) : adminSubTab === "analytics" ? (
+
+        /* VISITOR / LOGIN / SIGNUP ANALYTICS PANEL */
+        <div className="space-y-4">
+          <h5 className="text-sm font-black text-slate-850 dark:text-white mb-2 flex items-center gap-2">
+            <Activity className="w-5 h-5 text-amber-500" />
+            {language === "bn" ? "ভিজিটর ও লগইন পরিসংখ্যান" : "Visitor & Login Analytics"}
+          </h5>
+
+          <div className="grid grid-cols-3 gap-3">
+            <div className="p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl text-center">
+              <Globe className="w-5 h-5 text-blue-500 mx-auto mb-1" />
+              <p className="text-lg font-black text-slate-850 dark:text-white">{(analyticsStats.totalVisits || 0).toLocaleString()}</p>
+              <p className="text-[9px] text-slate-400 font-bold uppercase">{language === "bn" ? "মোট ভিজিট" : "Total Visits"}</p>
+            </div>
+            <div className="p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl text-center">
+              <User className="w-5 h-5 text-emerald-500 mx-auto mb-1" />
+              <p className="text-lg font-black text-slate-850 dark:text-white">{(analyticsStats.totalLogins || 0).toLocaleString()}</p>
+              <p className="text-[9px] text-slate-400 font-bold uppercase">{language === "bn" ? "মোট লগইন" : "Total Logins"}</p>
+            </div>
+            <div className="p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl text-center">
+              <Users className="w-5 h-5 text-amber-500 mx-auto mb-1" />
+              <p className="text-lg font-black text-slate-850 dark:text-white">{(analyticsStats.totalSignups || 0).toLocaleString()}</p>
+              <p className="text-[9px] text-slate-400 font-bold uppercase">{language === "bn" ? "নতুন ইউজার" : "New Signups"}</p>
+            </div>
+          </div>
+
+          <h6 className="text-xs font-black text-slate-500 uppercase tracking-wider pt-2">
+            {language === "bn" ? "সাম্প্রতিক ভিজিট লগ" : "Recent Visit Log"}
+          </h6>
+
+          {loadingVisits ? (
+            <div className="flex flex-col items-center justify-center p-12 bg-white dark:bg-slate-900 border rounded-2xl">
+              <Loader2 className="w-8 h-8 animate-spin text-amber-500 mb-2" />
+            </div>
+          ) : visitEvents.length === 0 ? (
+            <div className="flex flex-col items-center justify-center p-12 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl text-center">
+              <Inbox className="w-10 h-10 text-slate-300 dark:text-slate-700 mb-2" />
+              <p className="text-xs font-bold text-slate-500">
+                {language === "bn" ? "এখনো কোনো ভিজিট রেকর্ড হয়নি।" : "No visits recorded yet."}
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {visitEvents.map((ev) => (
+                <div
+                  key={ev.id}
+                  className="p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl flex items-center justify-between gap-3"
+                >
+                  <div className="min-w-0 flex items-center gap-2.5">
+                    <span
+                      className={`shrink-0 text-[9px] font-black uppercase px-2 py-1 rounded-full ${
+                        ev.type === "signup"
+                          ? "bg-amber-500/15 text-amber-500"
+                          : ev.type === "login"
+                          ? "bg-emerald-500/15 text-emerald-500"
+                          : "bg-blue-500/15 text-blue-500"
+                      }`}
+                    >
+                      {ev.type === "signup"
+                        ? (language === "bn" ? "নতুন ইউজার" : "Signup")
+                        : ev.type === "login"
+                        ? (language === "bn" ? "লগইন" : "Login")
+                        : (language === "bn" ? "ভিজিট" : "Visit")}
+                    </span>
+                    <div className="min-w-0">
+                      <p className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1 truncate">
+                        <MapPin className="w-3 h-3 text-slate-400 shrink-0" />
+                        {ev.city || "Unknown"}{ev.country ? `, ${ev.country}` : ""}
+                      </p>
+                      <p className="text-[10px] text-slate-400 font-mono truncate">{ev.ip || "-"}</p>
+                    </div>
+                  </div>
+                  <span className="text-[9px] text-slate-400 font-mono shrink-0">
+                    {ev.createdAt?.toDate
+                      ? ev.createdAt.toDate().toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })
+                      : ""}
+                  </span>
                 </div>
               ))}
             </div>

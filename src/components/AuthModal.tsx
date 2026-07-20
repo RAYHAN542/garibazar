@@ -13,6 +13,7 @@ import { CITIES } from "../translations";
 import { SupportedLanguage } from "../types";
 import { sanitizeText, validateBanglaPhone } from "../utils/sanitizer";
 import { uploadToCloudinary } from "../utils/cloudinary";
+import { trackEvent } from "../utils/trackEvent";
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -106,6 +107,7 @@ export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModa
         referralCode: existingData.referralCode,
       };
       localStorage.setItem("gari_bazar_session_user", JSON.stringify(sessionUser));
+      trackEvent("login", fbUser.uid);
       onAuthSuccess(sessionUser);
       onClose();
       return;
@@ -256,6 +258,7 @@ export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModa
 
       await setDoc(doc(db, "users", googleUser.uid), savedData);
       localStorage.setItem("gari_bazar_session_user", JSON.stringify(savedData));
+      trackEvent("signup", googleUser.uid);
       onAuthSuccess(savedData);
       onClose();
     } catch (err) {
