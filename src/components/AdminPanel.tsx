@@ -483,10 +483,10 @@ export function AdminPanel({ language, currentUser, listings: listingsProp, isUs
       </div>
 
       {/* Admin Panel Sub-Tabs */}
-      <div className="flex border-b border-slate-200 dark:border-slate-800 gap-1.5 pt-1">
+      <div className="flex border-b border-slate-200 dark:border-slate-800 gap-1.5 pt-1 overflow-x-auto [-webkit-overflow-scrolling:touch] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         <button
           onClick={() => setAdminSubTab("requests")}
-          className={`pb-2.5 px-4 font-bold text-xs uppercase tracking-wider border-b-2 transition-all cursor-pointer ${
+          className={`pb-2.5 px-4 font-bold text-xs uppercase tracking-wider border-b-2 transition-all cursor-pointer shrink-0 whitespace-nowrap ${
             adminSubTab === "requests"
               ? "border-amber-500 text-amber-500"
               : "border-transparent text-slate-400 hover:text-slate-300"
@@ -497,7 +497,7 @@ export function AdminPanel({ language, currentUser, listings: listingsProp, isUs
 
         <button
           onClick={() => setAdminSubTab("listings")}
-          className={`pb-2.5 px-4 font-bold text-xs uppercase tracking-wider border-b-2 transition-all cursor-pointer ${
+          className={`pb-2.5 px-4 font-bold text-xs uppercase tracking-wider border-b-2 transition-all cursor-pointer shrink-0 whitespace-nowrap ${
             adminSubTab === "listings"
               ? "border-amber-500 text-amber-500"
               : "border-transparent text-slate-400 hover:text-slate-300"
@@ -508,7 +508,7 @@ export function AdminPanel({ language, currentUser, listings: listingsProp, isUs
 
         <button
           onClick={() => setAdminSubTab("settings")}
-          className={`pb-2.5 px-4 font-bold text-xs uppercase tracking-wider border-b-2 transition-all cursor-pointer ${
+          className={`pb-2.5 px-4 font-bold text-xs uppercase tracking-wider border-b-2 transition-all cursor-pointer shrink-0 whitespace-nowrap ${
             adminSubTab === "settings"
               ? "border-amber-500 text-amber-500"
               : "border-transparent text-slate-400 hover:text-slate-300"
@@ -519,7 +519,7 @@ export function AdminPanel({ language, currentUser, listings: listingsProp, isUs
 
         <button
           onClick={() => setAdminSubTab("tickets")}
-          className={`pb-2.5 px-4 font-bold text-xs uppercase tracking-wider border-b-2 transition-all cursor-pointer ${
+          className={`pb-2.5 px-4 font-bold text-xs uppercase tracking-wider border-b-2 transition-all cursor-pointer shrink-0 whitespace-nowrap ${
             adminSubTab === "tickets"
               ? "border-amber-500 text-amber-500"
               : "border-transparent text-slate-400 hover:text-slate-300"
@@ -532,7 +532,7 @@ export function AdminPanel({ language, currentUser, listings: listingsProp, isUs
 
         <button
           onClick={() => setAdminSubTab("analytics")}
-          className={`pb-2.5 px-4 font-bold text-xs uppercase tracking-wider border-b-2 transition-all cursor-pointer whitespace-nowrap ${
+          className={`pb-2.5 px-4 font-bold text-xs uppercase tracking-wider border-b-2 transition-all cursor-pointer shrink-0 whitespace-nowrap ${
             adminSubTab === "analytics"
               ? "border-amber-500 text-amber-500"
               : "border-transparent text-slate-400 hover:text-slate-300"
