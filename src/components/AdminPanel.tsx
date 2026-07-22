@@ -35,7 +35,8 @@ import {
   Activity,
   Globe,
   Users,
-  MapPin
+  MapPin,
+  Eye
 } from "lucide-react";
 import { SupportedLanguage } from "../types";
 
@@ -430,6 +431,7 @@ export function AdminPanel({ language, currentUser, listings: listingsProp, isUs
     .reduce((sum, req) => sum + (Number(req.amount) || 0), 0);
   const totalListings = adminListings?.length || 0;
   const pendingRequestsCount = requests.filter(r => r.status === 'pending').length;
+  const totalViews = (adminListings || []).reduce((sum, l: any) => sum + (Number(l.views) || 0), 0);
 
   return (
     <div className="space-y-6">
@@ -455,7 +457,7 @@ export function AdminPanel({ language, currentUser, listings: listingsProp, isUs
       </div>
 
       {/* Dynamic Admin Stats Bento Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         {/* Total Revenue card */}
         <div className="bg-emerald-500/5 dark:bg-emerald-500/[0.03] border border-emerald-500/20 rounded-2xl p-4 flex items-center justify-between">
           <div>
@@ -483,6 +485,21 @@ export function AdminPanel({ language, currentUser, listings: listingsProp, isUs
           </div>
           <div className="p-3 bg-blue-500/15 text-blue-600 dark:text-blue-400 rounded-xl">
             <Grid className="w-5 h-5" />
+          </div>
+        </div>
+
+        {/* Total views across all listings */}
+        <div className="bg-purple-500/5 dark:bg-purple-500/[0.03] border border-purple-500/20 rounded-2xl p-4 flex items-center justify-between">
+          <div>
+            <span className="text-[10px] font-black tracking-widest text-slate-450 dark:text-slate-400 uppercase block mb-1">
+              {language === "bn" ? "মোট ভিউ" : "TOTAL VIEWS"}
+            </span>
+            <span className="text-xl sm:text-2xl font-black text-purple-600 dark:text-purple-400 font-mono tracking-tight">
+              {totalViews.toLocaleString()}
+            </span>
+          </div>
+          <div className="p-3 bg-purple-500/15 text-purple-600 dark:text-purple-400 rounded-xl">
+            <Eye className="w-5 h-5" />
           </div>
         </div>
 
