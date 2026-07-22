@@ -107,7 +107,7 @@ export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModa
         referralCode: existingData.referralCode,
       };
       localStorage.setItem("gari_bazar_session_user", JSON.stringify(sessionUser));
-      trackEvent("login", fbUser.uid);
+      trackEvent("login", fbUser.uid, sessionUser.email || sessionUser.phoneNumber);
       onAuthSuccess(sessionUser);
       onClose();
       return;
@@ -258,7 +258,7 @@ export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModa
 
       await setDoc(doc(db, "users", googleUser.uid), savedData);
       localStorage.setItem("gari_bazar_session_user", JSON.stringify(savedData));
-      trackEvent("signup", googleUser.uid);
+      trackEvent("signup", googleUser.uid, savedData.email || savedData.phoneNumber);
       onAuthSuccess(savedData);
       onClose();
     } catch (err) {

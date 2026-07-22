@@ -67,6 +67,7 @@ export default async function handler(req: any, res: any) {
     const body = typeof req.body === "string" ? JSON.parse(req.body || "{}") : (req.body || {});
     const type = ALLOWED_TYPES.has(body?.type) ? body.type : "visit";
     const uid = typeof body?.uid === "string" ? body.uid.slice(0, 128) : null;
+    const identifier = typeof body?.identifier === "string" ? body.identifier.slice(0, 128) : null;
     const path = typeof body?.path === "string" ? body.path.slice(0, 300) : "";
     const referrer = typeof body?.referrer === "string" ? body.referrer.slice(0, 300) : "";
 
@@ -79,6 +80,7 @@ export default async function handler(req: any, res: any) {
     await db.collection("site_visits").add({
       type,
       uid,
+      identifier,
       ip,
       city: geo.city,
       region: geo.region,

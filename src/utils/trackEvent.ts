@@ -2,7 +2,7 @@
 // throws -- if it fails for any reason (offline, ad-blocker, slow network)
 // the app keeps working normally. `keepalive: true` lets the request finish
 // even if the page navigates away right after this is called.
-export function trackEvent(type: "visit" | "login" | "signup", uid?: string | null) {
+export function trackEvent(type: "visit" | "login" | "signup", uid?: string | null, identifier?: string | null) {
   try {
     fetch("/api/track-event", {
       method: "POST",
@@ -10,6 +10,7 @@ export function trackEvent(type: "visit" | "login" | "signup", uid?: string | nu
       body: JSON.stringify({
         type,
         uid: uid || null,
+        identifier: identifier || null,
         path: window.location.pathname + window.location.search,
         referrer: document.referrer || "",
       }),

@@ -1044,6 +1044,12 @@ export function AdminPanel({ language, currentUser, listings: listingsProp, isUs
                         {ev.city || "Unknown"}{ev.country ? `, ${ev.country}` : ""}
                       </p>
                       <p className="text-[10px] text-slate-400 font-mono truncate">{ev.ip || "-"}</p>
+                      {(ev.type === "login" || ev.type === "signup") && ev.identifier && (
+                        <p className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold truncate flex items-center gap-1">
+                          <Mail className="w-3 h-3 shrink-0" />
+                          {ev.identifier}
+                        </p>
+                      )}
                       <p className="text-[10px] text-indigo-500 dark:text-indigo-400 font-bold truncate">
                         {language === "bn" ? "সোর্স: " : "Source: "}{getTrafficSource(ev.referrer, language)}
                       </p>
