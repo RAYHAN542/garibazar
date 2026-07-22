@@ -32,15 +32,15 @@ async function lookupGeo(ip: string) {
     return fallback;
   }
   try {
-    const resp = await fetch(`https://ipapi.co/${ip}/json/`);
+    const resp = await fetch(`https://ipwho.is/${ip}`);
     if (!resp.ok) return fallback;
     const data: any = await resp.json();
-    if (data?.error) return fallback;
+    if (data?.success === false) return fallback;
     return {
       city: data.city || "Unknown",
       region: data.region || "",
-      country: data.country_name || "",
-      isp: data.org || "",
+      country: data.country || "",
+      isp: data.connection?.isp || data.connection?.org || "",
     };
   } catch {
     return fallback;
