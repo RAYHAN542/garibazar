@@ -46,6 +46,26 @@ interface AdminPanelProps {
   isUserAdmin: boolean;
 }
 
+// Turns a raw document.referrer URL into a friendly traffic-source label
+// (Facebook, Instagram, Google, WhatsApp, etc.) for the visitor log.
+const getTrafficSource = (referrer: string | undefined, language: SupportedLanguage): string => {
+  if (!referrer) return language === "bn" ? "সরাসরি" : "Direct";
+  try {
+    const host = new URL(referrer).hostname.replace(/^www\./, "").replace(/^m\./, "").replace(/^l\./, "");
+    if (host.includes("facebook.com") || host.includes("fb.com") || host === "fb.watch") return "Facebook";
+    if (host.includes("instagram.com")) return "Instagram";
+    if (host.includes("messenger.com")) return "Messenger";
+    if (host.includes("whatsapp.com") || host === "wa.me") return "WhatsApp";
+    if (host.includes("google.")) return "Google";
+    if (host.includes("youtube.com") || host === "youtu.be") return "YouTube";
+    if (host.includes("twitter.com") || host === "x.com" || host === "t.co") return "Twitter/X";
+    if (host.includes("tiktok.com")) return "TikTok";
+    return host;
+  } catch {
+    return language === "bn" ? "সরাসরি" : "Direct";
+  }
+};
+
 export function AdminPanel({ language, currentUser, listings: listingsProp, isUserAdmin }: AdminPanelProps) {
   // Local mirror of the listings prop so we can optimistically remove
   // deleted items instantly without waiting for a full page reload.
@@ -1007,6 +1027,9 @@ export function AdminPanel({ language, currentUser, listings: listingsProp, isUs
                         {ev.city || "Unknown"}{ev.country ? `, ${ev.country}` : ""}
                       </p>
                       <p className="text-[10px] text-slate-400 font-mono truncate">{ev.ip || "-"}</p>
+                      <p className="text-[10px] text-indigo-500 dark:text-indigo-400 font-bold truncate">
+                        {language === "bn" ? "সোর্স: " : "Source: "}{getTrafficSource(ev.referrer, language)}
+                      </p>
                     </div>
                   </div>
                   <span className="text-[9px] text-slate-400 font-mono shrink-0">
