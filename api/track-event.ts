@@ -15,6 +15,22 @@ if (!getApps().length) {
 
 const ALLOWED_TYPES = new Set(["visit", "login", "signup"]);
 
+// Known bot / crawler / monitoring User-Agent signatures. If the UA matches
+// any of these, the hit is not a real human visitor (link-preview bots like
+// Facebook's, search engine crawlers, uptime monitors, scripts, etc.).
+const BOT_UA_PATTERN = /bot|crawl|spider|slurp|facebookexternalhit|facebot|whatsapp|telegrambot|discordbot|slackbot|skypeuripreview|linkedinbot|pinterest|embedly|quora link preview|outbrain|vkshare|w3c_validator|redditbot|applebot|semrush|ahrefs|mj12bot|dotbot|baiduspider|yandex|duckduckbot|python-requests|python-urllib|curl\/|wget\/|node-fetch|axios\/|postmanruntime|headlesschrome|phantomjs|go-http-client|java\/|libwww-perl|scrapy|vercel-screenshot|vercel-favicon|^vercel|uptimerobot|pingdom|statuscake|monitor/i;
+
+// Known hosting / cloud-provider ISPs. A "visit" from Amazon/Google/Microsoft/
+// Vercel's own infrastructure is virtually always an automated request, not a
+// human on a home or mobile connection.
+const HOSTING_ISP_PATTERN = /amazon|aws|google llc|google cloud|microsoft corporation|azure|digitalocean|linode|ovh|hetzner|vercel inc|vercel, inc|cloudflare|oracle cloud|contabo|scaleway/i;
+
+function isLikelyBot(userAgent: string, isp: string): boolean {
+  if (!userAgent || BOT_UA_PATTERN.test(userAgent)) return true;
+  if (isp && HOSTING_ISP_PATTERN.test(isp)) return true;
+  return false;
+}
+
 function getClientIp(req: any): string {
   const fwd = req.headers["x-forwarded-for"];
   if (typeof fwd === "string" && fwd.length > 0) {
@@ -74,6 +90,12 @@ export default async function handler(req: any, res: any) {
     const ip = getClientIp(req);
     const geo = await lookupGeo(ip);
     const userAgent = (req.headers["user-agent"] || "").toString().slice(0, 300);
+
+    if (isLikelyBot(userAgent, geo.isp)) {
+      // Silently drop bot/crawler traffic — don't pollute the visitor log or stats.
+      res.status(200).json({ ok: true, skipped: true });
+      return;
+    }
 
     const db = getFirestore();
 
