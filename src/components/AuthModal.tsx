@@ -3,12 +3,13 @@ import { auth, db, googleProvider, facebookProvider } from "../firebase";
 import {
   signInWithPopup,
   signInWithRedirect,
+  signInWithCustomToken,
   getRedirectResult,
   signOut,
   User as FirebaseUser,
 } from "firebase/auth";
 import { doc, getDoc, setDoc } from "firebase/firestore";
-import { X, MapPin, Loader2, Sparkles, Camera } from "lucide-react";
+import { X, MapPin, Loader2, Sparkles, Camera, Phone, ArrowLeft } from "lucide-react";
 import { CITIES } from "../translations";
 import { SupportedLanguage } from "../types";
 import { sanitizeText, validateBanglaPhone } from "../utils/sanitizer";
@@ -86,8 +87,10 @@ export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModa
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const [step, setStep] = useState<"start" | "profile">("start");
+  const [step, setStep] = useState<"start" | "phone" | "otp" | "profile">("start");
   const [googleUser, setGoogleUser] = useState<FirebaseUser | null>(null);
+  const [otpPhone, setOtpPhone] = useState("");
+  const [otpCode, setOtpCode] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
   const [city, setCity] = useState(CITIES[0]);
@@ -239,6 +242,65 @@ export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModa
     }
   };
 
+  const handleSendOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    const cleanPhone = otpPhone.replace(/\D/g, "");
+    if (!validateBanglaPhone(cleanPhone)) {
+      setError(language === "bn" ? "সঠিক ১১ ডিজিটের মোবাইল নম্বর দিন" : "Enter a valid 11-digit phone number");
+      return;
+    }
+    setLoading(true);
+    try {
+      const resp = await fetch("/api/auth/send-otp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone: cleanPhone }),
+      });
+      const data = await resp.json();
+      if (!resp.ok) {
+        setError(data.error || (language === "bn" ? "OTP পাঠানো যায়নি।" : "Could not send OTP."));
+        return;
+      }
+      setOtpCode("");
+      setStep("otp");
+    } catch (err) {
+      console.error(err);
+      setError(language === "bn" ? "নেটওয়ার্ক সমস্যা। আবার চেষ্টা করুন।" : "Network error. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleVerifyOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    if (!/^\d{6}$/.test(otpCode)) {
+      setError(language === "bn" ? "৬-সংখ্যার কোড দিন" : "Enter the 6-digit code");
+      return;
+    }
+    setLoading(true);
+    try {
+      const resp = await fetch("/api/auth/verify-otp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone: otpPhone.replace(/\D/g, ""), code: otpCode }),
+      });
+      const data = await resp.json();
+      if (!resp.ok) {
+        setError(data.error || (language === "bn" ? "ভেরিফিকেশন ব্যর্থ হয়েছে।" : "Verification failed."));
+        return;
+      }
+      const result = await signInWithCustomToken(auth, data.token);
+      await handlePostGoogleAuth(result.user);
+    } catch (err) {
+      console.error(err);
+      setError(language === "bn" ? "সাইন-ইন ব্যর্থ হয়েছে। আবার চেষ্টা করুন।" : "Sign-in failed. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleCancelProfileStep = async () => {
     try { await signOut(auth); } catch { /* ignore */ }
     setGoogleUser(null);
@@ -353,80 +415,63 @@ export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModa
               {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <FacebookIcon />}
               {language === "bn" ? "Facebook দিয়ে চালিয়ে যান" : "Continue with Facebook"}
             </button>
+            <button
+              type="button"
+              onClick={() => { setError(""); setStep("phone"); }}
+              disabled={loading}
+              className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white font-bold rounded-lg text-sm flex items-center justify-center gap-2"
+            >
+              <Phone className="w-4 h-4" />
+              {language === "bn" ? "মোবাইল নম্বর দিয়ে চালিয়ে যান" : "Continue with Phone"}
+            </button>
           </div>
-        ) : (
-          <form onSubmit={handleCompleteProfile} className="space-y-4">
+        ) : step === "phone" ? (
+          <form onSubmit={handleSendOtp} className="space-y-4">
             <p className="text-xs text-slate-500 text-center">
               {language === "bn"
-                ? "শেষ ধাপ! ক্রেতারা যেন আপনার সাথে যোগাযোগ করতে পারে, তাই একটা মোবাইল নম্বর ও জেলা দিন।"
-                : "Almost done! Add a phone number and district so buyers can contact you."}
+                ? "আপনার মোবাইল নম্বর দিন, আমরা একটা যাচাইকরণ কোড (OTP) পাঠাবো।"
+                : "Enter your mobile number and we'll send a verification code (OTP)."}
             </p>
-
-            <div className="flex justify-center mb-2">
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                className="relative w-20 h-20 rounded-full overflow-hidden border-2 border-dashed border-slate-300 dark:border-slate-600 flex items-center justify-center bg-slate-50 dark:bg-slate-800"
-              >
-                {profilePhotoPreview ? (
-                  <>
-                    <img src={profilePhotoPreview} alt="preview" className="w-full h-full object-cover" />
-                    <span className="absolute bottom-0 inset-x-0 bg-slate-900/60 text-white flex items-center justify-center py-1">
-                      <Camera className="w-3.5 h-3.5" />
-                    </span>
-                  </>
-                ) : (
-                  <>
-                    <Camera className="w-6 h-6 text-slate-400" />
-                    <div className="absolute bottom-0 inset-x-0 bg-black/50 text-white text-[9px] font-bold text-center py-0.5">
-                      {language === "bn" ? "ছবি দিন" : "Add Photo"}
-                    </div>
-                  </>
-                )}
-              </button>
-              <input type="file" ref={fileInputRef} onChange={handlePhotoSelect} accept="image/*" className="hidden" />
-            </div>
-
-            <div>
-              <label className="text-[10px] font-bold block mb-1 text-slate-500">{language === "bn" ? "আপনার নাম *" : "Name *"}</label>
-              <div className="relative">
-                <input type="text" required value={displayName} onChange={(e) => setDisplayName(e.target.value)} className="w-full px-3 py-2 text-sm border rounded-lg dark:bg-slate-800 dark:border-slate-700 dark:text-white" placeholder="Rayhan" />
-              </div>
-            </div>
-
             <div>
               <label className="text-[10px] font-bold block mb-1 text-slate-500">{language === "bn" ? "মোবাইল নম্বর *" : "Mobile Number *"}</label>
-              <div className="relative">
-                <input type="tel" required value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value)} className="w-full px-3 py-2 text-sm border rounded-lg dark:bg-slate-800 dark:border-slate-700 dark:text-white" placeholder="01993878271" />
-              </div>
-              <p className="text-[10px] text-slate-400 mt-1">
-                {language === "bn" ? "এই নম্বরে OTP পাঠানো হবে না — শুধু যোগাযোগের জন্য দেখানো হবে।" : "No OTP is sent here — it's shown to buyers as your contact number."}
-              </p>
+              <input
+                type="tel"
+                required
+                autoFocus
+                value={otpPhone}
+                onChange={(e) => setOtpPhone(e.target.value)}
+                className="w-full px-3 py-2 text-sm border rounded-lg dark:bg-slate-800 dark:border-slate-700 dark:text-white"
+                placeholder="01XXXXXXXXX"
+              />
             </div>
-
-            <div>
-              <label className="text-[10px] font-bold block mb-1 text-slate-500">{language === "bn" ? "জেলা *" : "District *"}</label>
-              <div className="relative">
-                <MapPin className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
-                <select value={city} onChange={(e) => setCity(e.target.value)} className="w-full pl-9 pr-3 py-2 text-sm border rounded-lg dark:bg-slate-800 dark:border-slate-700 dark:text-white appearance-none">
-                  {CITIES.map((c) => <option key={c} value={c}>{c}</option>)}
-                </select>
-              </div>
-            </div>
-
-            <button type="submit" disabled={loading} className="w-full py-2.5 bg-amber-500 hover:bg-amber-600 disabled:bg-amber-300 text-white font-bold rounded-lg text-sm flex items-center justify-center gap-2">
-              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-              {uploadingPhoto
-                ? (language === "bn" ? "ছবি আপলোড হচ্ছে..." : "Uploading photo...")
-                : (language === "bn" ? "প্রোফাইল তৈরি করুন" : "Create Profile")}
+            <button type="submit" disabled={loading} className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white font-bold rounded-lg text-sm flex items-center justify-center gap-2">
+              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Phone className="w-4 h-4" />}
+              {language === "bn" ? "কোড পাঠান" : "Send Code"}
             </button>
-
-            <button type="button" onClick={handleCancelProfileStep} className="w-full text-center text-xs text-slate-500 hover:underline">
-              {language === "bn" ? "← বাতিল করুন" : "← Cancel"}
+            <button type="button" onClick={() => { setError(""); setStep("start"); }} className="w-full flex items-center justify-center gap-1 text-xs text-slate-500 hover:underline">
+              <ArrowLeft className="w-3 h-3" />
+              {language === "bn" ? "পেছনে যান" : "Back"}
             </button>
           </form>
-        )}
-      </div>
-    </div>
-  );
-      }
+        ) : step === "otp" ? (
+          <form onSubmit={handleVerifyOtp} className="space-y-4">
+            <p className="text-xs text-slate-500 text-center">
+              {language === "bn"
+                ? `${otpPhone} নম্বরে পাঠানো ৬-সংখ্যার কোডটি দিন।`
+                : `Enter the 6-digit code sent to ${otpPhone}.`}
+            </p>
+            <div>
+              <label className="text-[10px] font-bold block mb-1 text-slate-500">{language === "bn" ? "OTP কোড *" : "OTP Code *"}</label>
+              <input
+                type="text"
+                inputMode="numeric"
+                required
+                autoFocus
+                maxLength={6}
+                value={otpCode}
+                onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                className="w-full px-3 py-2 text-center text-lg tracking-[0.5em] border rounded-lg dark:bg-slate-800 dark:border-slate-700 dark:text-white"
+                placeholder="······"
+              />
+            </div>
+            <button type="submit" disabled={loading} className="w-full
