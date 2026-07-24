@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { X, Shield, Smartphone, ChevronRight, Loader2, CreditCard, ArrowLeft, Heart, Check, Copy } from "lucide-react";
+import { X, Shield, Loader2, Check, Copy } from "lucide-react";
 
 interface SimulatedPaymentPortalProps {
   isOpen: boolean;

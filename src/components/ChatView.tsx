@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { collection, query, where, orderBy, onSnapshot, addDoc, serverTimestamp, doc, setDoc, updateDoc, arrayUnion, limit, increment } from "firebase/firestore";
 import { db } from "../firebase";
 import { SupportedLanguage, PartListing } from "../types";
-import { Send, User, MessageSquare, ArrowLeft, Loader2, HeartHandshake, Phone, ShieldCheck } from "lucide-react";
+import { Send, User, MessageSquare, ArrowLeft, Loader2, HeartHandshake, ShieldCheck } from "lucide-react";
 import { ImageWithFallback } from "./ImageWithFallback";
 
 interface ChatViewProps {

@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Trash2, AlertTriangle, ArrowLeft, Globe, Loader2, CheckCircle, Mail, ShieldAlert } from "lucide-react";
+import { Trash2, AlertTriangle, ArrowLeft, Globe, Loader2, CheckCircle, Mail } from "lucide-react";
 import { SupportedLanguage } from "../types";
 import { auth, db } from "../firebase";
 import { deleteUser } from "firebase/auth";

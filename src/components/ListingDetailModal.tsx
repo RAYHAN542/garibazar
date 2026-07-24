@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { PartListing, SupportedLanguage } from "../types";
-import { X, Eye, MapPin, Sparkles, Play, SquarePlay, Heart, Flag, ShieldAlert, CheckCircle2, RotateCcw, ChevronLeft, ChevronRight, Loader2, ShoppingBag, Star, User, MessageSquare, Calendar, Send, Share2 } from "lucide-react";
+import { X, MapPin, Sparkles, Play, SquarePlay, Flag, ShieldAlert, CheckCircle2, ChevronLeft, ChevronRight, Loader2, ShoppingBag, Star, User, MessageSquare, Send, Share2 } from "lucide-react";
 import { doc, getDoc, updateDoc, collection, addDoc, query, where, getDocs, increment } from "firebase/firestore";
 import { db, logAnalyticsEvent } from "../firebase";
 import { getOptimizedImageUrl } from "../utils/cloudinary";
@@ -969,7 +969,6 @@ export function ListingDetailModal({ listing, language, currentUser, onClose, on
                 </span>
               </div>
             )}
-
 
 
           </div>

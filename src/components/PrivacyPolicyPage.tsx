@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { ShieldCheck, Calendar, Mail, FileText, ArrowLeft, Globe, Printer } from "lucide-react";
+import { ShieldCheck, Calendar, Mail, ArrowLeft, Globe, Printer } from "lucide-react";
 import { SupportedLanguage } from "../types";
 
 interface PrivacyPolicyPageProps {

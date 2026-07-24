@@ -1,16 +1,5 @@
 import React, { useState, useMemo } from "react";
-import { 
-  TrendingUp, 
-  Eye, 
-  MousePointerClick, 
-  Calendar, 
-  ArrowUpRight, 
-  Activity, 
-  Award,
-  ChevronRight,
-  TrendingDown,
-  Percent
-} from "lucide-react";
+import { TrendingUp, Eye, MousePointerClick, Calendar, Activity, Award, ChevronRight, Percent } from "lucide-react";
 import { SupportedLanguage } from "../types";
 
 interface SellerAnalyticsGraphProps {
@@ -252,7 +241,6 @@ export default function SellerAnalyticsGraph({
             <span>{language === "bn" ? "কনভার্সন %" : "Conversion %"}</span>
           </button>
       </div>
-
 
       {/* Primary Analytics Graph Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 items-center">

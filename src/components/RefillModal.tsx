@@ -3,7 +3,7 @@ import { db, auth } from "../firebase";
 import { collection, addDoc, doc, onSnapshot, query, where, orderBy, getDoc, updateDoc } from "firebase/firestore";
 import { X, Copy, Check, ShieldAlert, Loader2, Coins, CheckCircle2, History, CreditCard, Sparkles, AlertCircle } from "lucide-react";
 import { SupportedLanguage } from "../types";
-import { sanitizeText, validatePriceInput, validateBanglaPhone } from "../utils/sanitizer";
+import { sanitizeText, validateBanglaPhone } from "../utils/sanitizer";
 import SimulatedPaymentPortal from "./SimulatedPaymentPortal";
 
 interface RefillModalProps {

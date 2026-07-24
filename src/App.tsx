@@ -9,49 +9,11 @@ import { logger } from "./utils/logger";
 import { trackEvent } from "./utils/trackEvent";
 import { signOut } from "firebase/auth";
 import { collection, onSnapshot, query, orderBy, getDocs, doc, getDoc, updateDoc, where, addDoc, deleteDoc, limit, startAfter, DocumentSnapshot, increment } from "firebase/firestore";
-import { 
-  Car, 
-  Search, 
-  Sparkles, 
-  User, 
-  Plus, 
-  MapPin, 
-  LogOut, 
-  Tag, 
-  Globe, 
-  Loader2, 
-  History, 
-  ShoppingBag, 
-  TrendingUp, 
-  Eye, 
-  SquarePlay, 
-  Phone,
-  Grid,
-  Heart,
-  ChevronRight,
-  ShieldCheck,
-  ShieldAlert,
-  Zap,
-  Coins,
-  Send,
-  Check,
-  Copy,
-  X,
-  Star,
-  CheckCircle2,
-  Trash2,
-  SquarePen,
-  Share2,
-  Bell,
-  Gift,
-  Wrench,
-  RotateCw,
-  Truck,
-} from "lucide-react";
+import { Car, Search, User, LogOut, Globe, Loader2, ShoppingBag, Phone, ChevronRight, ShieldCheck, Send, Check } from "lucide-react";
 
 import { PartListing, SupportedLanguage } from "./types";
-import { translations, CITIES, CATEGORIES, SAMPLE_LISTINGS, AD_PACKAGES } from "./translations";
-import { PromotedSlider } from "./components/PromotedSlider";
+import { translations, CATEGORIES, SAMPLE_LISTINGS, AD_PACKAGES } from "./translations";
+
 import { ListingCard } from "./components/ListingCard";
 import { HeaderNav } from "./components/HeaderNav";
 // 📦 নিচের কম্পোনেন্টগুলো lazy-loaded — এগুলোর কোড শুধু তখনই ডাউনলোড হবে যখন
@@ -75,7 +37,7 @@ const DashboardTab = lazy(() => import("./components/DashboardTab"));
 const MarketplaceTab = lazy(() => import("./components/MarketplaceTab"));
 import Fuse from "fuse.js";
 import { buildSearchBlob, convertBengaliDigitsToEnglish, convertEnglishDigitsToBengali, toPhoneticKey } from "./searchAliases";
-import { MessageSquare, Cpu, SlidersHorizontal, Moon, Sun, Users, HelpCircle, Mail, FileText, Menu, ChevronDown, Lock, CreditCard } from "lucide-react";
+import { Moon, Sun, Users, HelpCircle, Mail, FileText, Menu } from "lucide-react";
 import vehicleCardImg from "./assets/images/vehicle-card-new.png";
 import partsCardImg from "./assets/images/parts-card-new.png";
 
@@ -1662,7 +1624,6 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-100 flex flex-col font-sans transition-colors duration-300">
-      
 
       {/* Offline Alert Banner in Bengali */}
       {isOffline && (

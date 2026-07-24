@@ -1,43 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { db } from "../firebase";
-import { 
-  collection, 
-  onSnapshot, 
-  query, 
-  orderBy, 
-  doc, 
-  getDoc, 
-  setDoc, 
-  updateDoc,
-  deleteDoc,
-  limit
-} from "firebase/firestore";
-import { 
-  ShieldAlert, 
-  CheckCircle2, 
-  XCircle, 
-  Coins, 
-  Loader2, 
-  Save, 
-  Check, 
-  Phone, 
-  Smartphone, 
-  ArrowRight, 
-  User, 
-  Clock, 
-  Mail,
-  Trash2,
-  Search,
-  TrendingUp,
-  Grid,
-  Inbox,
-  Flag,
-  Activity,
-  Globe,
-  Users,
-  MapPin,
-  Eye
-} from "lucide-react";
+import { collection, onSnapshot, query, orderBy, doc, getDoc, setDoc, updateDoc, deleteDoc, limit } from "firebase/firestore";
+import { ShieldAlert, CheckCircle2, XCircle, Coins, Loader2, Save, Check, Smartphone, User, Clock, Mail, Trash2, Search, TrendingUp, Grid, Inbox, Flag, Activity, Globe, Users, MapPin, Eye } from "lucide-react";
 import { SupportedLanguage } from "../types";
 
 interface AdminPanelProps {

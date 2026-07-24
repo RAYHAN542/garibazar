@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { PartListing, SupportedLanguage } from "../types";
-import { X, Sparkles, CheckCircle, ShieldAlert, Award, Loader2, CreditCard, Lock } from "lucide-react";
+import { X, CheckCircle, ShieldAlert, Award, Loader2, CreditCard, Lock } from "lucide-react";
 import { AD_PACKAGES } from "../translations";
 import { collection, addDoc } from "firebase/firestore";
 import { db, auth } from "../firebase";
@@ -70,7 +70,6 @@ export function PromoteAdModal({ listing, language, currentUser, onClose, onProm
       setLoading(false);
     }
   };
-
 
   return (
     <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-4 z-50 overflow-y-auto">
