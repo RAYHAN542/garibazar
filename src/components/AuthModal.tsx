@@ -408,15 +408,6 @@ export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModa
             </button>
             <button
               type="button"
-              onClick={handleFacebookSignIn}
-              disabled={loading}
-              className="w-full py-2.5 bg-[#1877F2] hover:bg-[#166FE5] disabled:opacity-60 text-white font-bold rounded-lg text-sm flex items-center justify-center gap-2"
-            >
-              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <FacebookIcon />}
-              {language === "bn" ? "Facebook দিয়ে চালিয়ে যান" : "Continue with Facebook"}
-            </button>
-            <button
-              type="button"
               onClick={() => { setError(""); setStep("phone"); }}
               disabled={loading}
               className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white font-bold rounded-lg text-sm flex items-center justify-center gap-2"
@@ -474,4 +465,9 @@ export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModa
                 placeholder="······"
               />
             </div>
-            <button type="submit" disabled={loading} className="w-full
+            <button type="submit" disabled={loading} className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white font-bold rounded-lg text-sm flex items-center justify-center gap-2">
+              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+              {language === "bn" ? "যাচাই করুন" : "Verify"}
+            </button>
+            <div className="flex items-center justify-between text-xs">
+              <button type="button" onClick={() => { setError(""); setStep("phone"); }} className="flex items-
