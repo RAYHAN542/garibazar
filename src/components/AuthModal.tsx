@@ -266,7 +266,7 @@ export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModa
       setStep("otp");
     } catch (err) {
       console.error(err);
-      setError(language === "bn" ? "নেটওয়ার্ক সমস্যা। আবার চেষ্টা করুন।" : "Network error. Please try again.");
+      setError(`DEBUG: ${err?.message || err?.name || String(err)}`);
     } finally {
       setLoading(false);
     }
