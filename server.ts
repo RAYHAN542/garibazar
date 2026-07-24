@@ -1,13 +1,14 @@
+import "dotenv/config";
+
 import express from "express";
 import path from "path";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
-import dotenv from "dotenv";
 import admin from "firebase-admin";
 import helmet from "helmet";
 import cors from "cors";
-
-dotenv.config();
+import sendOtpHandler from "./api/auth/send-otp";
+import verifyOtpHandler from "./api/auth/verify-otp";
 
 const isProd = process.env.NODE_ENV === "production";
 const logger = {
@@ -386,6 +387,10 @@ Keep it structured, highlighting compatibility, reliability, usage warning or be
       res.status(500).json({ error: err.message || "Failed to generate description with Gemini AI" });
     }
   });
+
+  // Phone/OTP auth
+  app.post("/api/auth/send-otp", sendOtpHandler);
+  app.post("/api/auth/verify-otp", verifyOtpHandler);
 
   // Vite middleware setup
   if (process.env.NODE_ENV !== "production") {
