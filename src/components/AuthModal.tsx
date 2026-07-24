@@ -429,4 +429,50 @@ export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModa
             </button>
             <button type="button" onClick={() => { setError(""); setStep("start"); }} className="w-full flex items-center justify-center gap-1 text-xs text-slate-500 hover:underline">
               <ArrowLeft className="w-3 h-3" />
-              {language ===
+              {language === "bn" ? "পেছনে যান" : "Back"}
+            </button>
+          </form>
+        ) : step === "otp" ? (
+          <form onSubmit={handleVerifyOtp} className="space-y-4">
+            <p className="text-xs text-slate-500 text-center">
+              {language === "bn"
+                ? `${otpPhone} নম্বরে পাঠানো ৬-সংখ্যার কোডটি দিন।`
+                : `Enter the 6-digit code sent to ${otpPhone}.`}
+            </p>
+            <div>
+              <label className="text-[10px] font-bold block mb-1 text-slate-500">{language === "bn" ? "OTP কোড *" : "OTP Code *"}</label>
+              <input
+                type="text"
+                inputMode="numeric"
+                required
+                autoFocus
+                maxLength={6}
+                value={otpCode}
+                onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                className="w-full px-3 py-2 text-center text-lg tracking-[0.5em] border rounded-lg dark:bg-slate-800 dark:border-slate-700 dark:text-white"
+                placeholder="······"
+              />
+            </div>
+            <button type="submit" disabled={loading} className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white font-bold rounded-lg text-sm flex items-center justify-center gap-2">
+              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+              {language === "bn" ? "যাচাই করুন" : "Verify"}
+            </button>
+            <div className="flex items-center justify-between text-xs">
+              <button type="button" onClick={() => { setError(""); setStep("phone"); }} className="flex items-center gap-1 text-slate-500 hover:underline">
+                <ArrowLeft className="w-3 h-3" />
+                {language === "bn" ? "নম্বর বদলান" : "Change number"}
+              </button>
+              <button type="button" onClick={handleSendOtp as any} disabled={loading} className="text-emerald-600 font-bold hover:underline disabled:opacity-60">
+                {language === "bn" ? "আবার কোড পাঠান" : "Resend code"}
+              </button>
+            </div>
+          </form>
+        ) : (
+          <form onSubmit={handleCompleteProfile} className="space-y-4">
+            <p className="text-xs text-slate-500 text-center">
+              {language === "bn"
+                ? "শেষ ধাপ! ক্রেতারা যেন আপনার সাথে যোগাযোগ করতে পারে, তাই একটা মোবাইল নম্বর ও জেলা দিন।"
+                : "Almost done! Add a phone number and district so buyers can contact you."}
+            </p>
+
+     
