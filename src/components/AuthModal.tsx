@@ -77,12 +77,6 @@ const GoogleIcon = () => (
   </svg>
 );
 
-const FacebookIcon = () => (
-  <svg className="w-5 h-5" viewBox="0 0 24 24" aria-hidden="true">
-    <path fill="#1877F2" d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
-  </svg>
-);
-
 export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModalProps) {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -174,12 +168,6 @@ export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModa
     setError("");
     setLoading(true);
     try {
-      // Popup first on every device. signInWithRedirect depends on Firebase's
-      // authDomain (garibazar-bd.firebaseapp.com) sharing storage/cookies with
-      // this app's real hosting domain to hand back the result — Chrome's
-      // third-party storage partitioning breaks that bridge, which is why
-      // redirect sign-in was silently failing to persist. Popup avoids that
-      // entirely since it completes and resolves in the same tab session.
       const result = await signInWithPopup(auth, googleProvider);
       await handlePostGoogleAuth(result.user);
     } catch (err: any) {
@@ -441,33 +429,4 @@ export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModa
             </button>
             <button type="button" onClick={() => { setError(""); setStep("start"); }} className="w-full flex items-center justify-center gap-1 text-xs text-slate-500 hover:underline">
               <ArrowLeft className="w-3 h-3" />
-              {language === "bn" ? "পেছনে যান" : "Back"}
-            </button>
-          </form>
-        ) : step === "otp" ? (
-          <form onSubmit={handleVerifyOtp} className="space-y-4">
-            <p className="text-xs text-slate-500 text-center">
-              {language === "bn"
-                ? `${otpPhone} নম্বরে পাঠানো ৬-সংখ্যার কোডটি দিন।`
-                : `Enter the 6-digit code sent to ${otpPhone}.`}
-            </p>
-            <div>
-              <label className="text-[10px] font-bold block mb-1 text-slate-500">{language === "bn" ? "OTP কোড *" : "OTP Code *"}</label>
-              <input
-                type="text"
-                inputMode="numeric"
-                required
-                autoFocus
-                maxLength={6}
-                value={otpCode}
-                onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
-                className="w-full px-3 py-2 text-center text-lg tracking-[0.5em] border rounded-lg dark:bg-slate-800 dark:border-slate-700 dark:text-white"
-                placeholder="······"
-              />
-            </div>
-            <button type="submit" disabled={loading} className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white font-bold rounded-lg text-sm flex items-center justify-center gap-2">
-              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-              {language === "bn" ? "যাচাই করুন" : "Verify"}
-            </button>
-            <div className="flex items-center justify-between text-xs">
-              <button type="button" onClick={() => { setError(""); setStep("phone"); }} className="flex items-
+              {language ===
