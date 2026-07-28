@@ -252,11 +252,11 @@ export default function MarketplaceTab({
             >
               <img
                 src={vehicleCardImg}
-                alt={language === "bn" ? "গাড়ি বেচা/কেনা" : "Vehicle Buy & Sell"}
+                alt={language === "bn" ? "গাড়ি,এক্সাভেটর" : "Vehicle Buy & Sell"}
                 className="w-14 h-14 object-contain shrink-0"
               />
               <span className="font-black text-sm text-amber-800 dark:text-amber-300 leading-tight truncate">
-                {language === "bn" ? "গাড়ি বেচা/কেনা" : "Vehicle Buy & Sell"}
+                {language === "bn" ? "গাড়ি,এক্সাভেটর" : "Vehicle Buy & Sell"}
               </span>
               {selectedCategory === "vehicles" && (
                 <span className="absolute top-1.5 right-1.5 w-5 h-5 rounded-full bg-amber-500 text-white flex items-center justify-center shadow-md z-10">
