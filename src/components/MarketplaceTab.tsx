@@ -253,9 +253,9 @@ export default function MarketplaceTab({
               <img
                 src={vehicleCardImg}
                 alt={language === "bn" ? "গাড়ি বেচা/কেনা" : "Vehicle Buy & Sell"}
-                className="w-11 h-11 object-contain shrink-0"
+                className="w-14 h-14 object-contain shrink-0"
               />
-              <span className="font-black text-[12px] text-amber-800 dark:text-amber-300 leading-tight truncate">
+              <span className="font-black text-sm text-amber-800 dark:text-amber-300 leading-tight truncate">
                 {language === "bn" ? "গাড়ি বেচা/কেনা" : "Vehicle Buy & Sell"}
               </span>
               {selectedCategory === "vehicles" && (
@@ -280,9 +280,9 @@ export default function MarketplaceTab({
               <img
                 src={partsCardImg}
                 alt={language === "bn" ? "গাড়ির পাট" : "Vehicle Parts"}
-                className="w-11 h-11 object-contain shrink-0"
+                className="w-14 h-14 object-contain shrink-0"
               />
-              <span className="font-black text-[12px] text-sky-800 dark:text-sky-300 leading-tight truncate">
+              <span className="font-black text-sm text-sky-800 dark:text-sky-300 leading-tight truncate">
                 {language === "bn" ? "গাড়ির পাট" : "Vehicle Parts"}
               </span>
               {selectedCategory === "spare_parts" && (
