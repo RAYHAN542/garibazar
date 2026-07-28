@@ -442,13 +442,12 @@ export default function App() {
   const [showInstallPrompt, setShowInstallPrompt] = useState(false);
 
   useEffect(() => {
-    const alreadyLoggedIn = !!localStorage.getItem("gari_bazar_session_user");
     const dismissedForever = localStorage.getItem("gari_bazar_install_dismissed") === "true";
 
     const handleBeforeInstallPrompt = (e: any) => {
       e.preventDefault();
       setDeferredInstallPrompt(e);
-      if (!alreadyLoggedIn && !dismissedForever) {
+      if (!dismissedForever) {
         setShowInstallPrompt(true);
       }
     };
@@ -2369,7 +2368,6 @@ export default function App() {
           });
           setUserMetadata(sessionUser);
           setIsAuthOpen(false);
-          dismissInstallPrompt(true);
         }}
       />
 
