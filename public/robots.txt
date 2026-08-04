@@ -2,4 +2,4 @@ User-agent: *
 Allow: /
 Disallow: /api/
 
-Sitemap: https://garibazar.vercel.app/sitemap.xml
+Sitemap: https://garibazar.shop/sitemap.xml

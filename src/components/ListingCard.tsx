@@ -53,13 +53,17 @@ export function ListingCard({ listing, language, onViewDetails, onPromoteClick, 
     : (language === "bn" ? "পার্ট" : "Part");
 
   return (
-    <div
+    <a
+      href={`/l/${listing.id}`}
       className={`relative rounded-2xl overflow-hidden bg-white dark:bg-slate-900 transition-all duration-300 flex flex-col hover:shadow-lg cursor-pointer group border ${
         isAd
           ? "border-2 border-amber-400 shadow-sm shadow-amber-500/10"
           : "border-slate-200 hover:border-amber-300 dark:border-slate-800 dark:hover:border-slate-700"
       }`}
-      onClick={() => onViewDetails(listing)}
+      onClick={(e) => {
+        e.preventDefault();
+        onViewDetails(listing);
+      }}
     >
       {/* IMAGE */}
       <div className="relative aspect-[4/3] w-full bg-slate-50 dark:bg-slate-950 overflow-hidden">
@@ -116,6 +120,6 @@ export function ListingCard({ listing, language, onViewDetails, onPromoteClick, 
           </span>
         </div>
       </div>
-    </div>
+    </a>
   );
 }

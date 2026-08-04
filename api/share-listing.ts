@@ -15,7 +15,7 @@ if (!getApps().length) {
 
 const SITE_URL = "https://garibazar.shop";
 const DEFAULT_IMAGE = `${SITE_URL}/og-banner.jpg`;
-const CRAWLER_UA = /facebookexternalhit|Facebot|Twitterbot|LinkedInBot|WhatsApp|TelegramBot|Slackbot|Pinterest|Discordbot|redditbot/i;
+const CRAWLER_UA = /facebookexternalhit|Facebot|Twitterbot|LinkedInBot|WhatsApp|TelegramBot|Slackbot|Pinterest|Discordbot|redditbot|Googlebot|bingbot|DuckDuckBot|Applebot|YandexBot|Baiduspider/i;
 
 function escapeHtml(str: string) {
   return String(str)
@@ -67,6 +67,8 @@ export default async function handler(req: any, res: any) {
 <head>
 <meta charset="utf-8" />
 <title>${escapeHtml(title)}</title>
+<meta name="description" content="${escapeHtml(description)}" />
+<link rel="canonical" href="${escapeHtml(shareUrl)}" />
 <meta property="og:title" content="${escapeHtml(title)}" />
 <meta property="og:description" content="${escapeHtml(description)}" />
 <meta property="og:type" content="website" />
