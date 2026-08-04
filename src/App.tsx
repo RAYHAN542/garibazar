@@ -441,18 +441,38 @@ export default function App() {
   const [deferredInstallPrompt, setDeferredInstallPrompt] = useState<any>(null);
   const [showInstallPrompt, setShowInstallPrompt] = useState(false);
 
+  // Facebook/Instagram-এর in-app browser এ beforeinstallprompt কখনোই আসে না —
+  // তাই এই ব্রাউজারগুলো আলাদাভাবে ধরে, Chrome-এ পাঠিয়ে দেওয়া হয়
+  const isInAppBrowser = /FBAN|FBAV|Instagram|Messenger/i.test(navigator.userAgent);
+
   useEffect(() => {
     const dismissedForever = localStorage.getItem("gari_bazar_install_dismissed") === "true";
+
+    // Chrome-এ ফিরে আসার পর (in-app browser থেকে রিডাইরেক্ট হওয়ার পর) স্বয়ংক্রিয়ভাবে
+    // ইনস্টল popup তোলার জন্য এই ফ্ল্যাগ চেক করা হয়
+    const autoInstall = new URLSearchParams(window.location.search).get("install") === "1";
 
     const handleBeforeInstallPrompt = (e: any) => {
       e.preventDefault();
       setDeferredInstallPrompt(e);
-      if (!dismissedForever) {
+      if (autoInstall) {
+        // ইউজার আগেই "Install" চেপেছিল, শুধু ব্রাউজার বদলাতে হয়েছিল —
+        // এখন সাথে সাথেই আসল popup দেখিয়ে দেওয়া হচ্ছে, আবার ট্যাপ করতে হবে না
+        e.prompt();
+        const cleanUrl = window.location.pathname + window.location.hash;
+        window.history.replaceState({}, "", cleanUrl);
+      } else if (!dismissedForever) {
         setShowInstallPrompt(true);
       }
     };
 
     window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+
+    // Facebook/Instagram browser-এ beforeinstallprompt কখনোই আসবে না,
+    // তাই এখানে সরাসরি ব্যানার দেখিয়ে দেওয়া হচ্ছে (ট্যাপ করলে Chrome-এ পাঠাবে)
+    if (isInAppBrowser && !dismissedForever && !autoInstall) {
+      setShowInstallPrompt(true);
+    }
 
     const handleAppInstalled = () => {
       localStorage.setItem("gari_bazar_install_dismissed", "true");
@@ -468,6 +488,15 @@ export default function App() {
   }, []);
 
   const handleInstallApp = async () => {
+    if (isInAppBrowser) {
+      // Facebook/Instagram browser-এ থাকলে সরাসরি ইনস্টল সম্ভব না —
+      // Chrome-এ একই পেজ খুলে দেওয়া হচ্ছে, ?install=1 ফ্ল্যাগ সহ যাতে ওখানে
+      // পৌঁছেই স্বয়ংক্রিয়ভাবে ইনস্টল popup উঠে যায়
+      const targetUrl = `${window.location.origin}${window.location.pathname}?install=1`;
+      const intentUrl = `intent://${targetUrl.replace(/^https?:\/\//, "")}#Intent;scheme=https;package=com.android.chrome;end`;
+      window.location.href = intentUrl;
+      return;
+    }
     if (!deferredInstallPrompt) return;
     deferredInstallPrompt.prompt();
     await deferredInstallPrompt.userChoice;
