@@ -176,9 +176,9 @@ export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPromp
     setImages(prev => [...prev, ...newImages]);
     setError(null);
 
-    for (let i = 0; i < newImages.length; i++) {
-      await uploadImageToImgBB(newImages[i].file, currentLength + i);
-    }
+    await Promise.all(
+      newImages.map((img, i) => uploadImageToImgBB(img.file, currentLength + i))
+    );
   };
 
   const removeImage = (index: number) => {
