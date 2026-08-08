@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from "react";
-import { X, PartyPopper, Frown, Loader2, ShieldAlert, Gift } from "lucide-react";
+import { X, PartyPopper, Frown, Loader2, ShieldAlert, Gift, ChevronDown, Check } from "lucide-react";
 import { PartListing, SupportedLanguage } from "../types";
 import { auth } from "../firebase";
 
@@ -33,6 +33,7 @@ export function LotteryModal({ isOpen, onClose, language, currentUser, userMetad
   const [result, setResult] = useState<"win" | "lose" | null>(null);
   const [wheelRotation, setWheelRotation] = useState(0);
   const [transitionMs, setTransitionMs] = useState(SPIN_DURATION_MS);
+  const [isListingPickerOpen, setIsListingPickerOpen] = useState(false);
   const spinTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const eligibleListings = useMemo(() => {
@@ -41,6 +42,7 @@ export function LotteryModal({ isOpen, onClose, language, currentUser, userMetad
   }, [listings, currentUser?.uid]);
 
   const activeListingId = selectedListingId || eligibleListings[0]?.id || "";
+  const activeListing = eligibleListings.find((item) => item.id === activeListingId) || null;
 
   const usedToday = userMetadata?.lastLotteryDate === getTodayInDhaka();
 
@@ -242,20 +244,62 @@ export function LotteryModal({ isOpen, onClose, language, currentUser, userMetad
             )}
 
             {currentUser && eligibleListings.length > 1 && (
-              <div className="space-y-1.5">
+              <div className="space-y-1.5 relative">
                 <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">
                   {language === "bn" ? "কোন প্রোডাক্ট দিয়ে অংশ নিতে চান?" : "Which listing should enter?"}
                 </span>
-                <select
-                  value={activeListingId}
-                  onChange={(e) => setSelectedListingId(e.target.value)}
+
+                <button
+                  type="button"
                   disabled={spinning}
-                  className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 py-2 px-3 rounded-xl text-xs focus:ring-1 focus:ring-amber-500 focus:outline-none dark:text-white font-semibold disabled:opacity-60"
+                  onClick={() => setIsListingPickerOpen((v) => !v)}
+                  className="w-full flex items-center gap-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 py-2 px-2.5 rounded-xl text-xs focus:ring-1 focus:ring-amber-500 focus:outline-none dark:text-white font-semibold disabled:opacity-60 cursor-pointer"
                 >
-                  {eligibleListings.map((item) => (
-                    <option key={item.id} value={item.id}>{item.title}</option>
-                  ))}
-                </select>
+                  <img
+                    src={activeListing?.images?.[0] || activeListing?.image || ""}
+                    alt={activeListing?.title || ""}
+                    className="w-8 h-8 rounded-lg object-cover shrink-0 bg-slate-200 dark:bg-slate-800"
+                    referrerPolicy="no-referrer"
+                  />
+                  <span className="flex-1 min-w-0 text-left truncate">{activeListing?.title}</span>
+                  <ChevronDown className={`w-4 h-4 shrink-0 text-slate-400 transition-transform ${isListingPickerOpen ? "rotate-180" : ""}`} />
+                </button>
+
+                {isListingPickerOpen && (
+                  <>
+                    {/* Tap-outside-to-close backdrop */}
+                    <div
+                      className="fixed inset-0 z-30"
+                      onClick={() => setIsListingPickerOpen(false)}
+                    />
+                    <div className="absolute left-0 right-0 top-full mt-1 z-40 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-lg max-h-56 overflow-y-auto">
+                      {eligibleListings.map((item) => (
+                        <button
+                          key={item.id}
+                          type="button"
+                          onClick={() => {
+                            setSelectedListingId(item.id);
+                            setIsListingPickerOpen(false);
+                          }}
+                          className="w-full flex items-center gap-2.5 py-2 px-2.5 hover:bg-slate-50 dark:hover:bg-slate-800 transition text-left cursor-pointer"
+                        >
+                          <img
+                            src={item.images?.[0] || item.image || ""}
+                            alt={item.title}
+                            className="w-8 h-8 rounded-lg object-cover shrink-0 bg-slate-200 dark:bg-slate-800"
+                            referrerPolicy="no-referrer"
+                          />
+                          <span className="flex-1 min-w-0 text-xs font-semibold text-slate-800 dark:text-slate-100 truncate">
+                            {item.title}
+                          </span>
+                          {item.id === activeListingId && (
+                            <Check className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
               </div>
             )}
 
