@@ -85,12 +85,23 @@ export function LotteryModal({ isOpen, onClose, language, currentUser, userMetad
 
     try {
       const idToken = await auth.currentUser?.getIdToken();
-      const res = await fetch("/api/lottery/draw", {
+      const res = await fetch("/api/draw", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
         body: JSON.stringify({ listingId: activeListingId }),
       });
-      const data = await res.json();
+
+      let data: any = {};
+      try {
+        const raw = await res.text();
+        data = raw ? JSON.parse(raw) : {};
+      } catch (parseErr) {
+        throw new Error(
+          language === "bn"
+            ? "সার্ভার থেকে সঠিক উত্তর পাওয়া যায়নি। একটু পর আবার চেষ্টা করুন।"
+            : "Got an unexpected response from the server. Please try again shortly."
+        );
+      }
 
       if (!res.ok) {
         throw new Error(data.error || (language === "bn" ? "কিছু ভুল হয়েছে।" : "Something went wrong."));
