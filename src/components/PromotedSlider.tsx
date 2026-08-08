@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { PartListing, SupportedLanguage } from "../types";
-import { MapPin, ArrowRight, Gift } from "lucide-react";
+import { MapPin, ArrowRight, Plus } from "lucide-react";
 
 interface PromotedSliderProps {
   listings: PartListing[];
@@ -78,24 +78,6 @@ export function PromotedSlider({ listings, language, onViewListing, onOpenLotter
 
   return (
     <div className="mb-4 w-full max-w-xl mx-auto animate-fade-in">
-      {/* Title with rocket icon + free daily lottery CTA */}
-      <div className="mb-2 flex items-center justify-between gap-2 px-0.5">
-        <div className="flex items-center gap-1.5 min-w-0">
-          <span className="text-base">🚀</span>
-          <h3 className="text-sm sm:text-base font-black font-sans text-slate-800 dark:text-slate-100 tracking-tight truncate">
-            {language === "bn" ? "বুস্ট বিজ্ঞাপন" : "Boost Ads"}
-          </h3>
-        </div>
-        <button
-          id="open-lottery-btn"
-          onClick={onOpenLottery}
-          className="shrink-0 flex items-center gap-1 bg-gradient-to-r from-amber-400 to-orange-500 hover:from-amber-500 hover:to-orange-600 text-slate-950 font-black text-[10px] sm:text-xs px-3 py-1.5 rounded-full shadow-md transition cursor-pointer"
-        >
-          <Gift className="w-3.5 h-3.5" />
-          {language === "bn" ? "ফ্রী বুস্ট লটারি" : "Free Boost Lottery"}
-        </button>
-      </div>
-
       {currentItem && (
       <>
       {/* Main Slide Card — swipeable */}
@@ -138,17 +120,24 @@ export function PromotedSlider({ listings, language, onViewListing, onOpenLotter
           </span>
         </div>
 
-        {/* Top-Right corner "+" button — ট্যাপ করলে ফ্রী বুস্ট লটারি খুলবে */}
+        {/* Top-Right "Free Ads" pill — ট্যাপ করলে ফ্রী বুস্ট লটারি খুলবে */}
         <button
+          id="open-lottery-btn"
           type="button"
           onClick={(e) => {
             e.stopPropagation();
             onOpenLottery();
           }}
           title={language === "bn" ? "ফ্রী বুস্ট লটারি" : "Free Boost Lottery"}
-          className="absolute top-3.5 right-3.5 z-10 w-6 h-6 rounded-full bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-sm flex items-center justify-center shadow-md transition cursor-pointer"
+          className="absolute top-3.5 right-3.5 z-10 flex items-center gap-1.5 bg-gradient-to-r from-amber-400 to-orange-500 hover:from-amber-500 hover:to-orange-600 text-slate-950 font-black text-[10px] sm:text-xs pl-3 pr-1.5 py-1 rounded-full shadow-md transition cursor-pointer active:scale-95"
         >
-          +
+          <span className="whitespace-nowrap">
+            {language === "bn" ? "ফ্রি বিজ্ঞাপন" : "Free Ads"}
+          </span>
+          <ArrowRight className="w-3 h-3 shrink-0" />
+          <span className="w-5 h-5 rounded-full bg-slate-950/15 flex items-center justify-center shrink-0">
+            <Plus className="w-3.5 h-3.5" strokeWidth={3} />
+          </span>
         </button>
 
         {/* Right-side Text Block: title, location, price, CTA button */}
