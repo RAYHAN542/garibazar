@@ -304,6 +304,9 @@ export default function App() {
 
   // Core Database Listings State
   const [listings, setListings] = useState<PartListing[]>(getInitialListings);
+  // সব পোস্ট: ইউজারের নিজের সব লিস্টিং, হোমপেজের "Load More" পেজিনেশনের ওপর নির্ভর না করে —
+  // যাতে Dashboard আর Lottery সবসময় ইউজারের ১০০% পোস্ট দেখাতে পারে, হোমপেজে কত লোড হয়েছে তার তোয়াক্কা না করেই।
+  const [myListings, setMyListings] = useState<PartListing[]>([]);
   const [purchases, setPurchases] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -860,6 +863,30 @@ export default function App() {
         if (unreadForMe > 0) count++;
       });
       setUnreadChatsCount(count);
+    });
+    return () => unsubscribe();
+  }, [user?.uid]);
+
+  // 1b. My Own Listings — সরাসরি sellerId দিয়ে কোয়েরি করা, হোমপেজের ২০-টা পেজিনেটেড লিস্ট থেকে না।
+  // এভাবে Dashboard আর Lottery সবসময় ইউজারের আসল ১০০% পোস্ট দেখাবে।
+  useEffect(() => {
+    if (!user?.uid) {
+      setMyListings([]);
+      return;
+    }
+    const q = query(collection(db, "listings"), where("sellerId", "==", user.uid), orderBy("createdAt", "desc"));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const list: PartListing[] = [];
+      snapshot.forEach((docSnap) => {
+        const data = docSnap.data();
+        const normalizedCreatedAt = data.createdAt && typeof data.createdAt.toDate === "function"
+          ? data.createdAt.toDate().toISOString()
+          : data.createdAt;
+        list.push({ id: docSnap.id, ...data, createdAt: normalizedCreatedAt } as PartListing);
+      });
+      setMyListings(list);
+    }, (err) => {
+      logger.error("Failed to sync my listings:", err);
     });
     return () => unsubscribe();
   }, [user?.uid]);
@@ -1766,6 +1793,7 @@ export default function App() {
                   userMetadata={userMetadata}
                   isUserAdmin={isUserAdmin}
                   listings={listings}
+                  myListings={myListings}
                   purchases={purchases}
                   hasMorePurchases={hasMorePurchases}
                   loadingMorePurchases={loadingMorePurchases}
@@ -2453,7 +2481,7 @@ export default function App() {
           language={language}
           currentUser={user}
           userMetadata={userMetadata}
-          listings={listings}
+          listings={myListings}
           setIsAuthOpen={setIsAuthOpen}
         />
       )}

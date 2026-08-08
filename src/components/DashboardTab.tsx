@@ -21,6 +21,7 @@ interface DashboardTabProps {
   userMetadata: any;
   isUserAdmin: boolean;
   listings: PartListing[];
+  myListings: PartListing[];
   purchases: any[];
   hasMorePurchases: boolean;
   loadingMorePurchases: boolean;
@@ -59,6 +60,7 @@ export default function DashboardTab({
   userMetadata,
   isUserAdmin,
   listings,
+  myListings,
   purchases,
   hasMorePurchases,
   loadingMorePurchases,
@@ -101,7 +103,7 @@ export default function DashboardTab({
                       <Grid className="w-3.5 h-3.5" />
                     </div>
                     <span className="text-[8px] sm:text-[9px] uppercase font-bold text-slate-400 leading-tight">{activeTranslations.statsActive}</span>
-                    <span className="text-sm font-black text-slate-800 dark:text-white">{listings.filter(item => item.sellerId === user.uid).length}</span>
+                    <span className="text-sm font-black text-slate-800 dark:text-white">{myListings.filter(item => item.sellerId === user.uid).length}</span>
                   </div>
 
                   <div className="bg-white dark:bg-slate-900 rounded-xl p-2.5 border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col items-center text-center gap-1">
@@ -110,7 +112,7 @@ export default function DashboardTab({
                     </div>
                     <span className="text-[8px] sm:text-[9px] uppercase font-bold text-slate-400 leading-tight">{language === "bn" ? "মার্কেট ভিউস" : "Shop Views"}</span>
                     <span className="text-sm font-black text-slate-800 dark:text-white">
-                      {listings.filter(item => item.sellerId === user.uid).reduce((sum, current) => sum + (current.views ?? 0), 0)}
+                      {myListings.filter(item => item.sellerId === user.uid).reduce((sum, current) => sum + (current.views ?? 0), 0)}
                     </span>
                   </div>
                 </div>
@@ -218,7 +220,7 @@ export default function DashboardTab({
                         {language === "bn" ? "আমার কার পার্টস লিস্টিং" : "My Posted Car Parts"}
                       </h3>
 
-                      {listings.filter(item => item.sellerId === user.uid).length === 0 ? (
+                      {myListings.filter(item => item.sellerId === user.uid).length === 0 ? (
                         <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-850 p-4 text-center text-slate-500">
                           <p className="text-xs">{language === "bn" ? "আপনি এখনো কোনো প্রোডাক্ট পোস্ট করেননি" : "You have not listed any car parts yet."}</p>
                           <button
@@ -230,7 +232,7 @@ export default function DashboardTab({
                         </div>
                       ) : (
                         <div className="space-y-3">
-                          {listings.filter(item => item.sellerId === user.uid).map((item) => (
+                          {myListings.filter(item => item.sellerId === user.uid).map((item) => (
                             <div 
                               key={item.id}
                               className="bg-white dark:bg-slate-905 border border-slate-200 dark:border-slate-800 p-4 rounded-xl flex gap-3.5 items-center justify-between"
@@ -425,7 +427,7 @@ export default function DashboardTab({
                               {language === "bn" ? "মোট পোস্ট করা লিস্টিং" : "Total Posted"}
                             </span>
                             <span className="text-3xl font-black text-white">
-                              {listings.filter(item => item.sellerId === user.uid).length}
+                              {myListings.filter(item => item.sellerId === user.uid).length}
                             </span>
                           </div>
                           <div className="text-center md:text-right">
@@ -433,7 +435,7 @@ export default function DashboardTab({
                               {language === "bn" ? "সক্রিয় স্টক সংখ্যা" : "Active Items"}
                             </span>
                             <span className="text-3xl font-black text-amber-500">
-                              {listings.filter(item => item.sellerId === user.uid && !item.isSold).length}
+                              {myListings.filter(item => item.sellerId === user.uid && !item.isSold).length}
                             </span>
                           </div>
                         </div>
@@ -447,7 +449,7 @@ export default function DashboardTab({
                         {language === "bn" ? "আমার চলমান পার্টস ও সক্রিয় বিজ্ঞাপন" : "My Active Live Listings"}
                       </h4>
 
-                      {listings.filter(item => item.sellerId === user.uid && !item.isSold).length === 0 ? (
+                      {myListings.filter(item => item.sellerId === user.uid && !item.isSold).length === 0 ? (
                         <div className="text-center py-6 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-850 rounded-2xl p-4 text-slate-500 text-xs">
                           {language === "bn" 
                             ? "আপনার কোন সক্রিয় প্রোডাক্ট বা কার পার্টস লিস্টিং নেই! লিস্টিং যোগ করতে 'বিক্রি করুন' ট্যাবে যান।" 
@@ -455,7 +457,7 @@ export default function DashboardTab({
                         </div>
                       ) : (
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                          {listings.filter(item => item.sellerId === user.uid && !item.isSold).map((listing) => (
+                          {myListings.filter(item => item.sellerId === user.uid && !item.isSold).map((listing) => (
                             <ListingCard
                               key={listing.id}
                               listing={listing}
@@ -650,7 +652,7 @@ export default function DashboardTab({
                               {language === "bn" ? "কোন প্রোডাক্টটি বিজ্ঞাপন হিসেবে দেখাবেন?" : "Which car part do you want to promote?"}
                             </label>
                             
-                            {listings.filter(item => item.sellerId === user.uid).length === 0 ? (
+                            {myListings.filter(item => item.sellerId === user.uid).length === 0 ? (
                               <div className="p-4 bg-slate-50 dark:bg-slate-950 border border-dashed border-slate-200 dark:border-slate-800 rounded-lg text-center">
                                 <p className="text-xs text-slate-500 leading-relaxed">
                                   {language === "bn"
@@ -679,7 +681,7 @@ export default function DashboardTab({
                                 <option value="" className="bg-white text-slate-900">
                                   {language === "bn" ? "---একটি প্রোডাক্ট সিলেক্ট করুন---" : "---Choose a Posted Car Part---"}
                                 </option>
-                                {listings.filter(item => item.sellerId === user.uid).map((item) => (
+                                {myListings.filter(item => item.sellerId === user.uid).map((item) => (
                                   <option key={item.id} value={item.id} className="bg-white text-slate-900">
                                     {item.title} ({item.price ? `৳${item.price.toLocaleString()}` : (language === "bn" ? "মূল্য জানতে যোগাযোগ করুন" : "Price on Request")}) {item.isAd ? `[${language === "bn" ? "ইতিমধ্যে বুস্ট রয়েছে" : "Already boosted"}]` : ""}
                                   </option>
@@ -820,13 +822,13 @@ export default function DashboardTab({
                         {language === "bn" ? "আমার চলমান বিজ্ঞাপন এবং ক্যাম্পেইন ট্র্যাকিং" : "My Active Campaigns & Traffic Stats"}
                       </h4>
 
-                      {listings.filter(item => item.sellerId === user.uid && item.isAd).length === 0 ? (
+                      {myListings.filter(item => item.sellerId === user.uid && item.isAd).length === 0 ? (
                         <div className="bg-slate-50 dark:bg-slate-950 border border-dashed border-slate-200 dark:border-slate-800 rounded-xl p-4 text-center text-slate-500">
                           <p className="text-xs">{language === "bn" ? "আপনার প্রোফাইলে কোনো চলমান বিজ্ঞাপন ক্যাম্পেইন নেই।" : "No sponsored ad campaigns active for the current session. Choose a product above to boost!"}</p>
                         </div>
                       ) : (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          {listings.filter(item => item.sellerId === user.uid && item.isAd).map((item) => (
+                          {myListings.filter(item => item.sellerId === user.uid && item.isAd).map((item) => (
                             <div 
                               key={item.id} 
                               className="bg-white dark:bg-slate-905 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 flex gap-4 items-center justify-between shadow-sm relative overflow-hidden"
