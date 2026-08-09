@@ -22,8 +22,7 @@ const WHEEL_SEGMENTS = 8;
 const WIN_SEGMENT_INDEX = 0;
 const SEGMENT_ANGLE = 360 / WHEEL_SEGMENTS;
 const SPIN_DURATION_MS = 4200;
-const WARMUP_SPIN_MS = 900;
-const FINAL_SPIN_MS = 3300;
+const WAIT_LOOP_MS = 1000;
 const SEGMENT_COLORS = ["#f59e0b", "#0f172a"];
 
 export function LotteryModal({ isOpen, onClose, language, currentUser, userMetadata, listings, setIsAuthOpen }: LotteryModalProps) {
@@ -33,8 +32,10 @@ export function LotteryModal({ isOpen, onClose, language, currentUser, userMetad
   const [result, setResult] = useState<"win" | "lose" | null>(null);
   const [wheelRotation, setWheelRotation] = useState(0);
   const [transitionMs, setTransitionMs] = useState(SPIN_DURATION_MS);
+  const [waitingForServer, setWaitingForServer] = useState(false);
   const [isListingPickerOpen, setIsListingPickerOpen] = useState(false);
   const spinTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const spinStartTimeRef = useRef<number>(0);
 
   const eligibleListings = useMemo(() => {
     if (!currentUser?.uid) return [];
@@ -48,15 +49,15 @@ export function LotteryModal({ isOpen, onClose, language, currentUser, userMetad
 
   if (!isOpen) return null;
 
-  const spinWheelTo = (landingIndex: number) => {
+  const spinWheelTo = (landingIndex: number, fromAngle: number) => {
     const jitterRange = SEGMENT_ANGLE - 10;
     const jitter = (Math.random() - 0.5) * jitterRange;
     const targetWithinSegment = landingIndex * SEGMENT_ANGLE + SEGMENT_ANGLE / 2 + jitter;
     const desiredFinalMod = ((360 - targetWithinSegment) % 360 + 360) % 360;
-    const currentMod = ((wheelRotation % 360) + 360) % 360;
+    const currentMod = ((fromAngle % 360) + 360) % 360;
     const delta = ((desiredFinalMod - currentMod) % 360 + 360) % 360;
     const EXTRA_FULL_SPINS = 5;
-    setWheelRotation((prev) => prev + EXTRA_FULL_SPINS * 360 + delta);
+    setWheelRotation(fromAngle + EXTRA_FULL_SPINS * 360 + delta);
   };
 
   const pickRandomLosingIndex = (): number => {
@@ -79,11 +80,8 @@ export function LotteryModal({ isOpen, onClose, language, currentUser, userMetad
     }
 
     setSpinning(true);
-
-    // ক্লিক করার সাথে সাথেই একটা দ্রুত "ওয়ার্ম-আপ" স্পিন শুরু হয়, যাতে API রেসপন্সের
-    // জন্য অপেক্ষা করতে না হয় — চাকা তাৎক্ষণিকভাবে ঘোরা শুরু করে।
-    setTransitionMs(WARMUP_SPIN_MS);
-    setWheelRotation((prev) => prev + 2 * 360);
+    setWaitingForServer(true);
+    spinStartTimeRef.current = Date.now();
 
     try {
       const idToken = await auth.currentUser?.getIdToken();
@@ -110,15 +108,31 @@ export function LotteryModal({ isOpen, onClose, language, currentUser, userMetad
       }
 
       const landingIndex = data.win ? WIN_SEGMENT_INDEX : pickRandomLosingIndex();
-      // এখন আসল ফলাফলের দিকে চাকাটা নিয়ে গিয়ে থামানো হচ্ছে।
-      setTransitionMs(FINAL_SPIN_MS);
-      spinWheelTo(landingIndex);
+
+      // চাকাটা ঠিক যেখানে ঘুরছিল (continuous loop) সেখান থেকেই, কোনো ঝাঁকুনি ছাড়াই,
+      // আসল ফলাফলের দিকে মসৃণভাবে ধীরে ধীরে থামানো হচ্ছে।
+      const elapsed = Date.now() - spinStartTimeRef.current;
+      const currentAngle = ((elapsed % WAIT_LOOP_MS) / WAIT_LOOP_MS) * 360;
+
+      // ১) লুপ-স্পিন বন্ধ করে ঠিক ওই মুহূর্তের কোণেই স্থির করা হচ্ছে (transition ছাড়া, তাই ঝাঁকুনি হবে না)
+      setWaitingForServer(false);
+      setTransitionMs(0);
+      setWheelRotation(currentAngle);
+
+      // ২) পরের ফ্রেমে, সেখান থেকেই আসল ফলাফলের দিকে মসৃণভাবে ধীর হয়ে থামানো হচ্ছে
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          setTransitionMs(SPIN_DURATION_MS);
+          spinWheelTo(landingIndex, currentAngle);
+        });
+      });
 
       spinTimeoutRef.current = setTimeout(() => {
         setResult(data.win ? "win" : "lose");
         setSpinning(false);
-      }, FINAL_SPIN_MS);
+      }, SPIN_DURATION_MS);
     } catch (err: any) {
+      setWaitingForServer(false);
       setError(err?.message || (language === "bn" ? "কিছু ভুল হয়েছে। আবার চেষ্টা করুন।" : "Something went wrong. Please try again."));
       setSpinning(false);
     }
@@ -129,6 +143,7 @@ export function LotteryModal({ isOpen, onClose, language, currentUser, userMetad
     setResult(null);
     setError("");
     setSpinning(false);
+    setWaitingForServer(false);
     onClose();
   };
 
@@ -201,6 +216,12 @@ export function LotteryModal({ isOpen, onClose, language, currentUser, userMetad
             </div>
 
             <div className="relative w-52 h-52 mx-auto select-none">
+              <style>{`
+                @keyframes lottery-wait-spin {
+                  from { transform: rotate(0deg); }
+                  to { transform: rotate(360deg); }
+                }
+              `}</style>
               <div className="absolute -top-1 left-1/2 -translate-x-1/2 z-10 w-0 h-0 border-l-[10px] border-l-transparent border-r-[10px] border-r-transparent border-t-[16px] border-t-red-500 drop-shadow-md" />
 
               <div
@@ -208,7 +229,8 @@ export function LotteryModal({ isOpen, onClose, language, currentUser, userMetad
                 style={{
                   background: `conic-gradient(from 0deg, ${gradientStops})`,
                   transform: `rotate(${wheelRotation}deg)`,
-                  transition: spinning ? `transform ${transitionMs}ms cubic-bezier(0.17, 0.67, 0.12, 1)` : "none",
+                  transition: !waitingForServer && spinning ? `transform ${transitionMs}ms cubic-bezier(0.17, 0.67, 0.12, 1)` : "none",
+                  animation: waitingForServer ? `lottery-wait-spin ${WAIT_LOOP_MS}ms linear infinite` : "none",
                 }}
               >
                 {Array.from({ length: WHEEL_SEGMENTS }).map((_, i) => {
