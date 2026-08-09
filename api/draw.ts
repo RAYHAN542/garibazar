@@ -23,7 +23,7 @@ const getTodayInDhaka = (): string => {
   return new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Dhaka" }); // YYYY-MM-DD
 };
 
-// জেতার সম্ভাবনা ঠিক ১০০ জনের মধ্যে ১ জন (১%)। ক্রিপ্টো-সিকিউর random ব্যবহার করা হচ্ছে
+// জেতার সম্ভাবনা ঠিক ১০ জনের মধ্যে ১ জন (১০%)। ক্রিপ্টো-সিকিউর random ব্যবহার করা হচ্ছে
 // যাতে ক্লায়েন্ট সাইড থেকে ম্যানিপুলেট করা সম্ভব না হয় — পুরো ড্র সার্ভারেই হয়।
 const WIN_CHANCE_DENOMINATOR = 10;
 const BOOST_DURATION_HOURS = 24;
@@ -81,8 +81,8 @@ export default async function handler(req: any, res: any) {
       return res.status(400).json({ error: "এই প্রোডাক্টটি ইতিমধ্যে বিজ্ঞাপন হিসেবে লাইভ আছে।" });
     }
 
-    // 4. Draw — exactly 1-in-100 (1%) chance, server-side crypto RNG
-    const roll = randomInt(0, WIN_CHANCE_DENOMINATOR); // 0..99
+    // 4. Draw — exactly 1-in-10 (10%) chance, server-side crypto RNG
+    const roll = randomInt(0, WIN_CHANCE_DENOMINATOR); // 0..9
     const win = roll === 0;
 
     const batch = db.batch();
