@@ -726,6 +726,17 @@ export default function App() {
   // Ref to track if we pushed a modal state
   const modalHistoryRef = useRef<boolean>(false);
 
+  // Remembers which tab was active the moment a modal opened, so that
+  // closing the modal via the back button always returns to THAT tab --
+  // instead of trusting whichever tab happens to sit in the popped
+  // history entry. This is a defensive fix: on longer, Load-More-extended
+  // pages a stray/duplicate popstate (e.g. an Android edge back-gesture
+  // firing while scrolling) could occasionally hand handleTabPopState a
+  // stale tab from earlier in the session (e.g. Dashboard), landing the
+  // user on the wrong tab after closing a listing. Explicitly restoring
+  // the captured tab here overrides that regardless of the cause.
+  const tabWhenModalOpenedRef = useRef<string | null>(null);
+
   // Intercept browser back button to close active modal instead of exiting the page/iframe
   useEffect(() => {
     const isAnyModalOpen = !!(isAuthOpen || selectedListing || promotingListing || editingListing || isRefillModalOpen || isLegalOpen || isLotteryOpen);
@@ -738,10 +749,16 @@ export default function App() {
       setEditingListing(null);
       setIsRefillModalOpen(false);
       setIsLegalOpen(false);
+      if (tabWhenModalOpenedRef.current !== null) {
+        isRestoringTabRef.current = true;
+        setActiveTab(tabWhenModalOpenedRef.current as typeof activeTab);
+        tabWhenModalOpenedRef.current = null;
+      }
     };
 
     if (isAnyModalOpen) {
       if (!modalHistoryRef.current) {
+        tabWhenModalOpenedRef.current = activeTab;
         window.history.pushState({ modalOpen: true }, "");
         modalHistoryRef.current = true;
       }
