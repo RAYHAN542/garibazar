@@ -6,6 +6,7 @@ import { db } from "../firebase";
 import { sanitizeText, validatePriceInput, validateBanglaPhone } from "../utils/sanitizer";
 import { uploadToCloudinary } from "../utils/cloudinary";
 import { CITIES } from "../translations";
+import { detectDistrictFromArea } from "../data/areaMap";
 import vehicleCardImg from "../assets/images/vehicle-card-new.png";
 import partsCardImg from "../assets/images/parts-card-new.png";
 
@@ -103,6 +104,10 @@ const detectLocationFromText = (text: string): string => {
     if (bnName && text.includes(bnName)) return city;
     if (enName && lowerText.includes(enName.toLowerCase())) return city;
   }
+  // জেলার নাম সরাসরি না পেলে, থানা/উপজেলার নাম (যেমন "বনানী", "ভালুকা") দিয়ে
+  // চেষ্টা করে দেখো সেটা কোন জেলার অন্তর্গত।
+  const districtFromArea = detectDistrictFromArea(text);
+  if (districtFromArea) return districtFromArea;
   return "";
 };
 
