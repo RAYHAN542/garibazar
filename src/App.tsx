@@ -307,6 +307,9 @@ export default function App() {
   // সব পোস্ট: ইউজারের নিজের সব লিস্টিং, হোমপেজের "Load More" পেজিনেশনের ওপর নির্ভর না করে —
   // যাতে Dashboard আর Lottery সবসময় ইউজারের ১০০% পোস্ট দেখাতে পারে, হোমপেজে কত লোড হয়েছে তার তোয়াক্কা না করেই।
   const [myListings, setMyListings] = useState<PartListing[]>([]);
+  // সব বুস্ট করা অ্যাড: হোমপেজের পেজিনেশনের ওপর নির্ভর না করে সরাসরি fetch করা,
+  // যাতে "Load More" চাপার আগেই সবসময় বুস্ট ব্যানার দেখা যায়।
+  const [adListings, setAdListings] = useState<PartListing[]>([]);
   const [purchases, setPurchases] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -891,6 +894,26 @@ export default function App() {
     return () => unsubscribe();
   }, [user?.uid]);
 
+  // 1c. সব লাইভ বুস্ট করা অ্যাড — হোমপেজের "Load More" পেজিনেশনের ওপর নির্ভর না করে সরাসরি fetch করা,
+  // যাতে পেজ লোড হওয়ার সাথে সাথেই বুস্ট ব্যানার দেখা যায়, Load More চাপার আগেই।
+  useEffect(() => {
+    const q = query(collection(db, "listings"), where("isAd", "==", true));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const list: PartListing[] = [];
+      snapshot.forEach((docSnap) => {
+        const data = docSnap.data();
+        const normalizedCreatedAt = data.createdAt && typeof data.createdAt.toDate === "function"
+          ? data.createdAt.toDate().toISOString()
+          : data.createdAt;
+        list.push({ id: docSnap.id, ...data, createdAt: normalizedCreatedAt } as PartListing);
+      });
+      setAdListings(list);
+    }, (err) => {
+      logger.error("Failed to sync ad listings:", err);
+    });
+    return () => unsubscribe();
+  }, []);
+
   // 2. Paginated Listings Sync (using getDocs instead of global real-time onSnapshot)
   const fetchInitialListings = async () => {
     setLoading(true);
@@ -1183,10 +1206,10 @@ export default function App() {
 
   // 3b. Expired Ad Promotion Resetter & Delete / Edit Helpers
   useEffect(() => {
-    if (listings.length === 0) return;
+    if (adListings.length === 0) return;
     
     // Check if any listings contains an expired advertisement
-    const expiredAds = listings.filter(
+    const expiredAds = adListings.filter(
       (item) => item.isAd && item.adExpiresAt && new Date(item.adExpiresAt).getTime() < Date.now()
     );
 
@@ -1219,7 +1242,7 @@ export default function App() {
         }
       });
     }
-  }, [listings]);
+  }, [adListings]);
 
   const handleDeleteListingBySeller = async (itemId: string) => {
     const confirmDelete = window.confirm(
@@ -1420,8 +1443,21 @@ export default function App() {
   // only filters pages currently loaded in memory. For global searching across thousands of remote
   // listings in production, replace client fuzzy search with Algolia, Typesense, or Firebase Firestore Search extensions (e.g. Algolia Integration)
   // that queries a server-side indexed corpus on the backend.
+  // পেজিনেটেড হোমপেজ ফিড + সব লাইভ বুস্ট করা অ্যাড — একসাথে merge করা (duplicate বাদ দিয়ে),
+  // যাতে category/search filter সবসময় ঠিকভাবে কাজ করে আর বুস্ট ব্যানারও সবসময় দেখা যায়।
+  const listingsWithAds = useMemo(() => {
+    const merged = [...listings];
+    const existingIds = new Set(listings.map((item) => item.id));
+    for (const adItem of adListings) {
+      if (!existingIds.has(adItem.id)) {
+        merged.push(adItem);
+      }
+    }
+    return merged;
+  }, [listings, adListings]);
+
   const enrichedListings = useMemo(() => {
-    return listings.map((item) => {
+    return listingsWithAds.map((item) => {
       const cat = CATEGORIES.find(c => c.id === item.category);
       const categoryLabelEn = cat ? cat.labelEn : "";
       const categoryLabelBn = cat ? cat.labelBn : "";
@@ -1442,7 +1478,7 @@ export default function App() {
         searchBlob
       };
     });
-  }, [listings]);
+  }, [listingsWithAds]);
 
   const fuseInstance = useMemo(() => {
     return new Fuse(enrichedListings, {
