@@ -1472,10 +1472,22 @@ export default function App() {
         categoryLabelBn,
         item.location
       ]);
+
+      // ফাজি সার্চের জন্য আলাদা, পরিষ্কার ব্লব — টাইটেল/মডেল যেহেতু description থেকেই
+      // অটো-জেনারেট হয় (শুধু প্রথম লাইন), তাই পুরো description এখানে রাখা জরুরি, কিন্তু
+      // ক্যাটাগরি লেবেলের মতো generic টেক্সট (যেমন "Vehicle") বাদ দেওয়া হয়েছে —
+      // ওটাই ভুল ম্যাচ (যেমন "Truck" সার্চে সব গাড়ি চলে আসা) তৈরি করছিল।
+      const fuzzyBlob = buildSearchBlob([
+        item.title,
+        item.brand || "",
+        item.model,
+        item.description
+      ]);
       
       return {
         ...item,
-        searchBlob
+        searchBlob,
+        fuzzyBlob
       };
     });
   }, [listingsWithAds]);
@@ -1483,8 +1495,9 @@ export default function App() {
   const fuseInstance = useMemo(() => {
     return new Fuse(enrichedListings, {
       keys: [
-        { name: "title", weight: 0.6 },
-        { name: "model", weight: 0.4 }
+        { name: "title", weight: 0.5 },
+        { name: "model", weight: 0.2 },
+        { name: "fuzzyBlob", weight: 0.3 }
       ],
       threshold: 0.3,
       ignoreLocation: true,
