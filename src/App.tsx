@@ -1779,6 +1779,7 @@ export default function App() {
                   showFilters={showFilters}
                   setShowFilters={setShowFilters}
                   listings={listings}
+                  adListings={adListings}
                   filteredListings={filteredListings}
                   hasMoreListings={hasMoreListings}
                   loadingMoreListings={loadingMoreListings}

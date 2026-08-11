@@ -54,6 +54,7 @@ interface MarketplaceTabProps {
   showFilters: boolean;
   setShowFilters: (v: boolean) => void;
   listings: PartListing[];
+  adListings: PartListing[];
   filteredListings: PartListing[];
   hasMoreListings: boolean;
   loadingMoreListings: boolean;
@@ -99,6 +100,7 @@ export default function MarketplaceTab({
   showFilters,
   setShowFilters,
   listings,
+  adListings,
   filteredListings,
   hasMoreListings,
   loadingMoreListings,
@@ -482,9 +484,10 @@ export default function MarketplaceTab({
                 </div>
               )}
 
-                {/* 🚀 Boost Ads slide-show */}
+                {/* 🚀 Boost Ads slide-show — সব বুস্ট করা অ্যাড দেখাবে, category/search filter ছাড়াই,
+                    যাতে যিনি পার্ট বুস্ট করেছেন তিনিও Vehicle ট্যাবে নিজের অ্যাড দেখতে পান */}
                 <PromotedSlider 
-                  listings={filteredListings} 
+                  listings={adListings} 
                   language={language}
                   onViewListing={handleViewListingDetails}
                   onOpenLottery={() => setIsLotteryOpen(true)}
