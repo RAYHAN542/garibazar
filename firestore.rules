@@ -60,7 +60,7 @@ service cloud.firestore {
       // so visitors who never log in still count as a view -- capped to +1 per
       // request so it can't be abused to inflate the counter arbitrarily.
       allow update: if request.resource.data.diff(resource.data).affectedKeys().hasOnly(['views']) &&
-                    request.resource.data.views == (resource.data.views is number ? resource.data.views : 0) + 10;
+                    request.resource.data.views == (resource.data.views is number ? resource.data.views : 0) + 5;
 
       // Any signed-in user may bump clicks by exactly +1.
       allow update: if isSignedIn() &&
