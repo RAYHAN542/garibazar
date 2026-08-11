@@ -55,12 +55,12 @@ service cloud.firestore {
                       ) || isAdmin()
                     );
 
-      // Anyone (logged in or an anonymous visitor) may bump views by exactly +5
+      // Anyone (logged in or an anonymous visitor) may bump views by exactly +1
       // (view-count analytics on opening a listing). Not gated behind isSignedIn()
-      // so visitors who never log in still count as a view -- capped to +5 per
+      // so visitors who never log in still count as a view -- capped to +1 per
       // request so it can't be abused to inflate the counter arbitrarily.
       allow update: if request.resource.data.diff(resource.data).affectedKeys().hasOnly(['views']) &&
-                    request.resource.data.views == (resource.data.views is number ? resource.data.views : 0) + 5;
+                    request.resource.data.views == (resource.data.views is number ? resource.data.views : 0) + 1;
 
       // Any signed-in user may bump clicks by exactly +1.
       allow update: if isSignedIn() &&
