@@ -1483,11 +1483,10 @@ export default function App() {
   const fuseInstance = useMemo(() => {
     return new Fuse(enrichedListings, {
       keys: [
-        { name: "title", weight: 0.4 },
-        { name: "model", weight: 0.3 },
-        { name: "searchBlob", weight: 0.3 }
+        { name: "title", weight: 0.6 },
+        { name: "model", weight: 0.4 }
       ],
-      threshold: 0.4,
+      threshold: 0.3,
       ignoreLocation: true,
       minMatchCharLength: 2
     });
