@@ -1051,20 +1051,49 @@ export default function App() {
   }, [firebaseListings, moreListings, userMetadata?.blockedUids]);
 
   // 2c. Listings Pagination Loader helper
+  // NOTE: Firestore pagination fetches the next 20 listings of ANY category
+  // (vehicles + parts mixed), but the visible list is filtered client-side by
+  // whichever tab (selectedCategory) the person is on. That mismatch is why
+  // "Load More" used to feel broken -- e.g. on the Parts tab, if only 1 of
+  // the next 20 raw docs happened to be a part, the person would see just 1
+  // new item and have to tap Load More again and again. Fixed by looping:
+  // keep pulling batches until enough *matching* items have been collected
+  // (or there's nothing left to fetch), so one tap reliably surfaces a
+  // meaningful number of new items for whatever filter is active.
   const handleLoadMoreListings = async () => {
     if (!lastListingDoc || loadingMoreListings) return;
     setLoadingMoreListings(true);
+
+    const TARGET_NEW_MATCHES = 6;
+    const MAX_BATCHES = 6; // safety cap: at most 6*20 = 120 extra reads per tap
+
+    const matchesCurrentFilter = (item: PartListing): boolean => {
+      const isVehicle = isItemVehicle(item);
+      if (selectedCategory === "vehicles") return isVehicle;
+      if (selectedCategory === "spare_parts") return !isVehicle;
+      return true;
+    };
+
     try {
-      const q = query(
-        collection(db, "listings"),
-        orderBy("createdAt", "desc"),
-        startAfter(lastListingDoc),
-        limit(20)
-      );
-      const snapshot = await getDocs(q);
-      if (snapshot.empty) {
-        setHasMoreListings(false);
-      } else {
+      let cursor = lastListingDoc;
+      let combinedNew: PartListing[] = [];
+      let matchedCount = 0;
+      let exhausted = false;
+
+      for (let i = 0; i < MAX_BATCHES; i++) {
+        const q = query(
+          collection(db, "listings"),
+          orderBy("createdAt", "desc"),
+          startAfter(cursor),
+          limit(20)
+        );
+        const snapshot = await getDocs(q);
+
+        if (snapshot.empty) {
+          exhausted = true;
+          break;
+        }
+
         const nextList: PartListing[] = [];
         snapshot.forEach((doc) => {
           const data = doc.data();
@@ -1073,19 +1102,31 @@ export default function App() {
             : data.createdAt;
           nextList.push({ id: doc.id, ...data, createdAt: normalizedCreatedAt } as PartListing);
         });
-        
-        setMoreListings(prev => {
-          const combined = [...prev];
-          nextList.forEach(item => {
-            if (!combined.some(existing => existing.id === item.id)) {
-              combined.push(item);
-            }
-          });
-          return combined;
-        });
-        setLastListingDoc(snapshot.docs[snapshot.docs.length - 1]);
-        setHasMoreListings(snapshot.docs.length === 20);
+
+        combinedNew = combinedNew.concat(nextList);
+        matchedCount += nextList.filter(matchesCurrentFilter).length;
+        cursor = snapshot.docs[snapshot.docs.length - 1];
+
+        if (snapshot.docs.length < 20) {
+          exhausted = true;
+          break;
+        }
+        if (matchedCount >= TARGET_NEW_MATCHES) {
+          break;
+        }
       }
+
+      setMoreListings(prev => {
+        const combined = [...prev];
+        combinedNew.forEach(item => {
+          if (!combined.some(existing => existing.id === item.id)) {
+            combined.push(item);
+          }
+        });
+        return combined;
+      });
+      setLastListingDoc(cursor);
+      setHasMoreListings(!exhausted);
     } catch (err) {
       console.warn("Failed to load more listings:", err);
     } finally {
