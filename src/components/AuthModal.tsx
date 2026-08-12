@@ -87,10 +87,14 @@ export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModa
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const [step, setStep] = useState<"start" | "phone" | "otp" | "profile">("start");
+  const [step, setStep] = useState<"start" | "phone" | "profile">("start");
   const [googleUser, setGoogleUser] = useState<FirebaseUser | null>(null);
   const [otpPhone, setOtpPhone] = useState("");
-  const [otpCode, setOtpCode] = useState("");
+  // phoneAuthMode: OTP/SMS gateway সরিয়ে ফোন নম্বর + পাসওয়ার্ড দিয়ে লগইন/সাইনআপ করা হয়,
+  // কারণ SMS gateway (Android ফোন-ভিত্তিক) মাঝেমধ্যে অফলাইন/ব্যর্থ হয়ে যায়।
+  const [phoneAuthMode, setPhoneAuthMode] = useState<"login" | "signup">("login");
+  const [phonePassword, setPhonePassword] = useState("");
+  const [phonePasswordConfirm, setPhonePasswordConfirm] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
   const [city, setCity] = useState(CITIES[0]);
@@ -146,6 +150,9 @@ export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModa
     if (!isOpen) {
       setStep("start");
       setError("");
+      setPhoneAuthMode("login");
+      setPhonePassword("");
+      setPhonePasswordConfirm("");
     }
   }, [isOpen]);
 
@@ -242,7 +249,7 @@ export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModa
     }
   };
 
-  const handleSendOtp = async (e: React.FormEvent) => {
+  const handlePhoneLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     const cleanPhone = otpPhone.replace(/\D/g, "");
@@ -250,50 +257,69 @@ export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModa
       setError(language === "bn" ? "সঠিক ১১ ডিজিটের মোবাইল নম্বর দিন" : "Enter a valid 11-digit phone number");
       return;
     }
+    if (!phonePassword) {
+      setError(language === "bn" ? "পাসওয়ার্ড দিন" : "Enter your password");
+      return;
+    }
     setLoading(true);
     try {
-      const resp = await fetch("/api/auth/send-otp", {
+      const resp = await fetch("/api/auth/phone-login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone: cleanPhone }),
+        body: JSON.stringify({ phone: cleanPhone, password: phonePassword }),
       });
       const data = await resp.json();
       if (!resp.ok) {
-        setError(data.error || (language === "bn" ? "OTP পাঠানো যায়নি।" : "Could not send OTP."));
+        if (data.code === "NOT_REGISTERED") {
+          setPhoneAuthMode("signup");
+        }
+        setError(data.error || (language === "bn" ? "লগইন ব্যর্থ হয়েছে।" : "Login failed."));
         return;
       }
-      setOtpCode("");
-      setStep("otp");
-    } catch (err) {
+      const result = await signInWithCustomToken(auth, data.token);
+      await handlePostGoogleAuth(result.user);
+    } catch (err: any) {
       console.error(err);
-      setError(`DEBUG: ${err?.message || err?.name || String(err)}`);
+      setError(language === "bn" ? "সাইন-ইন ব্যর্থ হয়েছে। আবার চেষ্টা করুন।" : "Sign-in failed. Please try again.");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleVerifyOtp = async (e: React.FormEvent) => {
+  const handlePhoneSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
-    if (!/^\d{6}$/.test(otpCode)) {
-      setError(language === "bn" ? "৬-সংখ্যার কোড দিন" : "Enter the 6-digit code");
+    const cleanPhone = otpPhone.replace(/\D/g, "");
+    if (!validateBanglaPhone(cleanPhone)) {
+      setError(language === "bn" ? "সঠিক ১১ ডিজিটের মোবাইল নম্বর দিন" : "Enter a valid 11-digit phone number");
+      return;
+    }
+    if (phonePassword.length < 6) {
+      setError(language === "bn" ? "পাসওয়ার্ড কমপক্ষে ৬ ক্যারেক্টার হতে হবে" : "Password must be at least 6 characters");
+      return;
+    }
+    if (phonePassword !== phonePasswordConfirm) {
+      setError(language === "bn" ? "দুই পাসওয়ার্ড মিলছে না" : "Passwords don't match");
       return;
     }
     setLoading(true);
     try {
-      const resp = await fetch("/api/auth/verify-otp", {
+      const resp = await fetch("/api/auth/phone-signup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone: otpPhone.replace(/\D/g, ""), code: otpCode }),
+        body: JSON.stringify({ phone: cleanPhone, password: phonePassword }),
       });
       const data = await resp.json();
       if (!resp.ok) {
-        setError(data.error || (language === "bn" ? "ভেরিফিকেশন ব্যর্থ হয়েছে।" : "Verification failed."));
+        if (data.code === "ALREADY_REGISTERED") {
+          setPhoneAuthMode("login");
+        }
+        setError(data.error || (language === "bn" ? "অ্যাকাউন্ট তৈরি করা যায়নি।" : "Could not create account."));
         return;
       }
       const result = await signInWithCustomToken(auth, data.token);
       await handlePostGoogleAuth(result.user);
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
       setError(language === "bn" ? "সাইন-ইন ব্যর্থ হয়েছে। আবার চেষ্টা করুন।" : "Sign-in failed. Please try again.");
     } finally {
@@ -417,11 +443,11 @@ export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModa
             </button>
           </div>
         ) : step === "phone" ? (
-          <form onSubmit={handleSendOtp} className="space-y-4">
+          <form onSubmit={phoneAuthMode === "login" ? handlePhoneLogin : handlePhoneSignup} className="space-y-4">
             <p className="text-xs text-slate-500 text-center">
-              {language === "bn"
-                ? "আপনার মোবাইল নম্বর দিন, আমরা একটা যাচাইকরণ কোড (OTP) পাঠাবো।"
-                : "Enter your mobile number and we'll send a verification code (OTP)."}
+              {phoneAuthMode === "login"
+                ? (language === "bn" ? "আপনার মোবাইল নম্বর ও পাসওয়ার্ড দিয়ে সাইন-ইন করুন।" : "Sign in with your mobile number and password.")
+                : (language === "bn" ? "নতুন অ্যাকাউন্ট তৈরি করতে মোবাইল নম্বর ও পাসওয়ার্ড দিন।" : "Enter a mobile number and password to create your account.")}
             </p>
             <div>
               <label className="text-[10px] font-bold block mb-1 text-slate-500">{language === "bn" ? "মোবাইল নম্বর *" : "Mobile Number *"}</label>
@@ -435,47 +461,49 @@ export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModa
                 placeholder="01XXXXXXXXX"
               />
             </div>
-            <button type="submit" disabled={loading} className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white font-bold rounded-lg text-sm flex items-center justify-center gap-2">
-              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Phone className="w-4 h-4" />}
-              {language === "bn" ? "কোড পাঠান" : "Send Code"}
-            </button>
-            <button type="button" onClick={() => { setError(""); setStep("start"); }} className="w-full flex items-center justify-center gap-1 text-xs text-slate-500 hover:underline">
-              <ArrowLeft className="w-3 h-3" />
-              {language === "bn" ? "পেছনে যান" : "Back"}
-            </button>
-          </form>
-        ) : step === "otp" ? (
-          <form onSubmit={handleVerifyOtp} className="space-y-4">
-            <p className="text-xs text-slate-500 text-center">
-              {language === "bn"
-                ? `${otpPhone} নম্বরে পাঠানো ৬-সংখ্যার কোডটি দিন।`
-                : `Enter the 6-digit code sent to ${otpPhone}.`}
-            </p>
             <div>
-              <label className="text-[10px] font-bold block mb-1 text-slate-500">{language === "bn" ? "OTP কোড *" : "OTP Code *"}</label>
+              <label className="text-[10px] font-bold block mb-1 text-slate-500">{language === "bn" ? "পাসওয়ার্ড *" : "Password *"}</label>
               <input
-                type="text"
-                inputMode="numeric"
+                type="password"
                 required
-                autoFocus
-                maxLength={6}
-                value={otpCode}
-                onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
-                className="w-full px-3 py-2 text-center text-lg tracking-[0.5em] border rounded-lg dark:bg-slate-800 dark:border-slate-700 dark:text-white"
-                placeholder="······"
+                value={phonePassword}
+                onChange={(e) => setPhonePassword(e.target.value)}
+                className="w-full px-3 py-2 text-sm border rounded-lg dark:bg-slate-800 dark:border-slate-700 dark:text-white"
+                placeholder={language === "bn" ? "কমপক্ষে ৬ ক্যারেক্টার" : "At least 6 characters"}
               />
             </div>
+            {phoneAuthMode === "signup" && (
+              <div>
+                <label className="text-[10px] font-bold block mb-1 text-slate-500">{language === "bn" ? "পাসওয়ার্ড আবার দিন *" : "Confirm Password *"}</label>
+                <input
+                  type="password"
+                  required
+                  value={phonePasswordConfirm}
+                  onChange={(e) => setPhonePasswordConfirm(e.target.value)}
+                  className="w-full px-3 py-2 text-sm border rounded-lg dark:bg-slate-800 dark:border-slate-700 dark:text-white"
+                  placeholder={language === "bn" ? "পাসওয়ার্ড আবার লিখুন" : "Re-enter password"}
+                />
+              </div>
+            )}
             <button type="submit" disabled={loading} className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white font-bold rounded-lg text-sm flex items-center justify-center gap-2">
-              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-              {language === "bn" ? "যাচাই করুন" : "Verify"}
+              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Phone className="w-4 h-4" />}
+              {phoneAuthMode === "login"
+                ? (language === "bn" ? "সাইন-ইন করুন" : "Sign In")
+                : (language === "bn" ? "অ্যাকাউন্ট তৈরি করুন" : "Create Account")}
             </button>
             <div className="flex items-center justify-between text-xs">
-              <button type="button" onClick={() => { setError(""); setStep("phone"); }} className="flex items-center gap-1 text-slate-500 hover:underline">
+              <button type="button" onClick={() => { setError(""); setStep("start"); }} className="flex items-center gap-1 text-slate-500 hover:underline">
                 <ArrowLeft className="w-3 h-3" />
-                {language === "bn" ? "নম্বর বদলান" : "Change number"}
+                {language === "bn" ? "পেছনে যান" : "Back"}
               </button>
-              <button type="button" onClick={handleSendOtp as any} disabled={loading} className="text-emerald-600 font-bold hover:underline disabled:opacity-60">
-                {language === "bn" ? "আবার কোড পাঠান" : "Resend code"}
+              <button
+                type="button"
+                onClick={() => { setError(""); setPhoneAuthMode(phoneAuthMode === "login" ? "signup" : "login"); }}
+                className="text-emerald-600 font-bold hover:underline"
+              >
+                {phoneAuthMode === "login"
+                  ? (language === "bn" ? "নতুন অ্যাকাউন্ট তৈরি করুন" : "Create new account")
+                  : (language === "bn" ? "আগে থেকে অ্যাকাউন্ট আছে? সাইন-ইন" : "Already have an account? Sign in")}
               </button>
             </div>
           </form>

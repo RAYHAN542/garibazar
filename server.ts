@@ -9,6 +9,8 @@ import helmet from "helmet";
 import cors from "cors";
 import sendOtpHandler from "./api/auth/send-otp";
 import verifyOtpHandler from "./api/auth/verify-otp";
+import phoneSignupHandler from "./api/auth/phone-signup";
+import phoneLoginHandler from "./api/auth/phone-login";
 
 const isProd = process.env.NODE_ENV === "production";
 const logger = {
@@ -391,6 +393,8 @@ Keep it structured, highlighting compatibility, reliability, usage warning or be
   // Phone/OTP auth
   app.post("/api/auth/send-otp", sendOtpHandler);
   app.post("/api/auth/verify-otp", verifyOtpHandler);
+  app.post("/api/auth/phone-signup", phoneSignupHandler);
+  app.post("/api/auth/phone-login", phoneLoginHandler);
 
   // Vite middleware setup
   if (process.env.NODE_ENV !== "production") {
