@@ -31,6 +31,7 @@ const PlayStoreDiagnostics = lazy(() => import("./components/PlayStoreDiagnostic
 const LegalHubModal = lazy(() => import("./components/LegalHubModal"));
 const PrivacyPolicyPage = lazy(() => import("./components/PrivacyPolicyPage"));
 const DataDeletionPage = lazy(() => import("./components/DataDeletionPage"));
+const AboutContactPage = lazy(() => import("./components/AboutContactPage"));
 const SellerAnalyticsGraph = lazy(() => import("./components/SellerAnalyticsGraph"));
 const SellerShopPage = lazy(() => import("./components/SellerShopPage").then(m => ({ default: m.SellerShopPage })));
 const DashboardTab = lazy(() => import("./components/DashboardTab"));
@@ -337,6 +338,8 @@ export default function App() {
   const [editingListing, setEditingListing] = useState<PartListing | null>(null);
   const [isStandalonePrivacy, setIsStandalonePrivacy] = useState(false);
   const [isStandaloneDeletion, setIsStandaloneDeletion] = useState(false);
+  const [isStandaloneTerms, setIsStandaloneTerms] = useState(false);
+  const [isStandaloneAbout, setIsStandaloneAbout] = useState(false);
 
   // Synchronize saved Listing IDs from localStorage when activeTab shifts or selectedListing toggles
   useEffect(() => {
@@ -653,7 +656,7 @@ export default function App() {
       const searchParams = new URLSearchParams(window.location.search);
       const isPrivacyQuery = searchParams.get("view") === "privacy" || searchParams.get("page") === "privacy";
       const isPrivacyHash = window.location.hash === "#privacy";
-      const isPrivacyPath = window.location.pathname.endsWith("/privacy");
+      const isPrivacyPath = window.location.pathname.endsWith("/privacy") || window.location.pathname.endsWith("/privacy-policy");
       
       if (isPrivacyQuery || isPrivacyHash || isPrivacyPath) {
         setIsStandalonePrivacy(true);
@@ -665,6 +668,22 @@ export default function App() {
 
       if (isDeleteQuery || isDeleteHash || isDeletePath) {
         setIsStandaloneDeletion(true);
+      }
+
+      const isTermsQuery = searchParams.get("view") === "terms" || searchParams.get("page") === "terms";
+      const isTermsHash = window.location.hash === "#terms";
+      const isTermsPath = window.location.pathname.endsWith("/terms") || window.location.pathname.endsWith("/terms-of-service");
+
+      if (isTermsQuery || isTermsHash || isTermsPath) {
+        setIsStandaloneTerms(true);
+      }
+
+      const isAboutQuery = searchParams.get("view") === "about" || searchParams.get("page") === "about" || searchParams.get("page") === "contact";
+      const isAboutHash = window.location.hash === "#about" || window.location.hash === "#contact";
+      const isAboutPath = window.location.pathname.endsWith("/about") || window.location.pathname.endsWith("/contact");
+
+      if (isAboutQuery || isAboutHash || isAboutPath) {
+        setIsStandaloneAbout(true);
       }
     }
   }, []);
@@ -1773,6 +1792,43 @@ export default function App() {
           standalone={true}
           onBack={() => {
             setIsStandaloneDeletion(false);
+            if (typeof window !== "undefined" && window.history.pushState) {
+              const cleanUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
+              window.history.pushState({ path: cleanUrl }, "", cleanUrl);
+            }
+          }}
+        />
+      </Suspense>
+    );
+  }
+
+  if (isStandaloneTerms) {
+    return (
+      <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><Loader2 className="w-6 h-6 animate-spin text-amber-500" /></div>}>
+        <LegalHubModal
+          language={language}
+          standalone={true}
+          initialTab="terms"
+          onBack={() => {
+            setIsStandaloneTerms(false);
+            if (typeof window !== "undefined" && window.history.pushState) {
+              const cleanUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
+              window.history.pushState({ path: cleanUrl }, "", cleanUrl);
+            }
+          }}
+        />
+      </Suspense>
+    );
+  }
+
+  if (isStandaloneAbout) {
+    return (
+      <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><Loader2 className="w-6 h-6 animate-spin text-amber-500" /></div>}>
+        <AboutContactPage
+          language={language}
+          standalone={true}
+          onBack={() => {
+            setIsStandaloneAbout(false);
             if (typeof window !== "undefined" && window.history.pushState) {
               const cleanUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
               window.history.pushState({ path: cleanUrl }, "", cleanUrl);
