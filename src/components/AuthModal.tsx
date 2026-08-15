@@ -546,14 +546,14 @@ export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModa
             <div>
               <label className="text-[10px] font-bold block mb-1 text-slate-500">{language === "bn" ? "আপনার নাম *" : "Name *"}</label>
               <div className="relative">
-                <input type="text" required value={displayName} onChange={(e) => setDisplayName(e.target.value)} className="w-full px-3 py-2 text-sm border rounded-lg dark:bg-slate-800 dark:border-slate-700 dark:text-white" placeholder="Rayhan" />
+                <input type="text" required value={displayName} onChange={(e) => setDisplayName(e.target.value)} className="w-full px-3 py-2 text-sm border rounded-lg dark:bg-slate-800 dark:border-slate-700 dark:text-white" placeholder={language === "bn" ? "আপনার নাম লিখুন" : "Your name"} />
               </div>
             </div>
 
             <div>
               <label className="text-[10px] font-bold block mb-1 text-slate-500">{language === "bn" ? "মোবাইল নম্বর *" : "Mobile Number *"}</label>
               <div className="relative">
-                <input type="tel" required value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value)} className="w-full px-3 py-2 text-sm border rounded-lg dark:bg-slate-800 dark:border-slate-700 dark:text-white" placeholder="01993878271" />
+                <input type="tel" required value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value)} className="w-full px-3 py-2 text-sm border rounded-lg dark:bg-slate-800 dark:border-slate-700 dark:text-white" placeholder="01XXXXXXXXX" />
               </div>
               <p className="text-[10px] text-slate-400 mt-1">
                 {language === "bn" ? "এই নম্বরে OTP পাঠানো হবে না — শুধু যোগাযোগের জন্য দেখানো হবে।" : "No OTP is sent here — it's shown to buyers as your contact number."}
