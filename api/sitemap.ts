@@ -30,6 +30,8 @@ export default async function handler(req: any, res: any) {
   const staticUrls = [
     { loc: `${SITE_URL}/`, changefreq: "daily", priority: "1.0" },
     { loc: `${SITE_URL}/privacy-policy`, changefreq: "monthly", priority: "0.5" },
+    { loc: `${SITE_URL}/terms`, changefreq: "monthly", priority: "0.5" },
+    { loc: `${SITE_URL}/about`, changefreq: "monthly", priority: "0.5" },
     { loc: `${SITE_URL}/data-deletion`, changefreq: "monthly", priority: "0.5" },
   ];
 

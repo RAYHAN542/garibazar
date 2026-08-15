@@ -1,36 +1,56 @@
 import React, { useState } from "react";
-import { X, ShieldAlert, FileText, Loader2, Scale } from "lucide-react";
+import { X, ShieldAlert, FileText, Loader2, Scale, ArrowLeft } from "lucide-react";
 import { SupportedLanguage } from "../types";
 
 interface LegalHubModalProps {
-  isOpen: boolean;
-  onClose: () => void;
+  isOpen?: boolean;
+  onClose?: () => void;
   language: SupportedLanguage;
+  standalone?: boolean;
+  initialTab?: "privacy" | "terms" | "refund";
+  onBack?: () => void;
 }
 
-export default function LegalHubModal({ isOpen, onClose, language }: LegalHubModalProps) {
-  const [activeTab, setActiveTab] = useState<"privacy" | "terms" | "refund">("privacy");
+export default function LegalHubModal({ isOpen = true, onClose, language, standalone = false, initialTab = "privacy", onBack }: LegalHubModalProps) {
+  const [activeTab, setActiveTab] = useState<"privacy" | "terms" | "refund">(initialTab);
 
-  if (!isOpen) return null;
+  if (!standalone && !isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 z-55 transition-all duration-300">
-      <div className="bg-white text-slate-800 rounded-3xl max-w-2xl w-full shadow-2xl border border-slate-200 overflow-hidden font-sans flex flex-col max-h-[85vh]">
+    <div className={standalone
+      ? "min-h-screen bg-slate-50 py-8 px-4 sm:px-6 lg:px-8"
+      : "fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 z-55 transition-all duration-300"
+    }>
+      <div className={standalone
+        ? "bg-white text-slate-800 rounded-3xl max-w-2xl w-full mx-auto shadow-xl border border-slate-200 overflow-hidden font-sans flex flex-col"
+        : "bg-white text-slate-800 rounded-3xl max-w-2xl w-full shadow-2xl border border-slate-200 overflow-hidden font-sans flex flex-col max-h-[85vh]"
+      }>
         
         {/* Header */}
         <div className="bg-slate-50 px-6 py-4 flex justify-between items-center border-b border-slate-100 shrink-0">
           <div>
+            {standalone && onBack && (
+              <button
+                onClick={onBack}
+                className="inline-flex items-center gap-1.5 text-xs text-indigo-600 hover:text-indigo-800 transition-colors mb-2 font-semibold"
+              >
+                <ArrowLeft className="w-3.5 h-3.5" />
+                {language === "bn" ? "ফিরে যান" : "Go Back"}
+              </button>
+            )}
             <h3 className="text-xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
               <Scale className="w-5 h-5 text-indigo-600" />
               {language === "bn" ? "আইনি ও পলিসি কেন্দ্র" : "Legal & Compliance Hub"}
             </h3>
             <p className="text-[11px] text-slate-500 font-medium">
-              {language === "bn" ? "গাড়ি বাজার প্লে স্টোর এবং আইনগত কমপ্লায়েন্স" : "Gari Bazar Play Store and Regulatory Integrity Policies"}
+              {language === "bn" ? "গাড়ি বাজার প্লে স্টোর এবং আইনগত কমপ্লায়েন্স" : "Gari Bazar Play Store and Regulatory Integrity Policies"}
             </p>
           </div>
-          <button onClick={onClose} className="p-1 hover:bg-slate-200 rounded-full transition-colors">
-            <X className="w-6 h-6 text-slate-400" />
-          </button>
+          {!standalone && (
+            <button onClick={onClose} className="p-1 hover:bg-slate-200 rounded-full transition-colors">
+              <X className="w-6 h-6 text-slate-400" />
+            </button>
+          )}
         </div>
 
         {/* Tab Selection */}
@@ -227,12 +247,14 @@ export default function LegalHubModal({ isOpen, onClose, language }: LegalHubMod
             <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
             <span>Version 1.0.4 - Secure Built</span>
           </div>
-          <button
-            onClick={onClose}
-            className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition shadow-md"
-          >
-            {language === "bn" ? "আমি পড়েছি ও সম্মত" : "Done / I Agree"}
-          </button>
+          {!standalone && (
+            <button
+              onClick={onClose}
+              className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition shadow-md"
+            >
+              {language === "bn" ? "আমি পড়েছি ও সম্মত" : "Done / I Agree"}
+            </button>
+          )}
         </div>
 
       </div>
