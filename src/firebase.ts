@@ -1,5 +1,5 @@
 import { initializeApp } from "firebase/app";
-import { getAuth, GoogleAuthProvider, FacebookAuthProvider } from "firebase/auth";
+import { getAuth, GoogleAuthProvider, FacebookAuthProvider, setPersistence, browserSessionPersistence } from "firebase/auth";
 import { initializeFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 import { logger } from "./utils/logger";
@@ -26,6 +26,14 @@ const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
 export const facebookProvider = new FacebookAuthProvider();
+
+// কিছু Android browser/incognito mode-এ IndexedDB ঠিকভাবে কাজ করে না
+// (Firebase Auth-এর ডিফল্ট persistence পদ্ধতি), যার ফলে sign-in "Database is
+// closing/hidden" জাতীয় error দিয়ে ব্যর্থ হয়। sessionStorage-ভিত্তিক
+// persistence অনেক বেশি নির্ভরযোগ্য এবং redirect flow-এর জন্যও যথেষ্ট।
+setPersistence(auth, browserSessionPersistence).catch((err) => {
+  logger.debug("Failed to set browserSessionPersistence, using default:", err);
+});
 
 export const db = initializeFirestore(app, {
   experimentalAutoDetectLongPolling: true,

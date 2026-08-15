@@ -206,13 +206,7 @@ export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModa
         }
       } else {
         console.error(err);
-        // সাময়িক ডিবাগ তথ্য: আসল Firebase error code দেখানো হচ্ছে, যাতে
-        // ঠিক কী কারণে sign-in ব্যর্থ হচ্ছে সেটা বোঝা যায় (কাজ শেষ হলে এই
-        // ডিবাগ অংশটা সরিয়ে আবার সাধারণ মেসেজে ফেরত নিয়ে যাওয়া উচিত)।
-        setError(
-          (language === "bn" ? "Google সাইন-ইন ব্যর্থ হয়েছে। " : "Google sign-in failed. ") +
-          `[DEBUG code: ${code || "unknown"}] ${err?.message || ""}`
-        );
+        setError(language === "bn" ? "Google সাইন-ইন ব্যর্থ হয়েছে। আবার চেষ্টা করুন।" : "Google sign-in failed. Please try again.");
       }
     } finally {
       setLoading(false);
