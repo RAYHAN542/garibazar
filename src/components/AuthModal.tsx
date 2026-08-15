@@ -417,8 +417,8 @@ export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModa
         {error && <div className="p-3 bg-red-500/10 text-red-600 rounded-lg text-xs mb-3 text-center">{error}</div>}
 
         {step === "start" ? (
-          <div className="space-y-4">
-            <p className="text-sm text-slate-500 dark:text-slate-400 text-center">
+          <div className="space-y-3">
+            <p className="text-sm text-slate-500 dark:text-slate-400 text-center mb-1">
               {language === "bn"
                 ? "গাড়ি বাজারে বিক্রি করতে বা কেনার জন্য সাইন-ইন করুন।"
                 : "Sign in to buy or sell on Gari Bazar."}
@@ -427,18 +427,22 @@ export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModa
               type="button"
               onClick={handleGoogleSignIn}
               disabled={loading}
-              className="w-full py-2.5 bg-white hover:bg-slate-50 disabled:opacity-60 text-slate-700 font-bold rounded-lg text-sm flex items-center justify-center gap-2 border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-white dark:hover:bg-slate-700"
+              className="w-full py-3 px-4 bg-slate-50 hover:bg-slate-100 disabled:opacity-60 text-slate-800 font-semibold rounded-xl text-sm flex items-center justify-center gap-3 border border-slate-200 transition-colors dark:bg-slate-800 dark:hover:bg-slate-700/80 dark:text-white dark:border-slate-700"
             >
-              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <GoogleIcon />}
+              <span className="w-8 h-8 rounded-full bg-white flex items-center justify-center shrink-0 shadow-sm">
+                {loading ? <Loader2 className="w-4 h-4 animate-spin text-slate-500" /> : <GoogleIcon />}
+              </span>
               {language === "bn" ? "Google দিয়ে চালিয়ে যান" : "Continue with Google"}
             </button>
             <button
               type="button"
               onClick={() => { setError(""); setStep("phone"); }}
               disabled={loading}
-              className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white font-bold rounded-lg text-sm flex items-center justify-center gap-2"
+              className="w-full py-3 px-4 bg-slate-50 hover:bg-slate-100 disabled:opacity-60 text-slate-800 font-semibold rounded-xl text-sm flex items-center justify-center gap-3 border border-slate-200 transition-colors dark:bg-slate-800 dark:hover:bg-slate-700/80 dark:text-white dark:border-slate-700"
             >
-              <Phone className="w-4 h-4" />
+              <span className="w-8 h-8 rounded-full bg-amber-500 flex items-center justify-center shrink-0 shadow-sm">
+                <Phone className="w-4 h-4 text-slate-900" />
+              </span>
               {language === "bn" ? "মোবাইল নম্বর দিয়ে চালিয়ে যান" : "Continue with Phone"}
             </button>
           </div>
