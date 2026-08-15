@@ -458,7 +458,6 @@ export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModa
               <input
                 type="tel"
                 required
-                autoFocus
                 value={otpPhone}
                 onChange={(e) => setOtpPhone(e.target.value)}
                 className="w-full px-3 py-2 text-sm border rounded-lg dark:bg-slate-800 dark:border-slate-700 dark:text-white"
@@ -495,15 +494,15 @@ export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModa
                 ? (language === "bn" ? "সাইন-ইন করুন" : "Sign In")
                 : (language === "bn" ? "অ্যাকাউন্ট তৈরি করুন" : "Create Account")}
             </button>
-            <div className="flex items-center justify-between text-xs">
-              <button type="button" onClick={() => { setError(""); setStep("start"); }} className="flex items-center gap-1 text-slate-500 hover:underline">
+            <div className="flex items-center justify-between gap-2 text-xs pt-1">
+              <button type="button" onClick={() => { setError(""); setStep("start"); }} className="flex items-center gap-1 text-slate-500 hover:underline shrink-0">
                 <ArrowLeft className="w-3 h-3" />
                 {language === "bn" ? "পেছনে যান" : "Back"}
               </button>
               <button
                 type="button"
                 onClick={() => { setError(""); setPhoneAuthMode(phoneAuthMode === "login" ? "signup" : "login"); }}
-                className="text-emerald-600 font-bold hover:underline"
+                className="text-emerald-600 dark:text-emerald-400 font-bold text-sm hover:underline text-right"
               >
                 {phoneAuthMode === "login"
                   ? (language === "bn" ? "নতুন অ্যাকাউন্ট তৈরি করুন" : "Create new account")
