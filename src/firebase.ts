@@ -2,6 +2,7 @@ import { initializeApp } from "firebase/app";
 import { getAuth, GoogleAuthProvider, FacebookAuthProvider, setPersistence, browserSessionPersistence } from "firebase/auth";
 import { initializeFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
+import { initializeAppCheck, ReCaptchaV3Provider } from "firebase/app-check";
 import { logger } from "./utils/logger";
 
 const requiredEnv = (key: string, value: string | undefined): string => {
@@ -22,6 +23,31 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
+
+// App Check: proves to Firebase that requests are coming from our real
+// website, not a bot/script calling the API directly. reCAPTCHA v3 runs
+// completely invisibly in the background -- no checkbox, no image puzzle,
+// users never see or do anything extra.
+//
+// IMPORTANT (rollout safety): this only starts sending App Check tokens.
+// It does NOT block anything by itself. Enforcement is turned on separately,
+// later, from Firebase Console -> App Check -> APIs tab (Firestore/Storage),
+// only after a few days of confirming real traffic has valid tokens. Do NOT
+// flip that switch until told to -- turning it on too early can lock
+// everyone (including the admin) out of the site.
+const recaptchaSiteKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY;
+if (recaptchaSiteKey) {
+  try {
+    initializeAppCheck(app, {
+      provider: new ReCaptchaV3Provider(recaptchaSiteKey),
+      isTokenAutoRefreshEnabled: true,
+    });
+  } catch (err) {
+    logger.debug("App Check initialization failed:", err);
+  }
+} else {
+  console.error("[Firebase] Missing env variable: VITE_RECAPTCHA_SITE_KEY. App Check will not run until it's set in .env (local) or Vercel Project Settings (production).");
+}
 
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
