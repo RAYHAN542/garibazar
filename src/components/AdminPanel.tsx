@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { db } from "../firebase";
-import { collection, onSnapshot, query, orderBy, doc, getDoc, setDoc, updateDoc, deleteDoc, limit } from "firebase/firestore";
+import { collection, onSnapshot, query, orderBy, doc, getDoc, setDoc, updateDoc, deleteDoc, limit, getAggregateFromServer, sum, count } from "firebase/firestore";
 import { ShieldAlert, CheckCircle2, XCircle, Coins, Loader2, Save, Check, Smartphone, User, Clock, Mail, Trash2, Search, TrendingUp, Grid, Inbox, Flag, Activity, Globe, Users, MapPin, Eye } from "lucide-react";
 import { SupportedLanguage } from "../types";
 
@@ -43,8 +43,17 @@ export function AdminPanel({ language, currentUser, listings: listingsProp, isUs
   // not just whatever the Market page happens to have paginated in via "Load More".
   // This is a dedicated, independent real-time listener so it's always accurate.
   const [adminListings, setAdminListings] = useState<any[]>([]);
+  // Accurate site-wide totals (listing count + summed views) computed server-side
+  // via a Firestore aggregate query — no documents are downloaded for this, so it
+  // stays cheap and correct even after the list below is capped.
+  const [aggListingCount, setAggListingCount] = useState<number>(0);
+  const [aggTotalViews, setAggTotalViews] = useState<number>(0);
+
   useEffect(() => {
-    const q = query(collection(db, "listings"), orderBy("createdAt", "desc"));
+    // Managing/searching listings only needs the most recent N, not literally every
+    // listing ever created — capped to keep this fast and inexpensive as the
+    // marketplace grows.
+    const q = query(collection(db, "listings"), orderBy("createdAt", "desc"), limit(300));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const all: any[] = [];
       snapshot.forEach((docSnap) => {
@@ -52,8 +61,19 @@ export function AdminPanel({ language, currentUser, listings: listingsProp, isUs
       });
       setAdminListings(all);
     }, (err) => {
-      console.error("Could not fetch full listings count for admin:", err);
+      console.error("Could not fetch listings for admin:", err);
     });
+
+    getAggregateFromServer(collection(db, "listings"), {
+      totalCount: count(),
+      totalViews: sum("views"),
+    }).then((snap) => {
+      setAggListingCount(snap.data().totalCount);
+      setAggTotalViews(snap.data().totalViews || 0);
+    }).catch((err) => {
+      console.error("Could not fetch listings aggregate for admin:", err);
+    });
+
     return () => unsubscribe();
   }, []);
 
@@ -393,9 +413,9 @@ export function AdminPanel({ language, currentUser, listings: listingsProp, isUs
   const totalRevenue = requests
     .filter((req) => req.status === "approved")
     .reduce((sum, req) => sum + (Number(req.amount) || 0), 0);
-  const totalListings = adminListings?.length || 0;
+  const totalListings = aggListingCount || adminListings?.length || 0;
   const pendingRequestsCount = requests.filter(r => r.status === 'pending').length;
-  const totalViews = (adminListings || []).reduce((sum, l: any) => sum + (Number(l.views) || 0), 0);
+  const totalViews = aggTotalViews || (adminListings || []).reduce((sum, l: any) => sum + (Number(l.views) || 0), 0);
 
   return (
     <div className="space-y-6">
