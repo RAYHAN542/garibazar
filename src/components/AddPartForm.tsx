@@ -2,7 +2,7 @@ import React, { useState, useRef } from "react";
 import { SupportedLanguage } from "../types";
 import { Camera, Loader2, AlertTriangle, X, Check } from "lucide-react";
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
-import { db } from "../firebase";
+import { db, auth } from "../firebase";
 import { sanitizeText, validatePriceInput, validateBanglaPhone } from "../utils/sanitizer";
 import { uploadToCloudinary } from "../utils/cloudinary";
 import { CITIES } from "../translations";
@@ -183,6 +183,24 @@ export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPromp
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!currentUser) {
+      onLoginPrompt();
+      return;
+    }
+
+    // পোস্ট করার আগে Firebase টোকেন জোর করে রিফ্রেশ করা হচ্ছে, যাতে পুরনো/
+    // মেয়াদোত্তীর্ণ সেশনের কারণে "permission denied" এরর না আসে। বেশিরভাগ
+    // ক্ষেত্রে এটা নিঃশব্দে ঠিক হয়ে যাবে, ইউজার কিছু বুঝতেও পারবে না।
+    try {
+      await auth.currentUser?.getIdToken(true);
+    } catch (tokenErr) {
+      console.error("Token refresh failed:", tokenErr);
+    }
+    if (!auth.currentUser) {
+      setError(
+        language === "bn"
+          ? "আপনার লগইন সেশন মেয়াদোত্তীর্ণ হয়ে গেছে। অনুগ্রহ করে আবার লগইন করুন।"
+          : "Your session has expired. Please log in again."
+      );
       onLoginPrompt();
       return;
     }
