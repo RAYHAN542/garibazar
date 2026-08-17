@@ -195,9 +195,22 @@ export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModa
       // third-party storage partitioning breaks that bridge, which is why
       // redirect sign-in was silently failing to persist. Popup avoids that
       // entirely since it completes and resolves in the same tab session.
-      const result = await signInWithPopup(auth, googleProvider);
+      const popupResult = signInWithPopup(auth, googleProvider);
+      const timeout = new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error("popup-timeout")), 15000);
+      });
+      const result = await Promise.race([popupResult, timeout]);
       await handlePostGoogleAuth(result.user);
     } catch (err: any) {
+      if (err?.message === "popup-timeout") {
+        setError(
+          language === "bn"
+            ? "সাইন-ইন সাড়া দিচ্ছে না। এই ব্রাউজারের Privacy/Tracking Protection সেটিংস Google সাইন-ইন ব্লক করছে হয়তো — Chrome ব্রাউজার দিয়ে চেষ্টা করুন, অথবা এই সাইটের জন্য Tracking Protection বন্ধ করুন।"
+            : "Sign-in isn't responding. This browser's Privacy/Tracking Protection may be blocking Google sign-in — try Chrome, or turn off Tracking Protection for this site."
+        );
+        setLoading(false);
+        return;
+      }
       const code = err?.code || "";
       if (code === "auth/popup-closed-by-user" || code === "auth/cancelled-popup-request") {
         // ইউজার নিজেই popup বন্ধ করেছে
