@@ -27,7 +27,6 @@ const AddPartForm = lazy(() => import("./components/AddPartForm").then(m => ({ d
 const RefillModal = lazy(() => import("./components/RefillModal").then(m => ({ default: m.RefillModal })));
 const AdminPanel = lazy(() => import("./components/AdminPanel").then(m => ({ default: m.AdminPanel })));
 const ChatView = lazy(() => import("./components/ChatView").then(m => ({ default: m.ChatView })));
-const PlayStoreDiagnostics = lazy(() => import("./components/PlayStoreDiagnostics").then(m => ({ default: m.PlayStoreDiagnostics })));
 const LegalHubModal = lazy(() => import("./components/LegalHubModal"));
 const PrivacyPolicyPage = lazy(() => import("./components/PrivacyPolicyPage"));
 const DataDeletionPage = lazy(() => import("./components/DataDeletionPage"));
