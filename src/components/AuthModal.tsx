@@ -2,7 +2,6 @@ import React, { useState, useRef } from "react";
 import { auth, db, googleProvider, facebookProvider } from "../firebase";
 import {
   signInWithPopup,
-  signInWithRedirect,
   signInWithCustomToken,
   getRedirectResult,
   signOut,
@@ -197,13 +196,11 @@ export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModa
         code === "auth/popup-blocked" ||
         code === "auth/operation-not-supported-in-this-environment"
       ) {
-        try {
-          await signInWithRedirect(auth, googleProvider);
-          return;
-        } catch (redirectErr) {
-          console.error(redirectErr);
-          setError(language === "bn" ? "Google সাইন-ইন করা যায়নি।" : "Could not sign in with Google.");
-        }
+        setError(
+          language === "bn"
+            ? "আপনার ব্রাউজার পপ-আপ ব্লক করেছে। ব্রাউজারের ঠিকানা বারে পপ-আপ আইকনে ট্যাপ করে অনুমতি দিন, তারপর আবার চেষ্টা করুন।"
+            : "Your browser blocked the sign-in pop-up. Allow pop-ups for this site (tap the pop-up icon in the address bar) and try again."
+        );
       } else {
         console.error(err);
         setError(language === "bn" ? "Google সাইন-ইন ব্যর্থ হয়েছে। আবার চেষ্টা করুন।" : "Google sign-in failed. Please try again.");
@@ -233,13 +230,11 @@ export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModa
         code === "auth/popup-blocked" ||
         code === "auth/operation-not-supported-in-this-environment"
       ) {
-        try {
-          await signInWithRedirect(auth, facebookProvider);
-          return;
-        } catch (redirectErr) {
-          console.error(redirectErr);
-          setError(language === "bn" ? "Facebook সাইন-ইন করা যায়নি।" : "Could not sign in with Facebook.");
-        }
+        setError(
+          language === "bn"
+            ? "আপনার ব্রাউজার পপ-আপ ব্লক করেছে। ব্রাউজারের ঠিকানা বারে পপ-আপ আইকনে ট্যাপ করে অনুমতি দিন, তারপর আবার চেষ্টা করুন।"
+            : "Your browser blocked the sign-in pop-up. Allow pop-ups for this site (tap the pop-up icon in the address bar) and try again."
+        );
       } else {
         console.error(err);
         setError(language === "bn" ? "Facebook সাইন-ইন ব্যর্থ হয়েছে। আবার চেষ্টা করুন।" : "Facebook sign-in failed. Please try again.");
