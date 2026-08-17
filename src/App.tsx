@@ -222,14 +222,15 @@ export default function App() {
       setIsAdminVerified(false);
       return;
     }
-    const checkAdminStatus = async (isRetry = false) => {
+    const checkAdminStatus = async (attempt = 0) => {
       try {
+        await user.getIdToken(true);
         const adminDoc = await getDoc(doc(db, "admins", user.uid));
         setIsAdminVerified(adminDoc.exists());
       } catch (err) {
-        console.error("Admin status check failed:", err);
-        if (!isRetry) {
-          setTimeout(() => checkAdminStatus(true), 1500);
+        console.error(`Admin status check failed (attempt ${attempt + 1}):`, err);
+        if (attempt < 2) {
+          setTimeout(() => checkAdminStatus(attempt + 1), 1000 * (attempt + 1));
         } else {
           setIsAdminVerified(false);
         }
