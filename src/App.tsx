@@ -231,22 +231,15 @@ export default function App() {
         }
         const adminDoc = await getDoc(doc(db, "admins", user.uid));
         setIsAdminVerified(adminDoc.exists());
-        if (attempt === 0 || attempt >= 1) {
-          alert("DEBUG ADMIN CHECK
-UID: " + user.uid + "
-auth.currentUser.uid: " + (auth.currentUser?.uid || "null") + "
-adminDoc exists: " + adminDoc.exists());
-        }
-      } catch (err: any) {
-        console.error(`Admin status check failed (attempt ${attempt + 1}):`, err);
+        window.alert("ADMIN CHECK OK | uid=" + user.uid + " | authUid=" + (auth.currentUser ? auth.currentUser.uid : "null") + " | exists=" + adminDoc.exists());
+      } catch (err) {
+        console.error("Admin status check failed attempt " + (attempt + 1), err);
         if (attempt < 4) {
-          setTimeout(() => checkAdminStatus(attempt + 1), 800 * (attempt + 1));
+          setTimeout(function() { checkAdminStatus(attempt + 1); }, 800 * (attempt + 1));
         } else {
           setIsAdminVerified(false);
-          alert("DEBUG ADMIN CHECK FAILED
-UID: " + user.uid + "
-auth.currentUser: " + (auth.currentUser?.uid || "null") + "
-Error: " + (err?.code || err?.message || String(err)));
+          var errMsg = (err && err.code) || (err && err.message) || String(err);
+          window.alert("ADMIN CHECK FAILED | uid=" + user.uid + " | authUid=" + (auth.currentUser ? auth.currentUser.uid : "null") + " | err=" + errMsg);
         }
       }
     };
