@@ -34,6 +34,15 @@ if (!getApps().length) {
 
 const ALLOWED_TYPES = new Set(["visit", "login", "signup"]);
 
+// The site owner's own IP(s) - visits/logins from here are excluded from the
+// analytics log and totals, since they're not real customer traffic (they're
+// the owner testing/checking their own site). Add more IPs here (comma
+// separated) if the owner's connection changes (e.g. new home broadband,
+// office wifi). Find the current IP by visiting whatismyipaddress.com.
+const OWNER_IPS = new Set([
+  "103.129.32.254",
+]);
+
 // Known bot / crawler / monitoring User-Agent signatures. If the UA matches
 // any of these, the hit is not a real human visitor (link-preview bots like
 // Facebook's, search engine crawlers, uptime monitors, scripts, etc.).
@@ -107,6 +116,12 @@ export default async function handler(req: any, res: any) {
     const referrer = typeof body?.referrer === "string" ? body.referrer.slice(0, 300) : "";
 
     const ip = getClientIp(req);
+
+    if (OWNER_IPS.has(ip)) {
+      // চুপচাপ বাদ দেওয়া হচ্ছে — মালিকের নিজের ভিজিট/লগইন visitor log ও total-এ ধরা হবে না।
+      res.status(200).json({ ok: true, skipped: true });
+      return;
+    }
 
     if (isRateLimited(ip)) {
       // চুপচাপ বাদ দেওয়া হচ্ছে — ইউজারকে কোনো এরর দেখানো হয় না, শুধু লগ করা হয় না।

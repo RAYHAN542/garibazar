@@ -218,19 +218,7 @@ export default function App() {
   const [isAdminVerified, setIsAdminVerified] = useState(false);
 
   useEffect(() => {
-    if (!user?.uid) {
-      setIsAdminVerified(false);
-      return;
-    }
-    const checkAdminStatus = async () => {
-      try {
-        const adminDoc = await getDoc(doc(db, "admins", user.uid));
-        setIsAdminVerified(adminDoc.exists());
-      } catch (err) {
-        setIsAdminVerified(false);
-      }
-    };
-    checkAdminStatus();
+    setIsAdminVerified(user?.isAdmin === true);
   }, [user]);
 
   const isUserAdmin = isAdminVerified;
@@ -805,7 +793,8 @@ export default function App() {
           uid: parsed.uid,
           displayName: parsed.displayName,
           email: parsed.email,
-          photoURL: parsed.photoURL || parsed.profilePicture
+          photoURL: parsed.photoURL || parsed.profilePicture,
+          isAdmin: parsed.isAdmin === true
         });
         setUserMetadata(parsed);
       } catch (err) {
@@ -2068,8 +2057,8 @@ export default function App() {
                 {/* A. Top left corner Logo & Branding with "Profile" */}
                 <div className="bg-white dark:bg-slate-900 border border-slate-150/80 dark:border-slate-800 rounded-3xl p-5 shadow-sm">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-gradient-to-r from-orange-550 to-amber-500 text-slate-950 font-black flex items-center justify-center shadow-md text-lg sm:text-xl select-none shrink-0">
-                      গ
+                    <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-full overflow-hidden shadow-md shrink-0 bg-slate-900">
+                      <img src="/icon-512.png" alt="Gari Bazar" className="w-full h-full object-cover" />
                     </div>
                     <div>
                       <div className="flex items-center gap-1.5 flex-wrap">
@@ -2180,7 +2169,7 @@ export default function App() {
                             <button
                               type="button"
                               onClick={() => setIsAuthOpen(true)}
-                              className="w-full bg-gradient-to-r from-amber-500 to-orange-550 hover:from-amber-600 hover:to-orange-605 text-slate-950 font-black py-2.5 px-4 rounded-xl text-xs transition duration-200 flex items-center justify-center gap-1.5 shadow-sm shadow-amber-550/15 cursor-pointer"
+                              className="w-full bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-slate-950 font-black py-2.5 px-4 rounded-xl text-xs transition duration-200 flex items-center justify-center gap-1.5 shadow-sm shadow-amber-500/15 cursor-pointer"
                             >
                               <User className="w-4 h-4 fill-slate-950 text-slate-950 shrink-0" />
                               <span>{language === "bn" ? "লগইন করুন / রেজিস্ট্রেশন" : "Sign In / Register"}</span>
@@ -2584,7 +2573,8 @@ export default function App() {
             uid: sessionUser.uid,
             displayName: sessionUser.displayName,
             email: sessionUser.email,
-            photoURL: sessionUser.photoURL || sessionUser.profilePicture
+            photoURL: sessionUser.photoURL || sessionUser.profilePicture,
+            isAdmin: sessionUser.isAdmin === true
           });
           setUserMetadata(sessionUser);
           setIsAuthOpen(false);

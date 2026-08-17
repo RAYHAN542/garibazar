@@ -2,7 +2,6 @@ import React, { useState, useRef } from "react";
 import { auth, db, googleProvider, facebookProvider } from "../firebase";
 import {
   signInWithPopup,
-  signInWithRedirect,
   signInWithCustomToken,
   getRedirectResult,
   signOut,
@@ -107,6 +106,14 @@ export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModa
     const userDocRef = doc(db, "users", fbUser.uid);
     const userSnap = await getDoc(userDocRef);
 
+    let isAdminUser = false;
+    try {
+      const adminDoc = await getDoc(doc(db, "admins", fbUser.uid));
+      isAdminUser = adminDoc.exists();
+    } catch (err) {
+      console.error("Admin check at login failed:", err);
+    }
+
     if (userSnap.exists()) {
       const existingData = userSnap.data() as any;
       const sessionUser = {
@@ -118,6 +125,7 @@ export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModa
         profilePicture: existingData.profilePicture || fbUser.photoURL || PRESET_AVATARS[0],
         simulatedCredits: existingData.simulatedCredits ?? 5000,
         referralCode: existingData.referralCode,
+        isAdmin: isAdminUser,
       };
       localStorage.setItem("gari_bazar_session_user", JSON.stringify(sessionUser));
       trackEvent("login", fbUser.uid, sessionUser.email || sessionUser.phoneNumber);
@@ -197,13 +205,11 @@ export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModa
         code === "auth/popup-blocked" ||
         code === "auth/operation-not-supported-in-this-environment"
       ) {
-        try {
-          await signInWithRedirect(auth, googleProvider);
-          return;
-        } catch (redirectErr) {
-          console.error(redirectErr);
-          setError(language === "bn" ? "Google সাইন-ইন করা যায়নি।" : "Could not sign in with Google.");
-        }
+        setError(
+          language === "bn"
+            ? "আপনার ব্রাউজার পপ-আপ ব্লক করেছে। ব্রাউজারের ঠিকানা বারে পপ-আপ আইকনে ট্যাপ করে অনুমতি দিন, তারপর আবার চেষ্টা করুন।"
+            : "Your browser blocked the sign-in pop-up. Allow pop-ups for this site (tap the pop-up icon in the address bar) and try again."
+        );
       } else {
         console.error(err);
         setError(language === "bn" ? "Google সাইন-ইন ব্যর্থ হয়েছে। আবার চেষ্টা করুন।" : "Google sign-in failed. Please try again.");
@@ -233,13 +239,11 @@ export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModa
         code === "auth/popup-blocked" ||
         code === "auth/operation-not-supported-in-this-environment"
       ) {
-        try {
-          await signInWithRedirect(auth, facebookProvider);
-          return;
-        } catch (redirectErr) {
-          console.error(redirectErr);
-          setError(language === "bn" ? "Facebook সাইন-ইন করা যায়নি।" : "Could not sign in with Facebook.");
-        }
+        setError(
+          language === "bn"
+            ? "আপনার ব্রাউজার পপ-আপ ব্লক করেছে। ব্রাউজারের ঠিকানা বারে পপ-আপ আইকনে ট্যাপ করে অনুমতি দিন, তারপর আবার চেষ্টা করুন।"
+            : "Your browser blocked the sign-in pop-up. Allow pop-ups for this site (tap the pop-up icon in the address bar) and try again."
+        );
       } else {
         console.error(err);
         setError(language === "bn" ? "Facebook সাইন-ইন ব্যর্থ হয়েছে। আবার চেষ্টা করুন।" : "Facebook sign-in failed. Please try again.");
@@ -384,6 +388,7 @@ export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModa
         createdAt: new Date().toISOString(),
         simulatedCredits: 5000,
         referralCode: myReferralCode,
+        isAdmin: false,
       };
 
       await setDoc(doc(db, "users", googleUser.uid), savedData);
@@ -417,8 +422,8 @@ export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModa
         {error && <div className="p-3 bg-red-500/10 text-red-600 rounded-lg text-xs mb-3 text-center">{error}</div>}
 
         {step === "start" ? (
-          <div className="space-y-4">
-            <p className="text-sm text-slate-500 dark:text-slate-400 text-center">
+          <div className="space-y-3">
+            <p className="text-sm text-slate-500 dark:text-slate-400 text-center mb-1">
               {language === "bn"
                 ? "গাড়ি বাজারে বিক্রি করতে বা কেনার জন্য সাইন-ইন করুন।"
                 : "Sign in to buy or sell on Gari Bazar."}
@@ -427,18 +432,22 @@ export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModa
               type="button"
               onClick={handleGoogleSignIn}
               disabled={loading}
-              className="w-full py-2.5 bg-white hover:bg-slate-50 disabled:opacity-60 text-slate-700 font-bold rounded-lg text-sm flex items-center justify-center gap-2 border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-white dark:hover:bg-slate-700"
+              className="w-full py-3 px-4 bg-slate-50 hover:bg-slate-100 disabled:opacity-60 text-slate-800 font-semibold rounded-xl text-sm flex items-center justify-center gap-3 border border-slate-200 transition-colors dark:bg-slate-800 dark:hover:bg-slate-700/80 dark:text-white dark:border-slate-700"
             >
-              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <GoogleIcon />}
+              <span className="w-8 h-8 rounded-full bg-white flex items-center justify-center shrink-0 shadow-sm">
+                {loading ? <Loader2 className="w-4 h-4 animate-spin text-slate-500" /> : <GoogleIcon />}
+              </span>
               {language === "bn" ? "Google দিয়ে চালিয়ে যান" : "Continue with Google"}
             </button>
             <button
               type="button"
               onClick={() => { setError(""); setStep("phone"); }}
               disabled={loading}
-              className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white font-bold rounded-lg text-sm flex items-center justify-center gap-2"
+              className="w-full py-3 px-4 bg-slate-50 hover:bg-slate-100 disabled:opacity-60 text-slate-800 font-semibold rounded-xl text-sm flex items-center justify-center gap-3 border border-slate-200 transition-colors dark:bg-slate-800 dark:hover:bg-slate-700/80 dark:text-white dark:border-slate-700"
             >
-              <Phone className="w-4 h-4" />
+              <span className="w-8 h-8 rounded-full bg-amber-500 flex items-center justify-center shrink-0 shadow-sm">
+                <Phone className="w-4 h-4 text-slate-900" />
+              </span>
               {language === "bn" ? "মোবাইল নম্বর দিয়ে চালিয়ে যান" : "Continue with Phone"}
             </button>
           </div>
@@ -454,7 +463,6 @@ export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModa
               <input
                 type="tel"
                 required
-                autoFocus
                 value={otpPhone}
                 onChange={(e) => setOtpPhone(e.target.value)}
                 className="w-full px-3 py-2 text-sm border rounded-lg dark:bg-slate-800 dark:border-slate-700 dark:text-white"
@@ -491,15 +499,15 @@ export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModa
                 ? (language === "bn" ? "সাইন-ইন করুন" : "Sign In")
                 : (language === "bn" ? "অ্যাকাউন্ট তৈরি করুন" : "Create Account")}
             </button>
-            <div className="flex items-center justify-between text-xs">
-              <button type="button" onClick={() => { setError(""); setStep("start"); }} className="flex items-center gap-1 text-slate-500 hover:underline">
+            <div className="flex items-center justify-between gap-2 text-xs pt-1">
+              <button type="button" onClick={() => { setError(""); setStep("start"); }} className="flex items-center gap-1 text-slate-500 hover:underline shrink-0">
                 <ArrowLeft className="w-3 h-3" />
                 {language === "bn" ? "পেছনে যান" : "Back"}
               </button>
               <button
                 type="button"
                 onClick={() => { setError(""); setPhoneAuthMode(phoneAuthMode === "login" ? "signup" : "login"); }}
-                className="text-emerald-600 font-bold hover:underline"
+                className="text-emerald-600 dark:text-emerald-400 font-bold text-sm hover:underline text-right"
               >
                 {phoneAuthMode === "login"
                   ? (language === "bn" ? "নতুন অ্যাকাউন্ট তৈরি করুন" : "Create new account")
@@ -543,14 +551,14 @@ export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModa
             <div>
               <label className="text-[10px] font-bold block mb-1 text-slate-500">{language === "bn" ? "আপনার নাম *" : "Name *"}</label>
               <div className="relative">
-                <input type="text" required value={displayName} onChange={(e) => setDisplayName(e.target.value)} className="w-full px-3 py-2 text-sm border rounded-lg dark:bg-slate-800 dark:border-slate-700 dark:text-white" placeholder="Rayhan" />
+                <input type="text" required value={displayName} onChange={(e) => setDisplayName(e.target.value)} className="w-full px-3 py-2 text-sm border rounded-lg dark:bg-slate-800 dark:border-slate-700 dark:text-white" placeholder={language === "bn" ? "আপনার নাম লিখুন" : "Your name"} />
               </div>
             </div>
 
             <div>
               <label className="text-[10px] font-bold block mb-1 text-slate-500">{language === "bn" ? "মোবাইল নম্বর *" : "Mobile Number *"}</label>
               <div className="relative">
-                <input type="tel" required value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value)} className="w-full px-3 py-2 text-sm border rounded-lg dark:bg-slate-800 dark:border-slate-700 dark:text-white" placeholder="01993878271" />
+                <input type="tel" required value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value)} className="w-full px-3 py-2 text-sm border rounded-lg dark:bg-slate-800 dark:border-slate-700 dark:text-white" placeholder="01XXXXXXXXX" />
               </div>
               <p className="text-[10px] text-slate-400 mt-1">
                 {language === "bn" ? "এই নম্বরে OTP পাঠানো হবে না — শুধু যোগাযোগের জন্য দেখানো হবে।" : "No OTP is sent here — it's shown to buyers as your contact number."}
