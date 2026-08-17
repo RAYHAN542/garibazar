@@ -218,32 +218,7 @@ export default function App() {
   const [isAdminVerified, setIsAdminVerified] = useState(false);
 
   useEffect(() => {
-    if (!user?.uid) {
-      setIsAdminVerified(false);
-      return;
-    }
-    const checkAdminStatus = async (attempt = 0) => {
-      try {
-        if (auth.currentUser) {
-          await auth.currentUser.getIdToken(true);
-        } else {
-          throw new Error("Firebase auth session not ready yet");
-        }
-        const adminDoc = await getDoc(doc(db, "admins", user.uid));
-        setIsAdminVerified(adminDoc.exists());
-        window.alert("ADMIN CHECK OK | uid=" + user.uid + " | authUid=" + (auth.currentUser ? auth.currentUser.uid : "null") + " | exists=" + adminDoc.exists());
-      } catch (err) {
-        console.error("Admin status check failed attempt " + (attempt + 1), err);
-        if (attempt < 4) {
-          setTimeout(function() { checkAdminStatus(attempt + 1); }, 800 * (attempt + 1));
-        } else {
-          setIsAdminVerified(false);
-          var errMsg = (err && err.code) || (err && err.message) || String(err);
-          window.alert("ADMIN CHECK FAILED | uid=" + user.uid + " | authUid=" + (auth.currentUser ? auth.currentUser.uid : "null") + " | err=" + errMsg);
-        }
-      }
-    };
-    checkAdminStatus();
+    setIsAdminVerified(user?.isAdmin === true);
   }, [user]);
 
   const isUserAdmin = isAdminVerified;
@@ -818,7 +793,8 @@ export default function App() {
           uid: parsed.uid,
           displayName: parsed.displayName,
           email: parsed.email,
-          photoURL: parsed.photoURL || parsed.profilePicture
+          photoURL: parsed.photoURL || parsed.profilePicture,
+          isAdmin: parsed.isAdmin === true
         });
         setUserMetadata(parsed);
       } catch (err) {
@@ -2597,7 +2573,8 @@ export default function App() {
             uid: sessionUser.uid,
             displayName: sessionUser.displayName,
             email: sessionUser.email,
-            photoURL: sessionUser.photoURL || sessionUser.profilePicture
+            photoURL: sessionUser.photoURL || sessionUser.profilePicture,
+            isAdmin: sessionUser.isAdmin === true
           });
           setUserMetadata(sessionUser);
           setIsAuthOpen(false);

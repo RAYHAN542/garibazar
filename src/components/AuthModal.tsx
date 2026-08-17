@@ -106,6 +106,14 @@ export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModa
     const userDocRef = doc(db, "users", fbUser.uid);
     const userSnap = await getDoc(userDocRef);
 
+    let isAdminUser = false;
+    try {
+      const adminDoc = await getDoc(doc(db, "admins", fbUser.uid));
+      isAdminUser = adminDoc.exists();
+    } catch (err) {
+      console.error("Admin check at login failed:", err);
+    }
+
     if (userSnap.exists()) {
       const existingData = userSnap.data() as any;
       const sessionUser = {
@@ -117,6 +125,7 @@ export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModa
         profilePicture: existingData.profilePicture || fbUser.photoURL || PRESET_AVATARS[0],
         simulatedCredits: existingData.simulatedCredits ?? 5000,
         referralCode: existingData.referralCode,
+        isAdmin: isAdminUser,
       };
       localStorage.setItem("gari_bazar_session_user", JSON.stringify(sessionUser));
       trackEvent("login", fbUser.uid, sessionUser.email || sessionUser.phoneNumber);
@@ -379,6 +388,7 @@ export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModa
         createdAt: new Date().toISOString(),
         simulatedCredits: 5000,
         referralCode: myReferralCode,
+        isAdmin: false,
       };
 
       await setDoc(doc(db, "users", googleUser.uid), savedData);
