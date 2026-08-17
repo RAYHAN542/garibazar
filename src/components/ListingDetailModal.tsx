@@ -5,6 +5,17 @@ import { doc, getDoc, updateDoc, collection, addDoc, query, where, getDocs, incr
 import { db, logAnalyticsEvent } from "../firebase";
 import { getOptimizedImageUrl } from "../utils/cloudinary";
 
+// Masks all but the last 4 digits so the full number isn't visible in plain
+// text to anonymous visitors or scrapers. The underlying tel: link still
+// uses the real number, so calling still works without the digits being
+// shown on screen until the viewer explicitly taps to reveal them.
+const maskPhoneNumber = (num?: string): string => {
+  if (!num) return "";
+  const digits = num.trim();
+  if (digits.length <= 4) return digits;
+  return "•".repeat(digits.length - 4) + digits.slice(-4);
+};
+
 interface ListingDetailModalProps {
   listing: PartListing;
   language: SupportedLanguage;
@@ -798,8 +809,21 @@ export function ListingDetailModal({ listing, language, currentUser, onClose, on
                       onClick={handleContactClick}
                       className="font-mono font-black text-xl text-amber-500 hover:text-amber-600 hover:underline block cursor-pointer"
                     >
-                      📞 {listing.contactNumber}
+                      📞 {isOwner || isAdmin || showPhoneNumber ? listing.contactNumber : maskPhoneNumber(listing.contactNumber)}
                     </a>
+                    {!isOwner && !isAdmin && !showPhoneNumber && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setShowPhoneNumber(true);
+                        }}
+                        className="text-xs font-bold text-amber-600 dark:text-amber-450 underline underline-offset-2"
+                      >
+                        {language === "bn" ? "নাম্বার দেখুন" : "Show number"}
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
