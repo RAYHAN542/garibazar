@@ -9,9 +9,8 @@ import { PartListing, SupportedLanguage, TranslationSet } from "../types";
 import type { ActiveTab } from "./HeaderNav";
 
 const AdminPanel = lazy(() => import("./AdminPanel").then(m => ({ default: m.AdminPanel })));
-const PlayStoreDiagnostics = lazy(() => import("./PlayStoreDiagnostics").then(m => ({ default: m.PlayStoreDiagnostics })));
 
-type DashboardSubTab = 'inventory' | 'ads' | 'admin' | 'playstore-audit' | 'my-shop';
+type DashboardSubTab = 'inventory' | 'ads' | 'admin' | 'my-shop';
 
 interface DashboardTabProps {
   language: SupportedLanguage;
@@ -192,22 +191,6 @@ export default function DashboardTab({
                     </button>
                   )}
 
-                  {isUserAdmin && (
-                    <button
-                      id="dash-subtab-playstore"
-                      onClick={() => {
-                        setDashboardSubTab('playstore-audit');
-                      }}
-                      className={`px-3 py-2 rounded-full text-[11px] font-bold transition-all flex items-center gap-1 cursor-pointer shrink-0 whitespace-nowrap ${
-                        dashboardSubTab === 'playstore-audit'
-                          ? 'bg-amber-500 text-slate-950 shadow-sm'
-                          : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'
-                      }`}
-                    >
-                      <Cpu className="w-3.5 h-3.5" />
-                      {language === "bn" ? "প্লে স্টোর" : "Play Store"}
-                    </button>
-                  )}
                 </div>
 
                 {dashboardSubTab === 'inventory' && (
@@ -874,12 +857,6 @@ export default function DashboardTab({
                 {dashboardSubTab === 'admin' && isUserAdmin && (
                   <Suspense fallback={<div className="flex items-center justify-center py-16"><Loader2 className="w-6 h-6 animate-spin text-amber-500" /></div>}>
                     <AdminPanel language={language} currentUser={userMetadata || user} listings={listings} isUserAdmin={isUserAdmin} />
-                  </Suspense>
-                )}
-
-                {dashboardSubTab === 'playstore-audit' && (
-                  <Suspense fallback={<div className="flex items-center justify-center py-16"><Loader2 className="w-6 h-6 animate-spin text-amber-500" /></div>}>
-                    <PlayStoreDiagnostics language={language} />
                   </Suspense>
                 )}
 
