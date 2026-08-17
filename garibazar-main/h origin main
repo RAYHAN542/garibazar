@@ -1,0 +1,40 @@
+[1mdiff --git a/src/components/DashboardTab.tsx b/src/components/DashboardTab.tsx[m
+[1mindex 71f4faf..f59e85a 100644[m
+[1m--- a/src/components/DashboardTab.tsx[m
+[1m+++ b/src/components/DashboardTab.tsx[m
+[36m@@ -249,7 +249,7 @@[m [mexport default function DashboardTab({[m
+                                 <div className="min-w-0">[m
+                                   <h5 className="text-sm font-bold text-slate-850 dark:text-white truncate">{item.title}</h5>[m
+                                   <div className="text-[11px] text-slate-400 mt-0.5 flex gap-2">[m
+[31m-                                    <span>৳{item.price.toLocaleString("en-IN")}</span>[m
+[32m+[m[32m                                    <span>{item.price ? `৳${item.price.toLocaleString("en-IN")}` : (language === "bn" ? "মূল্য জানতে যোগাযোগ করুন" : "Price on Request")}</span>[m
+                                     <span>•</span>[m
+                                     <span>👁️ {item.views || 0} views</span>[m
+                                   </div>[m
+[36m@@ -341,7 +341,7 @@[m [mexport default function DashboardTab({[m
+                               </div>[m
+ [m
+                               <div className="flex sm:flex-col items-end justify-between sm:justify-center border-t sm:border-0 border-slate-100 dark:border-slate-850 pt-2 sm:pt-0">[m
+[31m-                                <span className="text-xs font-black text-amber-500">৳{item.price.toLocaleString("en-IN")}</span>[m
+[32m+[m[32m                                <span className="text-xs font-black text-amber-500">{item.price ? `৳${item.price.toLocaleString("en-IN")}` : (language === "bn" ? "মূল্য জানতে যোগাযোগ করুন" : "Price on Request")}</span>[m
+                                 <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-450 mt-1 flex items-center gap-1">[m
+                                   <ShieldCheck className="w-3.5 h-3.5" />[m
+                                   {item.status || "Pending Delivery"}[m
+[36m@@ -688,7 +688,7 @@[m [mexport default function DashboardTab({[m
+                                 </option>[m
+                                 {listings.filter(item => item.sellerId === user.uid).map((item) => ([m
+                                   <option key={item.id} value={item.id} className="bg-white text-slate-900">[m
+[31m-                                    {item.title} (৳{item.price.toLocaleString()}) {item.isAd ? `[${language === "bn" ? "ইতিমধ্যে বুস্ট রয়েছে" : "Already boosted"}]` : ""}[m
+[32m+[m[32m                                    {item.title} ({item.price ? `৳${item.price.toLocaleString()}` : (language === "bn" ? "মূল্য জানতে যোগাযোগ করুন" : "Price on Request")}) {item.isAd ? `[${language === "bn" ? "ইতিমধ্যে বুস্ট রয়েছে" : "Already boosted"}]` : ""}[m
+                                   </option>[m
+                                 ))}[m
+                               </select>[m
+[36m@@ -847,7 +847,7 @@[m [mexport default function DashboardTab({[m
+                                 <div className="min-w-0">[m
+                                   <h5 className="text-xs font-bold text-slate-850 dark:text-white truncate">{item.title}</h5>[m
+                                   <div className="text-[10px] text-slate-400 mt-1 flex gap-2">[m
+[31m-                                    <span className="font-semibold text-amber-500">৳{item.price.toLocaleString()}</span>[m
+[32m+[m[32m                                    <span className="font-semibold text-amber-500">{item.price ? `৳${item.price.toLocaleString()}` : (language === "bn" ? "মূল্য জানতে যোগাযোগ করুন" : "Price on Request")}</span>[m
+                                     <span>•</span>[m
+                                     <span>👀 {item.views || 0} views</span>[m
+                                   </div>[m
