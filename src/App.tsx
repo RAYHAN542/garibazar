@@ -224,13 +224,17 @@ export default function App() {
     }
     const checkAdminStatus = async (attempt = 0) => {
       try {
-        await user.getIdToken(true);
+        if (auth.currentUser) {
+          await auth.currentUser.getIdToken(true);
+        } else {
+          throw new Error("Firebase auth session not ready yet");
+        }
         const adminDoc = await getDoc(doc(db, "admins", user.uid));
         setIsAdminVerified(adminDoc.exists());
       } catch (err) {
         console.error(`Admin status check failed (attempt ${attempt + 1}):`, err);
-        if (attempt < 2) {
-          setTimeout(() => checkAdminStatus(attempt + 1), 1000 * (attempt + 1));
+        if (attempt < 4) {
+          setTimeout(() => checkAdminStatus(attempt + 1), 800 * (attempt + 1));
         } else {
           setIsAdminVerified(false);
         }
