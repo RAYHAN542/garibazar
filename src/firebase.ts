@@ -1,5 +1,5 @@
 import { initializeApp } from "firebase/app";
-import { getAuth, GoogleAuthProvider, FacebookAuthProvider, setPersistence, browserSessionPersistence } from "firebase/auth";
+import { getAuth, GoogleAuthProvider, FacebookAuthProvider, setPersistence, browserLocalPersistence, browserSessionPersistence } from "firebase/auth";
 import { initializeFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 import { initializeAppCheck, ReCaptchaV3Provider } from "firebase/app-check";
@@ -57,8 +57,11 @@ export const facebookProvider = new FacebookAuthProvider();
 // (Firebase Auth-এর ডিফল্ট persistence পদ্ধতি), যার ফলে sign-in "Database is
 // closing/hidden" জাতীয় error দিয়ে ব্যর্থ হয়। sessionStorage-ভিত্তিক
 // persistence অনেক বেশি নির্ভরযোগ্য এবং redirect flow-এর জন্যও যথেষ্ট।
-setPersistence(auth, browserSessionPersistence).catch((err) => {
-  logger.debug("Failed to set browserSessionPersistence, using default:", err);
+setPersistence(auth, browserLocalPersistence).catch((err) => {
+  logger.debug("browserLocalPersistence failed, falling back to session persistence:", err);
+  setPersistence(auth, browserSessionPersistence).catch((err2) => {
+    logger.debug("Failed to set any persistence, using default:", err2);
+  });
 });
 
 export const db = initializeFirestore(app, {
