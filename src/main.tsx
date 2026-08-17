@@ -7,6 +7,15 @@ import "./index.css";
 
 // Register Service Worker for PWA (Lighthouse Audit / Google Play Store compatibility)
 if (typeof window !== "undefined" && "serviceWorker" in navigator) {
+  let refreshing = false;
+  // When a new service worker takes control, reload once so the user
+  // immediately gets the latest bundle instead of a stale cached one.
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    if (refreshing) return;
+    refreshing = true;
+    window.location.reload();
+  });
+
   window.addEventListener("load", () => {
     navigator.serviceWorker.register("/sw.js")
       .then((reg) => {
