@@ -69,6 +69,22 @@ export const storage = getStorage(app);
 
 export const logAnalyticsEvent = (eventName: string, eventParams?: any) => {
   logger.debug(`Analytics Event: ${eventName}`, eventParams);
+  const type = eventName === "login" ? "login" : eventName === "signup" ? "signup" : "visit";
+  try {
+    fetch("/api/track-event", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        type,
+        uid: eventParams?.uid || null,
+        identifier: eventParams?.identifier || null,
+        path: typeof window !== "undefined" ? window.location.pathname : "",
+        referrer: typeof document !== "undefined" ? document.referrer : "",
+      }),
+    }).catch((err) => logger.debug("track-event call failed:", err));
+  } catch (err) {
+    logger.debug("track-event call failed:", err);
+  }
 };
 
 export default app;

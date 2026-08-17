@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { db } from "../firebase";
+import { db, auth } from "../firebase";
+import { onAuthStateChanged } from "firebase/auth";
 import { collection, onSnapshot, query, orderBy, doc, getDoc, setDoc, updateDoc, deleteDoc, limit, getAggregateFromServer, sum, count } from "firebase/firestore";
 import { ShieldAlert, CheckCircle2, XCircle, Coins, Loader2, Save, Check, Smartphone, User, Clock, Mail, Trash2, Search, TrendingUp, Grid, Inbox, Flag, Activity, Globe, Users, MapPin, Eye } from "lucide-react";
 import { SupportedLanguage } from "../types";
@@ -115,6 +116,14 @@ export function AdminPanel({ language, currentUser, listings: listingsProp, isUs
   const [loadingVisits, setLoadingVisits] = useState(true);
   const [analyticsStats, setAnalyticsStats] = useState<{ totalVisits?: number; totalLogins?: number; totalSignups?: number }>({});
 
+  const [authReady, setAuthReady] = useState(!!auth.currentUser);
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, (u) => {
+      setAuthReady(!!u);
+    });
+    return () => unsub();
+  }, []);
+
   // Support tickets states
   const [ticketsList, setTicketsList] = useState<any[]>([]);
   const [loadingTickets, setLoadingTickets] = useState(true);
@@ -215,16 +224,18 @@ export function AdminPanel({ language, currentUser, listings: listingsProp, isUs
   // Live summary counters -- total visits / logins / signups (one small doc,
   // kept up to date atomically by the /api/track-event serverless function).
   useEffect(() => {
+    if (!authReady) return;
     const unsub = onSnapshot(doc(db, "analytics_stats", "summary"), (docSnap) => {
       setAnalyticsStats(docSnap.exists() ? (docSnap.data() as any) : {});
     }, (err) => {
       console.error("Could not fetch analytics summary:", err);
     });
     return () => unsub();
-  }, []);
+  }, [authReady]);
 
   // Recent visit/login/signup log, most recent first.
   useEffect(() => {
+    if (!authReady) return;
     const q = query(
       collection(db, "site_visits"),
       orderBy("createdAt", "desc"),
@@ -244,7 +255,7 @@ export function AdminPanel({ language, currentUser, listings: listingsProp, isUs
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [authReady]);
 
   const handleResolveTicket = async (ticketId: string) => {
     setTicketActionLoadingId(ticketId);
