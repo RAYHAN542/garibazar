@@ -12,6 +12,14 @@ import { X, MapPin, Loader2, Sparkles, Camera, Phone, ArrowLeft } from "lucide-r
 import { CITIES } from "../translations";
 import { SupportedLanguage } from "../types";
 import { sanitizeText, validateBanglaPhone } from "../utils/sanitizer";
+
+const isInAppBrowser = typeof navigator !== "undefined" && /FBAN|FBAV|Instagram|Messenger/i.test(navigator.userAgent);
+
+const openInChrome = () => {
+  const targetUrl = window.location.href;
+  const intentUrl = `intent://${targetUrl.replace(/^https?:\/\//, "")}#Intent;scheme=https;package=com.android.chrome;end`;
+  window.location.href = intentUrl;
+};
 import { uploadToCloudinary } from "../utils/cloudinary";
 import { trackEvent } from "../utils/trackEvent";
 
@@ -441,6 +449,22 @@ export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModa
                 ? "গাড়ি বাজারে বিক্রি করতে বা কেনার জন্য সাইন-ইন করুন।"
                 : "Sign in to buy or sell on Gari Bazar."}
             </p>
+            {isInAppBrowser && (
+              <div className="p-3 bg-amber-500/10 text-amber-700 dark:text-amber-400 rounded-lg text-xs text-center space-y-2">
+                <p>
+                  {language === "bn"
+                    ? "এই ব্রাউজারে Google সাইন-ইন কাজ নাও করতে পারে। মোবাইল নম্বর দিয়ে সাইন-ইন করুন, অথবা Chrome-এ খুলুন।"
+                    : "Google sign-in may not work in this browser. Use your phone number, or open in Chrome."}
+                </p>
+                <button
+                  type="button"
+                  onClick={openInChrome}
+                  className="w-full py-2 px-3 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-lg text-xs"
+                >
+                  {language === "bn" ? "Chrome-এ খুলুন" : "Open in Chrome"}
+                </button>
+              </div>
+            )}
             <button
               type="button"
               onClick={handleGoogleSignIn}
