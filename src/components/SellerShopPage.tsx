@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { PartListing, SupportedLanguage } from "../types";
 import { X, MapPin, Phone, MessageSquare, Star, ShoppingBag, Search, Sparkles, Loader2, HeartHandshake } from "lucide-react";
-import { collection, query, where, getDocs, doc, getDoc, addDoc } from "firebase/firestore";
+import { collection, query, where, getDocs, doc, getDoc, addDoc, limit } from "firebase/firestore";
 import { db } from "../firebase";
 import { ListingCard } from "./ListingCard";
 
@@ -162,7 +162,8 @@ export function SellerShopPage({
       try {
         const q = query(
           collection(db, "listings"),
-          where("sellerId", "==", sellerId)
+          where("sellerId", "==", sellerId),
+          limit(30)
         );
         const snapshot = await getDocs(q);
         if (active) {
@@ -220,7 +221,8 @@ export function SellerShopPage({
       try {
         const q = query(
           collection(db, "seller_reviews"),
-          where("sellerId", "==", sellerId)
+          where("sellerId", "==", sellerId),
+          limit(20)
         );
         const snapshot = await getDocs(q);
         if (active) {

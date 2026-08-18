@@ -183,7 +183,9 @@ export function ChatView({ currentUser, language, onLoginPrompt, initialListingT
     setLoadingThreads(true);
     const q = query(
       collection(db, "chats"),
-      where("participants", "array-contains", currentUser.uid)
+      where("participants", "array-contains", currentUser.uid),
+      orderBy("lastMessageAt", "desc"),
+      limit(50)
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
