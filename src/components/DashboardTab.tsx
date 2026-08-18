@@ -10,7 +10,7 @@ import type { ActiveTab } from "./HeaderNav";
 
 const AdminPanel = lazy(() => import("./AdminPanel").then(m => ({ default: m.AdminPanel })));
 
-type DashboardSubTab = 'inventory' | 'ads' | 'admin' | 'my-shop';
+type DashboardSubTab = 'inventory' | 'saved' | 'ads' | 'admin' | 'my-shop';
 
 interface DashboardTabProps {
   language: SupportedLanguage;
@@ -136,6 +136,28 @@ export default function DashboardTab({
                   </button>
 
                   <button
+                    id="dash-subtab-saved"
+                    onClick={() => {
+                      setDashboardSubTab('saved');
+                      setAdPromoSuccess(false);
+                      setAdPromoError("");
+                    }}
+                    className={`px-3 py-2 rounded-full text-[11px] font-bold transition-all flex items-center gap-1 cursor-pointer relative shrink-0 whitespace-nowrap ${
+                      dashboardSubTab === 'saved'
+                        ? 'bg-amber-500 text-slate-950 shadow-sm'
+                        : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'
+                    }`}
+                  >
+                    <ShoppingBag className="w-3.5 h-3.5" />
+                    {language === "bn" ? "সংরক্ষিত" : "Saved"}
+                    {purchases.length > 0 && (
+                      <span className="bg-emerald-500 text-white font-extrabold text-[8px] px-1.5 py-0.5 rounded-full leading-none min-w-[14px] text-center">
+                        {purchases.length}
+                      </span>
+                    )}
+                  </button>
+
+                  <button
                     id="dash-subtab-myshop"
                     onClick={() => {
                       setDashboardSubTab('my-shop');
@@ -194,11 +216,8 @@ export default function DashboardTab({
                 </div>
 
                 {dashboardSubTab === 'inventory' && (
-                  /* 3. My Listings list vs Tracks Purchased items split layout */
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 animate-fade-in">
-                    
-                    {/* Left: Listings posted by currently logged in User */}
-                    <div className="space-y-4">
+                  /* 3. My Listings posted by the currently logged in user */
+                  <div className="space-y-4 animate-fade-in">
                       <h3 className="text-base font-bold text-slate-900 dark:text-white font-sans tracking-tight border-b border-slate-100 dark:border-slate-800 pb-2">
                         {language === "bn" ? "আমার কার পার্টস লিস্টিং" : "My Posted Car Parts"}
                       </h3>
@@ -279,18 +298,20 @@ export default function DashboardTab({
                           ))}
                         </div>
                       )}
-                    </div>
+                  </div>
+                )}
 
-                    {/* Right: Simulated Buyer Purchases and Order Tracking Desk */}
-                    <div className="space-y-4">
+                {dashboardSubTab === 'saved' && (
+                  /* Ads the user bookmarked from other sellers via "Save to Dashboard" */
+                  <div className="space-y-4 animate-fade-in">
                       <h4 className="text-base font-bold text-slate-900 dark:text-white font-sans tracking-tight border-b border-slate-100 dark:border-slate-800 pb-2 flex items-center gap-2">
                         <ShoppingBag className="w-4 h-4 text-emerald-500" />
-                        {language === "bn" ? "আমার অর্ডার ও ক্রুস ট্র্যাক" : "My Inquiries & Simulated Purchases"}
+                        {language === "bn" ? "সংরক্ষিত বিজ্ঞাপন" : "Saved Ads"}
                       </h4>
 
                       {purchases.length === 0 ? (
                         <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-850 p-4 text-center text-slate-500">
-                          <p className="text-xs">{language === "bn" ? "কোন অর্ডার বা কেনাকাটার ট্র্যাক ইতিহাস নেই!" : "Empty. Click 'Buy / Order This Part' on any detail card to simulate."}</p>
+                          <p className="text-xs">{language === "bn" ? "আপনি এখনো কোনো বিজ্ঞাপন সংরক্ষণ করেননি। যেকোনো পণ্যের পেজে 'ড্যাশবোর্ডে সংরক্ষণ করুন' বাটনে চাপুন।" : "You haven't saved any ads yet. Tap 'Save to Dashboard' on any listing to add it here."}</p>
                         </div>
                       ) : (
                         <div className="space-y-3">
@@ -322,7 +343,7 @@ export default function DashboardTab({
                                 <span className="text-xs font-black text-amber-500">{item.price ? `৳${item.price.toLocaleString("en-IN")}` : (language === "bn" ? "মূল্য জানতে যোগাযোগ করুন" : "Price on Request")}</span>
                                 <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-450 mt-1 flex items-center gap-1">
                                   <ShieldCheck className="w-3.5 h-3.5" />
-                                  {item.status || "Pending Delivery"}
+                                  {language === "bn" ? "সংরক্ষিত" : "Saved"}
                                 </span>
                               </div>
                             </div>
@@ -350,8 +371,6 @@ export default function DashboardTab({
                           )}
                         </div>
                       )}
-                    </div>
-
                   </div>
                 )}
 

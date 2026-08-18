@@ -125,7 +125,7 @@ export default function App() {
   }, [activeTab]);
   
   // Dashboard Sub-tab & Ad promotions center states
-  const [dashboardSubTab, setDashboardSubTab] = useState<'inventory' | 'ads' | 'admin' | 'playstore-audit' | 'my-shop'>('inventory');
+  const [dashboardSubTab, setDashboardSubTab] = useState<'inventory' | 'saved' | 'ads' | 'admin' | 'playstore-audit' | 'my-shop'>('inventory');
   
   // Seller Shop states
   const [activeSellerShopId, setActiveSellerShopId] = useState<string | null>(null);
