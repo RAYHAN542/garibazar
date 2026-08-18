@@ -101,6 +101,26 @@ const compressImageToBlob = async (file: File, maxWidth = 1200, maxHeight = 1200
   }
 };
 
+// বিবরণের লেখা থেকে জেলার নাম (ইংরেজি বা বাংলা) খুঁজে বের করে, ফিল্টার সিস্টেমের
+// জন্য প্রয়োজনীয় নির্দিষ্ট ফরম্যাটে রিটার্ন করে (যেমন: "Dhaka (ঢাকা)")।
+const detectLocationFromText = (text: string): string => {
+  if (!text) return "";
+  const lowerText = text.toLowerCase();
+  for (const city of CITIES) {
+    const match = city.match(/^([^(]+)\(([^)]+)\)$/);
+    if (!match) continue;
+    const enName = match[1].trim();
+    const bnName = match[2].trim();
+    if (bnName && text.includes(bnName)) return city;
+    if (enName && lowerText.includes(enName.toLowerCase())) return city;
+  }
+  // জেলার নাম সরাসরি না পেলে, থানা/উপজেলার নাম (যেমন "বনানী", "ভালুকা") দিয়ে
+  // চেষ্টা করে দেখো সেটা কোন জেলার অন্তর্গত।
+  const districtFromArea = detectDistrictFromArea(text);
+  if (districtFromArea) return districtFromArea;
+  return "";
+};
+
 // বিবরণের প্রথম অংশ থেকে একটা সংক্ষিপ্ত শিরোনাম বানায় (কার্ডে দেখানোর জন্য)।
 const deriveTitleFromDescription = (text: string): string => {
   const firstLine = text.split("\n")[0].trim();
