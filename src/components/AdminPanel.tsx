@@ -181,7 +181,8 @@ export function AdminPanel({ language, currentUser, listings: listingsProp, isUs
   useEffect(() => {
     const q = query(
       collection(db, "refill_requests"),
-      orderBy("createdAt", "desc")
+      orderBy("createdAt", "desc"),
+      limit(50)
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -203,7 +204,8 @@ export function AdminPanel({ language, currentUser, listings: listingsProp, isUs
   useEffect(() => {
     const q = query(
       collection(db, "support_tickets"),
-      orderBy("createdAt", "desc")
+      orderBy("createdAt", "desc"),
+      limit(50)
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {

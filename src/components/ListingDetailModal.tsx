@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { PartListing, SupportedLanguage } from "../types";
 import { X, MapPin, Sparkles, Play, SquarePlay, Flag, ShieldAlert, CheckCircle2, ChevronLeft, ChevronRight, Loader2, ShoppingBag, Star, User, MessageSquare, Send, Share2 } from "lucide-react";
-import { doc, getDoc, updateDoc, collection, addDoc, query, where, getDocs, increment } from "firebase/firestore";
+import { doc, getDoc, updateDoc, collection, addDoc, query, where, getDocs, increment, limit } from "firebase/firestore";
 import { db, logAnalyticsEvent } from "../firebase";
 import { getOptimizedImageUrl } from "../utils/cloudinary";
 
@@ -141,7 +141,8 @@ export function ListingDetailModal({ listing, language, currentUser, onClose, on
       try {
         const q = query(
           collection(db, "seller_reviews"),
-          where("sellerId", "==", sellerKey)
+          where("sellerId", "==", sellerKey),
+          limit(20)
         );
         const snapshot = await getDocs(q);
         if (active) {
@@ -837,7 +838,7 @@ export function ListingDetailModal({ listing, language, currentUser, onClose, on
                   <div className="w-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-450 py-3 px-5 rounded-xl font-bold text-xs text-center flex items-center justify-center gap-2">
                     <CheckCircle2 className="w-4 h-4 text-emerald-500 animate-pulse" />
                     <span>
-                      {language === "bn" ? "ড্যাশবোর্ডে সফলভাবে যুক্ত হয়েছে!" : "Successfully added to dashboard!"}
+                      {language === "bn" ? "ড্যাশবোর্ডের 'সংরক্ষিত' ট্যাবে যুক্ত হয়েছে!" : "Saved to your Dashboard's 'Saved' tab!"}
                     </span>
                   </div>
                 ) : (
@@ -853,7 +854,7 @@ export function ListingDetailModal({ listing, language, currentUser, onClose, on
                       <ShoppingBag className="w-4 h-4" />
                     )}
                     <span>
-                      {language === "bn" ? "যোগ করুন" : "Add to Dashboard"}
+                      {language === "bn" ? "ড্যাশবোর্ডে সংরক্ষণ করুন" : "Save to Dashboard"}
                     </span>
                   </button>
                 )}

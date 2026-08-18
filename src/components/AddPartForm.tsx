@@ -18,7 +18,7 @@ interface AddPartFormProps {
   onViewListing?: (listing: any) => void;
 }
 
-const compressImageToBlob = async (file: File, maxWidth = 1000, maxHeight = 1000): Promise<{ blob: Blob; dataUrl: string }> => {
+const compressImageToBlob = async (file: File, maxWidth = 1200, maxHeight = 1200): Promise<{ blob: Blob; dataUrl: string }> => {
   try {
     const isHeic = file.type === "image/heic" || file.type === "image/heif" || file.name.toLowerCase().endsWith(".heic");
     let sourceImg: ImageBitmap | HTMLImageElement;
@@ -71,13 +71,23 @@ const compressImageToBlob = async (file: File, maxWidth = 1000, maxHeight = 1000
       (sourceImg as ImageBitmap).close();
     }
 
-    const dataUrl = canvas.toDataURL("image/jpeg", 0.7);
-    const blob = await new Promise<Blob>((resolve, reject) => {
+    let blob = await new Promise<Blob>((resolve, reject) => {
       canvas.toBlob((b) => {
         if (b) resolve(b);
         else reject(new Error("Failed to convert canvas to Blob"));
-      }, "image/jpeg", 0.7);
+      }, "image/webp", 0.8);
     });
+
+    if (blob.type !== "image/webp") {
+      blob = await new Promise<Blob>((resolve, reject) => {
+        canvas.toBlob((b) => {
+          if (b) resolve(b);
+          else reject(new Error("Failed to convert canvas to Blob"));
+        }, "image/jpeg", 0.8);
+      });
+    }
+
+    const dataUrl = canvas.toDataURL("image/jpeg", 0.8);
 
     return { blob, dataUrl };
   } catch (err) {

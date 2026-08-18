@@ -1,0 +1,52 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && firestore.exists(/databases/(default)/documents/admins/$(request.auth.uid));
+    }
+
+    function isOwner(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    function isValidImage() {
+      return request.resource.contentType.matches('image/.*') &&
+             request.resource.size < 5 * 1024 * 1024;
+    }
+
+    // Listing images - public read, owner write
+    match /listings/{listingId}/{fileName} {
+      allow read: if true;
+      allow write: if isSignedIn() && isValidImage();
+      allow delete: if isSignedIn() && isAdmin();
+    }
+
+    // User profile images - public read, owner write
+    match /users/{uid}/profile/{fileName} {
+      allow read: if true;
+      allow write: if isOwner(uid) && isValidImage();
+    }
+
+    // Private user files - owner only
+    match /users/{uid}/private/{fileName} {
+      allow read, write: if isOwner(uid);
+    }
+
+    // Payment proofs - owner read, admin write
+    match /payments/{uid}/{fileName} {
+      allow read: if isOwner(uid) || isAdmin();
+      allow write: if isOwner(uid);
+      allow delete: if isAdmin();
+    }
+
+    // Default deny everything else
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

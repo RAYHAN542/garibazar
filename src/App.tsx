@@ -27,7 +27,6 @@ const AddPartForm = lazy(() => import("./components/AddPartForm").then(m => ({ d
 const RefillModal = lazy(() => import("./components/RefillModal").then(m => ({ default: m.RefillModal })));
 const AdminPanel = lazy(() => import("./components/AdminPanel").then(m => ({ default: m.AdminPanel })));
 const ChatView = lazy(() => import("./components/ChatView").then(m => ({ default: m.ChatView })));
-const PlayStoreDiagnostics = lazy(() => import("./components/PlayStoreDiagnostics").then(m => ({ default: m.PlayStoreDiagnostics })));
 const LegalHubModal = lazy(() => import("./components/LegalHubModal"));
 const PrivacyPolicyPage = lazy(() => import("./components/PrivacyPolicyPage"));
 const DataDeletionPage = lazy(() => import("./components/DataDeletionPage"));
@@ -126,7 +125,7 @@ export default function App() {
   }, [activeTab]);
   
   // Dashboard Sub-tab & Ad promotions center states
-  const [dashboardSubTab, setDashboardSubTab] = useState<'inventory' | 'ads' | 'admin' | 'playstore-audit' | 'my-shop'>('inventory');
+  const [dashboardSubTab, setDashboardSubTab] = useState<'inventory' | 'saved' | 'ads' | 'admin' | 'playstore-audit' | 'my-shop'>('inventory');
   
   // Seller Shop states
   const [activeSellerShopId, setActiveSellerShopId] = useState<string | null>(null);
@@ -594,6 +593,13 @@ export default function App() {
 
   // Searches & Filtering
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [selectedSubCategory, setSelectedSubCategory] = useState("all");
   const [selectedCity, setSelectedCity] = useState("all");
@@ -1574,8 +1580,8 @@ export default function App() {
   const filteredListings = useMemo(() => {
     let baseListings = enrichedListings;
     
-    if (searchQuery.trim().length > 0) {
-      const queryLower = searchQuery.toLowerCase();
+    if (debouncedSearchQuery.trim().length > 0) {
+      const queryLower = debouncedSearchQuery.toLowerCase();
       const queryEnglishDigits = convertBengaliDigitsToEnglish(queryLower);
       const queryBengaliDigits = convertEnglishDigitsToBengali(queryLower);
       
@@ -1743,7 +1749,7 @@ export default function App() {
         return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
       }
     });
-  }, [enrichedListings, fuseInstance, searchQuery, selectedCategory, selectedSubCategory, selectedCity, sortBy]);
+  }, [enrichedListings, fuseInstance, debouncedSearchQuery, selectedCategory, selectedSubCategory, selectedCity, sortBy]);
 
   // 8. Stats counting
   const statsSummary = useMemo(() => {

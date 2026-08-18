@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { collection, query, where, orderBy, onSnapshot, addDoc, serverTimestamp, doc, setDoc, updateDoc, arrayUnion, limit, increment } from "firebase/firestore";
-import { db } from "../firebase";
+import { db, auth } from "../firebase";
+import { onAuthStateChanged } from "firebase/auth";
 import { SupportedLanguage, PartListing } from "../types";
 import { Send, User, MessageSquare, ArrowLeft, Loader2, HeartHandshake, ShieldCheck } from "lucide-react";
 import { ImageWithFallback } from "./ImageWithFallback";
@@ -49,6 +50,14 @@ export function ChatView({ currentUser, language, onLoginPrompt, initialListingT
   const [msgLimit, setMsgLimit] = useState(20);
   const [hasMoreMessages, setHasMoreMessages] = useState(false);
   const prevLimitRef = useRef(20);
+
+  const [authReady, setAuthReady] = useState(!!auth.currentUser);
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, (u) => {
+      setAuthReady(!!u);
+    });
+    return () => unsub();
+  }, []);
 
   useEffect(() => {
     setMsgLimit(20);
@@ -166,7 +175,7 @@ export function ChatView({ currentUser, language, onLoginPrompt, initialListingT
 
   // 1. Fetch Chat Threads for current user in real-time
   useEffect(() => {
-    if (!currentUser?.uid) {
+    if (!currentUser?.uid || !authReady) {
       setLoadingThreads(false);
       return;
     }
@@ -174,7 +183,9 @@ export function ChatView({ currentUser, language, onLoginPrompt, initialListingT
     setLoadingThreads(true);
     const q = query(
       collection(db, "chats"),
-      where("participants", "array-contains", currentUser.uid)
+      where("participants", "array-contains", currentUser.uid),
+      orderBy("lastMessageAt", "desc"),
+      limit(50)
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -203,11 +214,11 @@ export function ChatView({ currentUser, language, onLoginPrompt, initialListingT
     });
 
     return () => unsubscribe();
-  }, [currentUser?.uid, initialListingToChat]);
+  }, [currentUser?.uid, initialListingToChat, authReady]);
 
   // 2. Fetch messages of active thread
   useEffect(() => {
-    if (!activeThread?.id) {
+    if (!activeThread?.id || !authReady) {
       setMessages([]);
       return;
     }
@@ -250,7 +261,7 @@ export function ChatView({ currentUser, language, onLoginPrompt, initialListingT
     });
 
     return () => unsubscribe();
-  }, [activeThread?.id, msgLimit]);
+  }, [activeThread?.id, msgLimit, authReady]);
 
   // Auto scroll to bottom when messages list size changes
   useEffect(() => {
