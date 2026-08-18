@@ -1,6 +1,17 @@
 import { initializeApp } from "firebase/app";
-import { getAuth, GoogleAuthProvider, FacebookAuthProvider, setPersistence, browserLocalPersistence, browserSessionPersistence } from "firebase/auth";
-import { initializeFirestore } from "firebase/firestore";
+import {
+  getAuth,
+  GoogleAuthProvider,
+  FacebookAuthProvider,
+  setPersistence,
+  browserLocalPersistence,
+  browserSessionPersistence,
+} from "firebase/auth";
+import {
+  initializeFirestore,
+  persistentLocalCache,
+  persistentMultipleTabManager,
+} from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 import { initializeAppCheck, ReCaptchaV3Provider } from "firebase/app-check";
 import { logger } from "./utils/logger";
@@ -64,9 +75,21 @@ setPersistence(auth, browserLocalPersistence).catch((err) => {
   });
 });
 
-export const db = initializeFirestore(app, {
-  experimentalAutoDetectLongPolling: true,
-});
+let db: ReturnType<typeof initializeFirestore>;
+try {
+  db = initializeFirestore(app, {
+    experimentalAutoDetectLongPolling: true,
+    localCache: persistentLocalCache({
+      tabManager: persistentMultipleTabManager(),
+    }),
+  });
+} catch (err) {
+  logger.debug("Persistent Firestore cache unavailable, using default in-memory cache:", err);
+  db = initializeFirestore(app, {
+    experimentalAutoDetectLongPolling: true,
+  });
+}
+export { db };
 
 export const storage = getStorage(app);
 
