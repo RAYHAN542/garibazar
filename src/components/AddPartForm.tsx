@@ -18,7 +18,7 @@ interface AddPartFormProps {
   onViewListing?: (listing: any) => void;
 }
 
-const compressImageToBlob = async (file: File, maxWidth = 1000, maxHeight = 1000): Promise<{ blob: Blob; dataUrl: string }> => {
+const compressImageToBlob = async (file: File, maxWidth = 1200, maxHeight = 1200): Promise<{ blob: Blob; dataUrl: string }> => {
   try {
     const isHeic = file.type === "image/heic" || file.type === "image/heif" || file.name.toLowerCase().endsWith(".heic");
     let sourceImg: ImageBitmap | HTMLImageElement;
@@ -71,13 +71,23 @@ const compressImageToBlob = async (file: File, maxWidth = 1000, maxHeight = 1000
       (sourceImg as ImageBitmap).close();
     }
 
-    const dataUrl = canvas.toDataURL("image/jpeg", 0.7);
-    const blob = await new Promise<Blob>((resolve, reject) => {
+    let blob = await new Promise<Blob>((resolve, reject) => {
       canvas.toBlob((b) => {
         if (b) resolve(b);
         else reject(new Error("Failed to convert canvas to Blob"));
-      }, "image/jpeg", 0.7);
+      }, "image/webp", 0.8);
     });
+
+    if (blob.type !== "image/webp") {
+      blob = await new Promise<Blob>((resolve, reject) => {
+        canvas.toBlob((b) => {
+          if (b) resolve(b);
+          else reject(new Error("Failed to convert canvas to Blob"));
+        }, "image/jpeg", 0.8);
+      });
+    }
+
+    const dataUrl = canvas.toDataURL("image/jpeg", 0.8);
 
     return { blob, dataUrl };
   } catch (err) {
@@ -89,26 +99,6 @@ const compressImageToBlob = async (file: File, maxWidth = 1000, maxHeight = 1000
     });
     return { blob: file, dataUrl };
   }
-};
-
-// বিবরণের লেখা থেকে জেলার নাম (ইংরেজি বা বাংলা) খুঁজে বের করে, ফিল্টার সিস্টেমের
-// জন্য প্রয়োজনীয় নির্দিষ্ট ফরম্যাটে রিটার্ন করে (যেমন: "Dhaka (ঢাকা)")।
-const detectLocationFromText = (text: string): string => {
-  if (!text) return "";
-  const lowerText = text.toLowerCase();
-  for (const city of CITIES) {
-    const match = city.match(/^([^(]+)\(([^)]+)\)$/);
-    if (!match) continue;
-    const enName = match[1].trim();
-    const bnName = match[2].trim();
-    if (bnName && text.includes(bnName)) return city;
-    if (enName && lowerText.includes(enName.toLowerCase())) return city;
-  }
-  // জেলার নাম সরাসরি না পেলে, থানা/উপজেলার নাম (যেমন "বনানী", "ভালুকা") দিয়ে
-  // চেষ্টা করে দেখো সেটা কোন জেলার অন্তর্গত।
-  const districtFromArea = detectDistrictFromArea(text);
-  if (districtFromArea) return districtFromArea;
-  return "";
 };
 
 // বিবরণের প্রথম অংশ থেকে একটা সংক্ষিপ্ত শিরোনাম বানায় (কার্ডে দেখানোর জন্য)।
