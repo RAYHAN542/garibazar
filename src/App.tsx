@@ -593,6 +593,13 @@ export default function App() {
 
   // Searches & Filtering
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [selectedSubCategory, setSelectedSubCategory] = useState("all");
   const [selectedCity, setSelectedCity] = useState("all");
@@ -1573,8 +1580,8 @@ export default function App() {
   const filteredListings = useMemo(() => {
     let baseListings = enrichedListings;
     
-    if (searchQuery.trim().length > 0) {
-      const queryLower = searchQuery.toLowerCase();
+    if (debouncedSearchQuery.trim().length > 0) {
+      const queryLower = debouncedSearchQuery.toLowerCase();
       const queryEnglishDigits = convertBengaliDigitsToEnglish(queryLower);
       const queryBengaliDigits = convertEnglishDigitsToBengali(queryLower);
       
@@ -1742,7 +1749,7 @@ export default function App() {
         return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
       }
     });
-  }, [enrichedListings, fuseInstance, searchQuery, selectedCategory, selectedSubCategory, selectedCity, sortBy]);
+  }, [enrichedListings, fuseInstance, debouncedSearchQuery, selectedCategory, selectedSubCategory, selectedCity, sortBy]);
 
   // 8. Stats counting
   const statsSummary = useMemo(() => {
