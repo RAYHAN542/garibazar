@@ -10,7 +10,6 @@ import {
 import {
   initializeFirestore,
   persistentLocalCache,
-  persistentMultipleTabManager,
 } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 import { initializeAppCheck, ReCaptchaV3Provider } from "firebase/app-check";
@@ -77,11 +76,14 @@ setPersistence(auth, browserLocalPersistence).catch((err) => {
 
 let db: ReturnType<typeof initializeFirestore>;
 try {
+  // single-tab persistent cache: avoids the multi-tab lease/lock negotiation
+  // that persistentMultipleTabManager() requires, which was adding several
+  // seconds of delay every time the app was reopened (Android often leaves
+  // the previous tab/process half-alive in the background, so a new session
+  // had to wait for that old tab's lock to expire before it could proceed).
   db = initializeFirestore(app, {
     experimentalAutoDetectLongPolling: true,
-    localCache: persistentLocalCache({
-      tabManager: persistentMultipleTabManager(),
-    }),
+    localCache: persistentLocalCache({}),
   });
 } catch (err) {
   logger.debug("Persistent Firestore cache unavailable, using default in-memory cache:", err);
