@@ -16,6 +16,7 @@ import { translations, CATEGORIES, SAMPLE_LISTINGS, AD_PACKAGES } from "./transl
 
 import { ListingCard } from "./components/ListingCard";
 import { HeaderNav } from "./components/HeaderNav";
+import MarketplaceTab from "./components/MarketplaceTab";
 // 📦 নিচের কম্পোনেন্টগুলো lazy-loaded — এগুলোর কোড শুধু তখনই ডাউনলোড হবে যখন
 // ইউজার সত্যিই সেই অংশে যাবে (modal খুলবে/ট্যাব বদলাবে), শুরুতেই না।
 const ListingDetailModal = lazy(() => import("./components/ListingDetailModal").then(m => ({ default: m.ListingDetailModal })));
@@ -34,7 +35,6 @@ const AboutContactPage = lazy(() => import("./components/AboutContactPage"));
 const SellerAnalyticsGraph = lazy(() => import("./components/SellerAnalyticsGraph"));
 const SellerShopPage = lazy(() => import("./components/SellerShopPage").then(m => ({ default: m.SellerShopPage })));
 const DashboardTab = lazy(() => import("./components/DashboardTab"));
-const MarketplaceTab = lazy(() => import("./components/MarketplaceTab"));
 import Fuse from "fuse.js";
 import { buildSearchBlob, convertBengaliDigitsToEnglish, convertEnglishDigitsToBengali, toPhoneticKey } from "./searchAliases";
 import { Moon, Sun, Users, HelpCircle, Mail, FileText, Menu } from "lucide-react";
@@ -946,11 +946,12 @@ export default function App() {
   }, []);
 
   // 2. Paginated Listings Sync (using getDocs instead of global real-time onSnapshot)
+  const INITIAL_FETCH_LIMIT = 20; // restored: 8 caused annoying repeated "Load More" clicks
   const fetchInitialListings = async () => {
     setLoading(true);
     const isProduction = checkIsProduction();
     try {
-      const q = query(collection(db, "listings"), orderBy("createdAt", "desc"), limit(20));
+      const q = query(collection(db, "listings"), orderBy("createdAt", "desc"), limit(INITIAL_FETCH_LIMIT));
       const snapshot = await getDocs(q);
       
       if (snapshot.empty) {
@@ -978,7 +979,7 @@ export default function App() {
         
         setFirebaseListings(list);
         setLastListingDoc(snapshot.docs[snapshot.docs.length - 1]);
-        setHasMoreListings(snapshot.docs.length === 20);
+        setHasMoreListings(snapshot.docs.length === INITIAL_FETCH_LIMIT);
       }
     } catch (error) {
       console.error("Firestore loading error:", error);
