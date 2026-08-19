@@ -449,33 +449,10 @@ export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModa
                 ? "গাড়ি বাজারে বিক্রি করতে বা কেনার জন্য সাইন-ইন করুন।"
                 : "Sign in to buy or sell on Gari Bazar."}
             </p>
-            {isInAppBrowser && (
-              <div className="p-3 bg-amber-500/10 text-amber-700 dark:text-amber-400 rounded-lg text-xs text-center space-y-2">
-                <p>
-                  {language === "bn"
-                    ? "এই ব্রাউজারে Google সাইন-ইন কাজ নাও করতে পারে। মোবাইল নম্বর দিয়ে সাইন-ইন করুন, অথবা Chrome-এ খুলুন।"
-                    : "Google sign-in may not work in this browser. Use your phone number, or open in Chrome."}
-                </p>
-                <button
-                  type="button"
-                  onClick={openInChrome}
-                  className="w-full py-2 px-3 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-lg text-xs"
-                >
-                  {language === "bn" ? "Chrome-এ খুলুন" : "Open in Chrome"}
-                </button>
-              </div>
-            )}
-            <button
-              type="button"
-              onClick={handleGoogleSignIn}
-              disabled={loading}
-              className="w-full py-3 px-4 bg-slate-50 hover:bg-slate-100 disabled:opacity-60 text-slate-800 font-semibold rounded-xl text-sm flex items-center justify-center gap-3 border border-slate-200 transition-colors dark:bg-slate-800 dark:hover:bg-slate-700/80 dark:text-white dark:border-slate-700"
-            >
-              <span className="w-8 h-8 rounded-full bg-white flex items-center justify-center shrink-0 shadow-sm">
-                {loading ? <Loader2 className="w-4 h-4 animate-spin text-slate-500" /> : <GoogleIcon />}
-              </span>
-              {language === "bn" ? "Google দিয়ে চালিয়ে যান" : "Continue with Google"}
-            </button>
+            {/* Google sign-in আপাতত hide করা আছে (Facebook in-app browser থেকে
+                কাজ করছিল না — Google-এর নিজস্ব নিরাপত্তা নীতির কারণে)। শুধু
+                handleGoogleSignIn / openInChrome / isInAppBrowser এখনো কোডে
+                রাখা হয়েছে, পরে দরকার হলে সহজেই আবার চালু করা যাবে। */}
             <button
               type="button"
               onClick={() => { setError(""); setStep("phone"); }}
