@@ -1,6 +1,6 @@
 // Bumping this forces every existing user's browser to drop the old cache
 // (which was serving stale index.html / old JS bundles after new deploys).
-const CACHE_NAME = 'gari-bazar-v2';
+const CACHE_NAME = 'gari-bazar-v3';
 const ASSETS_TO_CACHE = [
   '/manifest.json'
 ];
