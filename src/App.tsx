@@ -1065,6 +1065,68 @@ export default function App() {
     };
   }, [firebaseListings, moreListings, userMetadata?.blockedUids]);
 
+  // 2d. সার্চ করার সময় ব্যাকগ্রাউন্ডে বড় ব্যাচে সব পোস্ট এনে ফেলা — যাতে "Load More" বারবার
+  // চাপা না লাগে, সার্চের রেজাল্ট প্রায় সবসময় সম্পূর্ণ থাকে (বর্তমান স্কেলে যথেষ্ট)।
+  useEffect(() => {
+    if (!searchQuery.trim()) return;
+    if (!hasMoreListings) return; // সব পোস্ট ইতিমধ্যে লোড হয়ে গেছে
+
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      let currentLastDoc = lastListingDoc;
+      const MAX_BATCHES = 5; // সর্বোচ্চ ৫ × ১০০ = ৫০০ অতিরিক্ত পোস্ট আনা হবে
+      for (let i = 0; i < MAX_BATCHES && !cancelled && currentLastDoc; i++) {
+        try {
+          const q = query(
+            collection(db, "listings"),
+            orderBy("createdAt", "desc"),
+            startAfter(currentLastDoc),
+            limit(100)
+          );
+          const snapshot = await getDocs(q);
+          if (snapshot.empty) {
+            setHasMoreListings(false);
+            break;
+          }
+          const nextList: PartListing[] = [];
+          snapshot.forEach((doc) => {
+            const data = doc.data();
+            const normalizedCreatedAt = data.createdAt && typeof data.createdAt.toDate === "function"
+              ? data.createdAt.toDate().toISOString()
+              : data.createdAt;
+            nextList.push({ id: doc.id, ...data, createdAt: normalizedCreatedAt } as PartListing);
+          });
+
+          setMoreListings(prev => {
+            const combined = [...prev];
+            nextList.forEach(item => {
+              if (!combined.some(existing => existing.id === item.id)) {
+                combined.push(item);
+              }
+            });
+            return combined;
+          });
+
+          currentLastDoc = snapshot.docs[snapshot.docs.length - 1];
+          setLastListingDoc(currentLastDoc);
+
+          if (snapshot.docs.length < 100) {
+            setHasMoreListings(false);
+            break;
+          }
+        } catch (err) {
+          console.warn("Failed to prefetch listings for search:", err);
+          break;
+        }
+      }
+    }, 400);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [searchQuery, hasMoreListings]);
+
   // 2c. Listings Pagination Loader helper
   // NOTE: Firestore pagination fetches the next 20 listings of ANY category
   // (vehicles + parts mixed), but the visible list is filtered client-side by
