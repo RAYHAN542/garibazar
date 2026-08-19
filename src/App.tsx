@@ -809,49 +809,51 @@ export default function App() {
     }
   }, []);
 
-  // Fetch dynamic payment info from database for the dashboard
   useEffect(() => {
-    const docRef = doc(db, "settings", "payment_info");
-    const unsub = onSnapshot(docRef, (docSnap) => {
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        setOwnerPaymentInfo({
-          bkash: data.bkash || "01783457173 (Personal)",
-          nagad: data.nagad || "01783457173 (Personal)",
-          rocket: data.rocket || "01783457173 (Personal)"
-        });
+    const fetchPaymentInfo = async () => {
+      try {
+        const docSnap = await getDoc(doc(db, "settings", "payment_info"));
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          setOwnerPaymentInfo({
+            bkash: data.bkash || "01783457173 (Personal)",
+            nagad: data.nagad || "01783457173 (Personal)",
+            rocket: data.rocket || "01783457173 (Personal)"
+          });
+        }
+      } catch (err: any) {
+        console.warn("Dashboard using offline fallback/cached payment_info:", err.message);
       }
-    }, (err) => {
-      console.warn("Dashboard using offline fallback/cached payment_info:", err.message);
-    });
-    return () => unsub();
+    };
+    fetchPaymentInfo();
   }, []);
 
-  // Fetch reviews for the currently logged-in user to display in "My Shop"
   useEffect(() => {
     if (!user?.uid) {
       setCurrentUserReviews([]);
       return;
     }
     setCurrentUserReviewsLoading(true);
-    const q = query(
-      collection(db, "seller_reviews"),
-      where("sellerId", "==", user.uid)
-    );
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const list: any[] = [];
-      snapshot.forEach((docSnap) => {
-        list.push({ id: docSnap.id, ...docSnap.data() });
-      });
-      list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-      setCurrentUserReviews(list);
-      setCurrentUserReviewsLoading(false);
-    }, (err) => {
-      console.warn("Failed to subscribe to current user reviews:", err);
-      setCurrentUserReviewsLoading(false);
-    });
-
-    return () => unsubscribe();
+    const fetchReviews = async () => {
+      try {
+        const q = query(
+          collection(db, "seller_reviews"),
+          where("sellerId", "==", user.uid)
+        );
+        const snapshot = await getDocs(q);
+        const list: any[] = [];
+        snapshot.forEach((docSnap) => {
+          list.push({ id: docSnap.id, ...docSnap.data() });
+        });
+        list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+        setCurrentUserReviews(list);
+      } catch (err) {
+        console.warn("Failed to fetch current user reviews:", err);
+      } finally {
+        setCurrentUserReviewsLoading(false);
+      }
+    };
+    fetchReviews();
   }, [user?.uid]);
 
   // Sync profile metadata real-time (e.g. simulated credits recharge instantly)
@@ -925,24 +927,25 @@ export default function App() {
     return () => unsubscribe();
   }, [user?.uid]);
 
-  // 1c. সব লাইভ বুস্ট করা অ্যাড — হোমপেজের "Load More" পেজিনেশনের ওপর নির্ভর না করে সরাসরি fetch করা,
-  // যাতে পেজ লোড হওয়ার সাথে সাথেই বুস্ট ব্যানার দেখা যায়, Load More চাপার আগেই।
   useEffect(() => {
-    const q = query(collection(db, "listings"), where("isAd", "==", true));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const list: PartListing[] = [];
-      snapshot.forEach((docSnap) => {
-        const data = docSnap.data();
-        const normalizedCreatedAt = data.createdAt && typeof data.createdAt.toDate === "function"
-          ? data.createdAt.toDate().toISOString()
-          : data.createdAt;
-        list.push({ id: docSnap.id, ...data, createdAt: normalizedCreatedAt } as PartListing);
-      });
-      setAdListings(list);
-    }, (err) => {
-      logger.error("Failed to sync ad listings:", err);
-    });
-    return () => unsubscribe();
+    const fetchAdListings = async () => {
+      try {
+        const q = query(collection(db, "listings"), where("isAd", "==", true));
+        const snapshot = await getDocs(q);
+        const list: PartListing[] = [];
+        snapshot.forEach((docSnap) => {
+          const data = docSnap.data();
+          const normalizedCreatedAt = data.createdAt && typeof data.createdAt.toDate === "function"
+            ? data.createdAt.toDate().toISOString()
+            : data.createdAt;
+          list.push({ id: docSnap.id, ...data, createdAt: normalizedCreatedAt } as PartListing);
+        });
+        setAdListings(list);
+      } catch (err) {
+        logger.error("Failed to fetch ad listings:", err);
+      }
+    };
+    fetchAdListings();
   }, []);
 
   // 2. Paginated Listings Sync (using getDocs instead of global real-time onSnapshot)

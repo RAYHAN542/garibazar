@@ -36,20 +36,24 @@ export function RefillModal({ isOpen, onClose, currentUser, language }: RefillMo
   const [requests, setRequests] = useState<any[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(true);
 
-  // Listen to payment configuration from Firestore
   useEffect(() => {
     if (!isOpen) return;
-    const unsub = onSnapshot(doc(db, "settings", "payment_info"), (docSnap) => {
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        setPaymentConfig({
-          bkash: data.bkash || "01783457173 (Personal)",
-          nagad: data.nagad || "01783457173 (Personal)",
-          rocket: data.rocket || "01783457173 (Personal)"
-        });
+    const fetchPaymentInfo = async () => {
+      try {
+        const docSnap = await getDoc(doc(db, "settings", "payment_info"));
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          setPaymentConfig({
+            bkash: data.bkash || "01783457173 (Personal)",
+            nagad: data.nagad || "01783457173 (Personal)",
+            rocket: data.rocket || "01783457173 (Personal)"
+          });
+        }
+      } catch (err) {
+        console.warn("Could not fetch payment_info:", err);
       }
-    });
-    return () => unsub();
+    };
+    fetchPaymentInfo();
   }, [isOpen]);
 
   // Listen to user's refill state history in real-time
