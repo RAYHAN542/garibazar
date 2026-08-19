@@ -22,15 +22,68 @@
 <meta property="og:image:height" content="630" />
 <meta name="twitter:card" content="summary_large_image" />
 <meta name="twitter:image" content="https://garibazar.shop/og-banner.jpg" />
-    <!-- Preload Noto Sans Bengali -->
+    <!-- Preload Noto Sans Bengali (non-render-blocking) -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+Bengali:wght@400;500;600;700&display=swap" />
+    <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Noto+Sans+Bengali:wght@400;500;600;700&display=swap" onload="this.onload=null;this.rel='stylesheet'" />
+    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+Bengali:wght@400;500;600;700&display=swap" /></noscript>
       <!-- Google AdSense verification -->
     <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-3277203446788826" crossorigin="anonymous"></script>
+    <style>
+      /* Static splash shown instantly before JS loads/parses/runs.
+         React replaces this the moment it mounts. */
+      .gb-splash {
+        display: flex;
+        flex-direction: column;
+        min-height: 100vh;
+        background: #f8fafc;
+      }
+      .gb-splash-header {
+        height: 56px;
+        display: flex;
+        align-items: center;
+        padding: 0 16px;
+        border-bottom: 1px solid #e2e8f0;
+        font-weight: 700;
+        color: #f59e0b;
+        font-size: 18px;
+      }
+      .gb-splash-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 10px;
+        padding: 12px;
+      }
+      .gb-skel {
+        border-radius: 16px;
+        overflow: hidden;
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+      }
+      .gb-skel-img {
+        width: 100%;
+        aspect-ratio: 4 / 3;
+        background: #e2e8f0;
+        animation: gb-pulse 1.4s ease-in-out infinite;
+      }
+      .gb-skel-lines {
+        padding: 10px;
+      }
+      .gb-skel-line {
+        height: 10px;
+        border-radius: 6px;
+        background: #e2e8f0;
+        margin-bottom: 8px;
+        animation: gb-pulse 1.4s ease-in-out infinite;
+      }
+      @keyframes gb-pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.5; }
+      }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root"><div class="gb-splash"><div class="gb-splash-header">গাড়ি বাজার</div><div class="gb-splash-grid"><div class="gb-skel"><div class="gb-skel-img"></div><div class="gb-skel-lines"><div class="gb-skel-line" style="width:75%"></div><div class="gb-skel-line" style="width:50%"></div></div></div><div class="gb-skel"><div class="gb-skel-img"></div><div class="gb-skel-lines"><div class="gb-skel-line" style="width:75%"></div><div class="gb-skel-line" style="width:50%"></div></div></div><div class="gb-skel"><div class="gb-skel-img"></div><div class="gb-skel-lines"><div class="gb-skel-line" style="width:75%"></div><div class="gb-skel-line" style="width:50%"></div></div></div><div class="gb-skel"><div class="gb-skel-img"></div><div class="gb-skel-lines"><div class="gb-skel-line" style="width:75%"></div><div class="gb-skel-line" style="width:50%"></div></div></div></div></div></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
