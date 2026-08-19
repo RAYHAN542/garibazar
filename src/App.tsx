@@ -1860,22 +1860,25 @@ export default function App() {
       <main className="flex-1 max-w-7xl mx-auto w-full px-2.5 sm:px-4 md:px-6 lg:px-8 pt-0.5 pb-24 md:pt-4 md:pb-8">
         
         {loading && listings.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20">
-            <Loader2 className="w-10 h-10 animate-spin text-amber-500 mb-3" />
-            <p className="text-slate-500 font-medium text-sm">
-              {language === "bn" ? "গাড়ি বাজার লোড হচ্ছে..." : "Loading Gari Bazar..."}
-            </p>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2.5 sm:gap-4">
+            {Array.from({ length: 12 }).map((_, i) => (
+              <div
+                key={i}
+                className="rounded-2xl overflow-hidden bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex flex-col animate-pulse"
+              >
+                <div className="w-full aspect-[4/3] bg-slate-200 dark:bg-slate-800" />
+                <div className="p-2.5 space-y-2">
+                  <div className="h-3 w-3/4 rounded bg-slate-200 dark:bg-slate-800" />
+                  <div className="h-3 w-1/2 rounded bg-slate-200 dark:bg-slate-800" />
+                  <div className="h-4 w-2/3 rounded bg-slate-200 dark:bg-slate-800" />
+                </div>
+              </div>
+            ))}
           </div>
         ) : (
           <div>
-            {loading && listings.length > 0 && (
-              <div className="w-full bg-amber-500/10 text-amber-600 dark:text-amber-400 text-xs font-bold py-1.5 px-3 rounded-xl mb-3 flex items-center justify-between gap-2 animate-pulse">
-                <span className="flex items-center gap-1.5">
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  {language === "bn" ? "সার্ভার থেকে নতুন ডেটা লোড হচ্ছে..." : "Loading fresh listings from server..."}
-                </span>
-              </div>
-            )}
+            {/* Silent background refresh: cached posts already visible above,
+                so we intentionally show no banner/spinner here (like FB/YouTube resume) */}
             
             {/* TAB 1: MARKETPLACE */}
             {/* TAB 1: MARKETPLACE */}
