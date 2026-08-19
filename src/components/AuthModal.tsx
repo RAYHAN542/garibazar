@@ -205,7 +205,7 @@ export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModa
       // entirely since it completes and resolves in the same tab session.
       const popupResult = signInWithPopup(auth, googleProvider);
       const timeout = new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error("popup-timeout")), 15000);
+        setTimeout(() => reject(new Error("popup-timeout")), 30000);
       });
       const result = await Promise.race([popupResult, timeout]);
       await handlePostGoogleAuth(result.user);
