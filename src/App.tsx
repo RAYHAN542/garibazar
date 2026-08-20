@@ -779,7 +779,13 @@ export default function App() {
     } else {
       if (modalHistoryRef.current) {
         modalHistoryRef.current = false;
-        window.history.back();
+        // আগে এখানে window.history.back() কল করা হতো, যেটা নিজেই একটা popstate
+        // ইভেন্ট ট্রিগার করত (async)। ইউজার যদি ঠিক তখনই আসল ব্যাক বাটনও চাপে,
+        // দুটো popstate একসাথে race করে "দুইবার ব্যাক চাপা লাগে, তারপর hang"
+        // সমস্যা তৈরি করত। এখন শুধু বর্তমান entry-টাকে replaceState দিয়ে
+        // "consumed" হিসেবে চিহ্নিত করা হচ্ছে — কোনো navigation বা event ছাড়াই,
+        // তাই কোনো race থাকবে না।
+        window.history.replaceState({ ...window.history.state, modalOpen: false }, "");
       }
     }
 
