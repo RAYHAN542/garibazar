@@ -41,6 +41,7 @@ import { Moon, Sun, Users, HelpCircle, Mail, FileText, Menu } from "lucide-react
 import vehicleCardImg from "./assets/images/vehicle-card-new.png";
 import partsCardImg from "./assets/images/parts-card-new.png";
 
+import { Analytics } from "@vercel/analytics/react";
 const HOME_CATEGORIES = [
   { id: "all", bnName: "সব ক্যাটাগরি", enName: "All Categories" },
   { id: "vehicles", bnName: "গাড়ি ও ভারী যন্ত্রপাতি", enName: "Vehicles & Equipment" },
@@ -2791,6 +2792,8 @@ export default function App() {
       )}
       </Suspense>
 
+      {/* Vercel Web Analytics */}
+      <Analytics />
     </div>
   );
 }
