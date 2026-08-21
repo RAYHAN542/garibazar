@@ -772,7 +772,24 @@ export default function App() {
     if (isAnyModalOpen) {
       if (!modalHistoryRef.current) {
         tabWhenModalOpenedRef.current = activeTab;
-        window.history.pushState({ modalOpen: true }, "");
+        // যখন আগের মডাল X বাটনে বন্ধ হয়েছিল, তখন নিচের else ব্লক নতুন কোনো
+        // entry push না করে বর্তমান entry-টাকেই "modalOpen: false" দিয়ে
+        // replaceState করেছিল (race এড়াতে)। ফলে ওই entry-টা history স্ট্যাকে
+        // অব্যবহৃত অবস্থায় থেকে যেত। পরের বার মডাল খুললে যদি আমরা আবার নতুন
+        // entry push করি, তাহলে প্রতিটা X-বন্ধ + পুনরায়-খোলা চক্রে স্ট্যাকে
+        // একটা করে "ভুতুড়ে" entry জমতে থাকে — এতে ব্যাক বাটনে একবার চাপলে
+        // কিছুই হয় না (সেই ভুতুড়ে entry-টা silently consume হয়), দ্বিতীয়বার
+        // চাপলে আসল নেভিগেশন হয়, এবং যথেষ্ট entry জমে গেলে স্ট্যাক ফুরিয়ে
+        // অ্যাপ পুরো reload হয়ে হোমপেজে চলে যায়। এড়াতে: বর্তমান entry যদি
+        // ইতিমধ্যে সেই "বন্ধ হওয়া মডাল"-এর ভুতুড়ে entry হয়, তাহলে নতুন push না
+        // করে সেটাকেই replaceState দিয়ে "modalOpen: true" বানিয়ে পুনরায় ব্যবহার
+        // করা হচ্ছে — স্ট্যাক আর বাড়ছে না।
+        const currentState = window.history.state as { modalOpen?: boolean } | null;
+        if (currentState && currentState.modalOpen === false) {
+          window.history.replaceState({ ...currentState, modalOpen: true }, "");
+        } else {
+          window.history.pushState({ modalOpen: true }, "");
+        }
         modalHistoryRef.current = true;
       }
       window.addEventListener("popstate", handlePopState);
