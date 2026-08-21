@@ -10,6 +10,28 @@ service cloud.firestore {
       return isSignedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
     }
 
+    // ---------- RATE LIMITING HELPERS ----------
+    // Client-direct writes (creating a listing, sending a chat message) have
+    // no server in front of them to throttle, so the cooldown itself has to
+    // live in these rules: each action reads the user's own userLimits doc
+    // and refuses the write if it happened too recently. The write that
+    // records the new timestamp is a separate write in the SAME batch (see
+    // AddPartForm.tsx / ChatView.tsx), validated below by the userLimits
+    // rules so a client can't just claim an old timestamp to dodge this.
+    function listingCooldownPassed() {
+      let path = /databases/$(database)/documents/userLimits/$(request.auth.uid);
+      return !exists(path) ||
+             !('lastListingCreatedAt' in get(path).data) ||
+             request.time.toMillis() - get(path).data.lastListingCreatedAt.toMillis() >= 30000;
+    }
+
+    function messageCooldownPassed() {
+      let path = /databases/$(database)/documents/userLimits/$(request.auth.uid);
+      return !exists(path) ||
+             !('lastMessageAt' in get(path).data) ||
+             request.time.toMillis() - get(path).data.lastMessageAt.toMillis() >= 2000;
+    }
+
     // ---------- USERS ----------
     match /users/{userId} {
       allow read: if isSignedIn() && (userId == request.auth.uid || isAdmin());
@@ -44,7 +66,8 @@ service cloud.firestore {
                     request.resource.data.title.size() > 0 &&
                     request.resource.data.title.size() < 200 &&
                     request.resource.data.description is string &&
-                    request.resource.data.description.size() < 3000;
+                    request.resource.data.description.size() < 3000 &&
+                    listingCooldownPassed();
 
       // Owner can edit their listing but cannot self-promote (isAd/adTier/etc are admin-only).
       allow update: if isSignedIn() && (
@@ -67,7 +90,71 @@ service cloud.firestore {
                     request.resource.data.diff(resource.data).affectedKeys().hasOnly(['clicks']) &&
                     request.resource.data.clicks == (resource.data.clicks is number ? resource.data.clicks : 0) + 1;
 
-      allow delete: if isSignedIn() && (resource.data.sellerId == request.auth.uid || isAdmin());
+      // Hard delete is admin-only now. Sellers "delete" their own listing by
+      // setting isDeleted/deletedAt via the update rule above instead --
+      // that's a soft delete with a 30-day recovery window, permanently
+      // purged later by /api/cron/data-retention-cleanup (Admin SDK, bypasses
+      // these rules entirely, so no rule is needed for that job itself).
+      allow delete: if isAdmin();
+
+      // ---------- DISTRIBUTED VIEW/SAVE COUNTER SHARDS ----------
+      // Instead of writing "views"/a save-count directly onto the listing
+      // document (which only reliably sustains ~1 write/second), each
+      // increment goes to one of several small shard documents chosen at
+      // random. A scheduled job (Admin SDK, bypasses these rules) sums the
+      // shards and refreshes listing.views / listing.savedCount every few
+      // minutes. Clients never read shard docs directly, only the admin
+      // aggregation job does, so read is locked down entirely.
+      match /counterShards/{shardId} {
+        allow read: if false;
+
+        // First write to a shard: bootstrapping either counter at exactly 1.
+        allow create: if (request.resource.data.keys().hasOnly(['views']) &&
+                           request.resource.data.views == 1) ||
+                          (isSignedIn() &&
+                           request.resource.data.keys().hasOnly(['saved']) &&
+                           request.resource.data.saved == 1);
+
+        // Subsequent writes: bump exactly one of the two counters by exactly
+        // +/-1 (views: visitors only ever add; saved: signed-in users can
+        // add when saving or subtract when un-saving).
+        allow update: if (
+                        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['views']) &&
+                        request.resource.data.views == (resource.data.views is number ? resource.data.views : 0) + 1
+                      ) || (
+                        isSignedIn() &&
+                        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['saved']) &&
+                        (
+                          request.resource.data.saved == (resource.data.saved is number ? resource.data.saved : 0) + 1 ||
+                          request.resource.data.saved == (resource.data.saved is number ? resource.data.saved : 0) - 1
+                        )
+                      );
+
+        allow delete: if false;
+      }
+    }
+
+    // ---------- RATE LIMIT TRACKING (one doc per user) ----------
+    // Written in the same batch as the action it's timestamping (see
+    // AddPartForm.tsx, ChatView.tsx) so the two either both succeed or both
+    // fail together. Only the field being changed right now is required to
+    // equal request.time -- otherwise re-saving one field would also force
+    // an untouched older timestamp on the other field to magically become
+    // "now", which would silently defeat that field's own cooldown.
+    match /userLimits/{uid} {
+      allow read: if isSignedIn() && request.auth.uid == uid;
+
+      allow create: if isSignedIn() && request.auth.uid == uid &&
+                    request.resource.data.keys().hasOnly(['lastListingCreatedAt', 'lastMessageAt']) &&
+                    (!('lastListingCreatedAt' in request.resource.data) || request.resource.data.lastListingCreatedAt == request.time) &&
+                    (!('lastMessageAt' in request.resource.data) || request.resource.data.lastMessageAt == request.time);
+
+      allow update: if isSignedIn() && request.auth.uid == uid &&
+                    request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastListingCreatedAt', 'lastMessageAt']) &&
+                    (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['lastListingCreatedAt']) || request.resource.data.lastListingCreatedAt == request.time) &&
+                    (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['lastMessageAt']) || request.resource.data.lastMessageAt == request.time);
+
+      allow delete: if false;
     }
 
     // ---------- REFILL / AD-PROMOTION REQUESTS ----------
@@ -115,7 +202,8 @@ service cloud.firestore {
                     (request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participants);
         allow create: if isSignedIn() &&
                       (request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participants) &&
-                      request.resource.data.senderId == request.auth.uid;
+                      request.resource.data.senderId == request.auth.uid &&
+                      messageCooldownPassed();
         allow update, delete: if isAdmin();
       }
     }

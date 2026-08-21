@@ -8,7 +8,8 @@ import { auth, db, logAnalyticsEvent } from "./firebase";
 import { logger } from "./utils/logger";
 import { trackEvent } from "./utils/trackEvent";
 import { signOut } from "firebase/auth";
-import { collection, onSnapshot, query, orderBy, getDocs, doc, getDoc, updateDoc, where, addDoc, deleteDoc, limit, startAfter, DocumentSnapshot, increment } from "firebase/firestore";
+import { collection, onSnapshot, query, orderBy, getDocs, doc, getDoc, updateDoc, where, addDoc, serverTimestamp, limit, startAfter, DocumentSnapshot } from "firebase/firestore";
+import { incrementListingViewShard } from "./utils/counters";
 import { Car, Search, User, LogOut, Globe, Loader2, ShoppingBag, Phone, ChevronRight, ShieldCheck, Send, Check } from "lucide-react";
 
 import { PartListing, SupportedLanguage } from "./types";
@@ -779,13 +780,7 @@ export default function App() {
     } else {
       if (modalHistoryRef.current) {
         modalHistoryRef.current = false;
-        // আগে এখানে window.history.back() কল করা হতো, যেটা নিজেই একটা popstate
-        // ইভেন্ট ট্রিগার করত (async)। ইউজার যদি ঠিক তখনই আসল ব্যাক বাটনও চাপে,
-        // দুটো popstate একসাথে race করে "দুইবার ব্যাক চাপা লাগে, তারপর hang"
-        // সমস্যা তৈরি করত। এখন শুধু বর্তমান entry-টাকে replaceState দিয়ে
-        // "consumed" হিসেবে চিহ্নিত করা হচ্ছে — কোনো navigation বা event ছাড়াই,
-        // তাই কোনো race থাকবে না।
-        window.history.replaceState({ ...window.history.state, modalOpen: false }, "");
+        window.history.back();
       }
     }
 
@@ -815,51 +810,49 @@ export default function App() {
     }
   }, []);
 
+  // Fetch dynamic payment info from database for the dashboard
   useEffect(() => {
-    const fetchPaymentInfo = async () => {
-      try {
-        const docSnap = await getDoc(doc(db, "settings", "payment_info"));
-        if (docSnap.exists()) {
-          const data = docSnap.data();
-          setOwnerPaymentInfo({
-            bkash: data.bkash || "01783457173 (Personal)",
-            nagad: data.nagad || "01783457173 (Personal)",
-            rocket: data.rocket || "01783457173 (Personal)"
-          });
-        }
-      } catch (err: any) {
-        console.warn("Dashboard using offline fallback/cached payment_info:", err.message);
+    const docRef = doc(db, "settings", "payment_info");
+    const unsub = onSnapshot(docRef, (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        setOwnerPaymentInfo({
+          bkash: data.bkash || "01783457173 (Personal)",
+          nagad: data.nagad || "01783457173 (Personal)",
+          rocket: data.rocket || "01783457173 (Personal)"
+        });
       }
-    };
-    fetchPaymentInfo();
+    }, (err) => {
+      console.warn("Dashboard using offline fallback/cached payment_info:", err.message);
+    });
+    return () => unsub();
   }, []);
 
+  // Fetch reviews for the currently logged-in user to display in "My Shop"
   useEffect(() => {
     if (!user?.uid) {
       setCurrentUserReviews([]);
       return;
     }
     setCurrentUserReviewsLoading(true);
-    const fetchReviews = async () => {
-      try {
-        const q = query(
-          collection(db, "seller_reviews"),
-          where("sellerId", "==", user.uid)
-        );
-        const snapshot = await getDocs(q);
-        const list: any[] = [];
-        snapshot.forEach((docSnap) => {
-          list.push({ id: docSnap.id, ...docSnap.data() });
-        });
-        list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-        setCurrentUserReviews(list);
-      } catch (err) {
-        console.warn("Failed to fetch current user reviews:", err);
-      } finally {
-        setCurrentUserReviewsLoading(false);
-      }
-    };
-    fetchReviews();
+    const q = query(
+      collection(db, "seller_reviews"),
+      where("sellerId", "==", user.uid)
+    );
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const list: any[] = [];
+      snapshot.forEach((docSnap) => {
+        list.push({ id: docSnap.id, ...docSnap.data() });
+      });
+      list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      setCurrentUserReviews(list);
+      setCurrentUserReviewsLoading(false);
+    }, (err) => {
+      console.warn("Failed to subscribe to current user reviews:", err);
+      setCurrentUserReviewsLoading(false);
+    });
+
+    return () => unsubscribe();
   }, [user?.uid]);
 
   // Sync profile metadata real-time (e.g. simulated credits recharge instantly)
@@ -921,6 +914,7 @@ export default function App() {
       const list: PartListing[] = [];
       snapshot.forEach((docSnap) => {
         const data = docSnap.data();
+        if (data.isDeleted === true) return; // soft-deleted, in its 30-day recovery window
         const normalizedCreatedAt = data.createdAt && typeof data.createdAt.toDate === "function"
           ? data.createdAt.toDate().toISOString()
           : data.createdAt;
@@ -933,25 +927,25 @@ export default function App() {
     return () => unsubscribe();
   }, [user?.uid]);
 
+  // 1c. সব লাইভ বুস্ট করা অ্যাড — হোমপেজের "Load More" পেজিনেশনের ওপর নির্ভর না করে সরাসরি fetch করা,
+  // যাতে পেজ লোড হওয়ার সাথে সাথেই বুস্ট ব্যানার দেখা যায়, Load More চাপার আগেই।
   useEffect(() => {
-    const fetchAdListings = async () => {
-      try {
-        const q = query(collection(db, "listings"), where("isAd", "==", true));
-        const snapshot = await getDocs(q);
-        const list: PartListing[] = [];
-        snapshot.forEach((docSnap) => {
-          const data = docSnap.data();
-          const normalizedCreatedAt = data.createdAt && typeof data.createdAt.toDate === "function"
-            ? data.createdAt.toDate().toISOString()
-            : data.createdAt;
-          list.push({ id: docSnap.id, ...data, createdAt: normalizedCreatedAt } as PartListing);
-        });
-        setAdListings(list);
-      } catch (err) {
-        logger.error("Failed to fetch ad listings:", err);
-      }
-    };
-    fetchAdListings();
+    const q = query(collection(db, "listings"), where("isAd", "==", true));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const list: PartListing[] = [];
+      snapshot.forEach((docSnap) => {
+        const data = docSnap.data();
+        if (data.isDeleted === true) return;
+        const normalizedCreatedAt = data.createdAt && typeof data.createdAt.toDate === "function"
+          ? data.createdAt.toDate().toISOString()
+          : data.createdAt;
+        list.push({ id: docSnap.id, ...data, createdAt: normalizedCreatedAt } as PartListing);
+      });
+      setAdListings(list);
+    }, (err) => {
+      logger.error("Failed to sync ad listings:", err);
+    });
+    return () => unsubscribe();
   }, []);
 
   // 2. Paginated Listings Sync (using getDocs instead of global real-time onSnapshot)
@@ -1043,6 +1037,12 @@ export default function App() {
       const blocked = getBlockedUids();
       let filtered = combined.filter(item => !blocked.includes(item.sellerId));
 
+      // Filter out soft-deleted listings (isDeleted:true) -- these are kept
+      // in Firestore for a 30-day recovery window (see the delete handler
+      // and /api/cron/data-retention-cleanup) but should never be visible
+      // anywhere in the app, same as if they were already gone.
+      filtered = filtered.filter(item => item.isDeleted !== true);
+
       // Filter out demo/sample/mock listings in production
       if (isProduction) {
         filtered = filtered.filter(item => {
@@ -1073,68 +1073,6 @@ export default function App() {
       window.removeEventListener("storage", handleLocalSync);
     };
   }, [firebaseListings, moreListings, userMetadata?.blockedUids]);
-
-  // 2d. সার্চ করার সময় ব্যাকগ্রাউন্ডে বড় ব্যাচে সব পোস্ট এনে ফেলা — যাতে "Load More" বারবার
-  // চাপা না লাগে, সার্চের রেজাল্ট প্রায় সবসময় সম্পূর্ণ থাকে (বর্তমান স্কেলে যথেষ্ট)।
-  useEffect(() => {
-    if (!searchQuery.trim()) return;
-    if (!hasMoreListings) return; // সব পোস্ট ইতিমধ্যে লোড হয়ে গেছে
-
-    let cancelled = false;
-    const timer = setTimeout(async () => {
-      let currentLastDoc = lastListingDoc;
-      const MAX_BATCHES = 5; // সর্বোচ্চ ৫ × ১০০ = ৫০০ অতিরিক্ত পোস্ট আনা হবে
-      for (let i = 0; i < MAX_BATCHES && !cancelled && currentLastDoc; i++) {
-        try {
-          const q = query(
-            collection(db, "listings"),
-            orderBy("createdAt", "desc"),
-            startAfter(currentLastDoc),
-            limit(100)
-          );
-          const snapshot = await getDocs(q);
-          if (snapshot.empty) {
-            setHasMoreListings(false);
-            break;
-          }
-          const nextList: PartListing[] = [];
-          snapshot.forEach((doc) => {
-            const data = doc.data();
-            const normalizedCreatedAt = data.createdAt && typeof data.createdAt.toDate === "function"
-              ? data.createdAt.toDate().toISOString()
-              : data.createdAt;
-            nextList.push({ id: doc.id, ...data, createdAt: normalizedCreatedAt } as PartListing);
-          });
-
-          setMoreListings(prev => {
-            const combined = [...prev];
-            nextList.forEach(item => {
-              if (!combined.some(existing => existing.id === item.id)) {
-                combined.push(item);
-              }
-            });
-            return combined;
-          });
-
-          currentLastDoc = snapshot.docs[snapshot.docs.length - 1];
-          setLastListingDoc(currentLastDoc);
-
-          if (snapshot.docs.length < 100) {
-            setHasMoreListings(false);
-            break;
-          }
-        } catch (err) {
-          console.warn("Failed to prefetch listings for search:", err);
-          break;
-        }
-      }
-    }, 400);
-
-    return () => {
-      cancelled = true;
-      clearTimeout(timer);
-    };
-  }, [searchQuery, hasMoreListings]);
 
   // 2c. Listings Pagination Loader helper
   // NOTE: Firestore pagination fetches the next 20 listings of ANY category
@@ -1411,7 +1349,10 @@ export default function App() {
         // Dispatch local event to refresh state
         window.dispatchEvent(new Event("storage"));
       } else {
-        await deleteDoc(doc(db, "listings", itemId));
+        await updateDoc(doc(db, "listings", itemId), {
+          isDeleted: true,
+          deletedAt: serverTimestamp(),
+        });
       }
     } catch (err) {
       console.error("Error deleting listing:", err);
@@ -1517,9 +1458,8 @@ export default function App() {
     setSelectedListing(listing);
 
     try {
-      const listingRef = doc(db, "listings", listing.id);
       const newViews = (listing.views || 0) + 1;
-      await updateDoc(listingRef, { views: increment(1) });
+      incrementListingViewShard(listing.id);
       setListings((prev) =>
         prev.map((item) =>
           item.id === listing.id ? { ...item, views: newViews } : item

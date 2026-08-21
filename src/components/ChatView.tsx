@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { collection, query, where, orderBy, onSnapshot, addDoc, serverTimestamp, doc, setDoc, updateDoc, arrayUnion, limit, increment } from "firebase/firestore";
+import { collection, query, where, orderBy, onSnapshot, serverTimestamp, doc, setDoc, updateDoc, arrayUnion, limit, increment, writeBatch } from "firebase/firestore";
 import { db, auth } from "../firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import { SupportedLanguage, PartListing } from "../types";
@@ -42,6 +42,7 @@ export function ChatView({ currentUser, language, onLoginPrompt, initialListingT
   const [activeThread, setActiveThread] = useState<ChatThread | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [newMessage, setNewMessage] = useState("");
+  const [sendCooldownNotice, setSendCooldownNotice] = useState(false);
   const [loadingThreads, setLoadingThreads] = useState(true);
   const [loadingMessages, setLoadingMessages] = useState(false);
   const pendingMessagesRef = useRef<ChatMessage[]>([]);
@@ -350,25 +351,47 @@ export function ChatView({ currentUser, language, onLoginPrompt, initialListingT
 
     try {
       const chatDocRef = doc(db, "chats", activeThread.id);
-      
-      // Write message to subcollection
-      await addDoc(collection(chatDocRef, "messages"), {
+      const partnerId = activeThread.buyerId === currentUser.uid ? activeThread.sellerId : activeThread.buyerId;
+
+      // Both writes below must succeed or fail together -- otherwise a
+      // message could be saved to the subcollection while the thread's
+      // lastMessage/unreadCount update is lost (e.g. a dropped connection
+      // between the two calls), leaving the recipient's chat list showing a
+      // stale preview and no unread badge for a message that did arrive.
+      const batch = writeBatch(db);
+
+      const newMessageRef = doc(collection(chatDocRef, "messages"));
+      batch.set(newMessageRef, {
         senderId: currentUser.uid,
         text: finalMsg,
         createdAt: serverTimestamp(),
         participants: [activeThread.buyerId, activeThread.sellerId]
       });
 
-      // Update parent summary info
-      const partnerId = activeThread.buyerId === currentUser.uid ? activeThread.sellerId : activeThread.buyerId;
-      await updateDoc(chatDocRef, {
+      batch.update(chatDocRef, {
         lastMessage: finalMsg,
         lastMessageAt: serverTimestamp(),
         [`unreadCount.${partnerId}`]: increment(1)
       });
 
-    } catch (e) {
+      // Same batch as the message itself -- this is what the firestore.rules
+      // cooldown reads on the *next* send attempt, so a half-committed batch
+      // can never leave a message sent without its cooldown timer starting.
+      batch.set(doc(db, "userLimits", currentUser.uid), { lastMessageAt: serverTimestamp() }, { merge: true });
+
+      await batch.commit();
+
+    } catch (e: any) {
       console.error("Error sending message:", e);
+      // Roll back the optimistic bubble we added above -- it never actually
+      // saved, so leaving it on screen would look like a sent message that
+      // silently vanishes for the other person.
+      pendingMessagesRef.current = pendingMessagesRef.current.filter((m) => m.id !== tempMsg.id);
+      setMessages((prev) => prev.filter((m) => m.id !== tempMsg.id));
+      if (e?.code === "permission-denied") {
+        setSendCooldownNotice(true);
+        setTimeout(() => setSendCooldownNotice(false), 2500);
+      }
     }
   };
 
@@ -587,6 +610,14 @@ export function ChatView({ currentUser, language, onLoginPrompt, initialListingT
               )}
               <div ref={messagesEndRef} />
             </div>
+
+            {sendCooldownNotice && (
+              <div className="px-4 py-1.5 bg-amber-500/10 border-t border-amber-500/20 text-center">
+                <span className="text-[10px] font-semibold text-amber-500">
+                  {language === "bn" ? "একটু ধীরে — কয়েক সেকেন্ড পর আবার পাঠান" : "Slow down — try sending again in a moment"}
+                </span>
+              </div>
+            )}
 
             {/* PRESETS PANEL FOR SPEED negotiations */}
             <div className="px-4 py-2 border-t border-slate-800 bg-slate-950/30 flex gap-2 overflow-x-auto whitespace-nowrap scrollbar-none select-none">
