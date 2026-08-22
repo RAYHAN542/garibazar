@@ -10,7 +10,7 @@ import { trackEvent } from "./utils/trackEvent";
 import { signOut } from "firebase/auth";
 import { collection, onSnapshot, query, orderBy, getDocs, doc, getDoc, updateDoc, where, addDoc, serverTimestamp, limit, startAfter, DocumentSnapshot } from "firebase/firestore";
 import { incrementListingView } from "./utils/counters";
-import { Car, Search, User, LogOut, Globe, Loader2, ShoppingBag, Phone, ChevronRight, ShieldCheck, Send, Check } from "lucide-react";
+import { Car, Search, User, LogOut, Globe, Loader2, ShoppingBag, Phone, ChevronRight, ShieldCheck, Send, Check, Download, Smartphone } from "lucide-react";
 
 import { PartListing, SupportedLanguage } from "./types";
 import { translations, CATEGORIES, SAMPLE_LISTINGS, AD_PACKAGES } from "./translations";
@@ -2117,6 +2117,28 @@ export default function App() {
                     </div>
                   </div>
                 </div>
+
+                {/* A2. Download Android App banner */}
+                <a
+                  href="/gari-bazar.apk"
+                  download
+                  className="flex items-center gap-3.5 bg-gradient-to-br from-amber-500 to-orange-600 rounded-3xl p-5 shadow-sm text-white"
+                >
+                  <div className="w-11 h-11 rounded-2xl bg-white/20 flex items-center justify-center shrink-0">
+                    <Smartphone className="w-6 h-6" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm sm:text-base font-extrabold leading-tight">
+                      {language === "bn" ? "অ্যান্ড্রয়েড অ্যাপ ডাউনলোড করুন" : "Download our Android App"}
+                    </p>
+                    <p className="text-[11px] sm:text-xs text-white/80 font-semibold mt-0.5">
+                      {language === "bn" ? "দ্রুত ও সহজভাবে ব্যবহার করুন, ইনস্টল করে নিন" : "Faster, easier - install it now"}
+                    </p>
+                  </div>
+                  <div className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center shrink-0">
+                    <Download className="w-4.5 h-4.5" />
+                  </div>
+                </a>
 
                 {/* B. Settings Menu List styling modeled on user's Settings screenshot */}
                 <div className="bg-white dark:bg-slate-900 border border-slate-150/80 dark:border-slate-800 rounded-3xl shadow-sm overflow-hidden divide-y divide-slate-100 dark:divide-slate-800/60">
