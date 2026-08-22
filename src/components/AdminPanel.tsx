@@ -236,8 +236,18 @@ export function AdminPanel({ language, currentUser, listings: listingsProp, isUs
     if (!authReady) return;
     const fetchStats = async () => {
       try {
-        const docSnap = await getDoc(doc(db, "analytics_stats", "summary"));
-        setAnalyticsStats(docSnap.exists() ? (docSnap.data() as any) : {});
+        // Totals are now spread across 10 shard docs (see api/track-event.ts) to
+        // avoid a single hot document under real concurrent traffic. Sum all
+        // shards client-side to get the true total.
+        const shardsSnap = await getDocs(collection(db, "analytics_stats", "summary", "shards"));
+        const totals: any = { totalVisits: 0, totalLogins: 0, totalSignups: 0 };
+        shardsSnap.forEach((shardDoc) => {
+          const data = shardDoc.data() as any;
+          totals.totalVisits += data.totalVisits || 0;
+          totals.totalLogins += data.totalLogins || 0;
+          totals.totalSignups += data.totalSignups || 0;
+        });
+        setAnalyticsStats(totals);
       } catch (err) {
         console.error("Could not fetch analytics summary:", err);
       }

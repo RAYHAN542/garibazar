@@ -237,6 +237,14 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Sharded counter sub-documents (analytics_stats/summary/shards/{0-9}).
+    // Firestore rules don't recurse into subcollections automatically, so
+    // this needs its own match block for the admin panel's client-side read.
+    match /analytics_stats/{statId}/shards/{shardId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
     // ---------- Everything else: locked down ----------
     match /{document=**} {
       allow read, write: if false;

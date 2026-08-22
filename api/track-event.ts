@@ -155,9 +155,18 @@ export default async function handler(req: any, res: any) {
       createdAt: FieldValue.serverTimestamp(),
     });
 
+    // Sharded counter instead of a single "analytics_stats/summary" doc.
+    // A single doc has a hard Firestore write-rate ceiling (~1 write/sec
+    // sustained) -- fine at today's traffic, but a real bottleneck once
+    // visitor volume grows. Spreading increments across 10 shards removes
+    // that ceiling almost entirely (writes land on whichever shard is picked
+    // at random, so contention is divided by ~10). Reading the total sums
+    // all 10 shards -- unavoidable extra reads, but reads are far cheaper
+    // and less contended than writes.
     const statsField =
       type === "login" ? "totalLogins" : type === "signup" ? "totalSignups" : "totalVisits";
-    await db.doc("analytics_stats/summary").set(
+    const shard = Math.floor(Math.random() * 10);
+    await db.doc(`analytics_stats/summary/shards/${shard}`).set(
       { [statsField]: FieldValue.increment(1) },
       { merge: true }
     );
