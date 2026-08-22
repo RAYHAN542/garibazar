@@ -1,5 +1,6 @@
 {
-  "name": "গাড়ি বাজার (Gari Bazar)",
+  "id": "/",
+  "name": "গাড়ি বাজার (Gari Bazar)",
   "short_name": "Gari Bazar",
   "description": "Auto Spares & Parts Marketplace in Bangladesh",
   "start_url": "/",
@@ -7,6 +8,7 @@
   "background_color": "#0f172a",
   "theme_color": "#f59e0b",
   "orientation": "portrait-primary",
+  "categories": ["shopping", "business"],
   "icons": [
     {
       "src": "/icon-192.png",
@@ -18,7 +20,13 @@
       "src": "/icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ]
 }
