@@ -1,3 +1,7 @@
+#!/data/data/com.termux/files/usr/bin/bash
+set -e
+cd ~/garibazar-live
+cat > src/components/AddPartForm.tsx << 'GBEOF'
 import React, { useState, useRef } from "react";
 import { SupportedLanguage } from "../types";
 import { Camera, Loader2, AlertTriangle, X, Check } from "lucide-react";
@@ -472,3 +476,9 @@ export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPromp
     </div>
   );
 }
+GBEOF
+echo "File written. Now git add/commit/push..."
+git add -A
+git commit -m "fix: apply cooldown message fix to AddPartForm.tsx (previous commit missed it)"
+git push
+echo "Done. Now run: vercel --prod"
