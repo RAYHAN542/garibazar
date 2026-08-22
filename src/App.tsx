@@ -9,7 +9,7 @@ import { logger } from "./utils/logger";
 import { trackEvent } from "./utils/trackEvent";
 import { signOut } from "firebase/auth";
 import { collection, onSnapshot, query, orderBy, getDocs, doc, getDoc, updateDoc, where, addDoc, serverTimestamp, limit, startAfter, DocumentSnapshot } from "firebase/firestore";
-import { incrementListingViewShard } from "./utils/counters";
+import { incrementListingView } from "./utils/counters";
 import { Car, Search, User, LogOut, Globe, Loader2, ShoppingBag, Phone, ChevronRight, ShieldCheck, Send, Check } from "lucide-react";
 
 import { PartListing, SupportedLanguage } from "./types";
@@ -1480,7 +1480,7 @@ export default function App() {
 
     try {
       const newViews = (listing.views || 0) + 1;
-      incrementListingViewShard(listing.id);
+      incrementListingView(listing.id);
       setListings((prev) =>
         prev.map((item) =>
           item.id === listing.id ? { ...item, views: newViews } : item
