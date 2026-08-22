@@ -10,7 +10,6 @@ import {
 import {
   initializeFirestore,
   persistentLocalCache,
-  persistentMultipleTabManager,
 } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 import { initializeAppCheck, ReCaptchaV3Provider } from "firebase/app-check";
@@ -77,11 +76,14 @@ setPersistence(auth, browserLocalPersistence).catch((err) => {
 
 let db: ReturnType<typeof initializeFirestore>;
 try {
+  // single-tab persistent cache: avoids the multi-tab lease/lock negotiation
+  // that persistentMultipleTabManager() requires, which was adding several
+  // seconds of delay every time the app was reopened (Android often leaves
+  // the previous tab/process half-alive in the background, so a new session
+  // had to wait for that old tab's lock to expire before it could proceed).
   db = initializeFirestore(app, {
     experimentalAutoDetectLongPolling: true,
-    localCache: persistentLocalCache({
-      tabManager: persistentMultipleTabManager(),
-    }),
+    localCache: persistentLocalCache({}),
   });
 } catch (err) {
   logger.debug("Persistent Firestore cache unavailable, using default in-memory cache:", err);
@@ -95,6 +97,20 @@ export const storage = getStorage(app);
 
 export const logAnalyticsEvent = (eventName: string, eventParams?: any) => {
   logger.debug(`Analytics Event: ${eventName}`, eventParams);
+
+  // Only real page visits / login / signup are worth 2 Firestore writes
+  // (site_visits.add + analytics_stats/summary increment) each. Click-level
+  // events (search, listing_view, select_category, select_location,
+  // contact_seller_click, ad_promote, seller_review_submitted, ...) were
+  // previously ALSO being sent here and silently relabeled "visit" -- costing
+  // 2 extra Firestore writes per click for no benefit, since the admin panel
+  // only ever distinguishes "login" / "signup" / generic "visit" anyway.
+  // Those events still get the console.debug log above; they just no longer
+  // hit Firestore.
+  if (eventName !== "login" && eventName !== "signup" && eventName !== "visit") {
+    return;
+  }
+
   const type = eventName === "login" ? "login" : eventName === "signup" ? "signup" : "visit";
   try {
     fetch("/api/track-event", {
