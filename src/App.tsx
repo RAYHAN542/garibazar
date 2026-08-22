@@ -854,7 +854,9 @@ export default function App() {
     setCurrentUserReviewsLoading(true);
     const q = query(
       collection(db, "seller_reviews"),
-      where("sellerId", "==", user.uid)
+      where("sellerId", "==", user.uid),
+      orderBy("createdAt", "desc"),
+      limit(30)
     );
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const list: any[] = [];
@@ -905,7 +907,9 @@ export default function App() {
     }
     const q = query(
       collection(db, "chats"),
-      where("participants", "array-contains", user.uid)
+      where("participants", "array-contains", user.uid),
+      orderBy("lastMessageAt", "desc"),
+      limit(50)
     );
     const unsubscribe = onSnapshot(q, (snapshot) => {
       let count = 0;
@@ -926,7 +930,7 @@ export default function App() {
       setMyListings([]);
       return;
     }
-    const q = query(collection(db, "listings"), where("sellerId", "==", user.uid), orderBy("createdAt", "desc"));
+    const q = query(collection(db, "listings"), where("sellerId", "==", user.uid), orderBy("createdAt", "desc"), limit(100));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const list: PartListing[] = [];
       snapshot.forEach((docSnap) => {
@@ -947,7 +951,7 @@ export default function App() {
   // 1c. সব লাইভ বুস্ট করা অ্যাড — হোমপেজের "Load More" পেজিনেশনের ওপর নির্ভর না করে সরাসরি fetch করা,
   // যাতে পেজ লোড হওয়ার সাথে সাথেই বুস্ট ব্যানার দেখা যায়, Load More চাপার আগেই।
   useEffect(() => {
-    const q = query(collection(db, "listings"), where("isAd", "==", true));
+    const q = query(collection(db, "listings"), where("isAd", "==", true), limit(20));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const list: PartListing[] = [];
       snapshot.forEach((docSnap) => {
