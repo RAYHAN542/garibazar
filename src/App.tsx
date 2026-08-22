@@ -8,7 +8,8 @@ import { auth, db, logAnalyticsEvent } from "./firebase";
 import { logger } from "./utils/logger";
 import { trackEvent } from "./utils/trackEvent";
 import { signOut } from "firebase/auth";
-import { collection, onSnapshot, query, orderBy, getDocs, doc, getDoc, updateDoc, where, addDoc, deleteDoc, limit, startAfter, DocumentSnapshot, increment } from "firebase/firestore";
+import { collection, onSnapshot, query, orderBy, getDocs, doc, getDoc, updateDoc, where, addDoc, serverTimestamp, limit, startAfter, DocumentSnapshot } from "firebase/firestore";
+import { incrementListingViewShard } from "./utils/counters";
 import { Car, Search, User, LogOut, Globe, Loader2, ShoppingBag, Phone, ChevronRight, ShieldCheck, Send, Check } from "lucide-react";
 
 import { PartListing, SupportedLanguage } from "./types";
@@ -772,7 +773,24 @@ export default function App() {
     if (isAnyModalOpen) {
       if (!modalHistoryRef.current) {
         tabWhenModalOpenedRef.current = activeTab;
-        window.history.pushState({ modalOpen: true }, "");
+        // যখন আগের মডাল X বাটনে বন্ধ হয়েছিল, তখন নিচের else ব্লক নতুন কোনো
+        // entry push না করে বর্তমান entry-টাকেই "modalOpen: false" দিয়ে
+        // replaceState করেছিল (race এড়াতে)। ফলে ওই entry-টা history স্ট্যাকে
+        // অব্যবহৃত অবস্থায় থেকে যেত। পরের বার মডাল খুললে যদি আমরা আবার নতুন
+        // entry push করি, তাহলে প্রতিটা X-বন্ধ + পুনরায়-খোলা চক্রে স্ট্যাকে
+        // একটা করে "ভুতুড়ে" entry জমতে থাকে — এতে ব্যাক বাটনে একবার চাপলে
+        // কিছুই হয় না (সেই ভুতুড়ে entry-টা silently consume হয়), দ্বিতীয়বার
+        // চাপলে আসল নেভিগেশন হয়, এবং যথেষ্ট entry জমে গেলে স্ট্যাক ফুরিয়ে
+        // অ্যাপ পুরো reload হয়ে হোমপেজে চলে যায়। এড়াতে: বর্তমান entry যদি
+        // ইতিমধ্যে সেই "বন্ধ হওয়া মডাল"-এর ভুতুড়ে entry হয়, তাহলে নতুন push না
+        // করে সেটাকেই replaceState দিয়ে "modalOpen: true" বানিয়ে পুনরায় ব্যবহার
+        // করা হচ্ছে — স্ট্যাক আর বাড়ছে না।
+        const currentState = window.history.state as { modalOpen?: boolean } | null;
+        if (currentState && currentState.modalOpen === false) {
+          window.history.replaceState({ ...currentState, modalOpen: true }, "");
+        } else {
+          window.history.pushState({ modalOpen: true }, "");
+        }
         modalHistoryRef.current = true;
       }
       window.addEventListener("popstate", handlePopState);
@@ -913,6 +931,7 @@ export default function App() {
       const list: PartListing[] = [];
       snapshot.forEach((docSnap) => {
         const data = docSnap.data();
+        if (data.isDeleted === true) return; // soft-deleted, in its 30-day recovery window
         const normalizedCreatedAt = data.createdAt && typeof data.createdAt.toDate === "function"
           ? data.createdAt.toDate().toISOString()
           : data.createdAt;
@@ -933,6 +952,7 @@ export default function App() {
       const list: PartListing[] = [];
       snapshot.forEach((docSnap) => {
         const data = docSnap.data();
+        if (data.isDeleted === true) return;
         const normalizedCreatedAt = data.createdAt && typeof data.createdAt.toDate === "function"
           ? data.createdAt.toDate().toISOString()
           : data.createdAt;
@@ -1033,6 +1053,12 @@ export default function App() {
       // Filter out blocked users
       const blocked = getBlockedUids();
       let filtered = combined.filter(item => !blocked.includes(item.sellerId));
+
+      // Filter out soft-deleted listings (isDeleted:true) -- these are kept
+      // in Firestore for a 30-day recovery window (see the delete handler
+      // and /api/cron/data-retention-cleanup) but should never be visible
+      // anywhere in the app, same as if they were already gone.
+      filtered = filtered.filter(item => item.isDeleted !== true);
 
       // Filter out demo/sample/mock listings in production
       if (isProduction) {
@@ -1340,7 +1366,10 @@ export default function App() {
         // Dispatch local event to refresh state
         window.dispatchEvent(new Event("storage"));
       } else {
-        await deleteDoc(doc(db, "listings", itemId));
+        await updateDoc(doc(db, "listings", itemId), {
+          isDeleted: true,
+          deletedAt: serverTimestamp(),
+        });
       }
     } catch (err) {
       console.error("Error deleting listing:", err);
@@ -1446,9 +1475,8 @@ export default function App() {
     setSelectedListing(listing);
 
     try {
-      const listingRef = doc(db, "listings", listing.id);
       const newViews = (listing.views || 0) + 1;
-      await updateDoc(listingRef, { views: increment(1) });
+      incrementListingViewShard(listing.id);
       setListings((prev) =>
         prev.map((item) =>
           item.id === listing.id ? { ...item, views: newViews } : item

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { db, auth } from "../firebase";
 import { onAuthStateChanged } from "firebase/auth";
-import { collection, onSnapshot, query, orderBy, doc, getDoc, setDoc, updateDoc, deleteDoc, limit, getAggregateFromServer, sum, count } from "firebase/firestore";
+import { collection, onSnapshot, query, orderBy, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, limit, getAggregateFromServer, sum, count } from "firebase/firestore";
 import { ShieldAlert, CheckCircle2, XCircle, Coins, Loader2, Save, Check, Smartphone, User, Clock, Mail, Trash2, Search, TrendingUp, Grid, Inbox, Flag, Activity, Globe, Users, MapPin, Eye } from "lucide-react";
 import { SupportedLanguage } from "../types";
 
@@ -54,16 +54,20 @@ export function AdminPanel({ language, currentUser, listings: listingsProp, isUs
     // Managing/searching listings only needs the most recent N, not literally every
     // listing ever created — capped to keep this fast and inexpensive as the
     // marketplace grows.
-    const q = query(collection(db, "listings"), orderBy("createdAt", "desc"), limit(300));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const all: any[] = [];
-      snapshot.forEach((docSnap) => {
-        all.push({ id: docSnap.id, ...docSnap.data() });
-      });
-      setAdminListings(all);
-    }, (err) => {
-      console.error("Could not fetch listings for admin:", err);
-    });
+    const fetchListings = async () => {
+      try {
+        const q = query(collection(db, "listings"), orderBy("createdAt", "desc"), limit(300));
+        const snapshot = await getDocs(q);
+        const all: any[] = [];
+        snapshot.forEach((docSnap) => {
+          all.push({ id: docSnap.id, ...docSnap.data() });
+        });
+        setAdminListings(all);
+      } catch (err) {
+        console.error("Could not fetch listings for admin:", err);
+      }
+    };
+    fetchListings();
 
     getAggregateFromServer(collection(db, "listings"), {
       totalCount: count(),
@@ -74,8 +78,6 @@ export function AdminPanel({ language, currentUser, listings: listingsProp, isUs
     }).catch((err) => {
       console.error("Could not fetch listings aggregate for admin:", err);
     });
-
-    return () => unsubscribe();
   }, []);
 
   // Enforce secure lock immediately
@@ -166,15 +168,20 @@ export function AdminPanel({ language, currentUser, listings: listingsProp, isUs
 
   // Load configured payment info from Firestore
   useEffect(() => {
-    const unsub = onSnapshot(doc(db, "settings", "payment_info"), (docSnap) => {
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        setBkash(data.bkash || "01783457173 (Personal)");
-        setNagad(data.nagad || "01783457173 (Personal)");
-        setRocket(data.rocket || "01783457173 (Personal)");
+    const fetchPaymentInfo = async () => {
+      try {
+        const docSnap = await getDoc(doc(db, "settings", "payment_info"));
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          setBkash(data.bkash || "01783457173 (Personal)");
+          setNagad(data.nagad || "01783457173 (Personal)");
+          setRocket(data.rocket || "01783457173 (Personal)");
+        }
+      } catch (err) {
+        console.error("Could not fetch payment_info:", err);
       }
-    });
-    return () => unsub();
+    };
+    fetchPaymentInfo();
   }, []);
 
   // Listen to all refill requests across Gari Bazar platform
@@ -227,36 +234,43 @@ export function AdminPanel({ language, currentUser, listings: listingsProp, isUs
   // kept up to date atomically by the /api/track-event serverless function).
   useEffect(() => {
     if (!authReady) return;
-    const unsub = onSnapshot(doc(db, "analytics_stats", "summary"), (docSnap) => {
-      setAnalyticsStats(docSnap.exists() ? (docSnap.data() as any) : {});
-    }, (err) => {
-      console.error("Could not fetch analytics summary:", err);
-    });
-    return () => unsub();
+    const fetchStats = async () => {
+      try {
+        const docSnap = await getDoc(doc(db, "analytics_stats", "summary"));
+        setAnalyticsStats(docSnap.exists() ? (docSnap.data() as any) : {});
+      } catch (err) {
+        console.error("Could not fetch analytics summary:", err);
+      }
+    };
+    fetchStats();
+    const interval = setInterval(fetchStats, 30000);
+    return () => clearInterval(interval);
   }, [authReady]);
 
-  // Recent visit/login/signup log, most recent first.
   useEffect(() => {
     if (!authReady) return;
-    const q = query(
-      collection(db, "site_visits"),
-      orderBy("createdAt", "desc"),
-      limit(200)
-    );
-
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const list: any[] = [];
-      snapshot.forEach((doc) => {
-        list.push({ id: doc.id, ...doc.data() });
-      });
-      setVisitEvents(list);
-      setLoadingVisits(false);
-    }, (err) => {
-      console.error("Could not fetch site visits:", err);
-      setLoadingVisits(false);
-    });
-
-    return () => unsubscribe();
+    const fetchVisits = async () => {
+      try {
+        const q = query(
+          collection(db, "site_visits"),
+          orderBy("createdAt", "desc"),
+          limit(200)
+        );
+        const snapshot = await getDocs(q);
+        const list: any[] = [];
+        snapshot.forEach((doc) => {
+          list.push({ id: doc.id, ...doc.data() });
+        });
+        setVisitEvents(list);
+      } catch (err) {
+        console.error("Could not fetch site visits:", err);
+      } finally {
+        setLoadingVisits(false);
+      }
+    };
+    fetchVisits();
+    const interval = setInterval(fetchVisits, 30000);
+    return () => clearInterval(interval);
   }, [authReady]);
 
   const handleResolveTicket = async (ticketId: string) => {

@@ -1,7 +1,7 @@
 import React, { useState, useRef } from "react";
 import { SupportedLanguage } from "../types";
 import { Camera, Loader2, AlertTriangle, X, Check } from "lucide-react";
-import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { collection, doc, addDoc, writeBatch, serverTimestamp } from "firebase/firestore";
 import { db, auth } from "../firebase";
 import { sanitizeText, validatePriceInput, validateBanglaPhone } from "../utils/sanitizer";
 import { uploadToCloudinary } from "../utils/cloudinary";
@@ -245,7 +245,15 @@ export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPromp
       const parentCategory = activeTab === "vehicle" ? "vehicles" : "general";
       const normalizedSubCategory = activeTab === "vehicle" ? "other_heavy_equipment" : "general";
 
-      const docRef = await addDoc(collection(db, "listings"), {
+      // Written as a batch (not a plain addDoc) so the new listing and the
+      // rate-limit timestamp land together -- the timestamp write is what
+      // the firestore.rules cooldown check reads on the *next* attempt, and
+      // batching means a half-failure can't leave the listing created but
+      // the cooldown timer never started (or vice versa).
+      const newListingRef = doc(collection(db, "listings"));
+      const userLimitsRef = doc(db, "userLimits", currentUser.uid);
+      const batch = writeBatch(db);
+      batch.set(newListingRef, {
         title: cleanTitle,
         model: cleanTitle,
         category: parentCategory,
@@ -264,6 +272,9 @@ export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPromp
         createdAt: serverTimestamp(),
         type: activeTab
       });
+      batch.set(userLimitsRef, { lastListingCreatedAt: serverTimestamp() }, { merge: true });
+      await batch.commit();
+      const docRef = { id: newListingRef.id };
 
       if (onViewListing) {
         onViewListing({
@@ -285,7 +296,15 @@ export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPromp
       onPostSuccess();
     } catch (err: any) {
       console.error(err);
-      setError(err.message || "Submission failed");
+      if (err?.code === "permission-denied") {
+        setError(
+          language === "bn"
+            ? "আপনি একটু আগেই একটা বিজ্ঞাপন পোস্ট করেছেন। অনুগ্রহ করে ৩০ সেকেন্ড অপেক্ষা করে আবার চেষ্টা করুন।"
+            : "You just posted a listing. Please wait about 30 seconds and try again."
+        );
+      } else {
+        setError(err.message || "Submission failed");
+      }
     } finally {
       setIsSubmitting(false);
     }
