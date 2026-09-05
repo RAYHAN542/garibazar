@@ -208,12 +208,15 @@ export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModa
     setStep("profile");
   };
 
-  const handlePostPhoneAuth = async (uid: string, phone: string) => {
+  const handlePostPhoneAuth = async (uid: string, phone: string, authUid?: string) => {
     const { data: userRow } = await supabase.from("users").select("*").eq("uid", uid).maybeSingle();
     const { data: adminRow } = await supabase.from("admins").select("uid").eq("uid", uid).maybeSingle();
 
     const sessionUser = {
       uid,
+      // uid is kept as the legacy app id so migrated listings/chats still
+      // resolve. authUid is the real Supabase Auth id used by RLS writes.
+      authUid,
       displayName: userRow?.name,
       email: userRow?.email,
       phoneNumber: userRow?.phone || phone,
@@ -410,11 +413,23 @@ export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModa
         if (data.code === "NOT_REGISTERED") {
           setPhoneAuthMode("signup");
         }
+        if (data.code === "LEGACY_SET_PASSWORD") {
+          // A migrated Firebase profile cannot be checked against its old
+          // Firebase password in Supabase. Move the user into the one-time
+          // claim form instead of leaving them on a login error screen.
+          setPhoneAuthMode("signup");
+          setPhonePassword("");
+          setPhonePasswordConfirm("");
+        }
         setError(data.error || (language === "bn" ? "লগইন ব্যর্থ হয়েছে।" : "Login failed."));
         return;
       }
-      await supabase.auth.setSession({ access_token: data.access_token, refresh_token: data.refresh_token });
-      await handlePostPhoneAuth(data.uid, data.phone);
+      const { error: sessionError } = await supabase.auth.setSession({
+        access_token: data.access_token,
+        refresh_token: data.refresh_token,
+      });
+      if (sessionError) throw sessionError;
+      await handlePostPhoneAuth(data.uid, data.phone, data.auth_uid);
     } catch (err: any) {
       console.error(err);
       const debugMsg = err?.message || String(err) || "unknown";
@@ -457,8 +472,12 @@ export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModa
         setError(data.error || (language === "bn" ? "অ্যাকাউন্ট তৈরি করা যায়নি।" : "Could not create account."));
         return;
       }
-      await supabase.auth.setSession({ access_token: data.access_token, refresh_token: data.refresh_token });
-      await handlePostPhoneAuth(data.uid, data.phone);
+      const { error: sessionError } = await supabase.auth.setSession({
+        access_token: data.access_token,
+        refresh_token: data.refresh_token,
+      });
+      if (sessionError) throw sessionError;
+      await handlePostPhoneAuth(data.uid, data.phone, data.auth_uid);
     } catch (err: any) {
       console.error(err);
       const debugMsg = err?.message || String(err) || "unknown";
