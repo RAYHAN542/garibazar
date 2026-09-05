@@ -1,0 +1,279 @@
+<!doctype html>
+<html lang="bn">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <title>📲 ইনস্টল করুন | Gari Bazar App</title>
+    <meta name="description" content="গাড়ি বাজার অ্যাপ ফ্রীতে ডাউনলোড ও ইনস্টল করুন। Play Store ছাড়াই সরাসরি ইনস্টল, মাত্র ৩ সেকেন্ডে।" />
+    <meta name="theme-color" content="#f59e0b" />
+    <link rel="icon" type="image/png" href="/icon-192.png" />
+    <link rel="manifest" href="/manifest.json" />
+
+    <!-- Open Graph -- this is what shows up in the Facebook link preview card -->
+    <meta property="og:title" content="📲 ইনস্টল করুন" />
+    <meta property="og:description" content="গাড়ি বাজার — Play Store ছাড়াই ফ্রীতে সরাসরি ইনস্টল করুন" />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://garibazar.shop/download" />
+    <meta property="og:image" content="https://garibazar.shop/og-banner.jpg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="📲 ইনস্টল করুন" />
+    <meta name="twitter:description" content="গাড়ি বাজার — Play Store ছাড়াই ফ্রীতে সরাসরি ইনস্টল করুন" />
+    <meta name="twitter:image" content="https://garibazar.shop/og-banner.jpg" />
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+Bengali:wght@400;500;600;700;900&display=swap" />
+
+    <style>
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      body {
+        font-family: "Noto Sans Bengali", -apple-system, sans-serif;
+        background: linear-gradient(180deg, #0f172a 0%, #1e293b 100%);
+        color: #fff;
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 32px 20px 60px;
+      }
+      .icon {
+        width: 88px;
+        height: 88px;
+        border-radius: 22px;
+        margin-top: 12px;
+        margin-bottom: 18px;
+        box-shadow: 0 8px 30px rgba(245, 158, 11, 0.35);
+      }
+      h1 {
+        font-size: 22px;
+        font-weight: 900;
+        text-align: center;
+        margin-bottom: 6px;
+      }
+      p.subtitle {
+        color: #94a3b8;
+        font-size: 14px;
+        text-align: center;
+        margin-bottom: 28px;
+      }
+      .download-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        width: 100%;
+        max-width: 380px;
+        background: linear-gradient(135deg, #f59e0b, #ea580c);
+        color: #0f172a;
+        font-weight: 900;
+        font-size: 17px;
+        padding: 18px 24px;
+        border-radius: 16px;
+        text-decoration: none;
+        box-shadow: 0 10px 30px rgba(245, 158, 11, 0.4);
+        margin-bottom: 10px;
+      }
+      .file-info {
+        color: #64748b;
+        font-size: 12px;
+        margin-bottom: 36px;
+      }
+      .steps {
+        width: 100%;
+        max-width: 380px;
+        background: #1e293b;
+        border: 1px solid #334155;
+        border-radius: 16px;
+        padding: 20px;
+      }
+      .steps h2 {
+        font-size: 14px;
+        font-weight: 900;
+        color: #f59e0b;
+        margin-bottom: 14px;
+      }
+      .step {
+        display: flex;
+        gap: 12px;
+        margin-bottom: 16px;
+      }
+      .step:last-child { margin-bottom: 0; }
+      .step-num {
+        flex-shrink: 0;
+        width: 26px;
+        height: 26px;
+        border-radius: 50%;
+        background: #f59e0b;
+        color: #0f172a;
+        font-weight: 900;
+        font-size: 13px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .step-text {
+        font-size: 13.5px;
+        color: #cbd5e1;
+        line-height: 1.5;
+        padding-top: 3px;
+      }
+      .safe-note {
+        margin-top: 24px;
+        font-size: 12px;
+        color: #64748b;
+        text-align: center;
+        max-width: 340px;
+        line-height: 1.6;
+      }
+      .website-link {
+        margin-top: 28px;
+        color: #94a3b8;
+        font-size: 13px;
+        text-decoration: underline;
+      }
+      .chrome-banner {
+        width: 100%;
+        max-width: 380px;
+        background: #1e3a5f;
+        border: 1px solid #2563eb;
+        border-radius: 16px;
+        padding: 16px;
+        margin-bottom: 20px;
+        text-align: center;
+      }
+      .chrome-banner-text {
+        font-size: 13px;
+        color: #bfdbfe;
+        line-height: 1.5;
+        margin-bottom: 12px;
+      }
+      .chrome-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        background: #2563eb;
+        color: #fff;
+        font-weight: 900;
+        font-size: 14px;
+        padding: 12px 24px;
+        border-radius: 12px;
+        text-decoration: none;
+      }
+    </style>
+  </head>
+  <body>
+    <img class="icon" src="/icon-192.png" alt="Gari Bazar" />
+    <h1>গাড়ি বাজার অ্যাপ ইনস্টল করুন</h1>
+    <p class="subtitle">Play Store ছাড়াই সরাসরি, সম্পূর্ণ ফ্রী</p>
+
+    <div class="chrome-banner" id="chrome-banner" style="display:none;">
+      <p class="chrome-banner-text">🔵 সবচেয়ে সহজ ইনস্টলের জন্য Chrome-এ খুলুন — এক ট্যাপেই ইনস্টল হয়ে যাবে</p>
+      <a class="chrome-btn" id="chrome-btn" href="#">Chrome-এ খুলুন</a>
+    </div>
+
+    <a class="download-btn" id="main-btn" href="/downloads/gari-bazar.apk">
+      ⬇️ এখনই ডাউনলোড করুন
+    </a>
+    <p class="file-info" id="file-info">APK ফাইল • ~3.3 MB</p>
+
+    <div class="steps" id="steps-apk">
+      <h2>ইনস্টল করবেন যেভাবে:</h2>
+      <div class="step">
+        <span class="step-num">১</span>
+        <span class="step-text">উপরের বাটনে ট্যাপ করুন — ফাইল ডাউনলোড হবে</span>
+      </div>
+      <div class="step">
+        <span class="step-num">২</span>
+        <span class="step-text">ডাউনলোড শেষ হলে ফোনের উপরে notification বার-এ <b>"Open"</b> লেখা একটা বাটন আসবে — সেখানে ট্যাপ করুন। (না দেখলে: Downloads ফোল্ডারে গিয়ে <b>gari-bazar.apk</b> ফাইলটা ট্যাপ করুন)</span>
+      </div>
+      <div class="step">
+        <span class="step-num">৩</span>
+        <span class="step-text">ফোন যদি "Unknown apps" পারমিশন চায়, <b>Settings</b> চেপে <b>Allow</b> করে দিন — এটা স্বাভাবিক, Play Store ছাড়া ইনস্টল করলে ফোন এই সতর্কতা দেখায়</span>
+      </div>
+      <div class="step">
+        <span class="step-num">৪</span>
+        <span class="step-text"><b>Install</b> চাপুন — ব্যস, অ্যাপ রেডি!</span>
+      </div>
+    </div>
+
+    <div class="steps" id="steps-native" style="display:none;">
+      <h2>ইনস্টল করবেন যেভাবে:</h2>
+      <div class="step">
+        <span class="step-num">১</span>
+        <span class="step-text">উপরের বাটনে ট্যাপ করুন</span>
+      </div>
+      <div class="step">
+        <span class="step-num">২</span>
+        <span class="step-text">যে popup আসবে সেখানে <b>Install</b> চাপুন — ব্যস, অ্যাপ রেডি!</span>
+      </div>
+    </div>
+
+    <p class="safe-note">🔒 এই অ্যাপটি সম্পূর্ণ নিরাপদ, গাড়ি বাজার টিমের নিজস্ব তৈরি। কোনো তৃতীয় পক্ষের সোর্স থেকে নয়।</p>
+
+    <a class="website-link" id="apk-fallback-link" href="/downloads/gari-bazar.apk" style="display:none;">অথবা সরাসরি APK ফাইল ডাউনলোড করুন →</a>
+    <a class="website-link" href="/">অথবা ব্রাউজারেই ব্যবহার করুন — ওয়েবসাইটে যান →</a>
+
+    <script>
+      // এই ভ্যারিয়েবলে ব্রাউজারের "beforeinstallprompt" ইভেন্টটা ধরে রাখা হয় --
+      // এটা পেলে বোঝা যায় Chrome নিজেই এক-ট্যাপে native install popup দেখাতে
+      // পারবে (ঠিক Play Store-এর মতো), আর তখন raw APK ডাউনলোডের বদলে সেই
+      // সহজ পথটাই দেখানো হয়। ফেসবুক/ইনস্টাগ্রামের ভেতরের ব্রাউজারে এই ইভেন্ট
+      // কখনোই আসে না -- তখন APK ডাউনলোড বাটনই (ডিফল্ট অবস্থা) থেকে যায়, যেটা
+      // ওখান থেকেও কাজ করে।
+      let deferredPrompt = null;
+      const mainBtn = document.getElementById("main-btn");
+      const fileInfo = document.getElementById("file-info");
+      const stepsApk = document.getElementById("steps-apk");
+      const stepsNative = document.getElementById("steps-native");
+      const apkFallbackLink = document.getElementById("apk-fallback-link");
+      const chromeBanner = document.getElementById("chrome-banner");
+      const chromeBtn = document.getElementById("chrome-btn");
+
+      // ফেসবুক/ইনস্টাগ্রাম/মেসেঞ্জারের ভেতরের ব্রাউজারে Chrome-এর
+      // beforeinstallprompt ফিচার কখনোই কাজ করে না (Google-এর নিজস্ব নীতি) --
+      // তাই এই ব্রাউজারগুলো আলাদাভাবে চিহ্নিত করে Android-এর "intent" লিংক
+      // দিয়ে জোর করে আসল Chrome অ্যাপেই এই একই পেজটা খুলে দেওয়া হয়, যেখানে
+      // native ইনস্টল বাটন সঠিকভাবে দেখা যাবে।
+      const isInAppBrowser = /FBAN|FBAV|Instagram|Messenger/i.test(navigator.userAgent);
+
+      if (isInAppBrowser) {
+        chromeBanner.style.display = "block";
+        const targetUrl = window.location.href;
+        const fallbackUrl = encodeURIComponent(targetUrl);
+        const intentUrl =
+          `intent://${targetUrl.replace(/^https?:\/\//, "")}` +
+          `#Intent;scheme=https;package=com.android.chrome;` +
+          `S.browser_fallback_url=${fallbackUrl};end`;
+        chromeBtn.href = intentUrl;
+      }
+
+      window.addEventListener("beforeinstallprompt", (e) => {
+        e.preventDefault();
+        deferredPrompt = e;
+
+        mainBtn.textContent = "📲 এক ট্যাপে ইনস্টল করুন";
+        mainBtn.removeAttribute("href");
+        fileInfo.textContent = "Chrome-এর মাধ্যমে সরাসরি ইনস্টল হবে";
+        stepsApk.style.display = "none";
+        stepsNative.style.display = "block";
+        apkFallbackLink.style.display = "block";
+
+        mainBtn.onclick = async (ev) => {
+          ev.preventDefault();
+          if (!deferredPrompt) return;
+          deferredPrompt.prompt();
+          await deferredPrompt.userChoice;
+          deferredPrompt = null;
+        };
+      });
+
+      window.addEventListener("appinstalled", () => {
+        deferredPrompt = null;
+        mainBtn.textContent = "✅ ইনস্টল হয়ে গেছে!";
+      });
+    </script>
+  </body>
+</html>

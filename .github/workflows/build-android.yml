@@ -1,0 +1,150 @@
+name: Build Android APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "capacitor.config.ts"
+      - "android/**"
+      - "package.json"
+      - "src/**"
+      - ".github/workflows/build-android.yml"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: "20"
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: "temurin"
+          java-version: "21"
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Write build-info.json (source-of-truth for this exact build)
+        # 🔧 Fixes "APK vs source mismatch" confusion: every APK now carries
+        # the exact git commit it was built from, baked into the bundle
+        # itself (public/ files are copied verbatim into dist/ by Vite, then
+        # into the Capacitor Android assets). At runtime it's fetchable at
+        # https://localhost/build-info.json inside the app, and it's also
+        # printed in this workflow's log/summary below for a quick sanity
+        # check without even opening the app.
+        run: |
+          cat > public/build-info.json << EOF
+          {
+            "commitSha": "${{ github.sha }}",
+            "commitShaShort": "$(echo ${{ github.sha }} | cut -c1-7)",
+            "workflowRunNumber": "${{ github.run_number }}",
+            "workflowRunId": "${{ github.run_id }}",
+            "builtAtUtc": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "branch": "${{ github.ref_name }}"
+          }
+          EOF
+          cat public/build-info.json
+
+      - name: Build web assets (Vite)
+        env:
+          VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
+          VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
+          VITE_FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
+          VITE_FIREBASE_STORAGE_BUCKET: ${{ secrets.VITE_FIREBASE_STORAGE_BUCKET }}
+          VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}
+          VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
+          VITE_FIREBASE_FIRESTORE_DATABASE_ID: ${{ secrets.VITE_FIREBASE_FIRESTORE_DATABASE_ID }}
+          VITE_FIREBASE_MEASUREMENT_ID: ${{ secrets.VITE_FIREBASE_MEASUREMENT_ID }}
+          VITE_RECAPTCHA_SITE_KEY: ${{ secrets.VITE_RECAPTCHA_SITE_KEY }}
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
+        run: npx vite build
+
+      - name: Record bundle hashes tied to this commit
+        # This is the part that answers "does this APK really match this
+        # source?" -- the hashed JS filenames Vite generates change
+        # whenever the underlying code changes, so pairing them with the
+        # commit SHA here gives an unambiguous fingerprint.
+        run: |
+          echo "## Build fingerprint" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Commit:** \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Branch:** \`${{ github.ref_name }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Built at (UTC):** $(date -u +%Y-%m-%dT%H:%M:%SZ)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Bundled JS files:**" >> $GITHUB_STEP_SUMMARY
+          for f in dist/assets/*.js; do
+            echo "  - \`$(basename "$f")\`" >> $GITHUB_STEP_SUMMARY
+          done
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Bundled JS files in this build:"
+          ls -la dist/assets/*.js
+
+      - name: Sync Capacitor Android project
+        run: npx cap sync android
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x android/gradlew
+
+      - name: Decode signing keystore
+        run: |
+          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > android/app/garibazar-release.keystore
+
+      - name: Build signed release APK
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: cd android && ./gradlew assembleRelease
+
+      - name: Build signed release AAB (required for Play Store submission)
+        # Play Store no longer accepts APKs for new app submissions -- it
+        # only takes the Android App Bundle format. The APK above is kept
+        # for direct sideload/testing (which is how this project has been
+        # tested so far); this AAB is what actually gets uploaded to Play.
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: cd android && ./gradlew bundleRelease
+
+      - name: Rename AAB with commit fingerprint
+        run: |
+          SHORT_SHA=$(echo ${{ github.sha }} | cut -c1-7)
+          mkdir -p renamed-aab
+          cp android/app/build/outputs/bundle/release/app-release.aab "renamed-aab/garibazar-${SHORT_SHA}-run${{ github.run_number }}.aab"
+          ls -la renamed-aab/
+
+      - name: Upload signed AAB artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: garibazar-release-aab
+          path: renamed-aab/*.aab
+
+      - name: Rename APK with commit fingerprint
+        # So the downloaded file itself says which commit it came from --
+        # no more guessing whether "app-release.apk" is the old or new one.
+        run: |
+          SHORT_SHA=$(echo ${{ github.sha }} | cut -c1-7)
+          mkdir -p renamed-apk
+          cp android/app/build/outputs/apk/release/app-release.apk "renamed-apk/garibazar-${SHORT_SHA}-run${{ github.run_number }}.apk"
+          ls -la renamed-apk/
+
+      - name: Upload signed APK artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: garibazar-release-apk
+          path: renamed-apk/*.apk
+
+      - name: Upload build-info.json alongside APK
+        uses: actions/upload-artifact@v7
+        with:
+          name: build-info
+          path: public/build-info.json

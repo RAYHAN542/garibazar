@@ -1,0 +1,2709 @@
+/**
+ * @license
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+import { useState, useEffect, useMemo, useRef, lazy, Suspense } from "react";
+import { auth, db, logAnalyticsEvent } from "./firebase";
+import { supabase } from "./supabase";
+import { logger } from "./utils/logger";
+import { trackEvent } from "./utils/trackEvent";
+import { signOut, onAuthStateChanged } from "firebase/auth";
+import { collection, onSnapshot, query, orderBy, getDocs, doc, getDoc, updateDoc, where, addDoc, serverTimestamp, limit, startAfter, DocumentSnapshot } from "firebase/firestore";
+import { withTimeout, TimeoutError } from "./utils/withTimeout";
+import { apiUrl } from "./utils/apiBase";
+import { incrementListingView } from "./utils/counters";
+import {
+  fetchInitialListings as fetchInitialListingsFromSupabase,
+  fetchMoreListings as fetchMoreListingsFromSupabase,
+  fetchAdListings as fetchAdListingsFromSupabase,
+} from "./utils/listingsApi";
+import { useAdPromotion } from "./hooks/useAdPromotion";
+import { Car, Search, User, LogOut, Globe, Loader2, ShoppingBag, Phone, ChevronRight, ShieldCheck, Send, Check, Download, Smartphone } from "lucide-react";
+
+import { PartListing, SupportedLanguage } from "./types";
+import { translations, CATEGORIES, SAMPLE_LISTINGS, AD_PACKAGES } from "./translations";
+
+import { ListingCard } from "./components/ListingCard";
+import { HeaderNav } from "./components/HeaderNav";
+import MarketplaceTab from "./components/MarketplaceTab";
+// 📦 নিচের কম্পোনেন্টগুলো lazy-loaded — এগুলোর কোড শুধু তখনই ডাউনলোড হবে যখন
+// ইউজার সত্যিই সেই অংশে যাবে (modal খুলবে/ট্যাব বদলাবে), শুরুতেই না।
+const ListingDetailModal = lazy(() => import("./components/ListingDetailModal").then(m => ({ default: m.ListingDetailModal })));
+const EditListingModal = lazy(() => import("./components/EditListingModal").then(m => ({ default: m.EditListingModal })));
+const AuthModal = lazy(() => import("./components/AuthModal").then(m => ({ default: m.AuthModal })));
+const PromoteAdModal = lazy(() => import("./components/PromoteAdModal").then(m => ({ default: m.PromoteAdModal })));
+const LotteryModal = lazy(() => import("./components/LotteryModal").then(m => ({ default: m.LotteryModal })));
+const AddPartForm = lazy(() => import("./components/AddPartForm").then(m => ({ default: m.AddPartForm })));
+const AdminPanel = lazy(() => import("./components/AdminPanel").then(m => ({ default: m.AdminPanel })));
+const ChatView = lazy(() => import("./components/ChatView").then(m => ({ default: m.ChatView })));
+const LegalHubModal = lazy(() => import("./components/LegalHubModal"));
+const PrivacyPolicyPage = lazy(() => import("./components/PrivacyPolicyPage"));
+const DataDeletionPage = lazy(() => import("./components/DataDeletionPage"));
+const AboutContactPage = lazy(() => import("./components/AboutContactPage"));
+const SellerAnalyticsGraph = lazy(() => import("./components/SellerAnalyticsGraph"));
+const SellerShopPage = lazy(() => import("./components/SellerShopPage").then(m => ({ default: m.SellerShopPage })));
+const DashboardTab = lazy(() => import("./components/DashboardTab"));
+import Fuse from "fuse.js";
+import { buildSearchBlob, convertBengaliDigitsToEnglish, convertEnglishDigitsToBengali, toPhoneticKey } from "./searchAliases";
+import { Moon, Sun, Users, HelpCircle, Mail, FileText, Menu } from "lucide-react";
+import vehicleCardImg from "./assets/images/vehicle-card-new.webp";
+import partsCardImg from "./assets/images/parts-card-new.webp";
+import PullToRefresh from "./components/PullToRefresh";
+import UpdateBanner from "./components/UpdateBanner";
+
+const HOME_CATEGORIES = [
+  { id: "all", bnName: "সব ক্যাটাগরি", enName: "All Categories" },
+  { id: "vehicles", bnName: "গাড়ি ও ভারী যন্ত্রপাতি", enName: "Vehicles & Equipment" },
+  { id: "engine", bnName: "ইঞ্জিন ও ট্রান্সমিশন", enName: "Engine & Transmission" },
+  { id: "wheels", bnName: "টায়ার ও হুইল", enName: "Tyres & Wheels" },
+  { id: "interior", bnName: "ইন্টেরিয়র পার্টস", enName: "Interior Accessories" },
+  { id: "exterior", bnName: "এক্সটেরিয়র বডি", enName: "Exterior Body" },
+];
+
+import { checkIsProduction, isItemVehicle, matchesSubCategoryFilter } from "./utils/listingFilters";
+
+export default function App() {
+  const [language, setLanguage] = useState<SupportedLanguage>(() => {
+    try {
+      const saved = localStorage.getItem("gari_bazar_language");
+      if (saved === "bn" || saved === "en") return saved as SupportedLanguage;
+    } catch (e) {}
+    return "bn"; // DEFAULT to Bengali as requested
+  });
+  const [activeTab, setActiveTab] = useState<'market' | 'saved' | 'sell' | 'my-dashboard' | 'chats' | 'profile'>(() => {
+    try {
+      const saved = localStorage.getItem("gari_bazar_active_tab");
+      const validTabs = ['market', 'saved', 'sell', 'my-dashboard', 'chats', 'profile'];
+      if (saved && validTabs.includes(saved)) {
+        return saved as 'market' | 'saved' | 'sell' | 'my-dashboard' | 'chats' | 'profile';
+      }
+    } catch (e) {}
+    return 'market';
+  });
+  const [savedListingIds, setSavedListingIds] = useState<string[]>([]);
+  const [initialListingToChat, setInitialListingToChat] = useState<PartListing | null>(null);
+  
+  // Persist language & active tab so a reload keeps the user where they were
+  useEffect(() => {
+    try {
+      localStorage.setItem("gari_bazar_language", language);
+    } catch (e) {}
+  }, [language]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("gari_bazar_active_tab", activeTab);
+    } catch (e) {}
+  }, [activeTab]);
+  
+  // Dashboard Sub-tab & Ad promotions center states
+  const [dashboardSubTab, setDashboardSubTab] = useState<'inventory' | 'saved' | 'ads' | 'admin' | 'playstore-audit' | 'my-shop'>('inventory');
+  
+  // Seller Shop states
+  const [activeSellerShopId, setActiveSellerShopId] = useState<string | null>(null);
+  const [activeSellerShopFallback, setActiveSellerShopFallback] = useState<{
+    name: string;
+    photo?: string;
+    location?: string;
+    contact?: string;
+  } | null>(null);
+
+  // Current logged in user reviews for My Shop tab
+  const [currentUserReviews, setCurrentUserReviews] = useState<any[]>([]);
+  const [currentUserReviewsLoading, setCurrentUserReviewsLoading] = useState(false);
+  const [selectedPromoPkg, setSelectedPromoPkg] = useState<any>(AD_PACKAGES[1]); // Default to Premium Promo package
+  const [expandedAdPkgId, setExpandedAdPkgId] = useState<string | null>(null); // accordion: which ad package card is expanded
+  
+  // Firebase Auth states
+  const [user, setUser] = useState<any>(null);
+  const [userMetadata, setUserMetadata] = useState<any>(null);
+  // 🔧 Fixes local-session/Firebase-Auth race condition: `user` above is set
+  // instantly from localStorage on startup so the UI feels fast (avatar,
+  // name, etc. show immediately). But Firestore security rules check
+  // `request.auth.uid`, which comes from the Firebase SDK's own async auth
+  // restoration -- NOT from this localStorage copy. If a uid-scoped listener
+  // (reviews, own listings, chats, profile sync) fires before Firebase
+  // Auth has actually finished restoring, it can run with `request.auth ==
+  // null` and get silently denied, or run against a stale/mismatched uid.
+  // `authReady` becomes true only once onAuthStateChanged has fired for the
+  // first time (whether the result is a user or null), and every uid-scoped
+  // listener below now waits for it.
+  const [authReady, setAuthReady] = useState(false);
+  const [showFilters, setShowFilters] = useState(false);
+  const [isPersonalInfoOpen, setIsPersonalInfoOpen] = useState(false);
+  const [isLanguageOpen, setIsLanguageOpen] = useState(false);
+  const [isTeamOpen, setIsTeamOpen] = useState(false);
+  const [isTermsSectionOpen, setIsTermsSectionOpen] = useState(false);
+  const [isSupportOpen, setIsSupportOpen] = useState(false);
+  
+  // Support Form state
+  const [supportName, setSupportName] = useState("");
+  const [supportEmail, setSupportEmail] = useState("");
+  const [supportMessage, setSupportMessage] = useState("");
+  const [isSupportSubmitting, setIsSupportSubmitting] = useState(false);
+  const [supportSuccess, setSupportSuccess] = useState(false);
+  const [supportError, setSupportError] = useState<string | null>(null);
+  
+  // Offline State Detector
+  const [isOffline, setIsOffline] = useState(() => {
+    if (typeof window !== "undefined") {
+      return !navigator.onLine;
+    }
+    return false;
+  });
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const handleOnline = () => setIsOffline(false);
+    const handleOffline = () => setIsOffline(true);
+
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+
+    return () => {
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+    };
+  }, []);
+
+  const [isDark, setIsDark] = useState(() => {
+    if (typeof window !== "undefined") {
+      return document.documentElement.classList.contains("dark") || 
+             localStorage.getItem("gari_bazar_theme") === "dark";
+    }
+    return false;
+  });
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      if (isDark) {
+        document.documentElement.classList.add("dark");
+        localStorage.setItem("gari_bazar_theme", "dark");
+      } else {
+        document.documentElement.classList.remove("dark");
+        localStorage.setItem("gari_bazar_theme", "light");
+      }
+    }
+  }, [isDark]);
+
+  // Admin checking logic
+  const [isAdminVerified, setIsAdminVerified] = useState(false);
+
+  useEffect(() => {
+    setIsAdminVerified(user?.isAdmin === true);
+  }, [user]);
+
+  const isUserAdmin = isAdminVerified;
+  
+  // Helper to retrieve all currently blocked user IDs
+  const getBlockedUids = (): string[] => {
+    let localBlocked: string[] = [];
+    if (typeof window !== "undefined") {
+      try {
+        const stored = localStorage.getItem("gari_bazar_blocked_uids") || "[]";
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed)) {
+          localBlocked = parsed;
+        }
+      } catch (e) {}
+    }
+    return [
+      ...(userMetadata?.blockedUids || []),
+      ...localBlocked
+    ];
+  };
+
+  // Load initial listings from local localStorage + SAMPLE_LISTINGS immediately for instant rendering on startup
+  const getInitialListings = (): PartListing[] => {
+    const isProduction = checkIsProduction();
+    
+    let localListings: any[] = [];
+    if (typeof window !== "undefined") {
+      const localListingsStr = localStorage.getItem("gari_bazar_local_listings") || "[]";
+      try {
+        localListings = JSON.parse(localListingsStr);
+      } catch (e) {}
+
+      if (isProduction) {
+        try {
+          const cachedProd = localStorage.getItem("gari_bazar_prod_cached_listings");
+          if (cachedProd) {
+            const parsed = JSON.parse(cachedProd);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              return parsed;
+            }
+          }
+        } catch (e) {}
+        return [];
+      }
+    }
+
+    const combined = [...localListings];
+    SAMPLE_LISTINGS.forEach((item) => {
+      if (!combined.some((dyn) => dyn.id === item.id)) {
+        combined.push(item);
+      }
+    });
+
+    // Sort by createdAt descending
+    combined.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    
+    // Filter out blocked users
+    let blockedUids: string[] = [];
+    if (typeof window !== "undefined") {
+      try {
+        const stored = localStorage.getItem("gari_bazar_blocked_uids") || "[]";
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed)) {
+          blockedUids = parsed;
+        }
+      } catch (e) {}
+    }
+    
+    return combined.filter(item => !blockedUids.includes(item.sellerId)) as PartListing[];
+  };
+
+  // Core Database Listings State
+  const [listings, setListings] = useState<PartListing[]>(getInitialListings);
+  // সব পোস্ট: ইউজারের নিজের সব লিস্টিং, হোমপেজের "Load More" পেজিনেশনের ওপর নির্ভর না করে —
+  // যাতে Dashboard আর Lottery সবসময় ইউজারের ১০০% পোস্ট দেখাতে পারে, হোমপেজে কত লোড হয়েছে তার তোয়াক্কা না করেই।
+  const [myListings, setMyListings] = useState<PartListing[]>([]);
+  // সব বুস্ট করা অ্যাড: হোমপেজের পেজিনেশনের ওপর নির্ভর না করে সরাসরি fetch করা,
+  // যাতে "Load More" চাপার আগেই সবসময় বুস্ট ব্যানার দেখা যায়।
+  const [adListings, setAdListings] = useState<PartListing[]>([]);
+  const [purchases, setPurchases] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  // Listings Pagination States
+  const [firebaseListings, setFirebaseListings] = useState<PartListing[]>([]);
+  const [moreListings, setMoreListings] = useState<PartListing[]>([]);
+  const [lastListingDoc, setLastListingDoc] = useState<string | null>(null);
+  const [hasMoreListings, setHasMoreListings] = useState(false);
+  const [loadingMoreListings, setLoadingMoreListings] = useState(false);
+  // 🔧 Surfaced instead of silently showing "no listings" -- set when the
+  // initial Firestore fetch times out or genuinely fails, cleared on retry.
+  const [listingsError, setListingsError] = useState<string | null>(null);
+
+  // Purchases Pagination States
+  const [firebasePurchases, setFirebasePurchases] = useState<any[]>([]);
+  const [morePurchases, setMorePurchases] = useState<any[]>([]);
+  const [lastPurchasesDoc, setLastPurchasesDoc] = useState<DocumentSnapshot | null>(null);
+  const [hasMorePurchases, setHasMorePurchases] = useState(false);
+  const [loadingMorePurchases, setLoadingMorePurchases] = useState(false);
+  
+  // UI Triggers & Modals
+  const [isAuthOpen, setIsAuthOpen] = useState(false);
+  const [isLegalOpen, setIsLegalOpen] = useState(false);
+  const [selectedListing, setSelectedListing] = useState<PartListing | null>(null);
+  const [promotingListing, setPromotingListing] = useState<PartListing | null>(null);
+  const [isLotteryOpen, setIsLotteryOpen] = useState(false);
+  const [editingListing, setEditingListing] = useState<PartListing | null>(null);
+  const [isStandalonePrivacy, setIsStandalonePrivacy] = useState(false);
+  const [isStandaloneDeletion, setIsStandaloneDeletion] = useState(false);
+  const [isStandaloneTerms, setIsStandaloneTerms] = useState(false);
+  const [isStandaloneAbout, setIsStandaloneAbout] = useState(false);
+
+  // Synchronize saved Listing IDs from localStorage when activeTab shifts or selectedListing toggles
+  useEffect(() => {
+    try {
+      const favsStr = localStorage.getItem("gari_bazar_favorites") || "[]";
+      const parsed = JSON.parse(favsStr);
+      if (Array.isArray(parsed)) {
+        setSavedListingIds(parsed);
+      }
+    } catch (e) {
+      console.error("Error reading favorites:", e);
+    }
+  }, [activeTab, selectedListing]);
+
+  // Dynamic bookmarks matching
+  const savedListings = useMemo(() => {
+    return listings.filter((item) => savedListingIds.includes(item.id));
+  }, [listings, savedListingIds]);
+
+  // Track a site visit once per browser session (not once per page load --
+  // opening/closing a listing now does a real reload, and we don't want that
+  // to inflate visit counts). Anonymous, IP-based, feeds the admin panel's
+  // "Visitors & Logins" tab.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      if (!sessionStorage.getItem("gari_bazar_visit_tracked")) {
+        sessionStorage.setItem("gari_bazar_visit_tracked", "1");
+        trackEvent("visit");
+      }
+    } catch {
+      trackEvent("visit");
+    }
+  }, []);
+
+  // Open a specific listing when arriving via a shared link (?listing=<id>)
+  // or via our own real-navigation listing open. Runs once per page load.
+  //
+  // Speed: instead of waiting for the ENTIRE listings collection to sync down
+  // before we can find this one item (slow, especially on weak connections),
+  // we try two much faster paths first:
+  //   1. A locally cached copy stashed right before we navigated here (instant,
+  //      zero network wait).
+  //   2. A direct single-document fetch by ID (one small request, instead of
+  //      syncing the whole marketplace).
+  // The full `listings` collection still loads in the background as normal.
+  const [hasOpenedSharedListing, setHasOpenedSharedListing] = useState(false);
+  useEffect(() => {
+    if (hasOpenedSharedListing) return;
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const sharedListingId = params.get("listing");
+    if (!sharedListingId) return;
+
+    setHasOpenedSharedListing(true);
+    const cleanUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
+
+    // Fastest path: a cached copy of this exact listing from just before we navigated.
+    try {
+      const cachedRaw = sessionStorage.getItem("gari_bazar_cached_listing");
+      if (cachedRaw) {
+        const cached = JSON.parse(cachedRaw);
+        if (cached && cached.id === sharedListingId) {
+          setSelectedListing(cached);
+          sessionStorage.removeItem("gari_bazar_cached_listing");
+          window.history.replaceState({}, "", cleanUrl);
+          return;
+        }
+      }
+    } catch {}
+
+    // Next fastest: an already-loaded local match, if the collection happened
+    // to sync down before this effect ran.
+    const target = listings.find((item) => item.id === sharedListingId);
+    if (target) {
+      setSelectedListing(target);
+      window.history.replaceState({}, "", cleanUrl);
+      return;
+    }
+
+    // Last resort: fetch just this one document directly.
+    (async () => {
+      try {
+        const snap = await getDoc(doc(db, "listings", sharedListingId));
+        if (snap.exists()) {
+          setSelectedListing({ id: snap.id, ...snap.data() } as PartListing);
+        }
+      } catch (err) {
+        console.warn("Could not fetch shared listing directly:", err);
+      } finally {
+        window.history.replaceState({}, "", cleanUrl);
+      }
+    })();
+  }, [listings, hasOpenedSharedListing]);
+
+  // Push Notifications (FCM) and Analytics integration states
+  const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>(
+    typeof window !== "undefined" && "Notification" in window ? Notification.permission : "default"
+  );
+  const [showNotificationPrompt, setShowNotificationPrompt] = useState(
+    typeof window !== "undefined" && "Notification" in window && Notification.permission === "default"
+  );
+
+  const prevListingsIdRef = useRef<Set<string>>(new Set());
+  const sessionStartTimeRef = useRef<number>(Date.now());
+
+  // 📲 PWA Install Prompt — একবার লগইন/রেজিস্টার করলে আর দেখানো হবে না
+  const [deferredInstallPrompt, setDeferredInstallPrompt] = useState<any>(null);
+  const [showInstallPrompt, setShowInstallPrompt] = useState(false);
+
+  // Facebook/Instagram-এর in-app browser এ beforeinstallprompt কখনোই আসে না —
+  // তাই এই ব্রাউজারগুলো আলাদাভাবে ধরে, Chrome-এ পাঠিয়ে দেওয়া হয়
+  const isInAppBrowser = /FBAN|FBAV|Instagram|Messenger/i.test(navigator.userAgent);
+
+  useEffect(() => {
+    const dismissedForever = localStorage.getItem("gari_bazar_install_dismissed") === "true";
+
+    // Chrome-এ ফিরে আসার পর (in-app browser থেকে রিডাইরেক্ট হওয়ার পর) স্বয়ংক্রিয়ভাবে
+    // ইনস্টল popup তোলার জন্য এই ফ্ল্যাগ চেক করা হয়
+    const autoInstall = new URLSearchParams(window.location.search).get("install") === "1";
+
+    const handleBeforeInstallPrompt = (e: any) => {
+      e.preventDefault();
+      setDeferredInstallPrompt(e);
+      if (autoInstall) {
+        // Chrome-এ ফিরে এলে browser install prompt-এ user activation দরকার।
+        // তাই এখানে prompt() জোর করে না তুলে Install button-টি দেখানো হবে।
+        if (!dismissedForever) setShowInstallPrompt(true);
+        const cleanUrl = window.location.pathname + window.location.hash;
+        window.history.replaceState({}, "", cleanUrl);
+      } else if (!dismissedForever) {
+        setShowInstallPrompt(true);
+      }
+    };
+
+    window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+
+    // Facebook/Instagram browser-এ beforeinstallprompt কখনোই আসবে না,
+    // তাই এখানে সরাসরি ব্যানার দেখিয়ে দেওয়া হচ্ছে (ট্যাপ করলে Chrome-এ পাঠাবে)
+    if (isInAppBrowser && !dismissedForever && !autoInstall) {
+      setShowInstallPrompt(true);
+    }
+
+    const handleAppInstalled = () => {
+      localStorage.setItem("gari_bazar_install_dismissed", "true");
+      setShowInstallPrompt(false);
+      setDeferredInstallPrompt(null);
+      // শুধু এখানেই সত্যিকারের ইনস্টল কনফার্ম হয় (ব্রাউজার নিজে ফায়ার করে,
+      // তাই বাটনে ক্লিক করা আর আসলে ইনস্টল করা — এই দুটো আলাদা থাকে)
+      trackEvent("install");
+    };
+    window.addEventListener("appinstalled", handleAppInstalled);
+
+    return () => {
+      window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+      window.removeEventListener("appinstalled", handleAppInstalled);
+    };
+  }, []);
+
+  // পেমেন্ট গেটওয়ে (Paymently/UddoktaPay) থেকে "X" চেপে ফিরে এলে ব্রাউজার
+  // bfcache থেকে পুরনো/ভাঙা অবস্থায় পেজ রিস্টোর করে - এখানে জোর করে রিলোড
+  // করে দিলে ব্যবহারকারীর ম্যানুয়াল রিলোড করার দরকার পড়ে না।
+  useEffect(() => {
+    const handlePageShow = (event: PageTransitionEvent) => {
+      if (event.persisted) {
+        window.location.reload();
+      }
+    };
+    window.addEventListener("pageshow", handlePageShow);
+    return () => window.removeEventListener("pageshow", handlePageShow);
+  }, []);
+
+  const handleInstallApp = async () => {
+    if (isInAppBrowser) {
+      // Facebook/Instagram browser-এ থাকলে সরাসরি ইনস্টল সম্ভব না —
+      // Chrome-এ একই পেজ খুলে দেওয়া হচ্ছে, ?install=1 ফ্ল্যাগ সহ যাতে ওখানে
+      // পৌঁছেই স্বয়ংক্রিয়ভাবে ইনস্টল popup উঠে যায়
+      const targetUrl = `${window.location.origin}${window.location.pathname}?install=1`;
+      const fallbackUrl = encodeURIComponent(targetUrl);
+      const intentUrl =
+        `intent://${targetUrl.replace(/^https?:\/\//, "")}` +
+        `#Intent;scheme=https;package=com.android.chrome;` +
+        `S.browser_fallback_url=${fallbackUrl};end`;
+      window.location.href = intentUrl;
+      return;
+    }
+    if (!deferredInstallPrompt) return;
+    deferredInstallPrompt.prompt();
+    await deferredInstallPrompt.userChoice;
+    setDeferredInstallPrompt(null);
+    setShowInstallPrompt(false);
+  };
+
+  const dismissInstallPrompt = (forever: boolean) => {
+    setShowInstallPrompt(false);
+    if (forever) {
+      localStorage.setItem("gari_bazar_install_dismissed", "true");
+    }
+  };
+
+  // Check for incoming referral code from shared links
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const searchParams = new URLSearchParams(window.location.search);
+      const refCode = searchParams.get("ref");
+      if (refCode) {
+        localStorage.setItem("gari_bazar_prefilled_referral", refCode.toUpperCase());
+        logger.debug("Captured prefilled referral code:", refCode);
+      }
+    }
+  }, []);
+
+  const showNotification = async (title: string, options: NotificationOptions) => {
+    if (!("Notification" in window)) return;
+    if (Notification.permission === "granted") {
+      try {
+        if ("serviceWorker" in navigator) {
+          const registration = await navigator.serviceWorker.ready;
+          if (registration) {
+            await registration.showNotification(title, options);
+            return;
+          }
+        }
+        new Notification(title, options);
+      } catch (e) {
+        console.warn("FCM push notification display failed:", e);
+      }
+    }
+  };
+
+  // Request Notification permission
+  const handleRequestNotificationPermission = async () => {
+    if (typeof window === "undefined" || !("Notification" in window)) {
+      alert("Push notifications are not supported in this browser environment.");
+      return;
+    }
+    try {
+      const permission = await Notification.requestPermission();
+      setNotificationPermission(permission);
+      setShowNotificationPrompt(false);
+      
+      if (permission === "granted") {
+        await showNotification("গাড়ি বাজার (Gari Bazar)", {
+          body: language === "bn" 
+            ? "পুশ নোটিফিকেশন সফলভাবে চালু হয়েছে! আপনাকে স্বাগতম!" 
+            : "Push notifications successfully enabled! Welcome aboard!",
+          icon: "/icon-192.png"
+        });
+      }
+    } catch (err) {
+      console.warn("Could not request notification permission:", err);
+    }
+  };
+
+  // Real-time listener for listings can check and trigger notifications
+  useEffect(() => {
+    if (listings.length === 0) return;
+    
+    // Extract listing IDs
+    const currentIds = new Set(listings.map(l => l.id));
+    
+    // If we already had past listings, check if any brand new listing was added
+    if (prevListingsIdRef.current.size > 0 && notificationPermission === "granted") {
+      const addedListings = listings.filter(l => !prevListingsIdRef.current.has(l.id));
+      
+      // Notify for each newly added listing if it's from another seller
+      // AND it was actually created after this session started (prevents Load More
+      // pagination from re-triggering notifications for old, already-existing listings)
+      addedListings.forEach(newListing => {
+        const createdAtMs = newListing.createdAt ? new Date(newListing.createdAt).getTime() : 0;
+        if (createdAtMs <= sessionStartTimeRef.current) return;
+        if (newListing.sellerId !== user?.uid) {
+          showNotification(language === "bn" ? "নতুন পার্টস বিক্রির বিজ্ঞাপন!" : "New Part Advert Listed!", {
+            body: `🚗 ${newListing.title} - ৳${newListing.price.toLocaleString("en-IN")} (${newListing.location})`,
+            icon: newListing.image || "/icon-192.png"
+          });
+        }
+      });
+    }
+    
+    // Update reference
+    prevListingsIdRef.current = currentIds;
+  }, [listings, notificationPermission, user?.uid, language]);
+
+  // Searches & Filtering
+  const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+  const [selectedCategory, setSelectedCategory] = useState("all");
+  const [selectedSubCategory, setSelectedSubCategory] = useState("all");
+  const [selectedCity, setSelectedCity] = useState("all");
+  const [sortBy, setSortBy] = useState("latest");
+  const [searchHistory, setSearchHistory] = useState<string[]>(() => {
+    try {
+      const h = localStorage.getItem("gari_bazar_search_history");
+      return h ? JSON.parse(h) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const appendSearchHistory = (q: string) => {
+    const clean = q.trim();
+    if (!clean || clean.length < 2) return;
+    setSearchHistory((prev) => {
+      const next = [clean, ...prev.filter((x) => x !== clean)].slice(0, 6);
+      localStorage.setItem("gari_bazar_search_history", JSON.stringify(next));
+      return next;
+    });
+  };
+
+  // Track search query analytics (Debounced)
+  useEffect(() => {
+    if (!searchQuery.trim()) return;
+    const timer = setTimeout(() => {
+      logAnalyticsEvent("search", { query: searchQuery.trim() });
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  // Track listing view analytics
+  useEffect(() => {
+    if (selectedListing) {
+      logAnalyticsEvent("listing_view", {
+        id: selectedListing.id,
+        title: selectedListing.title,
+        category: selectedListing.category,
+        isAd: selectedListing.isAd ?? false
+      });
+    }
+  }, [selectedListing]);
+
+  // Parse path or query params for direct standalone Privacy Policy link
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const searchParams = new URLSearchParams(window.location.search);
+      const isPrivacyQuery = searchParams.get("view") === "privacy" || searchParams.get("page") === "privacy";
+      const isPrivacyHash = window.location.hash === "#privacy";
+      const isPrivacyPath = window.location.pathname.endsWith("/privacy") || window.location.pathname.endsWith("/privacy-policy");
+      
+      if (isPrivacyQuery || isPrivacyHash || isPrivacyPath) {
+        setIsStandalonePrivacy(true);
+      }
+
+      const isDeleteQuery = searchParams.get("view") === "data-deletion" || searchParams.get("page") === "data-deletion" || searchParams.get("page") === "delete";
+      const isDeleteHash = window.location.hash === "#data-deletion" || window.location.hash === "#delete";
+      const isDeletePath = window.location.pathname.endsWith("/data-deletion") || window.location.pathname.endsWith("/delete");
+
+      if (isDeleteQuery || isDeleteHash || isDeletePath) {
+        setIsStandaloneDeletion(true);
+      }
+
+      const isTermsQuery = searchParams.get("view") === "terms" || searchParams.get("page") === "terms";
+      const isTermsHash = window.location.hash === "#terms";
+      const isTermsPath = window.location.pathname.endsWith("/terms") || window.location.pathname.endsWith("/terms-of-service");
+
+      if (isTermsQuery || isTermsHash || isTermsPath) {
+        setIsStandaloneTerms(true);
+      }
+
+      const isAboutQuery = searchParams.get("view") === "about" || searchParams.get("page") === "about" || searchParams.get("page") === "contact";
+      const isAboutHash = window.location.hash === "#about" || window.location.hash === "#contact";
+      const isAboutPath = window.location.pathname.endsWith("/about") || window.location.pathname.endsWith("/contact");
+
+      if (isAboutQuery || isAboutHash || isAboutPath) {
+        setIsStandaloneAbout(true);
+      }
+    }
+  }, []);
+
+  const activeTranslations = translations[language];
+
+  // Push one harmless "anchor" history entry as soon as the app boots, before
+  // any modal ever opens. This guarantees there is always at least one extra
+  // step of same-site history underneath any modal's pushState, so a single
+  // back press never has a chance of falling straight through to whatever
+  // was open before the site (e.g. the Facebook feed).
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.history.replaceState({ garibazarAnchor: true, ...window.history.state }, "");
+    // Also push one extra buffer entry right away. Without this, a fresh page
+    // load (e.g. arriving via a shared Facebook link) starts with only ONE
+    // history entry -- so the very first back-button/gesture press after
+    // opening a listing can land right on the edge of the stack and some
+    // Android back-gesture implementations close the whole tab/app instead
+    // of stepping back within the page. This buffer entry gives every
+    // modal's pushState a safe extra step of room underneath it.
+    window.history.pushState({ garibazarHome: true, garibazarTab: activeTab }, "");
+  }, []);
+
+  // Track tab switches (মার্কেট / বিক্রি / ড্যাশবোর্ড / চ্যাট / প্রোফাইল) in the
+  // browser's back-button history too, not just modals. Without this, the
+  // back button had no idea which tab you were on -- so it always fell
+  // straight through to the very first/home state instead of stepping back
+  // through the tabs you'd actually visited.
+  const tabHistoryRef = useRef<string>(activeTab);
+  const isRestoringTabRef = useRef(false);
+
+  useEffect(() => {
+    if (tabHistoryRef.current === activeTab) return;
+    tabHistoryRef.current = activeTab;
+    if (isRestoringTabRef.current) {
+      // This tab change came from a back-button press (see popstate handler
+      // below), not a fresh tap -- don't push another entry for it.
+      isRestoringTabRef.current = false;
+      return;
+    }
+    if (typeof window === "undefined") return;
+    window.history.pushState({ garibazarTab: activeTab }, "");
+  }, [activeTab]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const handleTabPopState = (event: PopStateEvent) => {
+      const state = event.state as { garibazarTab?: string } | null;
+      if (state && typeof state.garibazarTab === "string") {
+        isRestoringTabRef.current = true;
+        setActiveTab(state.garibazarTab as typeof activeTab);
+      }
+    };
+    window.addEventListener("popstate", handleTabPopState);
+    return () => window.removeEventListener("popstate", handleTabPopState);
+  }, []);
+
+  // Ref to track if we pushed a modal state
+  const modalHistoryRef = useRef<boolean>(false);
+
+  // Remembers which tab was active the moment a modal opened, so that
+  // closing the modal via the back button always returns to THAT tab --
+  // instead of trusting whichever tab happens to sit in the popped
+  // history entry. This is a defensive fix: on longer, Load-More-extended
+  // pages a stray/duplicate popstate (e.g. an Android edge back-gesture
+  // firing while scrolling) could occasionally hand handleTabPopState a
+  // stale tab from earlier in the session (e.g. Dashboard), landing the
+  // user on the wrong tab after closing a listing. Explicitly restoring
+  // the captured tab here overrides that regardless of the cause.
+  const tabWhenModalOpenedRef = useRef<string | null>(null);
+
+  // Intercept browser back button to close active modal instead of exiting the page/iframe
+  useEffect(() => {
+    const isAnyModalOpen = !!(isAuthOpen || selectedListing || promotingListing || editingListing || isLegalOpen || isLotteryOpen);
+
+    const handlePopState = () => {
+      modalHistoryRef.current = false;
+      setIsAuthOpen(false);
+      setSelectedListing(null);
+      setPromotingListing(null);
+      setEditingListing(null);
+      setIsLegalOpen(false);
+      if (tabWhenModalOpenedRef.current !== null) {
+        isRestoringTabRef.current = true;
+        setActiveTab(tabWhenModalOpenedRef.current as typeof activeTab);
+        tabWhenModalOpenedRef.current = null;
+      }
+    };
+
+    if (isAnyModalOpen) {
+      if (!modalHistoryRef.current) {
+        tabWhenModalOpenedRef.current = activeTab;
+        // যখন আগের মডাল X বাটনে বন্ধ হয়েছিল, তখন নিচের else ব্লক নতুন কোনো
+        // entry push না করে বর্তমান entry-টাকেই "modalOpen: false" দিয়ে
+        // replaceState করেছিল (race এড়াতে)। ফলে ওই entry-টা history স্ট্যাকে
+        // অব্যবহৃত অবস্থায় থেকে যেত। পরের বার মডাল খুললে যদি আমরা আবার নতুন
+        // entry push করি, তাহলে প্রতিটা X-বন্ধ + পুনরায়-খোলা চক্রে স্ট্যাকে
+        // একটা করে "ভুতুড়ে" entry জমতে থাকে — এতে ব্যাক বাটনে একবার চাপলে
+        // কিছুই হয় না (সেই ভুতুড়ে entry-টা silently consume হয়), দ্বিতীয়বার
+        // চাপলে আসল নেভিগেশন হয়, এবং যথেষ্ট entry জমে গেলে স্ট্যাক ফুরিয়ে
+        // অ্যাপ পুরো reload হয়ে হোমপেজে চলে যায়। এড়াতে: বর্তমান entry যদি
+        // ইতিমধ্যে সেই "বন্ধ হওয়া মডাল"-এর ভুতুড়ে entry হয়, তাহলে নতুন push না
+        // করে সেটাকেই replaceState দিয়ে "modalOpen: true" বানিয়ে পুনরায় ব্যবহার
+        // করা হচ্ছে — স্ট্যাক আর বাড়ছে না।
+        const currentState = window.history.state as { modalOpen?: boolean } | null;
+        if (currentState && currentState.modalOpen === false) {
+          window.history.replaceState({ ...currentState, modalOpen: true }, "");
+        } else {
+          window.history.pushState({ modalOpen: true }, "");
+        }
+        modalHistoryRef.current = true;
+      }
+      window.addEventListener("popstate", handlePopState);
+    } else {
+      if (modalHistoryRef.current) {
+        modalHistoryRef.current = false;
+        window.history.back();
+      }
+    }
+
+    return () => {
+      window.removeEventListener("popstate", handlePopState);
+    };
+  }, [isAuthOpen, selectedListing, promotingListing, editingListing, isLegalOpen, isLotteryOpen]);
+
+  // 1. Custom Passwordless Profile Authentication Listener & Real-time Firestore Sync
+  useEffect(() => {
+    // Read locally logged in profile on startup
+    const stored = localStorage.getItem("gari_bazar_session_user");
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored);
+        setUser({
+          uid: parsed.uid,
+          displayName: parsed.displayName,
+          email: parsed.email,
+          photoURL: parsed.photoURL || parsed.profilePicture,
+          isAdmin: parsed.isAdmin === true
+        });
+        setUserMetadata(parsed);
+      } catch (err) {
+        console.error("Local session parsing failed:", err);
+      }
+    }
+  }, []);
+
+  // 🔧 Waits for Firebase's own auth restoration to actually finish before
+  // letting any uid-scoped Firestore listener subscribe -- see the
+  // `authReady` comment above for why this matters. This fires exactly
+  // once per app load (whether the restored user is null or real);
+  // subsequent sign-in/sign-out during the session still update `user` via
+  // the normal login/logout code paths elsewhere in the app.
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, () => {
+      setAuthReady(true);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // Fetch reviews for the currently logged-in user to display in "My Shop"
+  useEffect(() => {
+    if (!authReady || !user?.uid) {
+      setCurrentUserReviews([]);
+      return;
+    }
+    setCurrentUserReviewsLoading(true);
+    const q = query(
+      collection(db, "seller_reviews"),
+      where("sellerId", "==", user.uid),
+      orderBy("createdAt", "desc"),
+      limit(30)
+    );
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const list: any[] = [];
+      snapshot.forEach((docSnap) => {
+        list.push({ id: docSnap.id, ...docSnap.data() });
+      });
+      list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      setCurrentUserReviews(list);
+      setCurrentUserReviewsLoading(false);
+    }, (err) => {
+      console.warn("Failed to subscribe to current user reviews:", err);
+      setCurrentUserReviewsLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, [authReady, user?.uid]);
+
+  // Sync profile metadata real-time (e.g. simulated credits recharge instantly)
+  useEffect(() => {
+    if (!authReady || !user?.uid) return;
+
+    const userRef = doc(db, "users", user.uid);
+    const unsubscribe = onSnapshot(userRef, (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        setUserMetadata((prev: any) => ({ ...prev, ...data }));
+        
+        // Sync back to local storage
+        const stored = localStorage.getItem("gari_bazar_session_user");
+        if (stored) {
+          try {
+            const parsed = JSON.parse(stored);
+            localStorage.setItem("gari_bazar_session_user", JSON.stringify({ ...parsed, ...data }));
+          } catch (e) {}
+        }
+      }
+    });
+
+    return () => unsubscribe();
+  }, [authReady, user?.uid]);
+
+  // Unread Chats Listener
+  const [unreadChatsCount, setUnreadChatsCount] = useState(0);
+  useEffect(() => {
+    if (!authReady || !user?.uid) {
+      setUnreadChatsCount(0);
+      return;
+    }
+    const q = query(
+      collection(db, "chats"),
+      where("participants", "array-contains", user.uid),
+      orderBy("lastMessageAt", "desc"),
+      limit(50)
+    );
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      let count = 0;
+      snapshot.forEach(docSnap => {
+        const data = docSnap.data();
+        const unreadForMe = data.unreadCount?.[user.uid] || 0;
+        if (unreadForMe > 0) count++;
+      });
+      setUnreadChatsCount(count);
+    });
+    return () => unsubscribe();
+  }, [authReady, user?.uid]);
+
+  // 1b. My Own Listings — সরাসরি sellerId দিয়ে কোয়েরি করা, হোমপেজের ২০-টা পেজিনেটেড লিস্ট থেকে না।
+  // এভাবে Dashboard আর Lottery সবসময় ইউজারের আসল ১০০% পোস্ট দেখাবে।
+  useEffect(() => {
+    if (!authReady || !user?.uid) {
+      setMyListings([]);
+      return;
+    }
+    const q = query(collection(db, "listings"), where("sellerId", "==", user.uid), orderBy("createdAt", "desc"), limit(100));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const list: PartListing[] = [];
+      snapshot.forEach((docSnap) => {
+        const data = docSnap.data();
+        if (data.isDeleted === true) return; // soft-deleted, in its 30-day recovery window
+        const normalizedCreatedAt = data.createdAt && typeof data.createdAt.toDate === "function"
+          ? data.createdAt.toDate().toISOString()
+          : data.createdAt;
+        list.push({ id: docSnap.id, ...data, createdAt: normalizedCreatedAt } as PartListing);
+      });
+      setMyListings(list);
+    }, (err) => {
+      logger.error("Failed to sync my listings:", err);
+    });
+    return () => unsubscribe();
+  }, [authReady, user?.uid]);
+
+  // 1c. সব লাইভ বুস্ট করা অ্যাড — হোমপেজের "Load More" পেজিনেশনের ওপর নির্ভর না করে সরাসরি fetch করা,
+  // যাতে পেজ লোড হওয়ার সাথে সাথেই বুস্ট ব্যানার দেখা যায়, Load More চাপার আগেই।
+  //
+  // Phase 1 Supabase migration + read-cost fix: was a Firestore onSnapshot
+  // real-time listener running for EVERY visitor unconditionally -- any
+  // matching write fanned out to every currently-connected client (1 write
+  // -> N reads at N concurrent visitors), which is what was driving the
+  // Firestore read-cost blowup at only ~40 visitors/day. Now a one-time
+  // Supabase fetch on page load, same UX (ads don't need to update live
+  // mid-browse), no fan-out cost, and Postgres has no per-read billing.
+  useEffect(() => {
+    (async () => {
+      try {
+        const list = await fetchAdListingsFromSupabase(20);
+        setAdListings(list);
+      } catch (err) {
+        logger.error("Failed to fetch ad listings:", err);
+      }
+    })();
+  }, []);
+
+  // 2. Paginated Listings Sync -- Phase 1 of Firebase -> Supabase migration:
+  // this now reads from Postgres (listingsApi.ts) instead of Firestore.
+  // Postgres has none of Firestore's per-read billing or the ~1
+  // write/sec/document ceiling that was driving the read-cost blowup at
+  // only ~40 visitors/day (see the ad-listener fan-out fix from earlier in
+  // this migration) -- a real fix for that problem, not just a workaround.
+  const INITIAL_FETCH_LIMIT = 20; // restored: 8 caused annoying repeated "Load More" clicks
+  const fetchInitialListings = async () => {
+    setLoading(true);
+    setListingsError(null);
+    const isProduction = checkIsProduction();
+    try {
+      const page = await withTimeout(fetchInitialListingsFromSupabase(INITIAL_FETCH_LIMIT), 12000, "fetchInitialListings");
+
+      if (page.listings.length === 0) {
+        if (isProduction) {
+          logger.debug("Supabase empty in production. No listings to show.");
+          setFirebaseListings([]);
+        } else {
+          logger.debug("Supabase empty. Fallback to offline mock car parts listings.");
+          setFirebaseListings(SAMPLE_LISTINGS as PartListing[]);
+        }
+        setHasMoreListings(false);
+        setLastListingDoc(null);
+      } else {
+        const list = page.listings.filter((item) => {
+          const isDemo = item.id.startsWith("local-") || item.id.startsWith("temp-") || item.id.startsWith("part-") || (item as any).isDemo === true;
+          return !isProduction || !isDemo;
+        });
+
+        setFirebaseListings(list);
+        setLastListingDoc(page.nextCursor);
+        setHasMoreListings(page.hasMore);
+      }
+    } catch (error: any) {
+      console.error("Firestore loading error:", error);
+      // 🔧 Previously this silently fell back to an empty list in
+      // production, so a real network/auth/index error looked identical to
+      // "no listings exist yet" -- and a hung promise looked identical to a
+      // permanent loading skeleton. Now we tell the user directly and let
+      // them retry, whichever it was.
+      const isTimeout = error instanceof TimeoutError;
+      setListingsError(
+        isTimeout
+          ? (language === "bn"
+              ? "লোড হতে বেশি সময় লাগছে। নেটওয়ার্ক চেক করে আবার চেষ্টা করুন।"
+              : "Taking too long to load. Check your connection and try again.")
+          : (language === "bn"
+              ? "পণ্য লোড করা যায়নি। আবার চেষ্টা করুন।"
+              : "Couldn't load listings. Please try again.")
+      );
+      if (isProduction) {
+        setFirebaseListings([]);
+      } else {
+        setFirebaseListings(SAMPLE_LISTINGS as PartListing[]);
+      }
+      setHasMoreListings(false);
+      setLastListingDoc(null);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchInitialListings();
+
+    const handleRefresh = () => {
+      fetchInitialListings();
+    };
+    window.addEventListener("gari_bazar_refreshed_data", handleRefresh);
+    return () => {
+      window.removeEventListener("gari_bazar_refreshed_data", handleRefresh);
+    };
+  }, []);
+
+  // 2b. Merge real-time, loaded-more, and local listings
+  useEffect(() => {
+    const processAndSetListings = (firebaseList: any[]) => {
+      const isProduction = checkIsProduction();
+      let localListings: any[] = [];
+      if (!isProduction) {
+        const localListingsStr = localStorage.getItem("gari_bazar_local_listings") || "[]";
+        try {
+          localListings = JSON.parse(localListingsStr);
+        } catch (e) {}
+      }
+
+      // Combine local listings first
+      const combined = [...localListings];
+      firebaseList.forEach((item) => {
+        if (!combined.some((dyn) => dyn.id === item.id)) {
+          combined.push(item);
+        }
+      });
+      
+      // Sort by createdAt descending
+      combined.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      
+      // Filter out blocked users
+      const blocked = getBlockedUids();
+      let filtered = combined.filter(item => !blocked.includes(item.sellerId));
+
+      // Filter out soft-deleted listings (isDeleted:true) -- these are kept
+      // in Firestore for a 30-day recovery window (see the delete handler
+      // and /api/cron/data-retention-cleanup) but should never be visible
+      // anywhere in the app, same as if they were already gone.
+      filtered = filtered.filter(item => item.isDeleted !== true);
+
+      // Filter out demo/sample/mock listings in production
+      if (isProduction) {
+        filtered = filtered.filter(item => {
+          const isDemo = item.id.startsWith("local-") || item.id.startsWith("temp-") || item.id.startsWith("part-") || item.isDemo === true;
+          return !isDemo;
+        });
+
+        // Cache production listings in local storage for instant loading on
+        // subsequent mounts. Bounded to the most recent 30 -- previously this
+        // wrote the *entire* accumulated array (including everything pulled
+        // in via repeated "Load More" clicks), so a long browsing session
+        // could grow this into hundreds of listings and re-stringify all of
+        // them on every single listings update.
+        if (typeof window !== "undefined" && filtered.length > 0) {
+          try {
+            localStorage.setItem("gari_bazar_prod_cached_listings", JSON.stringify(filtered.slice(0, 30)));
+          } catch (e) {}
+        }
+      }
+
+      setListings(filtered);
+    };
+
+    const combinedList = [...firebaseListings, ...moreListings];
+    processAndSetListings(combinedList);
+
+    const handleLocalSync = () => {
+      processAndSetListings([...firebaseListings, ...moreListings]);
+    };
+    window.addEventListener("storage", handleLocalSync);
+
+    return () => {
+      window.removeEventListener("storage", handleLocalSync);
+    };
+  }, [firebaseListings, moreListings, userMetadata?.blockedUids]);
+
+  // 2c. Listings Pagination Loader helper
+  // NOTE: Firestore pagination fetches the next 20 listings of ANY category
+  // (vehicles + parts mixed), but the visible list is filtered client-side by
+  // whichever tab (selectedCategory) the person is on. That mismatch is why
+  // "Load More" used to feel broken -- e.g. on the Parts tab, if only 1 of
+  // the next 20 raw docs happened to be a part, the person would see just 1
+  // new item and have to tap Load More again and again. Fixed by looping:
+  // keep pulling batches until enough *matching* items have been collected
+  // (or there's nothing left to fetch), so one tap reliably surfaces a
+  // meaningful number of new items for whatever filter is active.
+  const handleLoadMoreListings = async () => {
+    if (!lastListingDoc || loadingMoreListings) return;
+    setLoadingMoreListings(true);
+
+    const TARGET_NEW_MATCHES = 6;
+    const MAX_BATCHES = 6; // safety cap: at most 6*20 = 120 extra reads per tap
+
+    const matchesCurrentFilter = (item: PartListing): boolean => {
+      const isVehicle = isItemVehicle(item);
+      let matchesCategory = true;
+      if (selectedCategory === "vehicles") matchesCategory = isVehicle;
+      else if (selectedCategory === "spare_parts") matchesCategory = !isVehicle;
+
+      // Also require the selected sub-category (e.g. Excavator) to match, not
+      // just the parent category - otherwise the loop below would stop after
+      // finding a handful of *any* vehicle, even if none were excavators.
+      const matchesSub = matchesSubCategoryFilter(item, selectedSubCategory);
+
+      return matchesCategory && matchesSub;
+    };
+
+    try {
+      let cursor = lastListingDoc;
+      let combinedNew: PartListing[] = [];
+      let matchedCount = 0;
+      let exhausted = false;
+
+      for (let i = 0; i < MAX_BATCHES; i++) {
+        const page = await withTimeout(fetchMoreListingsFromSupabase(cursor as string, 20), 12000, "loadMoreListings");
+
+        if (page.listings.length === 0) {
+          exhausted = true;
+          break;
+        }
+
+        const nextList = page.listings;
+
+        combinedNew = combinedNew.concat(nextList);
+        matchedCount += nextList.filter(matchesCurrentFilter).length;
+        cursor = page.nextCursor;
+
+        if (nextList.length < 20) {
+          exhausted = true;
+          break;
+        }
+        if (matchedCount >= TARGET_NEW_MATCHES) {
+          break;
+        }
+      }
+
+      setMoreListings(prev => {
+        const combined = [...prev];
+        combinedNew.forEach(item => {
+          if (!combined.some(existing => existing.id === item.id)) {
+            combined.push(item);
+          }
+        });
+        return combined;
+      });
+      setLastListingDoc(cursor);
+      setHasMoreListings(!exhausted);
+    } catch (err) {
+      console.warn("Failed to load more listings:", err);
+    } finally {
+      setLoadingMoreListings(false);
+    }
+  };
+
+  // 3. Real-time Purchases Sync (capped to 20 documents)
+  useEffect(() => {
+    if (!user) {
+      setFirebasePurchases([]);
+      setMorePurchases([]);
+      setLastPurchasesDoc(null);
+      setHasMorePurchases(false);
+      return;
+    }
+
+    const q = query(collection(db, "purchases"), where("buyerId", "==", user.uid), orderBy("createdAt", "desc"), limit(20));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      if (snapshot.empty) {
+        setFirebasePurchases([]);
+        setLastPurchasesDoc(null);
+        setHasMorePurchases(false);
+      } else {
+        const firestoreList: any[] = [];
+        snapshot.forEach((doc) => {
+          const data = doc.data();
+          if (data.buyerId === user.uid || data.sellerContact === userMetadata?.phoneNumber) {
+            firestoreList.push({ id: doc.id, ...data });
+          }
+        });
+
+        setFirebasePurchases(firestoreList);
+        setLastPurchasesDoc(snapshot.docs[snapshot.docs.length - 1]);
+        setHasMorePurchases(snapshot.docs.length === 20);
+      }
+    }, (err) => {
+      console.warn("Using offline purchases:", err);
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, [user, userMetadata?.phoneNumber]);
+
+  // 3b. Merge real-time, loaded-more, and local purchases
+  useEffect(() => {
+    const loadLocal = () => {
+      const stored = localStorage.getItem("gari_bazar_local_purchases") || "[]";
+      try {
+        return JSON.parse(stored);
+      } catch (e) {
+        return [];
+      }
+    };
+
+    const processAndSetPurchases = (firebaseList: any[]) => {
+      // Merge Firestore items with local items (to prevent duplicates by title+createdAt or id)
+      const merged = [...firebaseList];
+      const currentLocal = loadLocal();
+      currentLocal.forEach((localItem: any) => {
+        const alreadyExists = merged.some(
+          (item) => 
+            item.id === localItem.id || 
+            (item.title === localItem.title && 
+             Math.abs(new Date(item.createdAt).getTime() - new Date(localItem.createdAt).getTime()) < 30000)
+        );
+        if (!alreadyExists) {
+          merged.push(localItem);
+        }
+      });
+
+      merged.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      setPurchases(merged);
+    };
+
+    const combinedPurchases = [...firebasePurchases, ...morePurchases];
+    processAndSetPurchases(combinedPurchases);
+
+    const handleLocalSync = (e: StorageEvent) => {
+      if (e.key === "gari_bazar_local_purchases" || !e.key) {
+        processAndSetPurchases([...firebasePurchases, ...morePurchases]);
+      }
+    };
+
+    window.addEventListener("storage", handleLocalSync);
+
+    return () => {
+      window.removeEventListener("storage", handleLocalSync);
+    };
+  }, [firebasePurchases, morePurchases]);
+
+  // 3c. Purchases Pagination Loader helper
+  const handleLoadMorePurchases = async () => {
+    if (!user || !lastPurchasesDoc || loadingMorePurchases) return;
+    setLoadingMorePurchases(true);
+    try {
+      const q = query(
+        collection(db, "purchases"),
+        where("buyerId", "==", user.uid),
+        orderBy("createdAt", "desc"),
+        startAfter(lastPurchasesDoc),
+        limit(20)
+      );
+      const snapshot = await withTimeout(getDocs(q), 12000, "loadMorePurchases");
+      if (snapshot.empty) {
+        setHasMorePurchases(false);
+      } else {
+        const nextList: any[] = [];
+        snapshot.forEach((doc) => {
+          const data = doc.data();
+          if (data.buyerId === user.uid || data.sellerContact === userMetadata?.phoneNumber) {
+            nextList.push({ id: doc.id, ...data });
+          }
+        });
+
+        setMorePurchases(prev => {
+          const combined = [...prev];
+          nextList.forEach(item => {
+            if (!combined.some(existing => existing.id === item.id)) {
+              combined.push(item);
+            }
+          });
+          return combined;
+        });
+
+        setLastPurchasesDoc(snapshot.docs[snapshot.docs.length - 1]);
+        setHasMorePurchases(snapshot.docs.length === 20);
+      }
+    } catch (err) {
+      console.warn("Failed to load more purchases:", err);
+    } finally {
+      setLoadingMorePurchases(false);
+    }
+  };
+
+  // 3b. Expired Ad Promotion Resetter & Delete / Edit Helpers
+  useEffect(() => {
+    if (adListings.length === 0) return;
+    
+    // Check if any listings contains an expired advertisement
+    const expiredAds = adListings.filter(
+      (item) => item.isAd && item.adExpiresAt && new Date(item.adExpiresAt).getTime() < Date.now()
+    );
+
+    if (expiredAds.length > 0) {
+      logger.debug(`Resetting ${expiredAds.length} expired ad promotions...`);
+      expiredAds.forEach(async (item) => {
+        try {
+          const isLocal = item.id.startsWith("local-") || item.id.startsWith("temp-");
+          if (isLocal) {
+            const localListingsStr = localStorage.getItem("gari_bazar_local_listings") || "[]";
+            let localListings: any[] = [];
+            try {
+              localListings = JSON.parse(localListingsStr);
+            } catch (e) {}
+
+            const updated = localListings.map((l) =>
+              l.id === item.id ? { ...l, isAd: false, adExpiresAt: null } : l
+            );
+            localStorage.setItem("gari_bazar_local_listings", JSON.stringify(updated));
+            window.dispatchEvent(new Event("storage"));
+          } else {
+            const listingRef = doc(db, "listings", item.id);
+            await updateDoc(listingRef, {
+              isAd: false,
+              adExpiresAt: null
+            });
+          }
+        } catch (err) {
+          console.error("Error resetting expired advertisement promotion:", err);
+        }
+      });
+    }
+  }, [adListings]);
+
+  const handleDeleteListingBySeller = async (itemId: string) => {
+    const confirmDelete = window.confirm(
+      language === "bn" 
+        ? "আপনি কি নিশ্চিত যে আপনি স্থায়ীভাবে এই বিজ্ঞাপনটি মুছে ফেলতে চান?" 
+        : "Are you sure you want to permanently delete this listing?"
+    );
+    if (!confirmDelete) return;
+
+    try {
+      const isLocal = itemId.startsWith("local-") || itemId.startsWith("temp-");
+      if (isLocal) {
+        const localListingsStr = localStorage.getItem("gari_bazar_local_listings") || "[]";
+        let localListings: any[] = [];
+        try {
+          localListings = JSON.parse(localListingsStr);
+        } catch (e) {}
+
+        const updated = localListings.filter(item => item.id !== itemId);
+        localStorage.setItem("gari_bazar_local_listings", JSON.stringify(updated));
+        
+        // Dispatch local event to refresh state
+        window.dispatchEvent(new Event("storage"));
+      } else {
+        // Migrated to Supabase. Soft-delete (is_deleted/deleted_at) is
+        // deliberately NOT in protect_listing_admin_fields' blocked list --
+        // a seller deleting their own listing is a normal action, unlike
+        // self-promoting to an ad or faking stats.
+        const { error: deleteError } = await supabase
+          .from("listings")
+          .update({ is_deleted: true, deleted_at: new Date().toISOString() })
+          .eq("id", itemId);
+        if (deleteError) throw deleteError;
+      }
+    } catch (err) {
+      console.error("Error deleting listing:", err);
+      alert(language === "bn" ? "মুছে ফেলতে ব্যর্থ হয়েছে" : "Failed to delete listing.");
+    }
+  };
+
+  // 4a. Launch Ad Campaign directly from user dashboard
+  const {
+    adSelectedListingId,
+    setAdSelectedListingId,
+    adPromoLoading,
+    adPromoSuccess,
+    setAdPromoSuccess,
+    adPromoError,
+    setAdPromoError,
+    handleDashboardPromoSubmit,
+  } = useAdPromotion({ user, language, setIsAuthOpen, myListings, listings, selectedPromoPkg });
+
+  // 5. Open the listing detail page instantly, client-side (no page reload).
+  // Shows whatever listing was tapped -- including ones from "Load More" --
+  // since it's already in memory. Back button is handled by the modal
+  // history effect above (isAnyModalOpen / handlePopState).
+  const handleViewListingDetails = async (listing: PartListing) => {
+    setSelectedListing(listing);
+
+    try {
+      const newViews = (listing.views || 0) + 1;
+      incrementListingView(listing.id);
+      setListings((prev) =>
+        prev.map((item) =>
+          item.id === listing.id ? { ...item, views: newViews } : item
+        )
+      );
+      setSelectedListing((prev) =>
+        prev && prev.id === listing.id ? { ...prev, views: newViews } : prev
+      );
+    } catch (err) {
+      console.warn("Could not increment view counter:", err);
+    }
+  };
+
+  // Close the listing detail page -- just clear the selection. The modal
+  // history effect pops the history entry it pushed when the listing opened.
+  const closeListingDetail = () => {
+    setSelectedListing(null);
+  };
+
+  // 6. Sign out trigger
+  const handleLogout = () => {
+    signOut(auth).catch((err) => console.warn("Firebase signOut failed:", err));
+    localStorage.removeItem("gari_bazar_session_user");
+    setUser(null);
+    setUserMetadata(null);
+    setActiveTab("market");
+  };
+
+  const handleSupportSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!supportMessage.trim()) return;
+
+    setIsSupportSubmitting(true);
+    try {
+      // 🔧 সরাসরি Firestore write-এর বদলে rate-limited API ব্যবহার করা হচ্ছে
+      // (guest হলে IP-ভিত্তিক, লগইন থাকলে uid-ভিত্তিক সীমা) -- দেখুন
+      // api/submit-support-ticket.ts, আর firestore.rules-এ support_tickets
+      // এখন client-এর জন্য সম্পূর্ণ বন্ধ।
+      const idToken = user?.uid ? await auth.currentUser?.getIdToken().catch(() => null) : null;
+      const resp = await fetch(apiUrl("/api/submit-support-ticket"), {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}),
+        },
+        body: JSON.stringify({
+          name: supportName || (user?.displayName || "Anonymous"),
+          email: supportEmail || (user?.email || "anonymous@garibazar.com"),
+          message: supportMessage,
+        }),
+      });
+      const data = await resp.json();
+      if (!resp.ok) {
+        throw new Error(data?.error || "Failed to submit ticket");
+      }
+
+      setSupportSuccess(true);
+      setSupportMessage("");
+      setTimeout(() => {
+        setSupportSuccess(false);
+      }, 5000);
+    } catch (err: any) {
+      console.error("Error submitting support ticket:", err);
+      // 🔧 আগে এখানে ব্যর্থ হলেও "সফল হয়েছে" দেখানো হতো (false success) --
+      // ইউজার ভাবতো টিকেট জমা হয়েছে, আসলে হয়নি। এখন প্রকৃত ব্যর্থতা দেখানো হয়।
+      setSupportError(
+        err?.message === "Failed to fetch"
+          ? (language === "bn" ? "নেটওয়ার্ক সমস্যা। আবার চেষ্টা করুন।" : "Network error. Please try again.")
+          : (err?.message || (language === "bn" ? "টিকেট জমা দেওয়া যায়নি।" : "Couldn't submit ticket."))
+      );
+    } finally {
+      setIsSupportSubmitting(false);
+    }
+  };
+
+  // 7. Filtering listings based on user queries using Fuse.js fuzzy & bilingual aliases
+  // TODO: Server-Side Search Note (Algolia/Typesense)
+  // Because public listings are now fetched with pagination via paginated getDocs, client-side Fuse.js
+  // only filters pages currently loaded in memory. For global searching across thousands of remote
+  // listings in production, replace client fuzzy search with Algolia, Typesense, or Firebase Firestore Search extensions (e.g. Algolia Integration)
+  // that queries a server-side indexed corpus on the backend.
+  // পেজিনেটেড হোমপেজ ফিড + সব লাইভ বুস্ট করা অ্যাড — একসাথে merge করা (duplicate বাদ দিয়ে),
+  // যাতে category/search filter সবসময় ঠিকভাবে কাজ করে আর বুস্ট ব্যানারও সবসময় দেখা যায়।
+  const listingsWithAds = useMemo(() => {
+    const merged = [...listings];
+    const existingIds = new Set(listings.map((item) => item.id));
+    for (const adItem of adListings) {
+      if (!existingIds.has(adItem.id)) {
+        merged.push(adItem);
+      }
+    }
+    return merged;
+  }, [listings, adListings]);
+
+  const enrichedListings = useMemo(() => {
+    return listingsWithAds.map((item) => {
+      const cat = CATEGORIES.find(c => c.id === item.category);
+      const categoryLabelEn = cat ? cat.labelEn : "";
+      const categoryLabelBn = cat ? cat.labelBn : "";
+      
+      const searchBlob = buildSearchBlob([
+        item.title,
+        item.brand || "",
+        item.model,
+        item.description,
+        item.category,
+        categoryLabelEn,
+        categoryLabelBn,
+        item.location
+      ]);
+
+      // ফাজি সার্চের জন্য আলাদা, পরিষ্কার ব্লব — টাইটেল/মডেল যেহেতু description থেকেই
+      // অটো-জেনারেট হয় (শুধু প্রথম লাইন), তাই পুরো description এখানে রাখা জরুরি, কিন্তু
+      // ক্যাটাগরি লেবেলের মতো generic টেক্সট (যেমন "Vehicle") বাদ দেওয়া হয়েছে —
+      // ওটাই ভুল ম্যাচ (যেমন "Truck" সার্চে সব গাড়ি চলে আসা) তৈরি করছিল।
+      const fuzzyBlob = buildSearchBlob([
+        item.title,
+        item.brand || "",
+        item.model,
+        item.description
+      ]);
+      
+      return {
+        ...item,
+        searchBlob,
+        fuzzyBlob
+      };
+    });
+  }, [listingsWithAds]);
+
+  const fuseInstance = useMemo(() => {
+    return new Fuse(enrichedListings, {
+      keys: [
+        { name: "title", weight: 0.5 },
+        { name: "model", weight: 0.2 },
+        { name: "fuzzyBlob", weight: 0.3 }
+      ],
+      threshold: 0.3,
+      ignoreLocation: true,
+      minMatchCharLength: 2
+    });
+  }, [enrichedListings]);
+
+  const filteredListings = useMemo(() => {
+    let baseListings = enrichedListings;
+    
+    if (debouncedSearchQuery.trim().length > 0) {
+      const queryLower = debouncedSearchQuery.toLowerCase();
+      const queryEnglishDigits = convertBengaliDigitsToEnglish(queryLower);
+      const queryBengaliDigits = convertEnglishDigitsToBengali(queryLower);
+      
+      // Also generate individual word tokens to support multi-word fallback
+      const words = queryLower.split(/\s+/).filter(w => w.trim().length > 1);
+      const engWords = words.map(w => convertBengaliDigitsToEnglish(w));
+      const bngWords = words.map(w => convertEnglishDigitsToBengali(w));
+
+      // Bangla<->English phonetic key, so "gari" finds Bengali posts and vice versa
+      const queryPhonetic = toPhoneticKey(queryLower);
+      const phoneticWords = words.map(w => toPhoneticKey(w));
+      
+      const searchOptions = Array.from(new Set([
+        queryLower,
+        queryEnglishDigits,
+        queryBengaliDigits,
+        queryLower.replace(/\s+/g, ""),
+        queryEnglishDigits.replace(/\s+/g, ""),
+        queryBengaliDigits.replace(/\s+/g, ""),
+        queryPhonetic,
+        queryPhonetic.replace(/\s+/g, ""),
+        ...words,
+        ...engWords,
+        ...bngWords,
+        ...phoneticWords
+      ])).filter(Boolean);
+      
+      let matchedItems: any[] = [];
+      const seenIds = new Set<string>();
+      
+      // Word-boundary aware substring check. Plain alphabetic queries (real
+      // words like "car", "bus", "cat") require a true word boundary so they
+      // don't match inside unrelated words like "cargo" or "carefully" -
+      // alphanumeric/model-style queries (like "320", "e70") keep the old
+      // loose substring behavior since that's needed for "320" -> "320B".
+      const isPureAlpha = (s: string) => /^[a-z]+$/i.test(s) || /^[\u0980-\u09FF]+$/.test(s);
+      const smartIncludes = (haystack: string, needle: string): boolean => {
+        if (!needle) return false;
+        if (!isPureAlpha(needle)) return haystack.includes(needle);
+        const escaped = needle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        const boundary = "[^a-zA-Z\\u0980-\\u09FF]";
+        const re = new RegExp(`(^|${boundary})${escaped}($|${boundary})`, "i");
+        return re.test(haystack);
+      };
+
+      // 1. Direct Case-Insensitive Substring matches - highly precise & reliable for short numbers (like '320' -> '320 B')
+      for (const item of enrichedListings) {
+        const titleLoc = (item.title || "").toLowerCase();
+        const brandLoc = (item.brand || "").toLowerCase();
+        const modelLoc = (item.model || "").toLowerCase();
+        const descLoc = (item.description || "").toLowerCase();
+        const blobLoc = (item.searchBlob || "").toLowerCase();
+        
+        let isDirectMatch = false;
+        for (const opt of searchOptions) {
+          const optLower = opt.toLowerCase();
+          if (
+            smartIncludes(titleLoc, optLower) ||
+            smartIncludes(brandLoc, optLower) ||
+            smartIncludes(modelLoc, optLower) ||
+            smartIncludes(descLoc, optLower) ||
+            smartIncludes(blobLoc, optLower)
+          ) {
+            isDirectMatch = true;
+            break;
+          }
+        }
+        
+        if (isDirectMatch) {
+          seenIds.add(item.id);
+          matchedItems.push(item);
+        }
+      }
+      
+      // 2. Fuzzy fallback matching via Fuse.js
+      // Skip very short tokens (<= 3 chars) here - fuzzy edit-distance matching
+      // on short strings is too imprecise (e.g. "car" ~ "cat") and causes
+      // false positives like a "Car" search pulling in every CAT-branded
+      // excavator listing. Exact substring matching above already covers
+      // short exact terms reliably.
+      for (const q of searchOptions) {
+        if (!q.trim() || q.trim().length <= 3) continue;
+        const results = fuseInstance.search(q);
+        for (const res of results) {
+          if (!seenIds.has(res.item.id)) {
+            seenIds.add(res.item.id);
+            matchedItems.push(res.item);
+          }
+        }
+      }
+      
+      baseListings = matchedItems;
+    }
+    
+    // Filter matching categories and geographic cities
+    const finalFiltered = baseListings.filter((item) => {
+      // 1. Parent category filter
+      let matchesCategory = true;
+      const isVehicle = isItemVehicle(item);
+      if (selectedCategory === "vehicles") {
+        matchesCategory = isVehicle;
+      } else if (selectedCategory === "spare_parts") {
+        matchesCategory = !isVehicle;
+      }
+
+      // 2. Sub-category filter
+      const matchesSub = matchesSubCategoryFilter(item, selectedSubCategory);
+
+      const matchesCity = selectedCity === "all" || item.location.includes(selectedCity.split(" ")[0]);
+      return matchesCategory && matchesSub && matchesCity;
+    });
+
+    // Custom sorting algorithms
+    return [...finalFiltered].sort((a, b) => {
+      // Prioritize boosted promoted spotlight ad listings
+      if (a.isAd && !b.isAd) return -1;
+      if (!a.isAd && b.isAd) return 1;
+
+      if (sortBy === "priceAsc") {
+        return a.price - b.price;
+      } else if (sortBy === "priceDesc") {
+        return b.price - a.price;
+      } else if (sortBy === "popularity") {
+        const popA = (a.views || 0) + (a.clicks || 0) * 3;
+        const popB = (b.views || 0) + (b.clicks || 0) * 3;
+        return popB - popA;
+      } else {
+        // "latest"
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      }
+    });
+  }, [enrichedListings, fuseInstance, debouncedSearchQuery, selectedCategory, selectedSubCategory, selectedCity, sortBy]);
+
+  // 7b. Auto-fetch more when a filter/sub-category matches nothing on the
+  // current page but more listings might still exist further back.
+  // Without this, a visitor picking e.g. "Excavator" would see "No matches"
+  // on the very first page and just leave - they have no way of knowing that
+  // clicking "Load More" would actually find some. handleLoadMoreListings()
+  // already loops internally until it finds real matches (or genuinely runs
+  // out, which flips hasMoreListings to false and stops this effect), so
+  // triggering it automatically here just removes the need for a manual tap.
+  useEffect(() => {
+    // Scoped to category/sub-category filtering only (not text search) -
+    // handleLoadMoreListings' matching only checks category/sub-category, so
+    // for a text search it could end up fetching the entire collection just
+    // to conclude nothing matches. Manual "Load More" still works for search.
+    if (
+      !loading &&
+      debouncedSearchQuery.trim().length === 0 &&
+      listings.length > 0 &&
+      filteredListings.length === 0 &&
+      hasMoreListings &&
+      !loadingMoreListings
+    ) {
+      handleLoadMoreListings();
+    }
+  }, [filteredListings.length, hasMoreListings, loadingMoreListings, loading, listings.length, selectedCategory, selectedSubCategory, selectedCity, debouncedSearchQuery]);
+
+  // 8. Stats counting
+  const statsSummary = useMemo(() => {
+    const activeCount = listings.length;
+    const totalViews = listings.reduce((sum, item) => sum + (item.views || 0), 0);
+    const activeAdsCount = listings.filter((item) => item.isAd).length;
+    const totalOrderValue = purchases.reduce((sum, item) => sum + item.price, 0);
+
+    return { activeCount, totalViews, activeAdsCount, totalOrderValue };
+  }, [listings, purchases]);
+
+  if (isStandalonePrivacy) {
+    return (
+      <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><Loader2 className="w-6 h-6 animate-spin text-amber-500" /></div>}>
+        <PrivacyPolicyPage 
+          language={language}
+          standalone={true}
+          onBack={() => {
+            setIsStandalonePrivacy(false);
+            if (typeof window !== "undefined" && window.history.pushState) {
+              const cleanUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
+              window.history.pushState({ path: cleanUrl }, "", cleanUrl);
+            }
+          }}
+        />
+      </Suspense>
+    );
+  }
+
+  if (isStandaloneDeletion) {
+    return (
+      <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><Loader2 className="w-6 h-6 animate-spin text-amber-500" /></div>}>
+        <DataDeletionPage
+          language={language}
+          standalone={true}
+          onBack={() => {
+            setIsStandaloneDeletion(false);
+            if (typeof window !== "undefined" && window.history.pushState) {
+              const cleanUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
+              window.history.pushState({ path: cleanUrl }, "", cleanUrl);
+            }
+          }}
+        />
+      </Suspense>
+    );
+  }
+
+  if (isStandaloneTerms) {
+    return (
+      <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><Loader2 className="w-6 h-6 animate-spin text-amber-500" /></div>}>
+        <LegalHubModal
+          language={language}
+          standalone={true}
+          initialTab="terms"
+          onBack={() => {
+            setIsStandaloneTerms(false);
+            if (typeof window !== "undefined" && window.history.pushState) {
+              const cleanUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
+              window.history.pushState({ path: cleanUrl }, "", cleanUrl);
+            }
+          }}
+        />
+      </Suspense>
+    );
+  }
+
+  if (isStandaloneAbout) {
+    return (
+      <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><Loader2 className="w-6 h-6 animate-spin text-amber-500" /></div>}>
+        <AboutContactPage
+          language={language}
+          standalone={true}
+          onBack={() => {
+            setIsStandaloneAbout(false);
+            if (typeof window !== "undefined" && window.history.pushState) {
+              const cleanUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
+              window.history.pushState({ path: cleanUrl }, "", cleanUrl);
+            }
+          }}
+        />
+      </Suspense>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-100 flex flex-col font-sans transition-colors duration-300" style={{ paddingTop: "env(safe-area-inset-top)" }}>
+
+      <PullToRefresh />
+      <UpdateBanner language={language} />
+
+      {/* Offline Alert Banner in Bengali */}
+      {isOffline && (
+        <div className="bg-red-600 text-white font-bold text-[13px] py-2.5 px-4 flex items-center justify-center gap-2 sticky top-0 z-50 shadow-md animate-pulse">
+          <div className="w-2 h-2 bg-white rounded-full animate-ping"></div>
+          <span>⚠️ আপনি এখন অফলাইনে আছেন। কিছু ফিচার ঠিকমতো কাজ নাও করতে পারে। (Offline Mode)</span>
+        </div>
+      )}
+      
+      <HeaderNav
+        language={language}
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        user={user}
+        unreadChatsCount={unreadChatsCount}
+        setIsAuthOpen={setIsAuthOpen}
+        navDashboardLabel={activeTranslations.navDashboard}
+        navSellLabel={activeTranslations.navSell}
+      />
+
+      {/* 4. MAIN LAYOUT AND CORE VIEWS */}
+      <main className="flex-1 max-w-7xl mx-auto w-full px-2.5 sm:px-4 md:px-6 lg:px-8 pt-0.5 pb-24 md:pt-4 md:pb-8">
+
+        {/* 🔧 Visible error + retry instead of a silent empty/forever-loading
+            state -- see fetchInitialListings' catch block. */}
+        {listingsError && (
+          <div className="mb-3 p-3 rounded-xl bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900 flex items-center justify-between gap-3">
+            <p className="text-xs sm:text-sm text-red-700 dark:text-red-400">{listingsError}</p>
+            <button
+              onClick={fetchInitialListings}
+              className="shrink-0 px-3 py-1.5 text-xs font-bold rounded-lg bg-red-600 text-white hover:bg-red-700 transition"
+            >
+              {language === "bn" ? "আবার চেষ্টা করুন" : "Retry"}
+            </button>
+          </div>
+        )}
+
+        {loading && listings.length === 0 ? (
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2.5 sm:gap-4">
+            {Array.from({ length: 12 }).map((_, i) => (
+              <div
+                key={i}
+                className="rounded-2xl overflow-hidden bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex flex-col animate-pulse"
+              >
+                <div className="w-full aspect-[16/9] bg-slate-200 dark:bg-slate-800" />
+                <div className="p-2.5 space-y-2">
+                  <div className="h-3 w-3/4 rounded bg-slate-200 dark:bg-slate-800" />
+                  <div className="h-3 w-1/2 rounded bg-slate-200 dark:bg-slate-800" />
+                  <div className="h-4 w-2/3 rounded bg-slate-200 dark:bg-slate-800" />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div>
+            {/* Silent background refresh: cached posts already visible above,
+                so we intentionally show no banner/spinner here (like FB/YouTube resume) */}
+            
+            {/* TAB 1: MARKETPLACE */}
+            {/* TAB 1: MARKETPLACE */}
+            {activeTab === 'market' && (
+              <Suspense fallback={<div className="flex items-center justify-center py-16"><Loader2 className="w-6 h-6 animate-spin text-amber-500" /></div>}>
+                <MarketplaceTab
+                  language={language}
+                  activeTranslations={activeTranslations}
+                  searchQuery={searchQuery}
+                  setSearchQuery={setSearchQuery}
+                  appendSearchHistory={appendSearchHistory}
+                  searchHistory={searchHistory}
+                  setSearchHistory={setSearchHistory}
+                  selectedCategory={selectedCategory}
+                  setSelectedCategory={setSelectedCategory}
+                  selectedSubCategory={selectedSubCategory}
+                  setSelectedSubCategory={setSelectedSubCategory}
+                  selectedCity={selectedCity}
+                  setSelectedCity={setSelectedCity}
+                  sortBy={sortBy}
+                  setSortBy={setSortBy}
+                  showFilters={showFilters}
+                  setShowFilters={setShowFilters}
+                  listings={listings}
+                  adListings={adListings}
+                  filteredListings={filteredListings}
+                  hasMoreListings={hasMoreListings}
+                  loadingMoreListings={loadingMoreListings}
+                  handleLoadMoreListings={handleLoadMoreListings}
+                  handleViewListingDetails={handleViewListingDetails}
+                  isUserAdmin={isUserAdmin}
+                  user={user}
+                  setIsAuthOpen={setIsAuthOpen}
+                  setPromotingListing={setPromotingListing}
+                  setActiveTab={setActiveTab}
+                  setDashboardSubTab={setDashboardSubTab}
+                  showInstallPrompt={showInstallPrompt}
+                  handleInstallApp={handleInstallApp}
+                  dismissInstallPrompt={dismissInstallPrompt}
+                  showNotificationPrompt={showNotificationPrompt}
+                  setShowNotificationPrompt={setShowNotificationPrompt}
+                  notificationPermission={notificationPermission}
+                  handleRequestNotificationPermission={handleRequestNotificationPermission}
+                  setIsLotteryOpen={setIsLotteryOpen}
+                />
+              </Suspense>
+            )}
+
+            {/* TAB 2: POST / SELL */}
+            {activeTab === 'sell' && (
+              <Suspense fallback={<div className="flex items-center justify-center py-16"><Loader2 className="w-6 h-6 animate-spin text-amber-500" /></div>}>
+                <AddPartForm 
+                  language={language}
+                  currentUser={userMetadata}
+                  onPostSuccess={() => {
+                    setActiveTab("market");
+                  }}
+                  onLoginPrompt={() => {
+                    setIsAuthOpen(true);
+                  }}
+                  onViewListing={handleViewListingDetails}
+                />
+              </Suspense>
+            )}
+
+            {/* TAB 3: USER DASHBOARD & TRACKING DESK */}
+            {activeTab === 'my-dashboard' && user && (
+              <Suspense fallback={<div className="flex items-center justify-center py-16"><Loader2 className="w-6 h-6 animate-spin text-amber-500" /></div>}>
+                <DashboardTab
+                  language={language}
+                  activeTranslations={activeTranslations}
+                  setActiveTab={setActiveTab}
+                  user={user}
+                  userMetadata={userMetadata}
+                  isUserAdmin={isUserAdmin}
+                  listings={listings}
+                  myListings={myListings}
+                  purchases={purchases}
+                  hasMorePurchases={hasMorePurchases}
+                  loadingMorePurchases={loadingMorePurchases}
+                  handleLoadMorePurchases={handleLoadMorePurchases}
+                  handleDeleteListingBySeller={handleDeleteListingBySeller}
+                  handleViewListingDetails={handleViewListingDetails}
+                  setEditingListing={setEditingListing}
+                  dashboardSubTab={dashboardSubTab}
+                  setDashboardSubTab={setDashboardSubTab}
+                  selectedPromoPkg={selectedPromoPkg}
+                  setSelectedPromoPkg={setSelectedPromoPkg}
+                  expandedAdPkgId={expandedAdPkgId}
+                  setExpandedAdPkgId={setExpandedAdPkgId}
+                  adSelectedListingId={adSelectedListingId}
+                  setAdSelectedListingId={setAdSelectedListingId}
+                  adPromoLoading={adPromoLoading}
+                  adPromoSuccess={adPromoSuccess}
+                  setAdPromoSuccess={setAdPromoSuccess}
+                  adPromoError={adPromoError}
+                  setAdPromoError={setAdPromoError}
+                  handleDashboardPromoSubmit={handleDashboardPromoSubmit}
+                />
+              </Suspense>
+            )}
+
+            {/* TAB: CHAT / MESSAGES */}
+            {activeTab === 'chats' && (
+              <div className="animate-fade-in">
+                <Suspense fallback={<div className="flex items-center justify-center py-16"><Loader2 className="w-6 h-6 animate-spin text-amber-500" /></div>}>
+                  <ChatView
+                    currentUser={user}
+                    language={language}
+                    onLoginPrompt={() => setIsAuthOpen(true)}
+                    initialListingToChat={initialListingToChat}
+                    onClearInitialListing={() => setInitialListingToChat(null)}
+                  />
+                </Suspense>
+              </div>
+            )}
+
+            {/* TAB: SAVED BOOKMARKS */}
+            {activeTab === 'saved' && (
+              <div className="animate-fade-in space-y-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-lg sm:text-xl font-black text-slate-850 dark:text-white flex items-center gap-2">
+                      <ShoppingBag className="w-5 h-5 text-amber-500" />
+                      {language === "bn" ? "আমার পছন্দের তালিকা ও বুকমার্ক" : "My Bookmarked Ads"}
+                    </h3>
+                    <p className="text-xs text-slate-400 dark:text-slate-500 font-bold mt-1">
+                      {language === "bn" 
+                        ? "আপনার সেভ করে রাখা খুচরা যন্ত্রাংশ এবং গাড়ির বিজ্ঞাপনসমূহ এখানে দেখতে পাবেন।" 
+                        : "Browse vehicle accessories and heavy equipments you have saved for later."}
+                    </p>
+                  </div>
+                </div>
+
+                {savedListings.length === 0 ? (
+                  <div className="bg-white dark:bg-slate-900 border border-dashed border-slate-200 dark:border-slate-850 rounded-3xl p-12 text-center text-slate-400 dark:text-slate-500 max-w-md mx-auto space-y-4 shadow-sm">
+                    <div className="w-16 h-16 rounded-full bg-slate-50 dark:bg-slate-800 flex items-center justify-center mx-auto text-slate-400">
+                      <ShoppingBag className="w-8 h-8" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-extrabold text-slate-700 dark:text-slate-300">
+                        {language === "bn" ? "কোনো বুকমার্ক পাওয়া যায়নি" : "No saved items yet"}
+                      </p>
+                      <p className="text-xs text-slate-450 mt-1">
+                        {language === "bn" 
+                          ? "মার্কেটপ্লেস থেকে যেকোনো লিস্টিংয়ের বুকমার্ক আইকনে ক্লিক করে এখানে সেভ করে রাখতে পারেন।" 
+                          : "Explore auto parts or vehicle advertisements and tap the bookmark icon to save them here."}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab("market")}
+                      className="inline-flex bg-gradient-to-r from-amber-500 to-orange-550 text-slate-950 font-black text-xs py-2.5 px-6 rounded-xl cursor-pointer"
+                    >
+                      {language === "bn" ? "মার্কেটপ্লেসে যান" : "Browse Marketplace"}
+                    </button>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2.5 sm:gap-4 animate-fade-in">
+                    {savedListings.map((listing) => (
+                      <ListingCard 
+                        key={listing.id}
+                        listing={listing}
+                        language={language}
+                        isAdmin={isUserAdmin}
+                        onViewDetails={handleViewListingDetails}
+                        onPromoteClick={(item) => {
+                          if (!user) {
+                            setIsAuthOpen(true);
+                          } else {
+                            setPromotingListing(item);
+                          }
+                        }}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {activeTab === 'profile' && (
+              <div className="animate-fade-in max-w-xl mx-auto space-y-5">
+                
+                {/* A. Top left corner Logo & Branding with "Profile" */}
+                <div className="bg-white dark:bg-slate-900 border border-slate-150/80 dark:border-slate-800 rounded-3xl p-5 shadow-sm">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-full overflow-hidden shadow-md shrink-0 bg-slate-900">
+                      <img src="/icon-512.png" alt="Gari Bazar" className="w-full h-full object-cover" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <h2 className="text-lg sm:text-xl font-black text-slate-850 dark:text-white leading-none">
+                          {language === "bn" ? "গাড়ি বাজার" : "Gari Bazar"}
+                        </h2>
+                        <span className="text-[10px] sm:text-xs font-black bg-amber-500/10 text-amber-600 dark:text-amber-400 px-2 py-0.5 rounded-lg select-none">
+                          {language === "bn" ? "প্রোফাইল" : "Profile"}
+                        </span>
+                      </div>
+                      <p className="text-[10px] sm:text-xs text-slate-400 dark:text-slate-500 font-semibold mt-1">
+                        {language === "bn" ? "পার্টস ও গাড়ি বেচাকেনা" : "Auto Parts & Vehicles Trading"}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* A2. Install Gari Bazar PWA — do not download the APK */}
+                <button
+                  type="button"
+                  onClick={handleInstallApp}
+                  className="w-full flex items-center gap-3.5 bg-gradient-to-br from-amber-500 to-orange-600 rounded-3xl p-5 shadow-sm text-white text-left active:scale-[0.99] transition-transform"
+                  aria-label={language === "bn" ? "গাড়ি বাজার অ্যাপ ইনস্টল করুন" : "Install Gari Bazar App"}
+                >
+                  <div className="w-11 h-11 rounded-2xl bg-white/20 flex items-center justify-center shrink-0">
+                    <Smartphone className="w-6 h-6" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm sm:text-base font-extrabold leading-tight">
+                      {language === "bn" ? "গাড়ি বাজার অ্যাপ ইনস্টল করুন" : "Install Gari Bazar App"}
+                    </p>
+                    <p className="text-[11px] sm:text-xs text-white/80 font-semibold mt-0.5">
+                      {language === "bn" ? "ডাউনলোড নয় — ফোনেই সরাসরি ইনস্টল করুন" : "Install directly on your phone — no APK download"}
+                    </p>
+                  </div>
+                  <div className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center shrink-0">
+                    <Download className="w-4.5 h-4.5" />
+                  </div>
+                </button>
+
+                {/* B. Settings Menu List styling modeled on user's Settings screenshot */}
+                <div className="bg-white dark:bg-slate-900 border border-slate-150/80 dark:border-slate-800 rounded-3xl shadow-sm overflow-hidden divide-y divide-slate-100 dark:divide-slate-800/60">
+                  
+                  {/* Row 1: Personal Info (ক্লিক করলে ডিটেইল দেখাবে) */}
+                  <div className="transition duration-150">
+                    <button
+                      type="button"
+                      id="profile-row-personal"
+                      onClick={() => setIsPersonalInfoOpen(!isPersonalInfoOpen)}
+                      className="w-full flex items-center justify-between p-4.5 hover:bg-slate-50 dark:hover:bg-slate-800/40 cursor-pointer text-left transition select-none"
+                    >
+                      <div className="flex items-center gap-3.5">
+                        <div className="w-9 h-9 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0 shadow-xs">
+                          <User className="w-5 h-5 fill-white text-emerald-500" />
+                        </div>
+                        <div>
+                          <p className="text-sm sm:text-base font-extrabold text-slate-800 dark:text-slate-100">
+                            {language === "bn" ? "ব্যক্তিগত তথ্য (Personal info)" : "Personal info"}
+                          </p>
+                          <p className="text-xs text-slate-400 dark:text-slate-500 font-bold mt-0.5">
+                            {user ? (user.displayName || "Seller") : (language === "bn" ? "লগইন করতে এখানে চাপুন" : "Sign in to see info")}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1 text-slate-400 dark:text-slate-500">
+                        {isPersonalInfoOpen ? (
+                          <span className="text-xs font-bold text-amber-500">{language === "bn" ? "বন্ধ করুন" : "Close"}</span>
+                        ) : (
+                          <span className="text-xs font-bold text-slate-400 dark:text-slate-550">{language === "bn" ? "দেখুন" : "View"}</span>
+                        )}
+                        <ChevronRight className={`w-4 h-4 transition-transform duration-200 ${isPersonalInfoOpen ? "rotate-90 text-amber-500" : ""}`} />
+                      </div>
+                    </button>
+
+                    {/* Expandable Info Detail card */}
+                    {isPersonalInfoOpen && (
+                      <div className="p-5 bg-slate-50/55 dark:bg-slate-950/35 border-t border-slate-100 dark:border-slate-800/60 animate-slide-down space-y-4">
+                        {user ? (
+                          <div className="space-y-4">
+                            <div className="flex items-center gap-3.5">
+                              <div className="w-12 h-12 rounded-full bg-gradient-to-r from-amber-500 to-orange-550 text-slate-950 font-black text-base overflow-hidden flex items-center justify-center border-2 border-amber-500/20 shadow-inner shrink-0">
+                                {user.photoURL ? (
+                                  <img src={user.photoURL} alt="User" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                                ) : (
+                                  user.displayName?.charAt(0).toUpperCase() || "S"
+                                )}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <h4 className="font-extrabold text-sm sm:text-base text-slate-800 dark:text-white truncate">
+                                    {user.displayName || "Seller"}
+                                  </h4>
+                                  <span className="text-[8px] bg-emerald-500/10 text-emerald-550 font-extrabold px-1.5 py-0.5 rounded uppercase tracking-wide flex items-center gap-0.5 select-none">
+                                    <span className="w-1.5 h-1.5 bg-emerald-550 rounded-full animate-pulse"></span>
+                                    {language === "bn" ? "অ্যাক্টিভ প্রোফাইল" : "Active Profile"}
+                                  </span>
+                                </div>
+                                <p className="text-xs text-slate-400 dark:text-slate-500 font-bold mt-0.5 truncate">
+                                  {user.email || (language === "bn" ? "ইমেইল প্রদান করা হয়নি" : "No email linked")}
+                                </p>
+                              </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 gap-2 text-xs pt-1">
+                              <div className="bg-white dark:bg-slate-900 border border-slate-150/80 dark:border-slate-800 p-2.5 rounded-xl shadow-xs">
+                                <span className="text-[9px] text-slate-400 font-bold uppercase block">
+                                  {language === "bn" ? "ফোন নম্বর" : "Phone Number"}
+                                </span>
+                                <span className="font-extrabold text-slate-750 dark:text-slate-205 block mt-0.5 font-mono">
+                                  {userMetadata?.phoneNumber || user?.phoneNumber || "—"}
+                                </span>
+                              </div>
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={handleLogout}
+                              className="w-full mt-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 dark:text-rose-400 font-extrabold text-xs py-2.5 px-4 rounded-xl transition duration-200 flex items-center justify-center gap-1.5 cursor-pointer"
+                            >
+                              <LogOut className="w-4 h-4 shrink-0" />
+                              <span>{language === "bn" ? "লগআউট করুন" : "Log Out of Account"}</span>
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="text-center py-2 space-y-3">
+                            <p className="text-xs text-slate-500 dark:text-slate-450 leading-relaxed font-bold">
+                              {language === "bn" 
+                                ? "গাড়ি বাজার অ্যাপে লগইন করতে দয়া করে নিচের বাটনে চাপুন।" 
+                                : "Please sign in to access your registered seller account details."}
+                            </p>
+                            <button
+                              type="button"
+                              onClick={() => setIsAuthOpen(true)}
+                              className="w-full bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-slate-950 font-black py-2.5 px-4 rounded-xl text-xs transition duration-200 flex items-center justify-center gap-1.5 shadow-sm shadow-amber-500/15 cursor-pointer"
+                            >
+                              <User className="w-4 h-4 fill-slate-950 text-slate-950 shrink-0" />
+                              <span>{language === "bn" ? "লগইন করুন / রেজিস্ট্রেশন" : "Sign In / Register"}</span>
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Row 1.5: My Shop (আমার দোকান) — এখন শুধু Dashboard-এ navigate করে, ডুপ্লিকেট কার্ড নেই */}
+                  <div className="transition duration-150">
+                    <button
+                      type="button"
+                      id="profile-row-myshop"
+                      onClick={() => {
+                        if (!user) {
+                          setIsAuthOpen(true);
+                          return;
+                        }
+                        setActiveTab("my-dashboard");
+                        setDashboardSubTab("my-shop");
+                      }}
+                      className="w-full flex items-center justify-between p-4.5 hover:bg-slate-50 dark:hover:bg-slate-800/40 cursor-pointer text-left transition select-none"
+                    >
+                      <div className="flex items-center gap-3.5">
+                        <div className="w-9 h-9 rounded-full bg-amber-500 text-white flex items-center justify-center shrink-0 shadow-xs">
+                          <ShoppingBag className="w-5 h-5 text-white" />
+                        </div>
+                        <div>
+                          <p className="text-sm sm:text-base font-extrabold text-slate-800 dark:text-slate-100">
+                            {language === "bn" ? "আমার দোকান (My Shop)" : "My Shop"}
+                          </p>
+                          <p className="text-xs text-slate-400 dark:text-slate-500 font-bold mt-0.5">
+                            {user ? (language === "bn" ? "আপনার পাবলিক দোকান এবং লিস্টিং দেখুন" : "View your public shop and listings") : (language === "bn" ? "আপনার দোকান দেখতে লগইন করুন" : "Sign in to access your shop")}
+                          </p>
+                        </div>
+                      </div>
+                      <ChevronRight className="w-4 h-4 text-slate-400 dark:text-slate-500" />
+                    </button>
+                  </div>
+
+                  {/* Row 2: Change language (ক্লিক করলে ডিয়েটাইল দেখাবে) */}
+                  <div className="transition duration-150">
+                    <button
+                      type="button"
+                      id="profile-row-lang"
+                      onClick={() => setIsLanguageOpen(!isLanguageOpen)}
+                      className="w-full flex items-center justify-between p-4.5 hover:bg-slate-50 dark:hover:bg-slate-800/40 cursor-pointer text-left transition select-none"
+                    >
+                      <div className="flex items-center gap-3.5">
+                        <div className="w-9 h-9 rounded-full bg-teal-500 text-white flex items-center justify-center shrink-0 shadow-xs">
+                          <Globe className="w-5 h-5 text-white" />
+                        </div>
+                        <div>
+                          <p className="text-sm sm:text-base font-extrabold text-slate-800 dark:text-slate-100">
+                            {language === "bn" ? "ভাষা পরিবর্তন করুন (Change language)" : "Change language"}
+                          </p>
+                          <p className="text-xs text-slate-400 dark:text-slate-500 font-bold mt-0.5">
+                            {language === "bn" ? "বাংলা ও ইংরেজি ভাষা নির্ধারণ করুন" : "Set app-wide language preference"}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1 text-slate-400 dark:text-slate-500">
+                        <span className="text-xs font-black text-amber-600 dark:text-amber-400">
+                          {language === "bn" ? "বাংলা" : "English"}
+                        </span>
+                        <ChevronRight className={`w-4 h-4 transition-transform duration-200 ${isLanguageOpen ? "rotate-90 text-amber-500" : ""}`} />
+                      </div>
+                    </button>
+
+                    {/* Expandable Language Selector Details */}
+                    {isLanguageOpen && (
+                      <div className="p-4 bg-slate-50/55 dark:bg-slate-950/35 border-t border-slate-100 dark:border-slate-800/60 animate-slide-down">
+                        <div className="grid grid-cols-2 gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setLanguage("bn");
+                              setIsLanguageOpen(false);
+                            }}
+                            className={`p-3 rounded-xl border font-black text-sm flex flex-col items-center gap-1 transition-all cursor-pointer ${
+                              language === "bn"
+                                ? "bg-amber-500/10 border-amber-500/40 text-amber-600 dark:text-amber-400 shadow-xs"
+                                : "bg-white dark:bg-slate-900 border-slate-200/80 dark:border-slate-800 text-slate-750 dark:text-slate-300 hover:bg-slate-50"
+                            }`}
+                          >
+                            <span className="text-sm sm:text-base">বাংলা</span>
+                            <span className="text-[10px] font-semibold text-slate-400">Bengali Language</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setLanguage("en");
+                              setIsLanguageOpen(false);
+                            }}
+                            className={`p-3 rounded-xl border font-black text-sm flex flex-col items-center gap-1 transition-all cursor-pointer ${
+                              language === "en"
+                                ? "bg-amber-500/10 border-amber-500/40 text-amber-600 dark:text-amber-400 shadow-xs"
+                                : "bg-white dark:bg-slate-900 border-slate-200/80 dark:border-slate-800 text-slate-750 dark:text-slate-300 hover:bg-slate-50"
+                            }`}
+                          >
+                            <span className="text-sm sm:text-base">English</span>
+                            <span className="text-[10px] font-semibold text-slate-400">ইংরেজি ভাষা</span>
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Row 3: Dark Mode */}
+                  <div className="p-4.5 flex items-center justify-between transition">
+                    <div className="flex items-center gap-3.5">
+                      <div className="w-9 h-9 rounded-full bg-indigo-500 text-white flex items-center justify-center shrink-0 shadow-xs">
+                        {isDark ? (
+                          <Sun className="w-5 h-5 text-amber-250 fill-amber-200" />
+                        ) : (
+                          <Moon className="w-5 h-5 text-white fill-white" />
+                        )}
+                      </div>
+                      <div>
+                        <p className="text-sm sm:text-base font-extrabold text-slate-800 dark:text-slate-100">
+                          {language === "bn" ? "ডার্ক মোড (Dark mode)" : "Dark mode"}
+                        </p>
+                        <p className="text-xs text-slate-400 dark:text-slate-500 font-bold mt-0.5">
+                          {language === "bn" ? "আপনার চোখের সুবিধার্থে থিম পরিবর্তন করুন" : "Switch comfortable visual light/dark modes"}
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      id="profile-theme-toggle"
+                      onClick={() => setIsDark(!isDark)}
+                      className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                        isDark ? 'bg-amber-500' : 'bg-slate-200 dark:bg-slate-800'
+                      }`}
+                    >
+                      <span className="sr-only">Toggle Dark Mode</span>
+                      <span
+                        className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                          isDark ? 'translate-x-5' : 'translate-x-0'
+                        }`}
+                      />
+                    </button>
+                  </div>
+
+                  {/* Row 4: About Team & Gari Bazar */}
+                  <div className="transition duration-150">
+                    <button
+                      type="button"
+                      onClick={() => setIsTeamOpen(!isTeamOpen)}
+                      className="w-full flex items-center justify-between p-4.5 hover:bg-slate-50 dark:hover:bg-slate-800/40 cursor-pointer text-left transition select-none"
+                    >
+                      <div className="flex items-center gap-3.5">
+                        <div className="w-9 h-9 rounded-full bg-blue-500 text-white flex items-center justify-center shrink-0 shadow-xs">
+                          <Users className="w-5 h-5 text-white" />
+                        </div>
+                        <div>
+                          <p className="text-sm sm:text-base font-extrabold text-slate-800 dark:text-slate-100">
+                            {language === "bn" ? "আমাদের টিম ও গাড়ি বাজার" : "Our Team & About"}
+                          </p>
+                          <p className="text-xs text-slate-400 dark:text-slate-500 font-bold mt-0.5">
+                            {language === "bn" ? "অ্যাপ ডেভেলপমেন্ট টিম এবং লক্ষ্য" : "Meet the creators of Gari Bazar"}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1 text-slate-400 dark:text-slate-500">
+                        <ChevronRight className={`w-4 h-4 transition-transform duration-200 ${isTeamOpen ? "rotate-90 text-amber-500" : ""}`} />
+                      </div>
+                    </button>
+
+                    {isTeamOpen && (
+                      <div className="p-5 bg-slate-50/55 dark:bg-slate-950/35 border-t border-slate-100 dark:border-slate-800/60 animate-slide-down space-y-4">
+                        <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-150 dark:border-slate-800/80 shadow-xs space-y-3">
+                          <div className="flex items-center gap-3">
+                            <div className="w-12 h-12 rounded-full bg-gradient-to-tr from-amber-500 to-orange-550 flex items-center justify-center font-black text-slate-950 text-base">
+                              MR
+                            </div>
+                            <div>
+                              <h5 className="font-extrabold text-sm text-slate-800 dark:text-slate-100">MD RAYHAN</h5>
+                              <p className="text-[10px] text-amber-600 dark:text-amber-400 font-bold">Lead Developer & Founder</p>
+                            </div>
+                          </div>
+                          <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed font-semibold">
+                            {language === "bn"
+                              ? "গাড়ি বাজার অ্যাপটি বাংলাদেশে অটো পার্টস ও খুচরা যন্ত্রাংশের বেচাকেনাকে সহজ এবং ডিজিটাল করতে তৈরি করা হয়েছে। আমাদের মূল লক্ষ্য গ্রাহকদের নিরাপদ ও বিশ্বস্ত সেবা প্রদান করা।"
+                              : "Gari Bazar is built to simplify auto parts and vehicle accessories trading across Bangladesh. Our mission is to make P2P parts sourcing seamless, verified, and transparent."}
+                          </p>
+                          <div className="flex items-center gap-1.5 text-xs text-slate-400 dark:text-slate-555 pt-1 font-mono">
+                            <Mail className="w-3.5 h-3.5" />
+                            <span>sadakalo7373@gmail.com</span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Row 5: Terms & Privacy Policy */}
+                  <div className="transition duration-150">
+                    <button
+                      type="button"
+                      onClick={() => setIsTermsSectionOpen(!isTermsSectionOpen)}
+                      className="w-full flex items-center justify-between p-4.5 hover:bg-slate-50 dark:hover:bg-slate-800/40 cursor-pointer text-left transition select-none"
+                    >
+                      <div className="flex items-center gap-3.5">
+                        <div className="w-9 h-9 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0 shadow-xs">
+                          <FileText className="w-5 h-5 text-white" />
+                        </div>
+                        <div>
+                          <p className="text-sm sm:text-base font-extrabold text-slate-800 dark:text-slate-100">
+                            {language === "bn" ? "শর্তাবলী ও পলিসি কেন্দ্র" : "Terms & Privacy Policies"}
+                          </p>
+                          <p className="text-xs text-slate-400 dark:text-slate-500 font-bold mt-0.5">
+                            {language === "bn" ? "প্লে স্টোর কমপ্লায়েন্স ও আইনি নীতিমালা" : "Play Store compliance rules and data usage"}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1 text-slate-400 dark:text-slate-500">
+                        <ChevronRight className={`w-4 h-4 transition-transform duration-200 ${isTermsSectionOpen ? "rotate-90 text-amber-500" : ""}`} />
+                      </div>
+                    </button>
+
+                    {isTermsSectionOpen && (
+                      <div className="p-5 bg-slate-50/55 dark:bg-slate-950/35 border-t border-slate-100 dark:border-slate-800/60 animate-slide-down space-y-3">
+                        <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-150 dark:border-slate-800/80 shadow-xs text-xs text-slate-500 dark:text-slate-400 space-y-3">
+                          <div className="flex items-center gap-1.5 text-slate-800 dark:text-white font-bold">
+                            <ShieldCheck className="w-4 h-4 text-emerald-500" />
+                            <span>{language === "bn" ? "প্লে স্টোর নীতিমালায় সংগতি" : "Fully Play Store Compliant"}</span>
+                          </div>
+                          <p className="leading-relaxed font-semibold">
+                            {language === "bn"
+                              ? "আপনার অ্যাকাউন্ট এবং পার্সোনাল ডাটা সম্পূর্ণ নিরাপদ। আমরা আপনার তথ্যের গোপনীয়তা রক্ষায় জেনুইন সিকিউরিটি ও ফায়ারবেস ব্যাকএন্ড ব্যবহার করি।"
+                              : "Our data storage protocols match modern standards. We respect user rights and protect trade listings from scraping with Firestore security filters."}
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => setIsLegalOpen(true)}
+                            className="inline-flex items-center gap-1 text-amber-600 dark:text-amber-400 font-bold underline hover:text-amber-700 cursor-pointer"
+                          >
+                            {language === "bn" ? "সম্পূর্ণ আইনি ও পলিসি হাব খুলুন" : "Open full Regulatory Compliance Hub"}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Row 6: Contact Support & Help Desk */}
+                  <div className="transition duration-150">
+                    <button
+                      type="button"
+                      onClick={() => setIsSupportOpen(!isSupportOpen)}
+                      className="w-full flex items-center justify-between p-4.5 hover:bg-slate-50 dark:hover:bg-slate-800/40 cursor-pointer text-left transition select-none"
+                    >
+                      <div className="flex items-center gap-3.5">
+                        <div className="w-9 h-9 rounded-full bg-orange-500 text-white flex items-center justify-center shrink-0 shadow-xs">
+                          <HelpCircle className="w-5 h-5 text-white" />
+                        </div>
+                        <div>
+                          <p className="text-sm sm:text-base font-extrabold text-slate-800 dark:text-slate-100">
+                            {language === "bn" ? "সাহায্য ও কন্টাক্ট সাপোর্ট" : "Help Desk & Customer Support"}
+                          </p>
+                          <p className="text-xs text-slate-400 dark:text-slate-500 font-bold mt-0.5">
+                            {language === "bn" ? "টিমের সাথে সরাসরি যোগাযোগ করুন" : "Reach out to support desk directly"}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1 text-slate-400 dark:text-slate-500">
+                        <ChevronRight className={`w-4 h-4 transition-transform duration-200 ${isSupportOpen ? "rotate-90 text-amber-500" : ""}`} />
+                      </div>
+                    </button>
+
+                    {isSupportOpen && (
+                      <div className="p-5 bg-slate-50/55 dark:bg-slate-950/35 border-t border-slate-100 dark:border-slate-800/60 animate-slide-down space-y-4">
+                        <form onSubmit={handleSupportSubmit} className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-150 dark:border-slate-800/80 shadow-xs space-y-3.5">
+                          <h5 className="font-extrabold text-xs text-slate-800 dark:text-slate-100 uppercase tracking-wide">
+                            {language === "bn" ? "সাপোর্ট রিকোয়েস্ট পাঠান" : "Open a Support Ticket"}
+                          </h5>
+                          
+                          {supportSuccess ? (
+                            <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-emerald-600 dark:text-emerald-400 text-xs font-bold flex items-center gap-2">
+                              <Check className="w-4 h-4 text-emerald-500" />
+                              <span>
+                                {language === "bn" 
+                                  ? "আপনার মেসেজটি সফলভাবে টিমের কাছে পাঠানো হয়েছে! ২৪ ঘণ্টার মধ্যে যোগাযোগ করা হবে।" 
+                                  : "Support ticket opened successfully! We will get back to you within 24 hours."}
+                              </span>
+                            </div>
+                          ) : (
+                            <>
+                              {supportError && (
+                                <div className="p-2.5 bg-red-500/10 border border-red-500/20 rounded-xl text-red-600 dark:text-red-400 text-xs font-medium">
+                                  {supportError}
+                                </div>
+                              )}
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                                <div>
+                                  <label className="text-[10px] text-slate-400 font-bold block mb-1">
+                                    {language === "bn" ? "আপনার নাম" : "Your Name"}
+                                  </label>
+                                  <input
+                                    type="text"
+                                    value={supportName}
+                                    onChange={(e) => setSupportName(e.target.value)}
+                                    placeholder={user?.displayName || (language === "bn" ? "যেমন: রায়হান" : "e.g. Rayhan")}
+                                    className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 py-1.5 px-3 rounded-xl text-xs focus:ring-1 focus:ring-amber-500 focus:outline-none dark:text-white font-semibold"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="text-[10px] text-slate-400 font-bold block mb-1">
+                                    {language === "bn" ? "ইমেইল ঠিকানা" : "Email Address"}
+                                  </label>
+                                  <input
+                                    type="email"
+                                    value={supportEmail}
+                                    onChange={(e) => setSupportEmail(e.target.value)}
+                                    placeholder={user?.email || "e.g. support@domain.com"}
+                                    className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 py-1.5 px-3 rounded-xl text-xs focus:ring-1 focus:ring-amber-500 focus:outline-none dark:text-white font-semibold"
+                                  />
+                                </div>
+                              </div>
+                              
+                              <div>
+                                <label className="text-[10px] text-slate-400 font-bold block mb-1">
+                                  {language === "bn" ? "আপনার বার্তা / অভিযোগ" : "Message or Feedback"}
+                                </label>
+                                <textarea
+                                  rows={3}
+                                  required
+                                  value={supportMessage}
+                                  onChange={(e) => setSupportMessage(e.target.value)}
+                                  placeholder={language === "bn" ? "আপনার সাহায্যপ্রার্থী মেসেজটি এখানে লিখুন..." : "Describe how we can help you today..."}
+                                  className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 py-2 px-3 rounded-xl text-xs focus:ring-1 focus:ring-amber-500 focus:outline-none dark:text-white font-semibold"
+                                />
+                              </div>
+
+                              <button
+                                type="submit"
+                                disabled={isSupportSubmitting}
+                                className="w-full bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-slate-950 font-black py-2 px-4 rounded-xl text-xs transition duration-200 flex items-center justify-center gap-1.5 shadow-sm cursor-pointer"
+                              >
+                                {isSupportSubmitting ? (
+                                  <>
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                    <span>{language === "bn" ? "পাঠানো হচ্ছে..." : "Sending..."}</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Send className="w-4 h-4 shrink-0" />
+                                    <span>{language === "bn" ? "মেসেজ পাঠান" : "Submit Ticket"}</span>
+                                  </>
+                                )}
+                              </button>
+                            </>
+                          )}
+                        </form>
+                      </div>
+                    )}
+                  </div>
+
+                </div>
+              </div>
+            )}
+
+          </div>
+        )}
+
+      </main>
+
+      {/* 5. Footer with credit/disclaimers - Profile tab only */}
+      {activeTab === 'profile' && (
+      <footer className="bg-slate-950 border-t border-slate-900 text-slate-500 text-xs py-8 pb-28 md:pb-8 mt-12">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center space-y-3">
+          <div className="flex items-center gap-1.5 justify-center text-slate-300 font-bold">
+            <Car className="w-4 h-4 text-amber-500" />
+            <span>{language === "bn" ? "গাড়ি বাজার লিমিটেড" : "Gari Bazar Auto Parts Marketplace"}</span>
+          </div>
+          <p className="max-w-md mx-auto leading-relaxed text-[11px] text-slate-400">
+            {language === "bn" 
+              ? "গাড়ি ও বাইকের অরিজিনাল জেনুইন খুচরা যন্ত্রাংশের বিশ্বস্ত বাজার। স্পন্সরড বিজ্ঞাপনদাতাদের জন্য উন্নত অ্যাড ক্যাম্পেইন ও AI ডেসক্রিপশন জেনারেটর ইঞ্জিন।" 
+              : "Bangladesh's premium online car parts marketplace. Boost your listings with secure, real-time sponsored ad placements."}
+          </p>
+          <div className="text-[10px] text-slate-400 flex flex-wrap gap-x-4 gap-y-1 justify-center pt-2">
+            <span>© 2026 Gari Bazar Tech</span>
+            <span>•</span>
+            <button 
+              onClick={() => setIsLegalOpen(true)}
+              className="hover:text-amber-500 font-bold underline transition-colors cursor-pointer"
+            >
+              {language === "bn" ? "🔒 আইনি পলিসি ও প্রাইভেসি কেন্দ্র" : "🔒 Legal Policies & Privacy Hub"}
+            </button>
+          </div>
+        </div>
+      </footer>
+      )}
+
+      {/* All interactive floating dialogs & Modals */}
+      <Suspense fallback={null}>
+      
+      {/* 1. Auth Modals */}
+      <AuthModal 
+        isOpen={isAuthOpen} 
+        onClose={() => setIsAuthOpen(false)}
+        language={language}
+        onAuthSuccess={(sessionUser) => {
+          setUser({
+            uid: sessionUser.uid,
+            displayName: sessionUser.displayName,
+            email: sessionUser.email,
+            photoURL: sessionUser.photoURL || sessionUser.profilePicture,
+            isAdmin: sessionUser.isAdmin === true
+          });
+          setUserMetadata(sessionUser);
+          setIsAuthOpen(false);
+        }}
+      />
+
+      {/* 2. Listing Details walk thoughts */}
+      {selectedListing && (
+        <ListingDetailModal 
+          listing={selectedListing}
+          language={language}
+          currentUser={userMetadata || user}
+          isAdmin={isUserAdmin}
+          onClose={closeListingDetail}
+          onPurchaseAdded={() => {
+            // updates purchases data automatically via firestore listener
+          }}
+          onLoginPrompt={() => {
+            setSelectedListing(null);
+            setIsAuthOpen(true);
+          }}
+          onInitiateSellerChat={(listingToChat) => {
+            setInitialListingToChat(listingToChat);
+            setSelectedListing(null);
+            setActiveTab("chats");
+          }}
+          onViewSellerShop={(sellerId, fallbackName, fallbackPhoto, fallbackLocation, fallbackContact) => {
+            setActiveSellerShopId(sellerId);
+            setActiveSellerShopFallback({
+              name: fallbackName,
+              photo: fallbackPhoto,
+              location: fallbackLocation,
+              contact: fallbackContact
+            });
+          }}
+        />
+      )}
+
+      {/* 3. Promote listings active ad selector */}
+      {promotingListing && (
+        <PromoteAdModal 
+          listing={promotingListing}
+          language={language}
+          currentUser={user}
+          onClose={() => setPromotingListing(null)}
+          onPromotionSuccess={() => {
+            // listing gets updated automatically via listener hook
+          }}
+        />
+      )}
+
+      {/* 3b. Free daily "Boost Ads" lottery — 1-in-100 win chance, one spin per user per day */}
+      {isLotteryOpen && (
+        <LotteryModal
+          isOpen={isLotteryOpen}
+          onClose={() => setIsLotteryOpen(false)}
+          language={language}
+          currentUser={user}
+          userMetadata={userMetadata}
+          listings={myListings}
+          setIsAuthOpen={setIsAuthOpen}
+        />
+      )}
+
+      {/* 6. Edit Listing Modal for Sellers */}
+      <EditListingModal
+        isOpen={!!editingListing}
+        onClose={() => setEditingListing(null)}
+        listing={editingListing}
+        language={language}
+        onSaveSuccess={() => {
+          // listings get updated automatically via firestore or local triggers
+        }}
+      />
+
+      {/* 7. Legal Hub Compliance Modal */}
+      <LegalHubModal
+        isOpen={isLegalOpen}
+        onClose={() => setIsLegalOpen(false)}
+        language={language}
+      />
+
+      {/* Seller Shop Page Modal Overlay */}
+      {activeSellerShopId && (
+        <SellerShopPage
+          sellerId={activeSellerShopId}
+          fallbackSellerName={activeSellerShopFallback?.name}
+          fallbackSellerPhoto={activeSellerShopFallback?.photo}
+          fallbackLocation={activeSellerShopFallback?.location}
+          fallbackContact={activeSellerShopFallback?.contact}
+          language={language}
+          currentUser={user}
+          onClose={() => setActiveSellerShopId(null)}
+          onViewListingDetails={(listing) => {
+            handleViewListingDetails(listing);
+          }}
+          onInitiateSellerChat={(listing) => {
+            setInitialListingToChat(listing);
+            setActiveSellerShopId(null);
+            setSelectedListing(null);
+            setActiveTab("chats");
+          }}
+          onLoginPrompt={() => {
+            setActiveSellerShopId(null);
+            setIsAuthOpen(true);
+          }}
+        />
+      )}
+      </Suspense>
+
+    </div>
+  );
+}

@@ -1,0 +1,69 @@
+{
+  "project_info": {
+    "project_number": "466216231725",
+    "firebase_url": "https://garibazar-bd-default-rtdb.asia-southeast1.firebasedatabase.app",
+    "project_id": "garibazar-bd",
+    "storage_bucket": "garibazar-bd.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:466216231725:android:f00f5260a436eba3e269a4",
+        "android_client_info": {
+          "package_name": "Garibazar.web"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "466216231725-5g46ggo88e7bjota3ufm60jrc5j72s44.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA1H6P_z9ulub84FlZkNxrR2AgLd5NHAzg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "466216231725-5g46ggo88e7bjota3ufm60jrc5j72s44.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:466216231725:android:bdde74439491c0dfe269a4",
+        "android_client_info": {
+          "package_name": "shop.garibazar.twa"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "466216231725-5g46ggo88e7bjota3ufm60jrc5j72s44.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA1H6P_z9ulub84FlZkNxrR2AgLd5NHAzg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "466216231725-5g46ggo88e7bjota3ufm60jrc5j72s44.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

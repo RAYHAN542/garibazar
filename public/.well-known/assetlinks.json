@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "shop.garibazar.twa",
+      "sha256_cert_fingerprints": [
+        "EF:F9:F7:C5:E8:A3:73:04:E3:8D:84:A0:F0:E6:E5:32:97:45:8A:41:A3:94:F2:FC:13:02:03:71:00:6A:55:FB"
+      ]
+    }
+  }
+]

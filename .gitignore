@@ -1,0 +1,33 @@
+node_modules/
+build/
+dist/
+coverage/
+.DS_Store
+*.log
+.env*
+!.env.example
+.env.local
+firebase-applet-config.json
+archive/
+src/**/*.txt
+.vercel
+
+# Android সাইনিং কী — কখনোই GitHub-এ পাবলিশ করা যাবে না, শুধু GitHub Secrets-এ থাকবে
+*.keystore
+*.jks
+keystore-base64.txt
+android/app/garibazar-release.keystore
+android/local.properties
+
+# APK বিল্ড আউটপুট রিপোতে কমিট করার দরকার নেই -- GitHub Actions প্রতি push-এ
+# বিল্ড করে Artifacts হিসেবে দেয়, সেটাই সোর্স অফ ট্রুথ (audit C16)
+*.apk
+
+# একবার ব্যবহারযোগ্য patch script/স্ক্র্যাচ ফাইল — ভবিষ্যতে ভুলে commit হওয়া ঠেকাতে
+fix_*.py
+apply_*.py
+patch_*.py
+*.zip
+!android/**/*.zip
+resolve_conflict_command.txt
+migration-firebase-key.json

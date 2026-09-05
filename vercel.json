@@ -1,0 +1,46 @@
+{
+  "rewrites": [
+    { "source": "/l/:id", "destination": "/api/share-listing?id=:id" },
+    { "source": "/sitemap.xml", "destination": "/api/sitemap" },
+    { "source": "/download", "destination": "/download.html" },
+    { "source": "/__/auth/:path*", "destination": "https://garibazar-bd.firebaseapp.com/__/auth/:path*" },
+    { "source": "/__/firebase/init.json", "destination": "https://garibazar-bd.firebaseapp.com/__/firebase/init.json" },
+    { "source": "/(.*)", "destination": "/index.html" }
+  ],
+  "headers": [
+    {
+      "source": "/downloads/(.*).apk",
+      "headers": [
+        {"key": "Content-Type", "value": "application/vnd.android.package-archive"}
+      ]
+    },
+    {
+      "source": "/assets/(.*)",
+      "headers": [
+        {"key": "Cache-Control", "value": "public, max-age=31536000, immutable"}
+      ]
+    },
+    {
+      "source": "/",
+      "headers": [
+        {"key": "Cache-Control", "value": "public, max-age=0, must-revalidate"}
+      ]
+    },
+    {
+      "source": "/(.*)",
+      "headers": [
+        {"key": "X-Frame-Options", "value": "DENY"},
+        {"key": "X-Content-Type-Options", "value": "nosniff"},
+        {"key": "Referrer-Policy", "value": "strict-origin-when-cross-origin"},
+        {"key": "Strict-Transport-Security", "value": "max-age=63072000; includeSubDomains; preload"},
+        {"key": "Content-Security-Policy", "value": "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.gstatic.com https://www.google.com https://apis.google.com https://pagead2.googlesyndication.com https://*.googlesyndication.com https://*.doubleclick.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https: ; connect-src 'self' https://*.googleapis.com https://api.cloudinary.com https://res.cloudinary.com https://ipwho.is https://pay.bkash.com https://api.nagad.com.bd https://*.googlesyndication.com https://*.doubleclick.net https://*.supabase.co; frame-src 'self' https://garibazar-bd.firebaseapp.com https://accounts.google.com https://www.google.com https://*.doubleclick.net; form-action 'self' https://pay.bkash.com https://api.nagad.com.bd; frame-ancestors 'self'; base-uri 'self'; object-src 'none';"}
+      ]
+    }
+  ],
+  "crons": [
+    {
+      "path": "/api/cron/maintenance",
+      "schedule": "0 2 * * *"
+    }
+  ]
+}

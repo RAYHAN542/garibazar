@@ -1,0 +1,323 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+
+    // ---------- RATE LIMITING HELPERS ----------
+    // Client-direct writes (creating a listing, sending a chat message) have
+    // no server in front of them to throttle, so the cooldown itself has to
+    // live in these rules: each action reads the user's own userLimits doc
+    // and refuses the write if it happened too recently. The write that
+    // records the new timestamp is a separate write in the SAME batch (see
+    // AddPartForm.tsx / ChatView.tsx), validated below by the userLimits
+    // rules so a client can't just claim an old timestamp to dodge this.
+    function listingCooldownPassed() {
+      let path = /databases/$(database)/documents/userLimits/$(request.auth.uid);
+      return !exists(path) ||
+             !('lastListingCreatedAt' in get(path).data) ||
+             request.time.toMillis() - get(path).data.lastListingCreatedAt.toMillis() >= 30000;
+    }
+
+    function messageCooldownPassed() {
+      let path = /databases/$(database)/documents/userLimits/$(request.auth.uid);
+      return !exists(path) ||
+             !('lastMessageAt' in get(path).data) ||
+             request.time.toMillis() - get(path).data.lastMessageAt.toMillis() >= 2000;
+    }
+
+    // ---------- USERS ----------
+    match /users/{userId} {
+      allow read: if isSignedIn() && (userId == request.auth.uid || isAdmin());
+      allow create: if isSignedIn() && userId == request.auth.uid;
+
+      // Owner can update their own profile, but NOT their own wallet balance.
+      // Only admin (via approved refill_requests) can change simulatedCredits.
+      allow update: if isSignedIn() && (
+                      (userId == request.auth.uid &&
+                       !request.resource.data.diff(resource.data).affectedKeys().hasAny(
+                         ['simulatedCredits', 'uid', 'referralCode', 'createdAt']
+                       )
+                      ) || isAdmin()
+                    );
+      allow delete: if isAdmin();
+    }
+
+    // ---------- ADMINS ----------
+    match /admins/{adminId} {
+      allow read: if isSignedIn() && adminId == request.auth.uid;
+      allow write: if false;
+    }
+
+    // ---------- LISTINGS ----------
+    match /listings/{listingId} {
+      allow read: if true;
+
+      allow create: if isSignedIn() &&
+                    request.resource.data.sellerId == request.auth.uid &&
+                    request.resource.data.price is number &&
+                    request.resource.data.price >= 0 &&
+                    request.resource.data.price <= 99999999 &&
+                    request.resource.data.title is string &&
+                    request.resource.data.title.size() > 0 &&
+                    request.resource.data.title.size() < 200 &&
+                    request.resource.data.description is string &&
+                    request.resource.data.description.size() < 3000 &&
+                    // আগে শুধু update rule এই field-গুলো ব্লক করত -- create-এ কোনো
+                    // বাধা ছিল না, তাই কেউ সরাসরি Firestore-এ লিখলে বিনা পেমেন্টে
+                    // isAd:true সহ একটা "promoted" লিস্টিং তৈরি করে ফেলতে পারত।
+                    !request.resource.data.keys().hasAny(
+                      ['isAd', 'adTier', 'adDurationDays', 'adExpiresAt', 'views', 'clicks', 'savedCount', 'dailyStats']
+                    ) &&
+                    listingCooldownPassed();
+
+      // Owner can edit their listing but cannot self-promote (isAd/adTier/etc are admin-only)
+      // and cannot touch views/clicks/dailyStats while editing (those are
+      // 🔧 server-only now, via /api/track-listing-interaction -- previously
+      // any visitor/signed-in user could write straight to `views`/`clicks`
+      // with only a flimsy "+1 per write" cap and no real throttle, so a
+      // script could inflate either arbitrarily by just calling updateDoc
+      // in a loop).
+      // Same price/title/description validation as create -- previously only
+      // blocked which KEYS could change, not what VALID VALUES those fields
+      // could hold, so an owner editing their own listing could set price to
+      // a negative number or an absurd figure, or an oversized title/description.
+      allow update: if isSignedIn() && (
+                      (resource.data.sellerId == request.auth.uid &&
+                       !request.resource.data.diff(resource.data).affectedKeys().hasAny(
+                         ['createdAt', 'sellerId', 'isAd', 'adTier', 'adDurationDays', 'adExpiresAt',
+                          'views', 'clicks', 'dailyStats']
+                       ) &&
+                       request.resource.data.price is number &&
+                       request.resource.data.price >= 0 &&
+                       request.resource.data.price <= 99999999 &&
+                       request.resource.data.title is string &&
+                       request.resource.data.title.size() > 0 &&
+                       request.resource.data.title.size() < 200 &&
+                       request.resource.data.description is string &&
+                       request.resource.data.description.size() < 3000
+                      ) || isAdmin()
+                    );
+      // No other `allow update` rule exists for this collection anymore --
+      // views/clicks/dailyStats can now ONLY change via the Admin SDK
+      // (the tracking API above, or isAdmin() through the rule just above).
+
+      // Hard delete is admin-only now. Sellers "delete" their own listing by
+      // setting isDeleted/deletedAt via the update rule above instead --
+      // that's a soft delete with a 30-day recovery window, permanently
+      // purged later by /api/cron/data-retention-cleanup (Admin SDK, bypasses
+      // these rules entirely, so no rule is needed for that job itself).
+      allow delete: if isAdmin();
+
+      // ---------- PRIVATE CONTACT SUBCOLLECTION ----------
+      // 🔧 sellerContact number lives here instead of on the listing doc
+      // itself so it's never included in the public "allow read: if true"
+      // listing read above.
+      //
+      // Read access is now OWNER + ADMIN ONLY. Any other signed-in user
+      // (a genuine buyer clicking "Show Number") must go through
+      // /api/get-seller-contact instead, which verifies their ID token
+      // AND applies a per-user hourly rate limit before returning the
+      // number. A blanket `allow read: if isSignedIn()` here would let any
+      // signed-in script enumerate public listing IDs and pull every
+      // seller's phone number in bulk, one request per listing, with no
+      // limit -- rate limiting that requires a server-side counter, which
+      // Firestore rules alone can't enforce on a plain read.
+      match /private/{docId} {
+        allow read: if isSignedIn() &&
+                    (resource.data.sellerId == request.auth.uid || isAdmin());
+        allow create: if isSignedIn() &&
+                      request.resource.data.sellerId == request.auth.uid;
+        allow update: if isSignedIn() &&
+                      (resource.data.sellerId == request.auth.uid || isAdmin());
+        allow delete: if isAdmin();
+      }
+
+      // ---------- DISTRIBUTED VIEW/SAVE COUNTER SHARDS ----------
+      // Instead of writing "views"/a save-count directly onto the listing
+      // document (which only reliably sustains ~1 write/second), each
+      // increment goes to one of several small shard documents chosen at
+      // random. A scheduled job (Admin SDK, bypasses these rules) sums the
+      // shards and refreshes listing.views / listing.savedCount every few
+      // minutes. Clients never read shard docs directly, only the admin
+      // aggregation job does, so read is locked down entirely.
+      // ---------- DISTRIBUTED "SAVED" COUNTER SHARDS ----------
+      // 🔧 এখন এই পুরো subcollection শুধুই /api/track-listing-interaction
+      // (Admin SDK) দিয়ে লেখা হয় -- client আর কখনো সরাসরি এখানে লেখে না।
+      // আগে যেকোনো signed-in user নিজে থেকে +1/-1 পাঠাতে পারত, বারবার
+      // save/un-save চেপে counter distort করে ফেলার সুযোগ ছিল (কারণ rules
+      // এটা যাচাই করতে পারত না যে এই user আগেই সেভ করেছে কিনা)। নতুন
+      // ব্যবস্থায় সেই "আগে থেকে সেভ করা আছে কিনা" চেক নিচের savedBy marker
+      // doc দিয়ে সার্ভার-সাইডেই হয়, rules দিয়ে না।
+      match /counterShards/{shardId} {
+        allow read: if false;
+        allow write: if false;
+      }
+
+      // ---------- PER-USER "SAVED" MARKER ----------
+      // একজন user সত্যিই এই listing-টা সেভ করে রেখেছে কিনা তার একমাত্র সত্য
+      // উৎস। Admin SDK-ই একমাত্র যে এটা লিখতে/মুছতে পারে (save/unsave করার
+      // সময়), তাই একই user বারবার "save" চাপলেও marker doc idempotent থাকে
+      // (exists/not-exists), counter কখনো ভুলভাবে বাড়ে/কমে না।
+      match /savedBy/{uid} {
+        allow read: if false;
+        allow write: if false;
+      }
+    }
+
+    // ---------- RATE LIMIT TRACKING (one doc per user) ----------
+    // Written in the same batch as the action it's timestamping (see
+    // AddPartForm.tsx, ChatView.tsx) so the two either both succeed or both
+    // fail together. Only the field being changed right now is required to
+    // equal request.time -- otherwise re-saving one field would also force
+    // an untouched older timestamp on the other field to magically become
+    // "now", which would silently defeat that field's own cooldown.
+    match /userLimits/{uid} {
+      allow read: if isSignedIn() && request.auth.uid == uid;
+
+      allow create: if isSignedIn() && request.auth.uid == uid &&
+                    request.resource.data.keys().hasOnly(['lastListingCreatedAt', 'lastMessageAt']) &&
+                    (!('lastListingCreatedAt' in request.resource.data) || request.resource.data.lastListingCreatedAt == request.time) &&
+                    (!('lastMessageAt' in request.resource.data) || request.resource.data.lastMessageAt == request.time);
+
+      allow update: if isSignedIn() && request.auth.uid == uid &&
+                    request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastListingCreatedAt', 'lastMessageAt']) &&
+                    (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['lastListingCreatedAt']) || request.resource.data.lastListingCreatedAt == request.time) &&
+                    (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['lastMessageAt']) || request.resource.data.lastMessageAt == request.time);
+
+      allow delete: if false;
+    }
+
+    // ---------- REFILL / AD-PROMOTION REQUESTS ----------
+    match /refill_requests/{requestId} {
+      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isSignedIn() &&
+                    request.resource.data.userId == request.auth.uid &&
+                    request.resource.data.amount is number &&
+                    request.resource.data.amount > 0 &&
+                    request.resource.data.status == "pending" &&
+                    request.resource.data.keys().hasOnly([
+                      'userId', 'userName', 'userEmail', 'amount', 'status',
+                      'type', 'listingId', 'listingTitle', 'adTier', 'durationDays',
+                      'currentViews', 'createdAt'
+                    ]) &&
+                    // ad_promotion-এর জন্য payer অবশ্যই ওই listing-এর প্রকৃত মালিক
+                    // হতে হবে -- নাহলে যে কেউ টাকা দিয়ে অন্য কারো (এমনকি
+                    // প্রতিদ্বন্দ্বীর) পোস্ট promote করে দিতে পারত।
+                    (request.resource.data.type != "ad_promotion" ||
+                     (request.resource.data.listingId is string &&
+                      get(/databases/$(database)/documents/listings/$(request.resource.data.listingId)).data.sellerId == request.auth.uid));
+      allow update, delete: if isAdmin();
+    }
+
+    // ---------- PURCHASES (order records, immutable after creation) ----------
+    match /purchases/{purchaseId} {
+      allow read: if isSignedIn() && (resource.data.buyerId == request.auth.uid || isAdmin());
+      // sellerId and price must match the real listing doc - stops a
+      // tampered client request from recording a fake price/seller.
+      allow create: if isSignedIn() &&
+                    request.resource.data.buyerId == request.auth.uid &&
+                    request.resource.data.listingId is string &&
+                    get(/databases/$(database)/documents/listings/$(request.resource.data.listingId)).data.sellerId == request.resource.data.sellerId &&
+                    get(/databases/$(database)/documents/listings/$(request.resource.data.listingId)).data.price == request.resource.data.price;
+      allow update, delete: if isAdmin();
+    }
+
+    // ---------- SELLER REVIEWS ----------
+    // 🔧 আগে reviewId auto-generated ছিল, তাই একই buyer একই seller-কে বারবার
+    // রিভিউ দিতে পারত, আর নিজের দোকানেও নিজে রিভিউ দিতে বাধা ছিল না।
+    // এখন client-এ deterministic ID (`${reviewerId}_${sellerId}`) ব্যবহার করা
+    // হয়, আর এখানে update সম্পূর্ণ বন্ধ -- তাই একই ID-তে দ্বিতীয়বার লেখার
+    // চেষ্টা "update" রুলে পড়ে (কারণ doc আগে থেকেই আছে) এবং বাতিল হয়ে যায়।
+    match /seller_reviews/{reviewId} {
+      allow read: if true;
+      allow create: if isSignedIn() &&
+                    request.resource.data.reviewerId == request.auth.uid &&
+                    request.resource.data.sellerId is string &&
+                    request.resource.data.sellerId != request.auth.uid &&
+                    reviewId == request.auth.uid + "_" + request.resource.data.sellerId &&
+                    request.resource.data.comment is string &&
+                    request.resource.data.comment.size() < 1000 &&
+                    request.resource.data.rating is number &&
+                    request.resource.data.rating >= 1 &&
+                    request.resource.data.rating <= 5;
+      allow update: if false; // রিভিউ একবার লেখা হলে অপরিবর্তনীয় (duplicate-প্রতিরোধের মূল অংশ)
+      allow delete: if isSignedIn() && (resource.data.reviewerId == request.auth.uid || isAdmin());
+    }
+
+    // ---------- CHATS ----------
+    match /chats/{chatId} {
+      allow read: if isSignedIn() && (request.auth.uid in resource.data.participants);
+      allow create: if isSignedIn() && (request.auth.uid in request.resource.data.participants);
+      allow update: if isSignedIn() &&
+                    (request.auth.uid in resource.data.participants) &&
+                    request.resource.data.diff(resource.data).affectedKeys().hasOnly(
+                      ['lastMessage', 'lastMessageAt', 'unreadCount']
+                    );
+      allow delete: if isAdmin();
+
+      match /messages/{messageId} {
+        allow read: if isSignedIn() &&
+                    (request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participants);
+        allow create: if isSignedIn() &&
+                      (request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participants) &&
+                      request.resource.data.senderId == request.auth.uid &&
+                      messageCooldownPassed();
+        allow update, delete: if isAdmin();
+      }
+    }
+
+    // ---------- LOTTERY DRAWS (free daily "Boost Ads" lottery, server-only writes) ----------
+    // Draws are only ever created by the /api/lottery/draw serverless function (Admin SDK),
+    // which bypasses these rules — this keeps the win chance and daily limit tamper-proof.
+    match /lottery_draws/{drawId} {
+      allow read: if isSignedIn() && (resource.data.uid == request.auth.uid || isAdmin());
+      allow write: if false;
+    }
+
+    // ---------- SUPPORT TICKETS ----------
+    // 🔧 আগে যেকোনো guest (কোনো auth.uid ছাড়াই) সরাসরি এখানে unlimited টিকেট
+    // লিখতে পারত -- Firestore rules-এ guest-দের কোনো স্থিতিশীল identity নেই
+    // (request.auth == null), তাই per-guest rate limit rules দিয়ে সম্ভব না।
+    // এখন সব টিকেট /api/submit-support-ticket দিয়ে যায় (guest হলে IP-ভিত্তিক,
+    // signed-in হলে uid-ভিত্তিক সীমা), যেটা Admin SDK দিয়ে লেখে -- তাই client-এর
+    // সরাসরি write এখন সম্পূর্ণ বন্ধ।
+    match /support_tickets/{ticketId} {
+      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if false; // শুধু /api/submit-support-ticket (Admin SDK) দিয়ে তৈরি হয়
+      allow update, delete: if isAdmin(); // Admin panel-এ ticket status বদলানোর জন্য দরকার
+    }
+
+    // ---------- SITE VISIT / LOGIN / SIGNUP ANALYTICS ----------
+    // Written only by the /api/track-event serverless function (Admin SDK),
+    // which bypasses these rules -- keeps visitor IP/location data from
+    // being writable or readable by anyone except an admin.
+    match /site_visits/{visitId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+    match /analytics_stats/{statId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    // Sharded counter sub-documents (analytics_stats/summary/shards/{0-9}).
+    // Firestore rules don't recurse into subcollections automatically, so
+    // this needs its own match block for the admin panel's client-side read.
+    match /analytics_stats/{statId}/shards/{shardId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    // ---------- Everything else: locked down ----------
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

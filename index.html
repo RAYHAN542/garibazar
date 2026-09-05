@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <title>গাড়ি বাজার (Gari Bazar) - Auto Spares & Parts Marketplace in Bangladesh</title>
+    <meta name="description" content="বাংলাদেশ প্রথম ডেডিকেটেড গাড়ি ও বাইক পার্টস কেনা-বেচার প্ল্যাটফর্ম। গাড়ি বাজার-এ খুব সহজেই খুঁজুন আপনার পছন্দের গাড়ির সঠিক পার্টস।" />
+    <meta name="theme-color" content="#f59e0b" />
+    <meta name="color-scheme" content="light" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <link rel="icon" type="image/png" href="./icon-192.png" />
+    <link rel="apple-touch-icon" href="./icon-192.png" />
+    <link rel="manifest" href="./manifest.json" />
+    <!-- Open Graph Metas for social sharing -->
+    <meta property="og:title" content="📲 গাড়ি বাজার অ্যাপ ইনস্টল করুন | Gari Bazar" />
+    <meta property="og:description" content="গাড়ি ও গাড়ির পার্টস কেনাবেচার জন্য গাড়ি বাজার অ্যাপ ইনস্টল করুন। এক ক্লিকে খুলুন এবং ফোনে App-এর মতো ব্যবহার করুন।" />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://garibazar.shop" />
+<meta property="og:image" content="https://garibazar.shop/og-banner.jpg" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="📲 গাড়ি বাজার অ্যাপ ইনস্টল করুন | Gari Bazar" />
+<meta name="twitter:description" content="গাড়ি বাজার অ্যাপ ইনস্টল করুন এবং গাড়ি ও গাড়ির পার্টস সহজে কেনাবেচা করুন।" />
+<meta name="twitter:image" content="https://garibazar.shop/og-banner.jpg" />
+    <!-- Preload Noto Sans Bengali (non-render-blocking) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <!-- First image on a listing card and the first Firestore round-trip
+         are on the critical path for the initial paint - starting the DNS
+         + TLS handshake for both now (before any JS runs) shaves roughly
+         200-300ms off the time to see real content. -->
+    <link rel="preconnect" href="https://res.cloudinary.com" />
+    <link rel="preconnect" href="https://firestore.googleapis.com" crossorigin />
+    <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Noto+Sans+Bengali:wght@400;500;600;700&display=swap" onload="this.onload=null;this.rel='stylesheet'" />
+    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+Bengali:wght@400;500;600;700&display=swap" /></noscript>
+      <!-- Google AdSense: loaded 3s after window 'load' instead of blocking
+           in <head>, so it never competes with the app's own first paint.
+           🚫 Skipped entirely inside the native Capacitor app (audit A4) --
+           AdSense in a packaged WebView violates AdSense program policy and
+           risks the whole AdSense account (not just this app) getting
+           suspended. Native ads should go through AdMob instead, separately.
+           window.Capacitor is injected by Capacitor's own runtime before
+           this fires, so this check works without importing anything. -->
+      <script>
+        window.addEventListener('load', function () {
+          setTimeout(function () {
+            if (window.Capacitor && typeof window.Capacitor.isNativePlatform === 'function' && window.Capacitor.isNativePlatform()) {
+              return;
+            }
+            var s = document.createElement('script');
+            s.async = true;
+            s.src = "https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-3277203446788826";
+            s.crossOrigin = "anonymous";
+            document.head.appendChild(s);
+          }, 3000);
+        });
+      </script>
+    <style>
+      /* Static splash shown instantly before JS loads/parses/runs.
+         React replaces this the moment it mounts. */
+      .gb-splash {
+        display: flex;
+        flex-direction: column;
+        min-height: 100vh;
+        background: #f8fafc;
+      }
+      .gb-splash-header {
+        height: 56px;
+        display: flex;
+        align-items: center;
+        padding: 0 16px;
+        border-bottom: 1px solid #e2e8f0;
+        font-weight: 700;
+        color: #f59e0b;
+        font-size: 18px;
+      }
+      .gb-splash-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 10px;
+        padding: 12px;
+      }
+      .gb-skel {
+        border-radius: 16px;
+        overflow: hidden;
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+      }
+      .gb-skel-img {
+        width: 100%;
+        aspect-ratio: 4 / 3;
+        background: #e2e8f0;
+        animation: gb-pulse 1.4s ease-in-out infinite;
+      }
+      .gb-skel-lines {
+        padding: 10px;
+      }
+      .gb-skel-line {
+        height: 10px;
+        border-radius: 6px;
+        background: #e2e8f0;
+        margin-bottom: 8px;
+        animation: gb-pulse 1.4s ease-in-out infinite;
+      }
+      @keyframes gb-pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.5; }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"><div class="gb-splash"><div class="gb-splash-header">গাড়ি বাজার</div><div class="gb-splash-grid"><div class="gb-skel"><div class="gb-skel-img"></div><div class="gb-skel-lines"><div class="gb-skel-line" style="width:75%"></div><div class="gb-skel-line" style="width:50%"></div></div></div><div class="gb-skel"><div class="gb-skel-img"></div><div class="gb-skel-lines"><div class="gb-skel-line" style="width:75%"></div><div class="gb-skel-line" style="width:50%"></div></div></div><div class="gb-skel"><div class="gb-skel-img"></div><div class="gb-skel-lines"><div class="gb-skel-line" style="width:75%"></div><div class="gb-skel-line" style="width:50%"></div></div></div><div class="gb-skel"><div class="gb-skel-img"></div><div class="gb-skel-lines"><div class="gb-skel-line" style="width:75%"></div><div class="gb-skel-line" style="width:50%"></div></div></div></div></div></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+
