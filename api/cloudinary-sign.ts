@@ -3,6 +3,7 @@ import { getAuth } from "firebase-admin/auth";
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import crypto from "crypto";
 import { applyCors } from "./_lib/cors.js";
+import { createClient } from "@supabase/supabase-js";
 
 // ------------------------------------------------------------------------
 // Signs Cloudinary uploads server-side so the browser never uploads
@@ -37,6 +38,15 @@ const RATE_LIMIT_MAX = 40; // signatures per user per hour -- generous for
 // normal listing/photo uploads, but stops a compromised/scripted account
 // from hammering Cloudinary storage quota.
 
+const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const supabaseAdmin =
+  SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY
+    ? createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+        auth: { autoRefreshToken: false, persistSession: false },
+      })
+    : null;
+
 // Was: any signed-in user could request an unlimited number of signatures,
 // each good for one real upload -- a single account (or a stolen token)
 // could burn through Cloudinary's free-tier storage/bandwidth in minutes.
@@ -66,6 +76,20 @@ async function checkAndBumpRateLimit(uid: string): Promise<boolean> {
   });
 }
 
+async function checkAndBumpSupabaseRateLimit(uid: string): Promise<boolean> {
+  if (!supabaseAdmin) return true;
+  const key = `cloudinary_${uid}`;
+  const now = new Date();
+  const { data } = await supabaseAdmin.from("rate_limits").select("*").eq("key", key).maybeSingle();
+  if (!data || now.getTime() - new Date(data.window_start).getTime() > RATE_LIMIT_WINDOW_MS) {
+    await supabaseAdmin.from("rate_limits").upsert({ key, count: 1, window_start: now.toISOString() });
+    return true;
+  }
+  const newCount = (data.count || 0) + 1;
+  await supabaseAdmin.from("rate_limits").update({ count: newCount }).eq("key", key);
+  return newCount <= RATE_LIMIT_MAX;
+}
+
 export default async function handler(req: any, res: any) {
   if (applyCors(req, res)) return;
   if (req.method !== "POST") {
@@ -73,10 +97,6 @@ export default async function handler(req: any, res: any) {
   }
 
   try {
-    if (!getApps().length) {
-      return res.status(500).json({ error: "সার্ভার কনফিজারেশনে সমস্যা।" });
-    }
-
     const apiKey = process.env.CLOUDINARY_API_KEY;
     const apiSecret = process.env.CLOUDINARY_API_SECRET;
     const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
@@ -87,13 +107,29 @@ export default async function handler(req: any, res: any) {
     // Only a signed-in user of this app may request a signature -- this is
     // the actual guard that unsigned uploads don't have.
     const authHeader = req.headers.authorization || "";
-    const idToken = authHeader.replace("Bearer ", "");
+    const idToken = authHeader.startsWith("Bearer ") ? authHeader.slice(7).trim() : "";
     if (!idToken) {
       return res.status(401).json({ error: "অননুমোদিত অনুরোধ।" });
     }
-    const decoded = await getAuth().verifyIdToken(idToken); // throws if invalid/expired
+    // Phone/password users carry a Supabase access token; older Firebase
+    // social-login users still carry a Firebase ID token.
+    let callerUid: string | null = null;
+    let usesSupabaseAuth = false;
+    if (supabaseAdmin) {
+      const { data, error } = await supabaseAdmin.auth.getUser(idToken);
+      if (!error && data?.user?.id) {
+        callerUid = data.user.id;
+        usesSupabaseAuth = true;
+      }
+    }
+    if (!callerUid) {
+      const decoded = await getAuth().verifyIdToken(idToken);
+      callerUid = decoded.uid;
+    }
 
-    const allowed = await checkAndBumpRateLimit(decoded.uid);
+    const allowed = usesSupabaseAuth
+      ? await checkAndBumpSupabaseRateLimit(callerUid)
+      : await checkAndBumpRateLimit(callerUid);
     if (!allowed) {
       return res.status(429).json({ error: "অনেকবার ছবি আপলোডের চে঵্টা হয়েছে। কিছুক্ষণ পর আবার চেষ্টা করুন।" });
     }
@@ -112,7 +148,7 @@ export default async function handler(req: any, res: any) {
     const paramsToSign: Record<string, string | number> = {
       timestamp,
       upload_preset: "gari_bazar_preset",
-      folder: `listings/${decoded.uid}`,
+      folder: `listings/${callerUid}`,
       allowed_formats: "jpg,png,webp",
     };
     const toSign = Object.keys(paramsToSign)
