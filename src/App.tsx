@@ -118,6 +118,7 @@ export default function App() {
   // Firebase Auth states
   const [user, setUser] = useState<any>(null);
   const [userMetadata, setUserMetadata] = useState<any>(null);
+  const [firebaseAuthUser, setFirebaseAuthUser] = useState<any>(null);
   // 🔧 Fixes local-session/Firebase-Auth race condition: `user` above is set
   // instantly from localStorage on startup so the UI feels fast (avatar,
   // name, etc. show immediately). But Firestore security rules check
@@ -801,7 +802,7 @@ export default function App() {
     };
   }, [isAuthOpen, selectedListing, promotingListing, editingListing, isLegalOpen, isLotteryOpen]);
 
-  // 1. Custom Passwordless Profile Authentication Listener & Real-time Firestore Sync
+  // 1. Custom Profile Authentication Listener & Real-time Firestore Sync
   useEffect(() => {
     // Read locally logged in profile on startup
     const stored = localStorage.getItem("gari_bazar_session_user");
@@ -810,6 +811,7 @@ export default function App() {
         const parsed = JSON.parse(stored);
         setUser({
           uid: parsed.uid,
+          authUid: parsed.authUid,
           displayName: parsed.displayName,
           email: parsed.email,
           photoURL: parsed.photoURL || parsed.profilePicture,
@@ -829,7 +831,8 @@ export default function App() {
   // subsequent sign-in/sign-out during the session still update `user` via
   // the normal login/logout code paths elsewhere in the app.
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, () => {
+    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+      setFirebaseAuthUser(firebaseUser);
       setAuthReady(true);
     });
     return () => unsubscribe();
@@ -837,7 +840,7 @@ export default function App() {
 
   // Fetch reviews for the currently logged-in user to display in "My Shop"
   useEffect(() => {
-    if (!authReady || !user?.uid) {
+    if (!authReady || !firebaseAuthUser?.uid || !user?.uid) {
       setCurrentUserReviews([]);
       return;
     }
@@ -862,11 +865,11 @@ export default function App() {
     });
 
     return () => unsubscribe();
-  }, [authReady, user?.uid]);
+  }, [authReady, firebaseAuthUser?.uid, user?.uid]);
 
   // Sync profile metadata real-time (e.g. simulated credits recharge instantly)
   useEffect(() => {
-    if (!authReady || !user?.uid) return;
+    if (!authReady || !firebaseAuthUser?.uid || !user?.uid) return;
 
     const userRef = doc(db, "users", user.uid);
     const unsubscribe = onSnapshot(userRef, (docSnap) => {
@@ -886,12 +889,12 @@ export default function App() {
     });
 
     return () => unsubscribe();
-  }, [authReady, user?.uid]);
+  }, [authReady, firebaseAuthUser?.uid, user?.uid]);
 
   // Unread Chats Listener
   const [unreadChatsCount, setUnreadChatsCount] = useState(0);
   useEffect(() => {
-    if (!authReady || !user?.uid) {
+    if (!authReady || !firebaseAuthUser?.uid || !user?.uid) {
       setUnreadChatsCount(0);
       return;
     }
@@ -911,12 +914,12 @@ export default function App() {
       setUnreadChatsCount(count);
     });
     return () => unsubscribe();
-  }, [authReady, user?.uid]);
+  }, [authReady, firebaseAuthUser?.uid, user?.uid]);
 
   // 1b. My Own Listings — সরাসরি sellerId দিয়ে কোয়েরি করা, হোমপেজের ২০-টা পেজিনেটেড লিস্ট থেকে না।
   // এভাবে Dashboard আর Lottery সবসময় ইউজারের আসল ১০০% পোস্ট দেখাবে।
   useEffect(() => {
-    if (!authReady || !user?.uid) {
+    if (!authReady || !firebaseAuthUser?.uid || !user?.uid) {
       setMyListings([]);
       return;
     }
@@ -936,7 +939,7 @@ export default function App() {
       logger.error("Failed to sync my listings:", err);
     });
     return () => unsubscribe();
-  }, [authReady, user?.uid]);
+  }, [authReady, firebaseAuthUser?.uid, user?.uid]);
 
   // 1c. সব লাইভ বুস্ট করা অ্যাড — হোমপেজের "Load More" পেজিনেশনের ওপর নির্ভর না করে সরাসরি fetch করা,
   // যাতে পেজ লোড হওয়ার সাথে সাথেই বুস্ট ব্যানার দেখা যায়, Load More চাপার আগেই।
@@ -1433,6 +1436,7 @@ export default function App() {
   // 6. Sign out trigger
   const handleLogout = () => {
     signOut(auth).catch((err) => console.warn("Firebase signOut failed:", err));
+    supabase.auth.signOut().catch((err) => console.warn("Supabase signOut failed:", err));
     localStorage.removeItem("gari_bazar_session_user");
     setUser(null);
     setUserMetadata(null);
@@ -2590,6 +2594,7 @@ export default function App() {
         onAuthSuccess={(sessionUser) => {
           setUser({
             uid: sessionUser.uid,
+            authUid: sessionUser.authUid,
             displayName: sessionUser.displayName,
             email: sessionUser.email,
             photoURL: sessionUser.photoURL || sessionUser.profilePicture,
