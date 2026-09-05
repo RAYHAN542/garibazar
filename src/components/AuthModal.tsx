@@ -103,7 +103,7 @@ export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModa
   const [otpPhone, setOtpPhone] = useState("");
   // phoneAuthMode: OTP/SMS gateway সরিয়ে ফোন নম্বর + পাসওয়ার্ড দিয়ে লগইন/সাইনআপ করা হয়,
   // কারণ SMS gateway (Android ফোন-ভিত্তিক) মাঝেমধ্যে অফলাইন/ব্যর্থ হয়ে যায়।
-  const [phoneAuthMode, setPhoneAuthMode] = useState<"login" | "signup">("login");
+  const [phoneAuthMode, setPhoneAuthMode] = useState<"login" | "signup" | "legacy">("login");
   const [phonePassword, setPhonePassword] = useState("");
   const [phonePasswordConfirm, setPhonePasswordConfirm] = useState("");
   const [displayName, setDisplayName] = useState("");
@@ -417,7 +417,7 @@ export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModa
           // A migrated Firebase profile cannot be checked against its old
           // Firebase password in Supabase. Move the user into the one-time
           // claim form instead of leaving them on a login error screen.
-          setPhoneAuthMode("signup");
+          setPhoneAuthMode("legacy");
           setPhonePassword("");
           setPhonePasswordConfirm("");
         }
@@ -645,6 +645,8 @@ export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModa
             <p className="text-xs text-slate-500 text-center">
               {phoneAuthMode === "login"
                 ? (language === "bn" ? "আপনার মোবাইল নম্বর ও পাসওয়ার্ড দিয়ে সাইন-ইন করুন।" : "Sign in with your mobile number and password.")
+                : phoneAuthMode === "legacy"
+                  ? (language === "bn" ? "আপনার পুরনো অ্যাকাউন্ট পাওয়া গেছে। সেটি চালু করতে নতুন ৮ অক্ষরের পাসওয়ার্ড দিন।" : "Your old account was found. Set a new password with at least 8 characters to restore it.")
                 : (language === "bn" ? "নতুন অ্যাকাউন্ট তৈরি করতে মোবাইল নম্বর ও পাসওয়ার্ড দিন।" : "Enter a mobile number and password to create your account.")}
             </p>
             <div>
@@ -686,6 +688,8 @@ export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModa
               {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Phone className="w-4 h-4" />}
               {phoneAuthMode === "login"
                 ? (language === "bn" ? "সাইন-ইন করুন" : "Sign In")
+                : phoneAuthMode === "legacy"
+                  ? (language === "bn" ? "পুরনো অ্যাকাউন্ট চালু করুন" : "Restore old account")
                 : (language === "bn" ? "অ্যাকাউন্ট তৈরি করুন" : "Create Account")}
             </button>
             <div className="flex items-center justify-between gap-2 text-xs pt-1">
@@ -693,7 +697,7 @@ export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModa
                 <ArrowLeft className="w-3 h-3" />
                 {language === "bn" ? "পেছনে যান" : "Back"}
               </button>
-              <button
+              {phoneAuthMode !== "legacy" && <button
                 type="button"
                 onClick={() => { setError(""); setPhoneAuthMode(phoneAuthMode === "login" ? "signup" : "login"); }}
                 className="text-emerald-600 dark:text-emerald-400 font-bold text-sm hover:underline text-right"
@@ -701,7 +705,7 @@ export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModa
                 {phoneAuthMode === "login"
                   ? (language === "bn" ? "নতুন অ্যাকাউন্ট তৈরি করুন" : "Create new account")
                   : (language === "bn" ? "আগে থেকে অ্যাকাউন্ট আছে? সাইন-ইন" : "Already have an account? Sign in")}
-              </button>
+              </button>}
             </div>
           </form>
         ) : (
