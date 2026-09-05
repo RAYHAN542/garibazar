@@ -257,6 +257,9 @@ export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModa
       setPhoneAuthMode("login");
       setPhonePassword("");
       setPhonePasswordConfirm("");
+      setDisplayName("");
+      setProfilePhotoFile(null);
+      setProfilePhotoPreview(null);
     }
   }, [isOpen]);
 
@@ -457,6 +460,10 @@ export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModa
       setError(language === "bn" ? "দুই পাসওয়ার্ড মিলছে না" : "Passwords don't match");
       return;
     }
+    if (!displayName.trim()) {
+      setError(language === "bn" ? "আপনার নাম দিন" : "Enter your name");
+      return;
+    }
     setLoading(true);
     try {
       const resp = await fetch(apiUrl("/api/auth/phone"), {
@@ -477,6 +484,32 @@ export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModa
         refresh_token: data.refresh_token,
       });
       if (sessionError) throw sessionError;
+
+      // নাম ও (ঐচ্ছিক) প্রোফাইল ছবি সেভ করা হচ্ছে -- একাউন্ট Supabase-এ তৈরি
+      // হয়ে গেছে ও সেশন সেট হয়ে গেছে, তাই RLS অনুযায়ী নিজের রো আপডেট করা যাবে।
+      const sanitizedDisplayName = sanitizeText(displayName, 50);
+      const profileUpdate: Record<string, string> = { name: sanitizedDisplayName };
+
+      if (profilePhotoFile) {
+        setUploadingPhoto(true);
+        try {
+          const compressedBlob = await compressImageToBlob(profilePhotoFile);
+          const uploadPromise = uploadToCloudinary(compressedBlob);
+          const timeoutPromise = new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error("upload/timeout")), 60000)
+          );
+          profileUpdate.profile_picture = await Promise.race([uploadPromise, timeoutPromise]);
+        } catch (photoErr) {
+          // ছবি আপলোড ব্যর্থ হলেও একাউন্ট তৈরি আটকানো ঠিক না -- নাম দিয়েই এগিয়ে যাওয়া হচ্ছে।
+          console.error("Signup photo upload failed:", photoErr);
+        } finally {
+          setUploadingPhoto(false);
+        }
+      }
+
+      const { error: updateError } = await supabase.from("users").update(profileUpdate).eq("uid", data.uid);
+      if (updateError) console.error("Failed to save name/photo after signup:", updateError);
+
       await handlePostPhoneAuth(data.uid, data.phone, data.auth_uid);
     } catch (err: any) {
       console.error(err);
@@ -649,6 +682,45 @@ export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModa
                   ? (language === "bn" ? "আপনার পুরনো অ্যাকাউন্ট পাওয়া গেছে। সেটি চালু করতে নতুন ৮ অক্ষরের পাসওয়ার্ড দিন।" : "Your old account was found. Set a new password with at least 8 characters to restore it.")
                 : (language === "bn" ? "নতুন অ্যাকাউন্ট তৈরি করতে মোবাইল নম্বর ও পাসওয়ার্ড দিন।" : "Enter a mobile number and password to create your account.")}
             </p>
+            {phoneAuthMode === "signup" && (
+              <div className="flex justify-center mb-1">
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="relative w-20 h-20 rounded-full overflow-hidden border-2 border-dashed border-slate-300 dark:border-slate-600 flex items-center justify-center bg-slate-50 dark:bg-slate-800"
+                >
+                  {profilePhotoPreview ? (
+                    <>
+                      <img src={profilePhotoPreview} alt="preview" className="w-full h-full object-cover" />
+                      <span className="absolute bottom-0 inset-x-0 bg-slate-900/60 text-white flex items-center justify-center py-1">
+                        <Camera className="w-3.5 h-3.5" />
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <Camera className="w-6 h-6 text-slate-400" />
+                      <div className="absolute bottom-0 inset-x-0 bg-black/50 text-white text-[9px] font-bold text-center py-0.5">
+                        {language === "bn" ? "ছবি দিন (ঐচ্ছিক)" : "Add Photo (optional)"}
+                      </div>
+                    </>
+                  )}
+                </button>
+                <input type="file" ref={fileInputRef} onChange={handlePhotoSelect} accept="image/*" className="hidden" />
+              </div>
+            )}
+            {phoneAuthMode === "signup" && (
+              <div>
+                <label className="text-[10px] font-bold block mb-1 text-slate-500">{language === "bn" ? "আপনার নাম *" : "Name *"}</label>
+                <input
+                  type="text"
+                  required
+                  value={displayName}
+                  onChange={(e) => setDisplayName(e.target.value)}
+                  className="w-full px-3 py-2 text-sm border rounded-lg dark:bg-slate-800 dark:border-slate-700 dark:text-white"
+                  placeholder={language === "bn" ? "আপনার নাম লিখুন" : "Your name"}
+                />
+              </div>
+            )}
             <div>
               <label className="text-[10px] font-bold block mb-1 text-slate-500">{language === "bn" ? "মোবাইল নম্বর *" : "Mobile Number *"}</label>
               <input
