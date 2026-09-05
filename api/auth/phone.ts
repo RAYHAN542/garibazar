@@ -13,8 +13,12 @@ const LOCK_DURATION_MS = 15 * 60 * 1000;
 const RATE_LIMIT_WINDOW_MS = 60 * 1000;
 const RATE_LIMIT_MAX = 10;
 
+function toEnglishDigits(raw: string): string {
+  return String(raw || "").replace(/[০-৯]/g, (digit) => String("০১২৩৪৫৬৭৮৯".indexOf(digit)));
+}
+
 function normalizeBanglaPhone(raw: string): string | null {
-  const digits = String(raw || "").replace(/[^\d]/g, "");
+  const digits = toEnglishDigits(raw).replace(/[^\d]/g, "");
   let local = digits;
   if (local.startsWith("880")) local = local.slice(3);
   if (local.startsWith("0")) local = local.slice(1);
@@ -63,6 +67,10 @@ function phoneVariants(intlPhone: string): string[] {
 }
 
 async function findLegacyProfile(intlPhone: string): Promise<{ uid: string } | null> {
+  // First try the common stored formats. Older Firebase exports sometimes
+  // contain spaces, dashes, Bangla digits, or a leading +880, so an exact
+  // `in(...)` query alone can miss the migrated profile and create a second
+  // application account.
   const { data, error } = await supabaseAdmin
     .from("users")
     .select("uid, phone, created_at")
@@ -71,9 +79,24 @@ async function findLegacyProfile(intlPhone: string): Promise<{ uid: string } | n
     .limit(1);
   if (error) {
     console.error("legacy profile lookup failed:", error.message);
+  } else if (data && data[0]) {
+    return { uid: data[0].uid };
+  }
+
+  // Fallback to canonical comparison so formatting differences from the
+  // Firebase migration cannot make an old user look like a new user.
+  const { data: candidates, error: fallbackError } = await supabaseAdmin
+    .from("users")
+    .select("uid, phone, created_at")
+    .not("phone", "is", null)
+    .order("created_at", { ascending: true });
+  if (fallbackError) {
+    console.error("legacy profile fallback lookup failed:", fallbackError.message);
     return null;
   }
-  return data && data[0] ? { uid: data[0].uid } : null;
+
+  const match = (candidates || []).find((candidate: any) => normalizeBanglaPhone(candidate.phone) === intlPhone);
+  return match ? { uid: match.uid } : null;
 }
 
 /** লগইন করা Auth ইউজারের জন্য অ্যাপের আসল uid (পুরনো হলে legacy uid)। */
@@ -93,6 +116,7 @@ async function handleSignup(req: any, res: any) {
     return res.status(400).json({ error: "পাসওয়ার্ড কমপক্ষে ৮ ক্যারেক্টার হতে হবে।" });
   }
 
+  const legacy = await findLegacyProfile(phone);
   const { error: createError } = await supabaseAdmin.auth.admin.createUser({
     phone,
     password,
@@ -101,6 +125,24 @@ async function handleSignup(req: any, res: any) {
 
   if (createError) {
     if (createError.status === 422 || /already.*registered|already.*exists/i.test(createError.message || "")) {
+      // The user may have reached this form after an earlier failed attempt.
+      // If Auth was created but the old profile still exists, sign into that
+      // Auth account and return the legacy app uid instead of treating it as a
+      // brand-new application account.
+      if (legacy) {
+        const { data: existingSession, error: existingSignInError } =
+          await supabaseAdmin.auth.signInWithPassword({ phone, password });
+        if (!existingSignInError && existingSession.session) {
+          return res.status(200).json({
+            access_token: existingSession.session.access_token,
+            refresh_token: existingSession.session.refresh_token,
+            uid: legacy.uid,
+            auth_uid: existingSession.user.id,
+            phone,
+            claimed: true,
+          });
+        }
+      }
       return res.status(409).json({
         error: "এই নম্বরে আগে থেকেই অ্যাকাউন্ট আছে। লগইন করুন।",
         code: "ALREADY_REGISTERED",
@@ -114,7 +156,7 @@ async function handleSignup(req: any, res: any) {
 
   // এই নম্বরের পুরনো (migrate হওয়া) প্রোফাইল থাকলে সেটার uid-ই রাখা হয়,
   // নইলে ওই ইউজারের পুরনো listing/chat নতুন অ্যাকাউন্টে দেখা যেত না।
-  const appUid = await resolveAppUid(sessionData.user.id, phone);
+  const appUid = legacy?.uid || (await resolveAppUid(sessionData.user.id, phone));
 
   await supabaseAdmin.from("users").upsert(
     { uid: appUid, phone, created_at: new Date().toISOString() },
