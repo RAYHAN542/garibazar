@@ -1,4 +1,9 @@
-import "dotenv/config";
+import dotenv from "dotenv";
+
+// The Vite client reads .env.development.local automatically, but this custom
+// Node server must load it explicitly before dynamically importing API routes.
+dotenv.config({ path: ".env.development.local" });
+dotenv.config();
 
 import express from "express";
 import path from "path";
