@@ -1,12 +1,22 @@
 import { createClient } from "@supabase/supabase-js";
 import { applyCors } from "../_lib/cors.js";
 
-const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
-const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+let supabaseAdmin: any = null;
 
-const supabaseAdmin = createClient(SUPABASE_URL as string, SUPABASE_SERVICE_ROLE_KEY as string, {
-  auth: { autoRefreshToken: false, persistSession: false },
-});
+function getSupabaseAdmin() {
+  if (supabaseAdmin) return supabaseAdmin;
+
+  const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!supabaseUrl || !serviceRoleKey) {
+    throw new Error("Supabase server environment is not configured");
+  }
+
+  supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+  return supabaseAdmin;
+}
 
 const MAX_FAILED_ATTEMPTS = 5;
 const LOCK_DURATION_MS = 15 * 60 * 1000;
@@ -35,15 +45,15 @@ function getClientIp(req: any): string {
 
 async function isRateLimited(key: string): Promise<boolean> {
   const now = new Date();
-  const { data } = await supabaseAdmin.from("rate_limits").select("*").eq("key", key).maybeSingle();
+  const { data } = await getSupabaseAdmin().from("rate_limits").select("*").eq("key", key).maybeSingle();
 
   if (!data || now.getTime() - new Date(data.window_start).getTime() > RATE_LIMIT_WINDOW_MS) {
-    await supabaseAdmin.from("rate_limits").upsert({ key, count: 1, window_start: now.toISOString() });
+    await getSupabaseAdmin().from("rate_limits").upsert({ key, count: 1, window_start: now.toISOString() });
     return false;
   }
 
   const newCount = (data.count || 0) + 1;
-  await supabaseAdmin.from("rate_limits").update({ count: newCount }).eq("key", key);
+  await getSupabaseAdmin().from("rate_limits").update({ count: newCount }).eq("key", key);
   return newCount > RATE_LIMIT_MAX;
 }
 
@@ -117,7 +127,7 @@ async function handleSignup(req: any, res: any) {
   }
 
   const legacy = await findLegacyProfile(phone);
-  const { error: createError } = await supabaseAdmin.auth.admin.createUser({
+  const { error: createError } = await getSupabaseAdmin().auth.admin.createUser({
     phone,
     password,
     phone_confirm: true,
@@ -131,7 +141,7 @@ async function handleSignup(req: any, res: any) {
       // brand-new application account.
       if (legacy) {
         const { data: existingSession, error: existingSignInError } =
-          await supabaseAdmin.auth.signInWithPassword({ phone, password });
+          await getSupabaseAdmin().auth.signInWithPassword({ phone, password });
         if (!existingSignInError && existingSession.session) {
           return res.status(200).json({
             access_token: existingSession.session.access_token,
@@ -151,14 +161,14 @@ async function handleSignup(req: any, res: any) {
     throw createError;
   }
 
-  const { data: sessionData, error: signInError } = await supabaseAdmin.auth.signInWithPassword({ phone, password });
+  const { data: sessionData, error: signInError } = await getSupabaseAdmin().auth.signInWithPassword({ phone, password });
   if (signInError || !sessionData.session) throw signInError || new Error("no session after signup");
 
-  // এই নম্বরের পুরনো (migrate হওয়া) প্রোফাইল থাকলে সেটার uid-ই রাখা হয়,
+  // এই নম্বরের পুরনো (migrate হওয়া) প্রোফাইল থাক��ে সেটার uid-ই রাখা হয়,
   // নইলে ওই ইউজারের পুরনো listing/chat নতুন অ্যাকাউন্টে দেখা যেত না।
   const appUid = legacy?.uid || (await resolveAppUid(sessionData.user.id, phone));
 
-  await supabaseAdmin.from("users").upsert(
+  await getSupabaseAdmin().from("users").upsert(
     { uid: appUid, phone, created_at: new Date().toISOString() },
     { onConflict: "uid" }
   );
@@ -194,7 +204,7 @@ async function handleLogin(req: any, res: any) {
     });
   }
 
-  const { data: sessionData, error } = await supabaseAdmin.auth.signInWithPassword({ phone, password });
+  const { data: sessionData, error } = await getSupabaseAdmin().auth.signInWithPassword({ phone, password });
 
   if (error) {
     const failedAttempts = (lockRow?.failed_attempts || 0) + 1;
@@ -203,7 +213,7 @@ async function handleLogin(req: any, res: any) {
       update.lock_until = new Date(now + LOCK_DURATION_MS).toISOString();
       update.failed_attempts = 0;
     }
-    await supabaseAdmin.from("login_lockouts").upsert(update, { onConflict: "phone" });
+    await getSupabaseAdmin().from("login_lockouts").upsert(update, { onConflict: "phone" });
 
     if (/invalid login credentials/i.test(error.message || "")) {
       // migrate হওয়া পুরনো ইউজার কিনা দেখা হচ্ছে (উপরের কমেন্ট দেখুন)।
@@ -215,14 +225,14 @@ async function handleLogin(req: any, res: any) {
             code: "LEGACY_SET_PASSWORD",
           });
         }
-        const { data: created, error: createError } = await supabaseAdmin.auth.admin.createUser({
+        const { data: created, error: createError } = await getSupabaseAdmin().auth.admin.createUser({
           phone,
           password,
           phone_confirm: true,
         });
         if (!createError && created?.user) {
           const { data: claimedSession, error: claimSignInError } =
-            await supabaseAdmin.auth.signInWithPassword({ phone, password });
+            await getSupabaseAdmin().auth.signInWithPassword({ phone, password });
           if (!claimSignInError && claimedSession?.session) {
             await supabaseAdmin
               .from("login_lockouts")
@@ -247,7 +257,7 @@ async function handleLogin(req: any, res: any) {
   }
 
   if (lockRow?.failed_attempts || lockRow?.lock_until) {
-    await supabaseAdmin.from("login_lockouts").update({ failed_attempts: 0, lock_until: null }).eq("phone", phone);
+    await getSupabaseAdmin().from("login_lockouts").update({ failed_attempts: 0, lock_until: null }).eq("phone", phone);
   }
 
   const appUid = await resolveAppUid(sessionData.user!.id, phone);
