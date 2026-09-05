@@ -7,7 +7,6 @@ import { GoogleGenAI } from "@google/genai";
 import admin from "firebase-admin";
 import helmet from "helmet";
 import cors from "cors";
-import phoneAuthHandler from "./api/auth/phone";
 
 const isProd = process.env.NODE_ENV === "production";
 const logger = {
@@ -387,7 +386,9 @@ Keep it structured, highlighting compatibility, reliability, usage warning or be
     }
   });
 
-  // Phone/password auth
+  // Load the auth handler after dotenv/config has populated process.env.
+  // Static ESM imports are evaluated before dotenv's side effect runs.
+  const { default: phoneAuthHandler } = await import("./api/auth/phone");
   app.post("/api/auth/phone", phoneAuthHandler);
 
   // Vite middleware setup
