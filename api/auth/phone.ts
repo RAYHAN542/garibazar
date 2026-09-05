@@ -125,6 +125,7 @@ async function handleSignup(req: any, res: any) {
     access_token: sessionData.session.access_token,
     refresh_token: sessionData.session.refresh_token,
     uid: appUid,
+    auth_uid: sessionData.user.id,
     phone,
   });
 }
@@ -189,6 +190,7 @@ async function handleLogin(req: any, res: any) {
               access_token: claimedSession.session.access_token,
               refresh_token: claimedSession.session.refresh_token,
               uid: legacy.uid,
+              auth_uid: claimedSession.user.id,
               phone,
               claimed: true,
             });
@@ -212,6 +214,7 @@ async function handleLogin(req: any, res: any) {
     access_token: sessionData.session!.access_token,
     refresh_token: sessionData.session!.refresh_token,
     uid: appUid,
+    auth_uid: sessionData.user!.id,
     phone,
   });
 }
