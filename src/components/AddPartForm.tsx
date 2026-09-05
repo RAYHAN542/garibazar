@@ -202,22 +202,22 @@ export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPromp
       return;
     }
 
-    // পোস্ট করার আগে Firebase টোকেন জোর করে রিফ্রেশ করা হচ্ছে, যাতে পুরনো/
-    // মেয়াদোত্তীর্ণ সেশনের কারণে "permission denied" এরর না আসে। বেশিরভাগ
-    // ক্ষেত্রে এটা নিঃশব্দে ঠিক হয়ে যাবে, ইউজার কিছু বুঝতেও পারবে না।
+    // Firebase থেকে Supabase Auth-এ আসার পর phone login-এর Firebase user
+    // থাকে না। তাই Firebase currentUser দেখে এখানে valid Supabase session-কে
+    // ভুল করে expired বলা যাবে না।
     try {
-      await auth.currentUser?.getIdToken(true);
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (!sessionData.session && !auth.currentUser) {
+        setError(
+          language === "bn"
+            ? "আপনার লগইন সেশন মেয়াদোত্তীর্ণ হয়ে গেছে। অনুগ্রহ করে আবার লগইন করুন।"
+            : "Your session has expired. Please log in again."
+        );
+        onLoginPrompt();
+        return;
+      }
     } catch (tokenErr) {
-      console.error("Token refresh failed:", tokenErr);
-    }
-    if (!auth.currentUser) {
-      setError(
-        language === "bn"
-          ? "আপনার লগইন সেশন মেয়াদোত্তীর্ণ হয়ে গেছে। অনুগ্রহ করে আবার লগইন করুন।"
-          : "Your session has expired. Please log in again."
-      );
-      onLoginPrompt();
-      return;
+      console.error("Auth session check failed:", tokenErr);
     }
 
     if (!description.trim()) {
@@ -274,7 +274,7 @@ export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPromp
           description: cleanDesc,
           location: detectedLocation,
           images: uploadedUrls,
-          seller_id: currentUser.uid,
+          seller_id: currentUser.authUid || currentUser.uid,
           seller_name: currentUser.displayName || "Rayhan",
           type: selectedType
         })
@@ -292,7 +292,7 @@ export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPromp
         .from("listing_contacts")
         .insert({
           listing_id: insertedListing.id,
-          seller_id: currentUser.uid,
+          seller_id: currentUser.authUid || currentUser.uid,
           phone: cleanPhone
         });
 
