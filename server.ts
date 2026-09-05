@@ -8,6 +8,7 @@ import path from "path";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
 import admin from "firebase-admin";
+import { createClient } from "@supabase/supabase-js";
 import helmet from "helmet";
 import cors from "cors";
 import phoneAuthHandler from "./api/auth/phone";
@@ -69,32 +70,28 @@ function getFirebaseAdmin(): any {
   return admin;
 }
 
-// Token Verification Helper
+// Token Verification Helper: Supabase access tokens must not be verified with Firebase Admin.
+const supabaseAuth = createClient(
+  process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || "",
+  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_PUBLISHABLE_KEY || "",
+  { auth: { autoRefreshToken: false, persistSession: false } },
+);
+
 async function verifyAuthToken(req: express.Request) {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
     throw new Error("Missing or invalid Authorization header");
   }
-  const token = authHeader.split("Bearer ")[1];
-  
-  const adminSDK = getFirebaseAdmin();
-  try {
-    // 1. Try standard Firebase ID Token verification if it matches JWT format
-    if (token && token.split('.').length === 3) {
-      const decodedToken = await (adminSDK as any).auth().verifyIdToken(token);
-      return decodedToken;
-    }
-  } catch (err) {
-    logger.warn("Standard verifyIdToken failed, attempting custom user fallback...", err);
+
+  const token = authHeader.slice("Bearer ".length).trim();
+  if (!token) throw new Error("Missing bearer token");
+
+  const { data, error } = await supabaseAuth.auth.getUser(token);
+  if (error || !data.user) {
+    throw new Error("Unauthorized: Invalid Supabase bearer token");
   }
 
-  // 2. Fallback ONLY in explicit dev mode with bypass flag enabled
-  if (process.env.NODE_ENV === "development" && process.env.ALLOW_DEV_AUTH_BYPASS === "true") {
-    logger.warn("DEV AUTH BYPASS ACTIVE - never enable in production!");
-    return { uid: token || "test-user-uid", email: "test@example.com" };
-  }
-  
-  throw new Error("Unauthorized: Invalid bearer token");
+  return { uid: data.user.id, email: data.user.email, user: data.user };
 }
 
 // Fallback local memory caches in case of offline/unconfigured Firebase instances
@@ -275,33 +272,32 @@ async function startServer() {
   );
 
   // 2. CORS configurations with strict origin validation
-  const devOrigins = [
+  const defaultOrigins = [
     "http://localhost:3000",
     "http://localhost:5173",
+    "https://localhost",
+    "https://garibazar.shop",
+    "https://www.garibazar.shop",
   ];
-  // In production, set ALLOWED_ORIGINS env var as comma-separated list
-  // e.g. ALLOWED_ORIGINS=https://garibazar.vercel.app,https://garibazar.com
-  const allowedOrigins = process.env.ALLOWED_ORIGINS
-    ? process.env.ALLOWED_ORIGINS.split(",").map(o => o.trim())
-    : devOrigins;
+  const allowedOrigins = new Set([
+    ...defaultOrigins,
+    ...(process.env.ALLOWED_ORIGINS || "").split(",").map(o => o.trim()).filter(Boolean),
+  ]);
 
   app.use(
     cors({
       origin: (origin, callback) => {
-        // Allow requests with no origin (mobile apps, curl, same-origin)
         if (!origin) return callback(null, true);
 
-        const isAllowed = allowedOrigins.includes(origin) ||
-          (process.env.NODE_ENV !== "production" && (
-            origin === "http://localhost:3000" ||
-            origin === "http://localhost:5173"
-          ));
-
-        if (isAllowed) {
-          callback(null, true);
-        } else {
-          callback(new Error("CORS policy violation: request from unauthorized origin."));
+        let isAllowed = allowedOrigins.has(origin);
+        try {
+          const url = new URL(origin);
+          isAllowed ||= url.hostname.endsWith(".vercel.app") || url.hostname.endsWith(".vercel.sh");
+        } catch {
+          isAllowed = false;
         }
+
+        callback(isAllowed ? null : new Error("CORS policy violation: request from unauthorized origin."), isAllowed);
       },
       methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
       allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
