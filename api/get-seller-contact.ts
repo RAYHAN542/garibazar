@@ -2,21 +2,30 @@ import { initializeApp, getApps, cert } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 import { getFirestore } from "firebase-admin/firestore";
 import { applyCors } from "./_lib/cors.js";
+import { checkAndBumpRateLimit } from "./_lib/rateLimit.js";
 import { createClient } from "@supabase/supabase-js";
 
 // ------------------------------------------------------------------------
-// "Show number" endpoint.
+// 🔧 Fixes: "seller contact scrape risk" (audit item -- private contact
+// leak, High priority).
 //
-// 🔧 FIX (Firebase -> Supabase migration): আগে এই endpoint শুধুমাত্র
-// Firebase ID token যাচাই করত। কিন্তু লগইন এখন Supabase (phone + password)
-// দিয়ে হয়, তাই ব্রাউজারে কোনো Firebase session থাকে না -- ফলে পোস্টে ক্লিক
-// করে "নম্বর দেখুন" চাপলে সবসময় 401 আসত এবং নম্বর দেখাত না।
-// এখন প্রথমে Supabase access token যাচাই করা হয়, না মিললে পুরনো Firebase
-// token fallback হিসেবে থাকে (পুরনো ক্লায়েন্ট version-এর জন্য)।
+// Before: any signed-in user could read listings/{id}/private/contact
+// directly from Firestore, one listing at a time, with NO limit on how
+// many listings they read this way. A logged-in script could enumerate
+// every public listing ID and pull every seller's phone number in bulk --
+// slower than a true bulk-read, but fully automatable and unbounded.
 //
-// Rate limit-ও Firestore থেকে Supabase-এর rate_limits টেবিলে সরানো হয়েছে,
-// কারণ Firebase admin credential না থাকলে আগের rate limiter throw করত এবং
-// সেটাও 401 হিসেবে ধরা পড়ত।
+// The "Show Number" feature itself is legitimate and intentionally open to
+// any signed-in visitor (this is a normal marketplace pattern, not a bug
+// on its own) -- so the fix is NOT to restrict *who* can see a number
+// (that would break real buyers who haven't started a chat yet), it's to
+// rate-limit *how many* a single account can reveal, the same pattern
+// already used for Cloudinary uploads and listing/message cooldowns.
+//
+// This endpoint is the only sanctioned way to read a seller's contact
+// number now. firestore.rules' listings/{id}/private/{docId} read rule is
+// locked down to owner+admin only (see the rule comment), so a client
+// trying to bypass this endpoint and read Firestore directly gets denied.
 // ------------------------------------------------------------------------
 
 if (!getApps().length) {
@@ -31,58 +40,10 @@ if (!getApps().length) {
   }
 }
 
-const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
-const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-const supabaseAdmin =
-  SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY
-    ? createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
-        auth: { autoRefreshToken: false, persistSession: false },
-      })
-    : null;
-
 const RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000; // 1 hour
-const RATE_LIMIT_MAX = 50; // reveals per user per hour
-
-async function checkRateLimit(key: string): Promise<boolean> {
-  if (!supabaseAdmin) return true;
-  try {
-    const now = new Date();
-    const { data } = await supabaseAdmin.from("rate_limits").select("*").eq("key", key).maybeSingle();
-    if (!data || now.getTime() - new Date(data.window_start).getTime() > RATE_LIMIT_WINDOW_MS) {
-      await supabaseAdmin.from("rate_limits").upsert({ key, count: 1, window_start: now.toISOString() });
-      return true;
-    }
-    const newCount = (data.count || 0) + 1;
-    await supabaseAdmin.from("rate_limits").update({ count: newCount }).eq("key", key);
-    return newCount <= RATE_LIMIT_MAX;
-  } catch (e) {
-    // rate limiter fail হলে ইউজারকে আটকানো হয় না, শুধু log করা হয়।
-    console.error("[get-seller-contact] rate limit check failed:", e);
-    return true;
-  }
-}
-
-/** Supabase token আগে, তারপর Firebase token -- দুটোর একটাও না মিললে null। */
-async function resolveCallerUid(token: string): Promise<string | null> {
-  if (supabaseAdmin) {
-    try {
-      const { data, error } = await supabaseAdmin.auth.getUser(token);
-      if (!error && data?.user?.id) return data.user.id;
-    } catch (e) {
-      console.error("[get-seller-contact] supabase token check failed:", e);
-    }
-  }
-  if (getApps().length) {
-    try {
-      const decoded = await getAuth().verifyIdToken(token);
-      return decoded.uid;
-    } catch (e) {
-      console.error("[get-seller-contact] firebase token check failed:", (e as any)?.message || e);
-    }
-  }
-  return null;
-}
+const RATE_LIMIT_MAX = 50; // reveals per user per hour -- generous for a
+// genuine buyer browsing many listings, but stops a scripted account from
+// harvesting the whole marketplace's phone numbers in one sweep.
 
 export default async function handler(req: any, res: any) {
   if (applyCors(req, res)) return;
@@ -91,42 +52,70 @@ export default async function handler(req: any, res: any) {
   }
 
   try {
-    const authHeader = req.headers.authorization || "";
-    const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7).trim() : "";
-    if (!token) {
-      return res.status(401).json({ error: "লগইন করা প্রয়োজন।" });
+    if (!getApps().length) {
+      return res.status(500).json({ error: "সার্ভার কনফিগারেশনে সমস্যা।" });
     }
 
-    const callerUid = await resolveCallerUid(token);
-    if (!callerUid) {
-      return res.status(401).json({ error: "লগইন সেশন মেয়াদোত্তীর্ণ। আবার লগইন করুন।" });
+    const authHeader = req.headers.authorization || "";
+    const idToken = authHeader.replace("Bearer ", "");
+    if (!idToken) {
+      return res.status(401).json({ error: "লগইন করা প্রয়োজন।" });
     }
+    const decoded = await getAuth().verifyIdToken(idToken); // throws if invalid/expired
 
     const { listingId } = req.body || {};
     if (!listingId || typeof listingId !== "string") {
       return res.status(400).json({ error: "listingId প্রয়োজন।" });
     }
 
-    const allowed = await checkRateLimit(`contact_reveal_${callerUid}`);
+    const allowed = await checkAndBumpRateLimit(`contact_reveal_${decoded.uid}`, RATE_LIMIT_WINDOW_MS, RATE_LIMIT_MAX);
     if (!allowed) {
       return res.status(429).json({
         error: "অনেকবার নম্বর দেখার চেষ্টা হয়েছে। কিছুক্ষণ পর আবার চেষ্টা করুন।",
       });
     }
 
-    // 1) Supabase (নতুন এবং migrate করা listing) -- এটাই এখন প্রধান উৎস।
-    if (supabaseAdmin) {
+    const db = getFirestore();
+    const contactSnap = await db
+      .collection("listings")
+      .doc(listingId)
+      .collection("private")
+      .doc("contact")
+      .get();
+
+    if (contactSnap.exists && contactSnap.data()?.contactNumber) {
+      return res.status(200).json({ contactNumber: contactSnap.data()?.contactNumber });
+    }
+
+    // Not in Firestore - this listing was created after the Supabase
+    // migration, so its number only lives there now. Uses the service role
+    // key (server-side only, never exposed to the client) with a direct
+    // query rather than the get_listing_contact_number RPC - that RPC's
+    // own "must be signed in" check reads the caller's Supabase session
+    // JWT, which doesn't exist when called with a plain service-role
+    // client. This endpoint already did its own Firebase-token auth +
+    // rate limit above, so re-checking via RLS here would be redundant.
+    const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!supabaseUrl || !supabaseServiceKey) {
+      // 🔧 আগে এই দুটো env var এর একটা মিসিং থাকলে silently পুরো Supabase
+      // fallback অংশটা skip হয়ে যেত -- ফলে শুধু Firestore-এ থাকা পুরনো
+      // listing-এর নম্বর দেখাত, নতুন (শুধু Supabase-এ থাকা) listing-এর
+      // জন্য সবসময় "পাওয়া যায়নি" দেখাত, কোনো log ছাড়াই। এখন স্পষ্ট করে
+      // লগ হবে যাতে ভবিষ্যতে দ্রুত ধরা পড়ে।
+      console.error("[get-seller-contact] Missing Supabase env vars -- url:", !!supabaseUrl, "serviceKey:", !!supabaseServiceKey);
+    }
+    if (supabaseUrl && supabaseServiceKey) {
+      const supabase = createClient(supabaseUrl, supabaseServiceKey);
       const isUuid = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(listingId);
-      const { data: listingRow, error: listingErr } = await supabaseAdmin
+      const { data: listingRow, error: listingErr } = await supabase
         .from("listings")
         .select("id")
-        .or(isUuid ? `id.eq.${listingId},legacy_firestore_id.eq.${listingId}` : `legacy_firestore_id.eq.${listingId}`)
+        .or(isUuid ? `legacy_firestore_id.eq.${listingId},id.eq.${listingId}` : `legacy_firestore_id.eq.${listingId}`)
         .maybeSingle();
 
-      if (listingErr) {
-        console.error("[get-seller-contact] Supabase lookup error:", listingErr.message);
-      } else if (listingRow) {
-        const { data: contactRow, error: contactErr } = await supabaseAdmin
+      if (!listingErr && listingRow) {
+        const { data: contactRow, error: contactErr } = await supabase
           .from("listing_contacts")
           .select("phone")
           .eq("listing_id", listingRow.id)
@@ -134,32 +123,14 @@ export default async function handler(req: any, res: any) {
         if (!contactErr && contactRow?.phone) {
           return res.status(200).json({ contactNumber: contactRow.phone });
         }
-        if (contactErr) console.error("[get-seller-contact] contact lookup error:", contactErr.message);
-      }
-    } else {
-      console.error("[get-seller-contact] Missing Supabase env vars (SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY)");
-    }
-
-    // 2) পুরনো Firestore fallback (যদি এখনো Firebase credential থাকে)।
-    if (getApps().length) {
-      try {
-        const contactSnap = await getFirestore()
-          .collection("listings")
-          .doc(listingId)
-          .collection("private")
-          .doc("contact")
-          .get();
-        if (contactSnap.exists && contactSnap.data()?.contactNumber) {
-          return res.status(200).json({ contactNumber: contactSnap.data()?.contactNumber });
-        }
-      } catch (e) {
-        console.error("[get-seller-contact] Firestore fallback failed:", (e as any)?.message || e);
+      } else if (listingErr) {
+        console.error("[get-seller-contact] Supabase fallback error:", listingErr.message);
       }
     }
 
     return res.status(404).json({ error: "নম্বর পাওয়া যায়নি।" });
   } catch (err: any) {
     console.error("[get-seller-contact] error:", err?.message || err);
-    return res.status(500).json({ error: "নম্বর আনা যায়নি। আবার চেষ্টা করুন।" });
+    return res.status(401).json({ error: "যাচাই ব্যর্থ হয়েছে।" });
   }
 }
