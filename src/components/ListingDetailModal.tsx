@@ -496,6 +496,10 @@ export function ListingDetailModal({ listing, language, currentUser, onClose, on
                         />
                       ))}
       
+                    </div>
+                  </>
+                )}
+
                 {listing.hasVideo && (
                   <button
                     onClick={() => setIsPlayingVideo(true)}
