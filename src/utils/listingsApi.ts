@@ -19,7 +19,7 @@ import { PartListing } from "../types";
 
 const INITIAL_FETCH_LIMIT = 20;
 
-function mapRowToListing(row: any): PartListing {
+export function mapRowToListing(row: any): PartListing {
   const images: string[] = Array.isArray(row.images) ? row.images : [];
   return {
     id: row.id,

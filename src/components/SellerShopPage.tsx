@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from "react";
 import { PartListing, SupportedLanguage } from "../types";
 import { X, MapPin, Phone, MessageSquare, ShoppingBag, Search, Sparkles, Loader2 } from "lucide-react";
-import { collection, query, where, getDocs, doc, getDoc, limit } from "firebase/firestore";
+import { doc, getDoc } from "firebase/firestore";
 import { db } from "../firebase";
 import { supabase } from "../supabase";
+import { mapRowToListing } from "../utils/listingsApi";
 import { ListingCard } from "./ListingCard";
 
 interface SellerShopPageProps {
@@ -173,19 +174,16 @@ export function SellerShopPage({
         return;
       }
       try {
-        const q = query(
-          collection(db, "listings"),
-          where("sellerId", "==", sellerId),
-          limit(30)
-        );
-        const snapshot = await getDocs(q);
+        const { data, error: listErr } = await supabase
+          .from("listings")
+          .select("*")
+          .eq("seller_id", sellerId)
+          .eq("is_deleted", false)
+          .order("created_at", { ascending: false })
+          .limit(30);
+        if (listErr) throw listErr;
         if (active) {
-          const list: PartListing[] = [];
-          snapshot.forEach((docSnap) => {
-            list.push({ id: docSnap.id, ...docSnap.data() } as PartListing);
-          });
-          // Sort newest first
-          list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+          const list = (data || []).map(mapRowToListing);
           setSellerListings(list);
         }
       } catch (err) {
