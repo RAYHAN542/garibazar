@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { PartListing, SupportedLanguage } from "../types";
 import { X, MapPin, Sparkles, Play, SquarePlay, Flag, ShieldAlert, CheckCircle2, ChevronLeft, ChevronRight, Loader2, ShoppingBag, MessageSquare, Share2 } from "lucide-react";
-import { doc, getDoc, updateDoc, collection, addDoc, query, increment } from "firebase/firestore";
-import { db, auth, logAnalyticsEvent } from "../firebase";
+import { auth, logAnalyticsEvent } from "../firebase";
 import { supabase } from "../supabase";
 import { trackListingClick } from "../utils/counters";
 import { getOptimizedImageUrl } from "../utils/cloudinary";
@@ -167,12 +166,16 @@ export function ListingDetailModal({ listing, language, currentUser, onClose, on
     }
 
     try {
-      const addPromise = addDoc(collection(db, "purchases"), newPurchaseDoc);
+      const addPromise = supabase.from("purchases").insert({
+        buyer_id: currentUser.uid,
+        data: newPurchaseDoc
+      });
       const timeoutPromise = new Promise((_, reject) =>
         setTimeout(() => reject(new Error("Timeout")), 8000)
       );
 
-      await Promise.race([addPromise, timeoutPromise]);
+      const { error: purchaseErr } = (await Promise.race([addPromise, timeoutPromise])) as any;
+      if (purchaseErr) throw purchaseErr;
 
       setAddToDashboardSuccess(true);
       if (onPurchaseAdded) {
@@ -303,10 +306,11 @@ export function ListingDetailModal({ listing, language, currentUser, onClose, on
     setSoldLoading(true);
     try {
       const newSoldStatus = !isSold;
-      const docRef = doc(db, "listings", listing.id);
-      await updateDoc(docRef, {
-        isSold: newSoldStatus
-      });
+      const { error: soldErr } = await supabase
+        .from("listings")
+        .update({ is_sold: newSoldStatus })
+        .eq("id", listing.id);
+      if (soldErr) throw soldErr;
       setIsSold(newSoldStatus);
       
       const localListingsStr = localStorage.getItem("gari_bazar_local_listings") || "[]";
@@ -336,21 +340,26 @@ export function ListingDetailModal({ listing, language, currentUser, onClose, on
     if (hasReported) return;
     setReportLoading(true);
     try {
-      const docRef = doc(db, "listings", listing.id);
-      const docSnap = await getDoc(docRef);
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        const currentReportedBy = data.reportedBy || [];
-        
-        if (!currentReportedBy.includes(currentUser.uid)) {
-          const nextReportedBy = [...currentReportedBy, currentUser.uid];
-          const nextReportCount = (data.reportCount || 0) + 1;
-          
-          await updateDoc(docRef, {
-            reportCount: nextReportCount,
-            reportedBy: nextReportedBy
-          });
-          
+      const { data, error: fetchErr } = await supabase
+        .from("listings")
+        .select("reported_by, report_count")
+        .eq("id", listing.id)
+        .single();
+      if (fetchErr) throw fetchErr;
+      if (data) {
+        const currentReportedBy = data.reported_by || [];
+        const uidKey = currentUser.authUid || currentUser.uid;
+
+        if (!currentReportedBy.includes(uidKey)) {
+          const nextReportedBy = [...currentReportedBy, uidKey];
+          const nextReportCount = (data.report_count || 0) + 1;
+
+          const { error: updateErr } = await supabase
+            .from("listings")
+            .update({ report_count: nextReportCount, reported_by: nextReportedBy })
+            .eq("id", listing.id);
+          if (updateErr) throw updateErr;
+
           setHasReported(true);
           setReportSuccess(true);
           
