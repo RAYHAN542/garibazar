@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from "react";
-import { doc, onSnapshot } from "firebase/firestore";
-import { db } from "./firebase";
+import { supabase } from "./supabase";
 import { CheckCircle2, Loader2, X } from "lucide-react";
 
 const STORAGE_KEY = "gari_bazar_pending_payment";
+const POLL_INTERVAL_MS = 5000;
 
 export function PaymentStatusBanner() {
   const [pending, setPending] = useState<any>(null);
@@ -25,15 +25,27 @@ export function PaymentStatusBanner() {
   }, []);
 
   useEffect(() => {
-    if (!pending?.requestId) return;
-    const ref = doc(db, "refill_requests", pending.requestId);
-    const unsub = onSnapshot(ref, (snap) => {
-      if (snap.exists() && snap.data().status === "approved") {
+    if (!pending?.requestId || status === "approved") return;
+
+    let active = true;
+    const check = async () => {
+      const { data } = await supabase
+        .from("refill_requests")
+        .select("status")
+        .eq("id", pending.requestId)
+        .maybeSingle();
+      if (active && data?.status === "approved") {
         setStatus("approved");
       }
-    });
-    return () => unsub();
-  }, [pending]);
+    };
+
+    check();
+    const interval = setInterval(check, POLL_INTERVAL_MS);
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
+  }, [pending, status]);
 
   const handleClose = () => {
     localStorage.removeItem(STORAGE_KEY);
