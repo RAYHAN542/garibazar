@@ -1,17 +1,13 @@
-import { initializeApp, getApps, cert } from "firebase-admin/app";
-import { getFirestore } from "firebase-admin/firestore";
+import { createClient } from "@supabase/supabase-js";
 
-if (!getApps().length) {
-  const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
-  if (serviceAccountJson) {
-    try {
-      const serviceAccount = JSON.parse(serviceAccountJson);
-      initializeApp({ credential: cert(serviceAccount) });
-    } catch (e) {
-      console.error("Failed to parse FIREBASE_SERVICE_ACCOUNT_KEY:", e);
-    }
-  }
-}
+const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const supabaseAdmin =
+  SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY
+    ? createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+        auth: { autoRefreshToken: false, persistSession: false },
+      })
+    : null;
 
 const SITE_URL = "https://garibazar.shop";
 const DEFAULT_IMAGE = `${SITE_URL}/og-banner.jpg`;
@@ -32,23 +28,23 @@ export default async function handler(req: any, res: any) {
   const userAgent = req.headers["user-agent"] || "";
   const isCrawler = CRAWLER_UA.test(userAgent);
 
-  // Real visitors (not a social-media crawler) just get sent straight into the app.
   if (!isCrawler) {
     res.writeHead(302, { Location: appUrl });
     return res.end();
   }
 
-  // Default (fallback) values in case the listing can't be loaded.
   let title = "গাড়ি বাজার (Gari Bazar) - Auto Spares Marketplace";
   let description = "খুব সহজেই এবং নিরাপদে গাড়ি ও বাইকের জেনুইন স্পেয়ার পার্টস কেনা-বেচা করুন গাড়ি বাজার-এ।";
   let image = DEFAULT_IMAGE;
 
   try {
-    if (getApps().length && id) {
-      const db = getFirestore();
-      const snap = await db.collection("listings").doc(id).get();
-      if (snap.exists) {
-        const listing = snap.data() as any;
+    if (supabaseAdmin && id) {
+      const { data: listing } = await supabaseAdmin
+        .from("listings")
+        .select("title, brand, model, price, location, images")
+        .eq("id", id)
+        .maybeSingle();
+      if (listing) {
         const name = listing.title || `${listing.brand || ""} ${listing.model || ""}`.trim() || "গাড়ি/পার্টস বিজ্ঞাপন";
         const priceText = listing.price ? `৳${Number(listing.price).toLocaleString("en-BD")}` : "মূল্য জানতে যোগাযোগ করুন";
         title = `${name} - গাড়ি বাজার`;
