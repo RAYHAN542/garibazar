@@ -1,9 +1,9 @@
 import React, { useState } from "react";
 import { Trash2, AlertTriangle, ArrowLeft, Globe, Loader2, CheckCircle, Mail } from "lucide-react";
 import { SupportedLanguage } from "../types";
-import { auth, db } from "../firebase";
-import { deleteUser } from "firebase/auth";
-import { collection, query, where, getDocs, deleteDoc, doc } from "firebase/firestore";
+import { auth } from "../firebase";
+import { supabase } from "../supabase";
+import { apiUrl } from "../utils/apiBase";
 
 interface DataDeletionPageProps {
   language?: SupportedLanguage;
@@ -22,7 +22,11 @@ export default function DataDeletionPage({
   const [error, setError] = useState("");
   const [confirmationInput, setConfirmationInput] = useState("");
 
-  const currentUser = auth.currentUser;
+  const [supaUser, setSupaUser] = useState<any>(null);
+  React.useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => setSupaUser(data.user));
+  }, []);
+  const currentUser = supaUser || auth.currentUser;
 
   const handleDataDeletion = async () => {
     if (!currentUser) {
