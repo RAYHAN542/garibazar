@@ -4,21 +4,6 @@ import { apiUrl } from "./apiBase";
 // throws -- if it fails for any reason (offline, ad-blocker, slow network)
 // the app keeps working normally. `keepalive: true` lets the request finish
 // even if the page navigates away right after this is called.
-export function trackEvent(type: "visit" | "login" | "signup" | "install", uid?: string | null, identifier?: string | null) {
-  try {
-    fetch(apiUrl("/api/track-event"), {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        type,
-        uid: uid || null,
-        identifier: identifier || null,
-        path: window.location.pathname + window.location.search,
-        referrer: document.referrer || "",
-      }),
-      keepalive: true,
-    }).catch(() => {});
-  } catch {
-    // ignore -- analytics should never break the app
-  }
+export function trackEvent(_type: "visit" | "login" | "signup" | "install", _uid?: string | null, _identifier?: string | null) {
+  // api/track-event.ts removed (Vercel 12-function limit)
 }
