@@ -1,8 +1,6 @@
 import { initializeApp, getApps, cert } from "firebase-admin/app";
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
-import { getAuth } from "firebase-admin/auth";
 import { applyCors } from "./_lib/cors.js";
-import { checkAndBumpRateLimit } from "./_lib/rateLimit.js";
 
 // একই IP থেকে মিনিটে ৩০ বারের বেশি রিকোয়েস্ট এলে চুপচাপ বাদ দেওয়া হয় (Firestore-এ
 // লেখা হয় না), যাতে কেউ ইচ্ছাকৃতভাবে স্প্যাম করে দৈনিক write কোটা শেষ করে দিতে না পারে।
@@ -70,79 +68,6 @@ if (!getApps().length) {
 // the function-count limit -- see the phone.ts merge comment for the same
 // constraint hitting auth earlier.
 // ---------------------------------------------------------------------------
-const LISTING_INTERACTION_TYPES = new Set(["view", "click", "save", "unsave"]);
-
-async function handleListingInteraction(req: any, res: any, listingId: string, type: string) {
-  const db = getFirestore();
-  const ip = getClientIp(req);
-  const todayKey = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
-
-  if (type === "view") {
-    // Anonymous-friendly: no login required to count a view. Rate-limited
-    // per IP+listing (not just IP) so browsing many different listings in
-    // one session still counts each of them once.
-    const allowed = await checkAndBumpRateLimit(`view_${listingId}_${ip}`, 10 * 60 * 1000, 1);
-    if (!allowed) return res.status(200).json({ ok: true, counted: false });
-
-    await db.doc(`listings/${listingId}`).set(
-      { views: FieldValue.increment(1), [`dailyStats.${todayKey}.views`]: FieldValue.increment(1) },
-      { merge: true }
-    );
-    return res.status(200).json({ ok: true, counted: true });
-  }
-
-  // click/save/unsave all require a real signed-in user -- verify the
-  // Firebase ID token the same way every other authenticated endpoint here
-  // does, rather than trusting a client-supplied uid.
-  const authHeader = req.headers.authorization || "";
-  const idToken = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
-  if (!idToken) return res.status(401).json({ error: "লগইন করা প্রয়োজন।" });
-  let uid: string;
-  try {
-    const decoded = await getAuth().verifyIdToken(idToken);
-    uid = decoded.uid;
-  } catch {
-    return res.status(401).json({ error: "সেশন মেয়াদোত্তীর্ণ, আবার লগইন করুন।" });
-  }
-
-  if (type === "click") {
-    // Once per user per listing per day -- repeatedly tapping "Show Number"
-    // on the same listing in one sitting shouldn't inflate the count.
-    const allowed = await checkAndBumpRateLimit(`click_${listingId}_${uid}_${todayKey}`, 24 * 60 * 60 * 1000, 1);
-    if (!allowed) return res.status(200).json({ ok: true, counted: false });
-
-    await db.doc(`listings/${listingId}`).set(
-      { clicks: FieldValue.increment(1), [`dailyStats.${todayKey}.clicks`]: FieldValue.increment(1) },
-      { merge: true }
-    );
-    return res.status(200).json({ ok: true, counted: true });
-  }
-
-  // save / unsave: the savedBy/{uid} marker doc is the only source of truth
-  // for whether THIS user has this listing saved -- a transaction keeps the
-  // marker and the savedCount tally consistent even under concurrent calls,
-  // and makes repeated save-save or unsave-unsave calls safe no-ops instead
-  // of double-counting.
-  const listingRef = db.doc(`listings/${listingId}`);
-  const markerRef = db.doc(`listings/${listingId}/savedBy/${uid}`);
-  const counted = await db.runTransaction(async (tx) => {
-    const markerSnap = await tx.get(markerRef);
-    if (type === "save") {
-      if (markerSnap.exists) return false; // already saved, no-op
-      tx.set(markerRef, { savedAt: FieldValue.serverTimestamp() });
-      tx.set(listingRef, { savedCount: FieldValue.increment(1) }, { merge: true });
-      return true;
-    } else {
-      // unsave
-      if (!markerSnap.exists) return false; // wasn't saved, no-op
-      tx.delete(markerRef);
-      tx.set(listingRef, { savedCount: FieldValue.increment(-1) }, { merge: true });
-      return true;
-    }
-  });
-  return res.status(200).json({ ok: true, counted });
-}
-
 const ALLOWED_TYPES = new Set(["visit", "login", "signup", "install"]);
 
 // The site owner's own IP(s) - visits/logins from here are excluded from the
@@ -221,11 +146,6 @@ export default async function handler(req: any, res: any) {
 
   try {
     const body = typeof req.body === "string" ? JSON.parse(req.body || "{}") : (req.body || {});
-
-    // New: per-listing view/click/save/unsave, routed to its own handler.
-    if (typeof body?.listingId === "string" && LISTING_INTERACTION_TYPES.has(body?.type)) {
-      return await handleListingInteraction(req, res, body.listingId, body.type);
-    }
 
     const type = ALLOWED_TYPES.has(body?.type) ? body.type : "visit";
     const uid = typeof body?.uid === "string" ? body.uid.slice(0, 128) : null;
