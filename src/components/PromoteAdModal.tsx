@@ -2,9 +2,9 @@ import React, { useState } from "react";
 import { PartListing, SupportedLanguage } from "../types";
 import { X, CheckCircle, ShieldAlert, Award, Loader2, CreditCard, Lock } from "lucide-react";
 import { AD_PACKAGES } from "../translations";
-import { collection, addDoc } from "firebase/firestore";
 import { apiUrl } from "../utils/apiBase";
-import { db, auth } from "../firebase";
+import { auth } from "../firebase";
+import { supabase } from "../supabase";
 
 interface PromoteAdModalProps {
   listing: PartListing;
@@ -33,7 +33,7 @@ export function PromoteAdModal({ listing, language, currentUser, onClose, onProm
     // #21 fix) -- অন্য কারো (সংরক্ষিত/সেভ করা) পোস্টে এই মোডাল খোলা থাকলে,
     // চেষ্টা করে raw "insufficient permissions" এরর দেখানোর বদলে আগেই
     // স্পষ্ট বাংলা মেসেজ দেখানো হচ্ছে।
-    if (listing.sellerId && listing.sellerId !== currentUser.uid) {
+    if (listing.sellerId && listing.sellerId !== (currentUser.authUid || currentUser.uid)) {
       setError(
         language === "bn"
           ? "শুধু নিজের পোস্টই প্রোমোট করা যায়।"
@@ -47,27 +47,39 @@ export function PromoteAdModal({ listing, language, currentUser, onClose, onProm
     try {
       // 1. Create a pending refill_request — the UddoktaPay webhook will
       //    verify the payment and activate the ad automatically.
-      const docData = {
-        userId: currentUser.uid,
-        userName: currentUser.displayName || "Seller",
-        userEmail: currentUser.email || "",
-        amount: Number(selectedPackage.price),
-        status: "pending",
-        type: "ad_promotion",
-        listingId: listing.id,
-        listingTitle: listing.title,
-        adTier: selectedPackage.tier,
-        durationDays: selectedPackage.durationDays,
-        createdAt: new Date().toISOString()
-      };
-      const docRef = await addDoc(collection(db, "refill_requests"), docData);
+      const { data: sessionData } = await supabase.auth.getSession();
+      let token = sessionData.session?.access_token;
+      if (!token) {
+        token = await auth.currentUser?.getIdToken();
+      }
+      if (!token) {
+        throw new Error(language === "bn" ? "লগইন সেশন পাওয়া যায়নি।" : "Login session not found.");
+      }
+
+      const { data: inserted, error: insertErr } = await supabase
+        .from("refill_requests")
+        .insert({
+          user_id: currentUser.authUid || currentUser.uid,
+          user_name: currentUser.displayName || "Seller",
+          user_email: currentUser.email || "",
+          amount: Number(selectedPackage.price),
+          status: "pending",
+          type: "ad_promotion",
+          listing_id: listing.id,
+          listing_title: listing.title,
+          ad_tier: selectedPackage.tier,
+          duration_days: selectedPackage.durationDays
+        })
+        .select("id")
+        .single();
+
+      if (insertErr) throw insertErr;
 
       // 2. Ask our server to open a real UddoktaPay checkout session for this request.
-      const idToken = await auth.currentUser?.getIdToken();
       const res = await fetch(apiUrl("/api/payment/create-charge"), {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
-        body: JSON.stringify({ requestId: docRef.id })
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ requestId: inserted.id })
       });
       const data = await res.json();
 
