@@ -484,8 +484,15 @@ export function AdminPanel({ language, currentUser, listings: listingsProp, isUs
     setActionSuccessMsg("");
 
     try {
-      const { error } = await supabase.from("listings").delete().eq("id", listingId);
+      // Supabase silently returns 0 rows deleted (no error) when RLS blocks
+      // a delete -- checking only `error` made this look like it always
+      // succeeded even when nothing was actually removed. .select("id")
+      // lets us confirm a row was really deleted.
+      const { data, error } = await supabase.from("listings").delete().eq("id", listingId).select("id");
       if (error) throw error;
+      if (!data || data.length === 0) {
+        throw new Error("PERMISSION_DENIED_OR_NOT_FOUND");
+      }
       // Remove instantly from the local list so the admin sees the
       // updated count/grid without needing to reload the page.
       setListings((prev) => prev.filter((l) => l.id !== listingId));
@@ -497,10 +504,15 @@ export function AdminPanel({ language, currentUser, listings: listingsProp, isUs
       );
     } catch (err: any) {
       console.error("Error deleting listing:", err);
+      const isPermission = err?.message === "PERMISSION_DENIED_OR_NOT_FOUND";
       setActionSuccessMsg(
-        language === "bn"
-          ? "লিস্টিং মুছে ফেলতে সমস্যা হয়েছে। অনুগ্রহ করে পুনরায় চেষ্টা করুন।"
-          : "Failed to delete listing. Please try again."
+        isPermission
+          ? (language === "bn"
+              ? "মুছে ফেলা যায়নি -- আপনার admin সেশনে সমস্যা থাকতে পারে। লগআউট করে আবার লগইন করে দেখুন।"
+              : "Delete blocked -- your admin session may be stale. Try logging out and back in.")
+          : (language === "bn"
+              ? "লিস্টিং মুছে ফেলতে সমস্যা হয়েছে। অনুগ্রহ করে পুনরায় চেষ্টা করুন।"
+              : "Failed to delete listing. Please try again.")
       );
     } finally {
       setDeleteLoadingId(null);
