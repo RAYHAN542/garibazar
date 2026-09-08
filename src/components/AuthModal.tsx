@@ -208,6 +208,27 @@ export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModa
     setStep("profile");
   };
 
+  // 🔧 ROOT-CAUSE FIX: শুধু Supabase session সেট করলে Firebase-এর নিজস্ব
+  // auth.currentUser কখনোই সেট হয় না -- অথচ App.tsx-এর myListings, reviews,
+  // unread chats, profile realtime sync, আর AdminPanel-এর ভিজিটর analytics
+  // (Total Visits/Logins/Signups, Recent Visit Log) সহ অনেক জায়গার Firestore
+  // listener এই Firebase auth session-এর অপেক্ষায় থাকে। ফলে এই সবগুলো
+  // জায়গায় "০" বা "লোডিং আটকে আছে" দেখাচ্ছিল, একেক জায়গায় একেকভাবে না বুঝেই
+  // আলাদা প্যাচ দেওয়ার বদলে root cause-টাই ঠিক করা হচ্ছে: ব্যাকএন্ড
+  // (api/auth/phone.ts) এখন একই uid-এর জন্য একটা Firebase custom token
+  // দেয়, সেটা দিয়ে এখানে সাথে সাথে Firebase-এও সাইন-ইন করানো হচ্ছে। এতে
+  // উপরের প্রতিটা Firestore listener আবার স্বাভাবিকভাবে কাজ করবে -- আলাদা
+  // আলাদা ফিক্স লাগবে না। token না পেলে বা ব্যর্থ হলেও লগইন আটকাবে না, শুধু
+  // ওই live listener গুলো silently কাজ করবে না, যেমনটা এখন হচ্ছে।
+  const bridgeFirebaseSession = async (firebaseToken?: string | null) => {
+    if (!firebaseToken) return;
+    try {
+      await signInWithCustomToken(auth, firebaseToken);
+    } catch (err) {
+      console.error("Firebase bridge sign-in failed (non-fatal):", err);
+    }
+  };
+
   const handlePostPhoneAuth = async (uid: string, phone: string, authUid?: string) => {
     const { data: userRow } = await supabase.from("users").select("*").eq("uid", uid).maybeSingle();
     const { data: adminRow } = await supabase.from("admins").select("uid").eq("uid", uid).maybeSingle();
@@ -432,6 +453,7 @@ export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModa
         refresh_token: data.refresh_token,
       });
       if (sessionError) throw sessionError;
+      await bridgeFirebaseSession(data.firebaseToken);
       await handlePostPhoneAuth(data.uid, data.phone, data.auth_uid);
     } catch (err: any) {
       console.error(err);
@@ -484,6 +506,7 @@ export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModa
         refresh_token: data.refresh_token,
       });
       if (sessionError) throw sessionError;
+      await bridgeFirebaseSession(data.firebaseToken);
 
       // নাম ও (ঐচ্ছিক) প্রোফাইল ছবি সেভ করা হচ্ছে -- একাউন্ট Supabase-এ তৈরি
       // হয়ে গেছে ও সেশন সেট হয়ে গেছে, তাই RLS অনুযায়ী নিজের রো আপডেট করা যাবে।
