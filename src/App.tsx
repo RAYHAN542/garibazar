@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useEffect, useMemo, useRef, lazy, Suspense } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback, lazy, Suspense } from "react";
 import { auth, db, logAnalyticsEvent } from "./firebase";
 import { supabase } from "./supabase";
 import { logger } from "./utils/logger";
@@ -927,7 +927,7 @@ export default function App() {
   // হয় না -- ফলে myListings সবসময় খালি থাকতো, "My Shop"/"Products" ট্যাবে
   // পোস্ট করা সব লিস্টিং থাকা সত্ত্বেও "০ পোস্ট" দেখাতো। এখন সরাসরি Supabase
   // থেকে fetch হয়, শুধু `user?.uid` থাকলেই চলে (firebaseAuthUser লাগে না)।
-  const refetchMyListings = React.useCallback(async () => {
+  const refetchMyListings = useCallback(async () => {
     if (!user?.uid) {
       setMyListings([]);
       return;
