@@ -60,17 +60,36 @@ async function isRateLimited(key: string): Promise<boolean> {
 // তখন প্রথম লগইনের পাসওয়ার্ড দিয়েই তার Auth অ্যাকাউন্ট বানিয়ে দেওয়া হয়
 // (one-time claim) এবং তার পুরনো uid-ই ফেরত দেওয়া হয়, যাতে আগের সব
 // listing, chat আর dashboard আগের মতোই থাকে।
+//
+// 🔧 SECOND FIX (এই আপডেটে যোগ করা হয়েছে): উপরের claim flow-এ নতুন Supabase
+// Auth user তৈরি হয় (auth.users.id = একটা নতুন UUID), কিন্তু অ্যাপের uid
+// (users.uid, listings.seller_id, chats.participant_a/b ইত্যাদি সব জায়গায়)
+// থেকে যায় পুরনো legacy uid -- এই দুটো আলাদা। RLS-এর current_uid() ফাংশন
+// user_auth_links টেবিল দেখে এই ম্যাপিং বের করে (auth_uid -> app_uid), কিন্তু
+// এতদিন কোথাও এই টেবিলে write হচ্ছিল না -- ফলে claim হওয়া প্রতিটা ইউজারের
+// জন্য current_uid() ভুল uid (নতুন auth uid) রিটার্ন করত, আর chats/listings/
+// user_limits-এর RLS policy তাদের নিজের ডেটাই দেখতে/লিখতে দিত না (silently
+// খালি ফলাফল বা permission-denied)। এখন প্রতিটা claim/signup/login-এর পর
+// linkAuthUser() কল করে এই ম্যাপিং সেভ করা হয়।
 // ---------------------------------------------------------------------------
+async function linkAuthUser(authUid: string, appUid: string): Promise<void> {
+  if (!authUid || !appUid || authUid === appUid) return;
+  try {
+    const { error } = await supabaseAdmin
+      .from("user_auth_links")
+      .upsert({ auth_uid: authUid, app_uid: appUid }, { onConflict: "auth_uid" });
+    if (error) console.error("[phone auth] user_auth_links upsert failed:", error.message);
+  } catch (e) {
+    console.error("[phone auth] failed to link auth_uid -> app_uid:", e);
+  }
+}
+
 function phoneVariants(intlPhone: string): string[] {
   const local = intlPhone.replace("+880", "");
   return [intlPhone, `880${local}`, `0${local}`, local];
 }
 
 async function findLegacyProfile(intlPhone: string): Promise<{ uid: string } | null> {
-  // First try the common stored formats. Older Firebase exports sometimes
-  // contain spaces, dashes, Bangla digits, or a leading +880, so an exact
-  // `in(...)` query alone can miss the migrated profile and create a second
-  // application account.
   const { data, error } = await supabaseAdmin
     .from("users")
     .select("uid, phone, created_at")
@@ -83,8 +102,6 @@ async function findLegacyProfile(intlPhone: string): Promise<{ uid: string } | n
     return { uid: data[0].uid };
   }
 
-  // Fallback to canonical comparison so formatting differences from the
-  // Firebase migration cannot make an old user look like a new user.
   const { data: candidates, error: fallbackError } = await supabaseAdmin
     .from("users")
     .select("uid, phone, created_at")
@@ -125,14 +142,11 @@ async function handleSignup(req: any, res: any) {
 
   if (createError) {
     if (createError.status === 422 || /already.*registered|already.*exists/i.test(createError.message || "")) {
-      // The user may have reached this form after an earlier failed attempt.
-      // If Auth was created but the old profile still exists, sign into that
-      // Auth account and return the legacy app uid instead of treating it as a
-      // brand-new application account.
       if (legacy) {
         const { data: existingSession, error: existingSignInError } =
           await supabaseAdmin.auth.signInWithPassword({ phone, password });
         if (!existingSignInError && existingSession.session) {
+          await linkAuthUser(existingSession.user.id, legacy.uid);
           return res.status(200).json({
             access_token: existingSession.session.access_token,
             refresh_token: existingSession.session.refresh_token,
@@ -154,9 +168,8 @@ async function handleSignup(req: any, res: any) {
   const { data: sessionData, error: signInError } = await supabaseAdmin.auth.signInWithPassword({ phone, password });
   if (signInError || !sessionData.session) throw signInError || new Error("no session after signup");
 
-  // এই নম্বরের পুরনো (migrate হওয়া) প্রোফাইল থাকলে সেটার uid-ই রাখা হয়,
-  // নইলে ওই ইউজারের পুরনো listing/chat নতুন অ্যাকাউন্টে দেখা যেত না।
   const appUid = legacy?.uid || (await resolveAppUid(sessionData.user.id, phone));
+  await linkAuthUser(sessionData.user.id, appUid);
 
   await supabaseAdmin.from("users").upsert(
     { uid: appUid, phone, created_at: new Date().toISOString() },
@@ -206,7 +219,6 @@ async function handleLogin(req: any, res: any) {
     await supabaseAdmin.from("login_lockouts").upsert(update, { onConflict: "phone" });
 
     if (/invalid login credentials/i.test(error.message || "")) {
-      // migrate হওয়া পুরনো ইউজার কিনা দেখা হচ্ছে (উপরের কমেন্ট দেখুন)।
       const legacy = await findLegacyProfile(phone);
       if (legacy) {
         if (password.length < 8) {
@@ -224,6 +236,7 @@ async function handleLogin(req: any, res: any) {
           const { data: claimedSession, error: claimSignInError } =
             await supabaseAdmin.auth.signInWithPassword({ phone, password });
           if (!claimSignInError && claimedSession?.session) {
+            await linkAuthUser(claimedSession.user.id, legacy.uid);
             await supabaseAdmin
               .from("login_lockouts")
               .update({ failed_attempts: 0, lock_until: null })
@@ -238,8 +251,6 @@ async function handleLogin(req: any, res: any) {
             });
           }
         }
-        // createUser ব্যর্থ মানে Auth অ্যাকাউন্ট আসলে আগে থেকেই আছে ->
-        // অর্থাৎ সত্যিই পাসওয়ার্ড ভুল।
       }
       return res.status(400).json({ error: "ভুল পাসওয়ার্ড অথবা এই নম্বরে কোনো অ্যাকাউন্ট নেই।" });
     }
@@ -251,6 +262,7 @@ async function handleLogin(req: any, res: any) {
   }
 
   const appUid = await resolveAppUid(sessionData.user!.id, phone);
+  await linkAuthUser(sessionData.user!.id, appUid);
 
   return res.status(200).json({
     access_token: sessionData.session!.access_token,

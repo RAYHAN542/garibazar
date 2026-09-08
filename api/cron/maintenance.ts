@@ -1,18 +1,4 @@
 import { createClient } from "@supabase/supabase-js";
-import { initializeApp, getApps, cert } from "firebase-admin/app";
-import { getFirestore } from "firebase-admin/firestore";
-
-if (!getApps().length) {
-  const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
-  if (serviceAccountJson) {
-    try {
-      const serviceAccount = JSON.parse(serviceAccountJson);
-      initializeApp({ credential: cert(serviceAccount) });
-    } catch (e) {
-      console.error("[maintenance] Failed to parse FIREBASE_SERVICE_ACCOUNT_KEY:", e);
-    }
-  }
-}
 
 const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -27,7 +13,7 @@ const RETENTION_DAYS_LISTINGS = 30;
 const RETENTION_DAYS_MESSAGES = 180;
 const BATCH_LIMIT = 400;
 
-// Listings now live in Supabase -- hard-delete soft-deleted rows past
+// Listings live in Supabase -- hard-delete soft-deleted rows past
 // retention so the table doesn't grow forever with dead listings.
 async function purgeOldSoftDeletedListings(): Promise<number> {
   if (!supabaseAdmin) return 0;
@@ -46,25 +32,23 @@ async function purgeOldSoftDeletedListings(): Promise<number> {
   return data?.length || 0;
 }
 
-// Chat messages are still on Firestore (in-app chat hasn't moved to
-// Supabase yet), so this part stays as-is until that migration happens.
+// 🔧 Chat migrated Firestore -> Supabase: purge old chat_messages rows the
+// same way listings are purged, instead of a Firestore collectionGroup batch
+// delete. firebase-admin is no longer needed anywhere in this file.
 async function purgeOldChatMessages(): Promise<number> {
-  if (!getApps().length) return 0;
-  const db = getFirestore();
-  const cutoff = new Date(Date.now() - RETENTION_DAYS_MESSAGES * 24 * 60 * 60 * 1000);
-  const snap = await db
-    .collectionGroup("messages")
-    .where("createdAt", "<", cutoff)
-    .limit(BATCH_LIMIT)
-    .get();
-
-  if (snap.empty) return 0;
-
-  const batch = db.batch();
-  snap.docs.forEach((d) => batch.delete(d.ref));
-  await batch.commit();
-
-  return snap.size;
+  if (!supabaseAdmin) return 0;
+  const cutoff = new Date(Date.now() - RETENTION_DAYS_MESSAGES * 24 * 60 * 60 * 1000).toISOString();
+  const { data, error } = await supabaseAdmin
+    .from("chat_messages")
+    .delete()
+    .lt("created_at", cutoff)
+    .select("id")
+    .limit(BATCH_LIMIT);
+  if (error) {
+    console.error("[maintenance] purgeOldChatMessages failed:", error.message);
+    return 0;
+  }
+  return data?.length || 0;
 }
 
 export default async function handler(req: any, res: any) {
