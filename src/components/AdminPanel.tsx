@@ -183,28 +183,45 @@ export function AdminPanel({ language, currentUser, listings: listingsProp, isUs
   const [refillLastDoc, setRefillLastDoc] = useState<any>(null);
   const [refillLoadingMore, setRefillLoadingMore] = useState(false);
 
-  useEffect(() => {
-    const q = query(
-      collection(db, "refill_requests"),
-      orderBy("createdAt", "desc"),
-      limit(20)
-    );
+  const mapRefillRow = (row: any) => ({
+    id: row.id,
+    userId: row.user_id,
+    userName: row.user_name,
+    userEmail: row.user_email,
+    amount: row.amount,
+    status: row.status,
+    type: row.type,
+    listingId: row.listing_id,
+    listingTitle: row.listing_title,
+    adTier: row.ad_tier,
+    durationDays: row.duration_days,
+    createdAt: row.created_at,
+    senderNumber: row.sender_number,
+    txId: row.transaction_id,
+    method: row.method,
+  });
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const list: any[] = [];
-      snapshot.forEach((doc) => {
-        list.push({ id: doc.id, ...doc.data() });
-      });
+  const fetchRefillRequests = async () => {
+    setLoadingRequests(true);
+    try {
+      const { data, error } = await supabase
+        .from("refill_requests")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(20);
+      if (error) throw error;
+      const list = (data || []).map(mapRefillRow);
       setRequests(list);
-      setRefillLastDoc(snapshot.docs[snapshot.docs.length - 1] || null);
-      setRefillHasMore(snapshot.docs.length === 20);
-      setLoadingRequests(false);
-    }, (err) => {
+      setRefillHasMore(list.length === 20);
+    } catch (err) {
       console.error("Could not fetch refill requests:", err);
+    } finally {
       setLoadingRequests(false);
-    });
+    }
+  };
 
-    return () => unsubscribe();
+  useEffect(() => {
+    fetchRefillRequests();
   }, []);
 
   // Listen to all customer support tickets across Gari Bazar platform
@@ -293,23 +310,18 @@ export function AdminPanel({ language, currentUser, listings: listingsProp, isUs
   }, [authReady]);
 
   const loadMoreRefillRequests = async () => {
-    if (!refillLastDoc || refillLoadingMore) return;
+    if (!refillHasMore || refillLoadingMore) return;
     setRefillLoadingMore(true);
     try {
-      const q = query(
-        collection(db, "refill_requests"),
-        orderBy("createdAt", "desc"),
-        startAfter(refillLastDoc),
-        limit(20)
-      );
-      const snapshot = await getDocs(q);
-      const more: any[] = [];
-      snapshot.forEach((doc) => {
-        more.push({ id: doc.id, ...doc.data() });
-      });
+      const { data, error } = await supabase
+        .from("refill_requests")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .range(requests.length, requests.length + 19);
+      if (error) throw error;
+      const more = (data || []).map(mapRefillRow);
       setRequests((prev) => [...prev, ...more]);
-      setRefillLastDoc(snapshot.docs[snapshot.docs.length - 1] || null);
-      setRefillHasMore(snapshot.docs.length === 20);
+      setRefillHasMore(more.length === 20);
     } catch (err) {
       console.error("Could not load more refill requests:", err);
     } finally {
@@ -375,41 +387,48 @@ export function AdminPanel({ language, currentUser, listings: listingsProp, isUs
     setActionSuccessMsg("");
 
     try {
-      // 1. Get current balance of target user
-      const userRef = doc(db, "users", request.userId);
-      const userSnap = await getDoc(userRef);
-      
-      let currentCredits = 5000; // default startup budget
-      if (userSnap.exists()) {
-        const data = userSnap.data();
-        currentCredits = data.simulatedCredits ?? 5000;
+      // Idempotent claim -- only flips pending -> approved once.
+      const { data: claimed, error: claimErr } = await supabase
+        .from("refill_requests")
+        .update({
+          status: "approved",
+          approved_at: new Date().toISOString(),
+        })
+        .eq("id", request.id)
+        .eq("status", "pending")
+        .select("*")
+        .maybeSingle();
+      if (claimErr) throw claimErr;
+      if (!claimed) {
+        setActionLoadingId(null);
+        return;
       }
 
-      // 2. Process based on request type
       if (request.type === "ad_promotion" && request.listingId) {
-        // Automatically make the listing listing active and promoted with correct duration
-        const listingRef = doc(db, "listings", request.listingId);
         const duration = Number(request.durationDays || 3);
-        await updateDoc(listingRef, {
-          isAd: true,
-          adTier: request.adTier || "basic",
-          adDurationDays: duration,
-          adExpiresAt: new Date(Date.now() + duration * 24 * 60 * 60 * 1000).toISOString()
-        });
+        await supabase
+          .from("listings")
+          .update({
+            is_ad: true,
+            ad_tier: request.adTier || "basic",
+            ad_duration_days: duration,
+            ad_expires_at: new Date(Date.now() + duration * 24 * 60 * 60 * 1000).toISOString(),
+          })
+          .eq("id", request.listingId);
       } else {
-        // Standard wallet balance refill request
-        const newCredits = currentCredits + request.amount;
-        await updateDoc(userRef, {
-          simulatedCredits: newCredits
-        });
+        const { data: userRow } = await supabase
+          .from("users")
+          .select("simulated_credits")
+          .eq("uid", request.userId)
+          .maybeSingle();
+        const currentCredits = Number(userRow?.simulated_credits ?? 5000);
+        await supabase
+          .from("users")
+          .update({ simulated_credits: currentCredits + Number(request.amount) })
+          .eq("uid", request.userId);
       }
 
-      // 3. Mark the refill request as approved
-      await updateDoc(doc(db, "refill_requests", request.id), {
-        status: "approved",
-        approvedAt: new Date().toISOString(),
-        reviewedBy: currentUser?.phoneNumber || currentUser?.email || "Admin"
-      });
+      setRequests((prev) => prev.map((r) => (r.id === request.id ? { ...r, status: "approved" } : r)));
 
       setActionSuccessMsg(
         language === "bn" 
@@ -432,11 +451,14 @@ export function AdminPanel({ language, currentUser, listings: listingsProp, isUs
     setActionSuccessMsg("");
 
     try {
-      await updateDoc(doc(db, "refill_requests", request.id), {
-        status: "rejected",
-        rejectedAt: new Date().toISOString(),
-        reviewedBy: currentUser?.phoneNumber || currentUser?.email || "Admin"
-      });
+      const { error } = await supabase
+        .from("refill_requests")
+        .update({ status: "rejected" })
+        .eq("id", request.id)
+        .eq("status", "pending");
+      if (error) throw error;
+
+      setRequests((prev) => prev.map((r) => (r.id === request.id ? { ...r, status: "rejected" } : r)));
 
       setActionSuccessMsg(
         language === "bn" 
