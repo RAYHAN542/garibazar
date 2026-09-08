@@ -17,6 +17,7 @@ import {
   fetchInitialListings as fetchInitialListingsFromSupabase,
   fetchMoreListings as fetchMoreListingsFromSupabase,
   fetchAdListings as fetchAdListingsFromSupabase,
+  fetchMyListings as fetchMyListingsFromSupabase,
 } from "./utils/listingsApi";
 import { useAdPromotion } from "./hooks/useAdPromotion";
 import { Car, Search, User, LogOut, Globe, Loader2, ShoppingBag, Phone, ChevronRight, ShieldCheck, Send, Check, Download, Smartphone } from "lucide-react";
@@ -918,28 +919,30 @@ export default function App() {
 
   // 1b. My Own Listings — সরাসরি sellerId দিয়ে কোয়েরি করা, হোমপেজের ২০-টা পেজিনেটেড লিস্ট থেকে না।
   // এভাবে Dashboard আর Lottery সবসময় ইউজারের আসল ১০০% পোস্ট দেখাবে।
-  useEffect(() => {
-    if (!authReady || !firebaseAuthUser?.uid || !user?.uid) {
+  const fetchMyListings = async () => {
+    if (!user?.uid) {
       setMyListings([]);
       return;
     }
-    const q = query(collection(db, "listings"), where("sellerId", "==", user.uid), orderBy("createdAt", "desc"), limit(100));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const list: PartListing[] = [];
-      snapshot.forEach((docSnap) => {
-        const data = docSnap.data();
-        if (data.isDeleted === true) return; // soft-deleted, in its 30-day recovery window
-        const normalizedCreatedAt = data.createdAt && typeof data.createdAt.toDate === "function"
-          ? data.createdAt.toDate().toISOString()
-          : data.createdAt;
-        list.push({ id: docSnap.id, ...data, createdAt: normalizedCreatedAt } as PartListing);
-      });
+    try {
+      const list = await fetchMyListingsFromSupabase(user.uid, user.authUid, 100);
       setMyListings(list);
-    }, (err) => {
-      logger.error("Failed to sync my listings:", err);
-    });
-    return () => unsubscribe();
-  }, [authReady, firebaseAuthUser?.uid, user?.uid]);
+    } catch (err) {
+      logger.error("Failed to fetch my listings:", err);
+    }
+  };
+
+  useEffect(() => {
+    fetchMyListings();
+
+    const handleRefresh = () => {
+      fetchMyListings();
+    };
+    window.addEventListener("gari_bazar_refreshed_data", handleRefresh);
+    return () => {
+      window.removeEventListener("gari_bazar_refreshed_data", handleRefresh);
+    };
+  }, [user?.uid, user?.authUid]);
 
   // 1c. সব লাইভ বুস্ট করা অ্যাড — হোমপেজের "Load More" পেজিনেশনের ওপর নির্ভর না করে সরাসরি fetch করা,
   // যাতে পেজ লোড হওয়ার সাথে সাথেই বুস্ট ব্যানার দেখা যায়, Load More চাপার আগেই।

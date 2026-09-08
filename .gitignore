@@ -31,3 +31,8 @@ patch_*.py
 !android/**/*.zip
 resolve_conflict_command.txt
 migration-firebase-key.json
+firebase-service-account.json
+backfill_and_fix.cjs
+dry_run_seller_fix.cjs
+generate_seller_fix_sql.cjs
+seller_id_fix.sql

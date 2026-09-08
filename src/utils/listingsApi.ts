@@ -111,3 +111,22 @@ export async function fetchAdListings(limit = 20): Promise<PartListing[]> {
   if (error) throw error;
   return (data || []).map(mapRowToListing);
 }
+
+// Seller's own listings for Dashboard/Lottery -- matches on both possible id
+// forms (legacy uid and Supabase authUid), same pattern used elsewhere
+// (PromoteAdModal, ListingDetailModal) since not every user has both set.
+export async function fetchMyListings(uid: string, authUid?: string | null, limit = 100): Promise<PartListing[]> {
+  const ids = Array.from(new Set([uid, authUid].filter(Boolean))) as string[];
+  if (ids.length === 0) return [];
+
+  const { data, error } = await supabase
+    .from("listings")
+    .select("*")
+    .eq("is_deleted", false)
+    .in("seller_id", ids)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+
+  if (error) throw error;
+  return (data || []).map(mapRowToListing);
+}
