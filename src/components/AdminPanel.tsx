@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { db, auth } from "../firebase";
+import { supabase } from "../supabase";
 import { onAuthStateChanged } from "firebase/auth";
 import {collection, onSnapshot, query, orderBy, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, limit, getAggregateFromServer, sum, count, startAfter} from "firebase/firestore";
 import { ShieldAlert, CheckCircle2, XCircle, Coins, Loader2, Save, Check, Smartphone, User, Clock, Mail, Trash2, Search, TrendingUp, Grid, Inbox, Flag, Activity, Globe, Users, MapPin, Eye, RefreshCw } from "lucide-react";
@@ -56,12 +57,29 @@ export function AdminPanel({ language, currentUser, listings: listingsProp, isUs
     // marketplace grows.
     const fetchListings = async () => {
       try {
-        const q = query(collection(db, "listings"), orderBy("createdAt", "desc"), limit(300));
-        const snapshot = await getDocs(q);
-        const all: any[] = [];
-        snapshot.forEach((docSnap) => {
-          all.push({ id: docSnap.id, ...docSnap.data() });
-        });
+        const { data, error } = await supabase
+          .from("listings")
+          .select("*")
+          .eq("is_deleted", false)
+          .order("created_at", { ascending: false })
+          .limit(300);
+        if (error) throw error;
+        const all = (data || []).map((row: any) => ({
+          id: row.id,
+          title: row.title,
+          category: row.category,
+          model: row.model,
+          price: row.price,
+          location: row.location,
+          sellerName: row.seller_name,
+          image: row.images?.[0] || "",
+          images: row.images || [],
+          views: row.views || 0,
+          isAd: row.is_ad,
+          adTier: row.ad_tier,
+          reportCount: row.report_count || 0,
+          reportedBy: row.reported_by || [],
+        }));
         setAdminListings(all);
       } catch (err) {
         console.error("Could not fetch listings for admin:", err);
@@ -69,14 +87,16 @@ export function AdminPanel({ language, currentUser, listings: listingsProp, isUs
     };
     fetchListings();
 
-    getAggregateFromServer(collection(db, "listings"), {
-      totalCount: count(),
-      totalViews: sum("views"),
-    }).then((snap) => {
-      setAggListingCount(snap.data().totalCount);
-      setAggTotalViews(snap.data().totalViews || 0);
-    }).catch((err) => {
-      console.error("Could not fetch listings aggregate for admin:", err);
+    supabase.rpc("admin_listings_stats").then(({ data, error }) => {
+      if (error) {
+        console.error("Could not fetch listings stats for admin:", error.message);
+        return;
+      }
+      const row = data?.[0];
+      if (row) {
+        setAggListingCount(Number(row.total_count) || 0);
+        setAggTotalViews(Number(row.total_views) || 0);
+      }
     });
   }, []);
 
@@ -135,36 +155,10 @@ export function AdminPanel({ language, currentUser, listings: listingsProp, isUs
   const [listingsSearch, setListingsSearch] = useState("");
   const [showOnlyReported, setShowOnlyReported] = useState(false);
   const [deleteLoadingId, setDeleteLoadingId] = useState<string | null>(null);
-  const [seeding, setSeeding] = useState(false);
 
-  const handleSeedMockListings = async () => {
-    const confirmSeed = window.confirm(
-      language === "bn"
-        ? "আপনি কি নিশ্চিতভাবে ডাটাবেসে মক ডেটা যোগ করতে চান?"
-        : "Are you sure you want to seed the database with sample mock listings?"
-    );
-    if (!confirmSeed) return;
-
-    setSeeding(true);
-    setActionSuccessMsg("");
-    try {
-      const { SAMPLE_LISTINGS } = await import("../translations");
-      for (const item of SAMPLE_LISTINGS) {
-        await setDoc(doc(db, "listings", item.id), item);
-      }
-      setActionSuccessMsg(
-        language === "bn"
-          ? "সফলভাবে ডাটাবেসে মক লিস্টিং যোগ করা হয়েছে! মার্কেটপ্লেস রিফ্রেশ করুন।"
-          : "Successfully seeded mock listings in the database! Please refresh the marketplace."
-      );
-      window.dispatchEvent(new CustomEvent("gari_bazar_refreshed_data"));
-    } catch (err: any) {
-      console.error("Seeding error:", err);
-      setActionSuccessMsg(`Failed to seed: ${err.message}`);
-    } finally {
-      setSeeding(false);
-    }
-  };
+  // Mock-data seeding removed -- was a dev-only convenience that wrote
+  // fake listings straight into the live production database. Too risky
+  // to keep around on a real, launched marketplace.
 
   // Load configured payment info from Firestore
   useEffect(() => {
@@ -468,10 +462,12 @@ export function AdminPanel({ language, currentUser, listings: listingsProp, isUs
     setActionSuccessMsg("");
 
     try {
-      await deleteDoc(doc(db, "listings", listingId));
+      const { error } = await supabase.from("listings").delete().eq("id", listingId);
+      if (error) throw error;
       // Remove instantly from the local list so the admin sees the
       // updated count/grid without needing to reload the page.
       setListings((prev) => prev.filter((l) => l.id !== listingId));
+      setAdminListings((prev) => prev.filter((l) => l.id !== listingId));
       setActionSuccessMsg(
         language === "bn"
           ? "লিস্টিংটি সফলভাবে গেটওয়ে ও ডাটাবেস থেকে মুছে ফেলা হয়েছে!"
@@ -768,26 +764,6 @@ export function AdminPanel({ language, currentUser, listings: listingsProp, isUs
                     ? `অভিযোগ প্রাপ্ত বিজ্ঞাপন (${adminListings.filter(i => (i.reportCount || 0) > 0).length})` 
                     : `Reported Only (${adminListings.filter(i => (i.reportCount || 0) > 0).length})`}
                 </span>
-              </button>
-
-              {/* Seed Database Action Button */}
-              <button
-                type="button"
-                disabled={seeding}
-                onClick={handleSeedMockListings}
-                className="px-3 py-2 bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-slate-950 font-bold rounded-xl text-xs flex items-center gap-1.5 transition cursor-pointer"
-              >
-                {seeding ? (
-                  <>
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    <span>{language === "bn" ? "যোগ হচ্ছে..." : "Seeding..."}</span>
-                  </>
-                ) : (
-                  <>
-                    <Coins className="w-3.5 h-3.5" />
-                    <span>{language === "bn" ? "মক লিস্টিং যোগ করুন" : "Seed Mock Listings"}</span>
-                  </>
-                )}
               </button>
 
               {/* Search Input Filter */}
