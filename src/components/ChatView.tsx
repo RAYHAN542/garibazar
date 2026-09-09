@@ -316,8 +316,13 @@ export function ChatView({ currentUser, language, onLoginPrompt, initialListingT
       })
       .subscribe();
 
+    // Same fallback reasoning as the messages poll above -- keeps thread
+    // previews/unread badges fresh even if realtime doesn't fire.
+    const pollInterval = setInterval(fetchThreads, 5000);
+
     return () => {
       cancelled = true;
+      clearInterval(pollInterval);
       supabase.removeChannel(channel);
     };
   }, [currentUser?.uid, initialListingToChat, authReady]);
@@ -380,8 +385,18 @@ export function ChatView({ currentUser, language, onLoginPrompt, initialListingT
       )
       .subscribe();
 
+    // 🔧 Fallback poll every 3s alongside the realtime subscription above.
+    // Realtime's RLS check (via current_uid(), which reads custom JWT GUCs)
+    // doesn't always evaluate the same way inside Supabase's Realtime
+    // broadcast path as it does for normal REST calls -- when that happens
+    // postgres_changes silently never fires and new messages only showed up
+    // after a manual reload. Polling guarantees messages appear within a
+    // few seconds either way, realtime working or not.
+    const pollInterval = setInterval(fetchMessages, 3000);
+
     return () => {
       cancelled = true;
+      clearInterval(pollInterval);
       supabase.removeChannel(channel);
     };
   }, [activeThread?.id, msgLimit, authReady]);
