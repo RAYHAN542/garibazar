@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { addDoc, collection } from "firebase/firestore";
-import { auth, db, logAnalyticsEvent } from "../firebase";
+import { auth, logAnalyticsEvent } from "../firebase";
+import { supabase } from "../supabase";
 import { SupportedLanguage } from "../types";
 import { apiUrl } from "../utils/apiBase";
 
@@ -58,28 +58,37 @@ export function useAdPromotion({
 
       // 1. Create a pending refill_request — the UddoktaPay webhook verifies
       //    payment and activates the ad automatically. No TxID needed.
-      const docData = {
-        userId: user.uid,
-        userName: user.displayName || "Seller",
-        userEmail: user.email || "",
-        amount: Number(selectedPromoPkg.price),
-        status: "pending",
-        type: "ad_promotion",
-        listingId: targetListing.id,
-        listingTitle: targetListing.title,
-        adTier: selectedPromoPkg.tier,
-        durationDays: selectedPromoPkg.durationDays,
-        currentViews: targetListing.views || 0,
-        createdAt: new Date().toISOString()
-      };
-      const docRef = await addDoc(collection(db, "refill_requests"), docData);
+      const { data: sessionData } = await supabase.auth.getSession();
+      let token = sessionData.session?.access_token;
+      if (!token) {
+        token = await auth.currentUser?.getIdToken();
+      }
+      if (!token) throw new Error("লগইন সেশন পাওয়া যায়নি।");
+
+      const { data: inserted, error: insertErr } = await supabase
+        .from("refill_requests")
+        .insert({
+          user_id: user.authUid || user.uid,
+          user_name: user.displayName || "Seller",
+          user_email: user.email || "",
+          amount: Number(selectedPromoPkg.price),
+          status: "pending",
+          type: "ad_promotion",
+          listing_id: targetListing.id,
+          listing_title: targetListing.title,
+          ad_tier: selectedPromoPkg.tier,
+          duration_days: selectedPromoPkg.durationDays
+        })
+        .select("id")
+        .single();
+
+      if (insertErr) throw insertErr;
 
       // 2. Ask our server to open a real UddoktaPay checkout session for this request.
-      const idToken = await auth.currentUser?.getIdToken();
       const res = await fetch(apiUrl("/api/payment/create-charge"), {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
-        body: JSON.stringify({ requestId: docRef.id })
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ requestId: inserted.id })
       });
       const data = await res.json();
 

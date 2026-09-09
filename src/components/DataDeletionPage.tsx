@@ -43,22 +43,23 @@ export default function DataDeletionPage({
     setError("");
 
     try {
-      const uid = currentUser.uid;
+      const { data: sessionData } = await supabase.auth.getSession();
+      let token = sessionData.session?.access_token;
+      if (!token) {
+        token = await auth.currentUser?.getIdToken();
+      }
+      if (!token) throw new Error("লগইন সেশন পাওয়া যায়নি।");
 
-      // 1. Delete listings owned by user
-      const listingsQuery = query(collection(db, "listings"), where("sellerId", "==", uid));
-      const listingsSnapshot = await getDocs(listingsQuery);
-      for (const d of listingsSnapshot.docs) {
-        await deleteDoc(doc(db, "listings", d.id));
+      const res = await fetch(apiUrl("/api/delete-account"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error || "অ্যাকাউন্ট ডিলিট করতে সমস্যা হয়েছে।");
       }
 
-      // 2. Delete public profiles and user private accounts
-      await deleteDoc(doc(db, "users", uid));
-      await deleteDoc(doc(db, "public_profiles", uid));
-
-      // 3. Delete the auth user record
-      await deleteUser(currentUser);
-
+      await supabase.auth.signOut();
       setCompleted(true);
     } catch (err: any) {
       console.error("Account & Data deletion failed:", err);

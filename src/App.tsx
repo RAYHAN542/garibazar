@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useEffect, useMemo, useRef, lazy, Suspense } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback, lazy, Suspense } from "react";
 import { auth, db, logAnalyticsEvent } from "./firebase";
 import { supabase } from "./supabase";
 import { logger } from "./utils/logger";
@@ -917,32 +917,37 @@ export default function App() {
     return () => unsubscribe();
   }, [authReady, firebaseAuthUser?.uid, user?.uid]);
 
-  // 1b. My Own Listings — সরাসরি sellerId দিয়ে কোয়েরি করা, হোমপেজের ২০-টা পেজিনেটেড লিস্ট থেকে না।
-  // এভাবে Dashboard আর Lottery সবসময় ইউজারের আসল ১০০% পোস্ট দেখাবে।
-  const fetchMyListings = async () => {
+  // 1b. My Own Listings — সরাসরি seller_id দিয়ে Supabase থেকে fetch করা হয়,
+  // হোমপেজের ২০-টা পেজিনেটেড লিস্ট থেকে না। এভাবে Dashboard আর Lottery
+  // সবসময় ইউজারের আসল ১০০% পোস্ট দেখাবে।
+  //
+  // 🔧 FIX (Firebase -> Supabase auth migration): আগে এটা Firestore
+  // onSnapshot দিয়ে হতো এবং `firebaseAuthUser` না থাকলে চলতোই না। লগইন এখন
+  // Supabase (ফোন + পাসওয়ার্ড) দিয়ে হয়, তাই `firebaseAuthUser` কখনোই সেট
+  // হয় না -- ফলে myListings সবসময় খালি থাকতো, "My Shop"/"Products" ট্যাবে
+  // পোস্ট করা সব লিস্টিং থাকা সত্ত্বেও "০ পোস্ট" দেখাতো। এখন সরাসরি Supabase
+  // থেকে fetch হয়, শুধু `user?.uid` থাকলেই চলে (firebaseAuthUser লাগে না)।
+  const refetchMyListings = useCallback(async () => {
     if (!user?.uid) {
       setMyListings([]);
       return;
     }
     try {
-      const list = await fetchMyListingsFromSupabase(user.uid, user.authUid, 100);
+      const list = await fetchMyListingsFromSupabase(user.uid, 200);
       setMyListings(list);
     } catch (err) {
       logger.error("Failed to fetch my listings:", err);
     }
-  };
+  }, [user?.uid]);
 
   useEffect(() => {
-    fetchMyListings();
+    refetchMyListings();
+  }, [refetchMyListings]);
 
-    const handleRefresh = () => {
-      fetchMyListings();
-    };
-    window.addEventListener("gari_bazar_refreshed_data", handleRefresh);
-    return () => {
-      window.removeEventListener("gari_bazar_refreshed_data", handleRefresh);
-    };
-  }, [user?.uid, user?.authUid]);
+  useEffect(() => {
+    window.addEventListener("gari_bazar_refreshed_data", refetchMyListings);
+    return () => window.removeEventListener("gari_bazar_refreshed_data", refetchMyListings);
+  }, [refetchMyListings]);
 
   // 1c. সব লাইভ বুস্ট করা অ্যাড — হোমপেজের "Load More" পেজিনেশনের ওপর নির্ভর না করে সরাসরি fetch করা,
   // যাতে পেজ লোড হওয়ার সাথে সাথেই বুস্ট ব্যানার দেখা যায়, Load More চাপার আগেই।
@@ -1389,6 +1394,8 @@ export default function App() {
           .eq("id", itemId);
         if (deleteError) throw deleteError;
       }
+      // মুছে ফেলা লিস্টিং এখন My Shop/Products ট্যাব থেকেও তাৎক্ষণিক সরে যাক।
+      setMyListings((prev) => prev.filter((item) => item.id !== itemId));
     } catch (err) {
       console.error("Error deleting listing:", err);
       alert(language === "bn" ? "মুছে ফেলতে ব্যর্থ হয়েছে" : "Failed to delete listing.");
@@ -1924,6 +1931,7 @@ export default function App() {
                   language={language}
                   currentUser={userMetadata}
                   onPostSuccess={() => {
+                    refetchMyListings();
                     setActiveTab("market");
                   }}
                   onLoginPrompt={() => {
@@ -2648,7 +2656,7 @@ export default function App() {
           currentUser={user}
           onClose={() => setPromotingListing(null)}
           onPromotionSuccess={() => {
-            // listing gets updated automatically via listener hook
+            refetchMyListings();
           }}
         />
       )}
@@ -2673,7 +2681,7 @@ export default function App() {
         listing={editingListing}
         language={language}
         onSaveSuccess={() => {
-          // listings get updated automatically via firestore or local triggers
+          refetchMyListings();
         }}
       />
 

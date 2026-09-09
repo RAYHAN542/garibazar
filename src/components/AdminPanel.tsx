@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { db, auth } from "../firebase";
+import { supabase } from "../supabase";
 import { onAuthStateChanged } from "firebase/auth";
 import {collection, onSnapshot, query, orderBy, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, limit, getAggregateFromServer, sum, count, startAfter} from "firebase/firestore";
 import { ShieldAlert, CheckCircle2, XCircle, Coins, Loader2, Save, Check, Smartphone, User, Clock, Mail, Trash2, Search, TrendingUp, Grid, Inbox, Flag, Activity, Globe, Users, MapPin, Eye, RefreshCw } from "lucide-react";
@@ -56,12 +57,29 @@ export function AdminPanel({ language, currentUser, listings: listingsProp, isUs
     // marketplace grows.
     const fetchListings = async () => {
       try {
-        const q = query(collection(db, "listings"), orderBy("createdAt", "desc"), limit(300));
-        const snapshot = await getDocs(q);
-        const all: any[] = [];
-        snapshot.forEach((docSnap) => {
-          all.push({ id: docSnap.id, ...docSnap.data() });
-        });
+        const { data, error } = await supabase
+          .from("listings")
+          .select("*")
+          .eq("is_deleted", false)
+          .order("created_at", { ascending: false })
+          .limit(300);
+        if (error) throw error;
+        const all = (data || []).map((row: any) => ({
+          id: row.id,
+          title: row.title,
+          category: row.category,
+          model: row.model,
+          price: row.price,
+          location: row.location,
+          sellerName: row.seller_name,
+          image: row.images?.[0] || "",
+          images: row.images || [],
+          views: row.views || 0,
+          isAd: row.is_ad,
+          adTier: row.ad_tier,
+          reportCount: row.report_count || 0,
+          reportedBy: row.reported_by || [],
+        }));
         setAdminListings(all);
       } catch (err) {
         console.error("Could not fetch listings for admin:", err);
@@ -69,14 +87,16 @@ export function AdminPanel({ language, currentUser, listings: listingsProp, isUs
     };
     fetchListings();
 
-    getAggregateFromServer(collection(db, "listings"), {
-      totalCount: count(),
-      totalViews: sum("views"),
-    }).then((snap) => {
-      setAggListingCount(snap.data().totalCount);
-      setAggTotalViews(snap.data().totalViews || 0);
-    }).catch((err) => {
-      console.error("Could not fetch listings aggregate for admin:", err);
+    supabase.rpc("admin_listings_stats").then(({ data, error }) => {
+      if (error) {
+        console.error("Could not fetch listings stats for admin:", error.message);
+        return;
+      }
+      const row = data?.[0];
+      if (row) {
+        setAggListingCount(Number(row.total_count) || 0);
+        setAggTotalViews(Number(row.total_views) || 0);
+      }
     });
   }, []);
 
@@ -135,36 +155,10 @@ export function AdminPanel({ language, currentUser, listings: listingsProp, isUs
   const [listingsSearch, setListingsSearch] = useState("");
   const [showOnlyReported, setShowOnlyReported] = useState(false);
   const [deleteLoadingId, setDeleteLoadingId] = useState<string | null>(null);
-  const [seeding, setSeeding] = useState(false);
 
-  const handleSeedMockListings = async () => {
-    const confirmSeed = window.confirm(
-      language === "bn"
-        ? "আপনি কি নিশ্চিতভাবে ডাটাবেসে মক ডেটা যোগ করতে চান?"
-        : "Are you sure you want to seed the database with sample mock listings?"
-    );
-    if (!confirmSeed) return;
-
-    setSeeding(true);
-    setActionSuccessMsg("");
-    try {
-      const { SAMPLE_LISTINGS } = await import("../translations");
-      for (const item of SAMPLE_LISTINGS) {
-        await setDoc(doc(db, "listings", item.id), item);
-      }
-      setActionSuccessMsg(
-        language === "bn"
-          ? "সফলভাবে ডাটাবেসে মক লিস্টিং যোগ করা হয়েছে! মার্কেটপ্লেস রিফ্রেশ করুন।"
-          : "Successfully seeded mock listings in the database! Please refresh the marketplace."
-      );
-      window.dispatchEvent(new CustomEvent("gari_bazar_refreshed_data"));
-    } catch (err: any) {
-      console.error("Seeding error:", err);
-      setActionSuccessMsg(`Failed to seed: ${err.message}`);
-    } finally {
-      setSeeding(false);
-    }
-  };
+  // Mock-data seeding removed -- was a dev-only convenience that wrote
+  // fake listings straight into the live production database. Too risky
+  // to keep around on a real, launched marketplace.
 
   // Load configured payment info from Firestore
   useEffect(() => {
@@ -189,51 +183,77 @@ export function AdminPanel({ language, currentUser, listings: listingsProp, isUs
   const [refillLastDoc, setRefillLastDoc] = useState<any>(null);
   const [refillLoadingMore, setRefillLoadingMore] = useState(false);
 
-  useEffect(() => {
-    const q = query(
-      collection(db, "refill_requests"),
-      orderBy("createdAt", "desc"),
-      limit(20)
-    );
+  const mapRefillRow = (row: any) => ({
+    id: row.id,
+    userId: row.user_id,
+    userName: row.user_name,
+    userEmail: row.user_email,
+    amount: row.amount,
+    status: row.status,
+    type: row.type,
+    listingId: row.listing_id,
+    listingTitle: row.listing_title,
+    adTier: row.ad_tier,
+    durationDays: row.duration_days,
+    createdAt: row.created_at,
+    senderNumber: row.sender_number,
+    txId: row.transaction_id,
+    method: row.method,
+  });
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const list: any[] = [];
-      snapshot.forEach((doc) => {
-        list.push({ id: doc.id, ...doc.data() });
-      });
+  const fetchRefillRequests = async () => {
+    setLoadingRequests(true);
+    try {
+      const { data, error } = await supabase
+        .from("refill_requests")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(20);
+      if (error) throw error;
+      const list = (data || []).map(mapRefillRow);
       setRequests(list);
-      setRefillLastDoc(snapshot.docs[snapshot.docs.length - 1] || null);
-      setRefillHasMore(snapshot.docs.length === 20);
-      setLoadingRequests(false);
-    }, (err) => {
+      setRefillHasMore(list.length === 20);
+    } catch (err) {
       console.error("Could not fetch refill requests:", err);
+    } finally {
       setLoadingRequests(false);
-    });
+    }
+  };
 
-    return () => unsubscribe();
+  useEffect(() => {
+    fetchRefillRequests();
   }, []);
 
-  // Listen to all customer support tickets across Gari Bazar platform
-  useEffect(() => {
-    const q = query(
-      collection(db, "support_tickets"),
-      orderBy("createdAt", "desc"),
-      limit(50)
-    );
+  // Fetch all customer support tickets from Supabase (submission already
+  // wrote here via api/submit-support-ticket.ts; this used to read Firestore
+  // instead, so no new ticket ever showed up here).
+  const mapTicketRow = (row: any) => ({
+    id: row.id,
+    name: row.data?.name,
+    email: row.data?.email,
+    message: row.data?.message,
+    status: row.status,
+    createdAt: row.created_at,
+  });
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const list: any[] = [];
-      snapshot.forEach((doc) => {
-        list.push({ id: doc.id, ...doc.data() });
-      });
-      setTicketsList(list);
-      setLoadingTickets(false);
-    }, (err) => {
+  const fetchSupportTickets = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("support_tickets")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(50);
+      if (error) throw error;
+      setTicketsList((data || []).map(mapTicketRow));
+    } catch (err) {
       console.error("Could not fetch support tickets:", err);
+    } finally {
       setLoadingTickets(false);
-    });
+    }
+  };
 
-    return () => unsubscribe();
+  useEffect(() => {
+    fetchSupportTickets();
   }, []);
 
   // Live summary counters -- total visits / logins / signups (one small doc,
@@ -299,23 +319,18 @@ export function AdminPanel({ language, currentUser, listings: listingsProp, isUs
   }, [authReady]);
 
   const loadMoreRefillRequests = async () => {
-    if (!refillLastDoc || refillLoadingMore) return;
+    if (!refillHasMore || refillLoadingMore) return;
     setRefillLoadingMore(true);
     try {
-      const q = query(
-        collection(db, "refill_requests"),
-        orderBy("createdAt", "desc"),
-        startAfter(refillLastDoc),
-        limit(20)
-      );
-      const snapshot = await getDocs(q);
-      const more: any[] = [];
-      snapshot.forEach((doc) => {
-        more.push({ id: doc.id, ...doc.data() });
-      });
+      const { data, error } = await supabase
+        .from("refill_requests")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .range(requests.length, requests.length + 19);
+      if (error) throw error;
+      const more = (data || []).map(mapRefillRow);
       setRequests((prev) => [...prev, ...more]);
-      setRefillLastDoc(snapshot.docs[snapshot.docs.length - 1] || null);
-      setRefillHasMore(snapshot.docs.length === 20);
+      setRefillHasMore(more.length === 20);
     } catch (err) {
       console.error("Could not load more refill requests:", err);
     } finally {
@@ -329,10 +344,14 @@ export function AdminPanel({ language, currentUser, listings: listingsProp, isUs
   const handleResolveTicket = async (ticketId: string) => {
     setTicketActionLoadingId(ticketId);
     try {
-      await updateDoc(doc(db, "support_tickets", ticketId), {
-        status: "resolved",
-        resolvedAt: new Date().toISOString()
-      });
+      const { data, error } = await supabase
+        .from("support_tickets")
+        .update({ status: "resolved" })
+        .eq("id", ticketId)
+        .select("id");
+      if (error) throw error;
+      if (!data || data.length === 0) throw new Error("PERMISSION_DENIED_OR_NOT_FOUND");
+      setTicketsList((prev) => prev.map((t) => (t.id === ticketId ? { ...t, status: "resolved" } : t)));
     } catch (err) {
       console.error("Could not resolve ticket:", err);
     } finally {
@@ -343,9 +362,14 @@ export function AdminPanel({ language, currentUser, listings: listingsProp, isUs
   const handleReopenTicket = async (ticketId: string) => {
     setTicketActionLoadingId(ticketId);
     try {
-      await updateDoc(doc(db, "support_tickets", ticketId), {
-        status: "open"
-      });
+      const { data, error } = await supabase
+        .from("support_tickets")
+        .update({ status: "open" })
+        .eq("id", ticketId)
+        .select("id");
+      if (error) throw error;
+      if (!data || data.length === 0) throw new Error("PERMISSION_DENIED_OR_NOT_FOUND");
+      setTicketsList((prev) => prev.map((t) => (t.id === ticketId ? { ...t, status: "open" } : t)));
     } catch (err) {
       console.error("Could not reopen ticket:", err);
     } finally {
@@ -381,41 +405,48 @@ export function AdminPanel({ language, currentUser, listings: listingsProp, isUs
     setActionSuccessMsg("");
 
     try {
-      // 1. Get current balance of target user
-      const userRef = doc(db, "users", request.userId);
-      const userSnap = await getDoc(userRef);
-      
-      let currentCredits = 5000; // default startup budget
-      if (userSnap.exists()) {
-        const data = userSnap.data();
-        currentCredits = data.simulatedCredits ?? 5000;
+      // Idempotent claim -- only flips pending -> approved once.
+      const { data: claimed, error: claimErr } = await supabase
+        .from("refill_requests")
+        .update({
+          status: "approved",
+          approved_at: new Date().toISOString(),
+        })
+        .eq("id", request.id)
+        .eq("status", "pending")
+        .select("*")
+        .maybeSingle();
+      if (claimErr) throw claimErr;
+      if (!claimed) {
+        setActionLoadingId(null);
+        return;
       }
 
-      // 2. Process based on request type
       if (request.type === "ad_promotion" && request.listingId) {
-        // Automatically make the listing listing active and promoted with correct duration
-        const listingRef = doc(db, "listings", request.listingId);
         const duration = Number(request.durationDays || 3);
-        await updateDoc(listingRef, {
-          isAd: true,
-          adTier: request.adTier || "basic",
-          adDurationDays: duration,
-          adExpiresAt: new Date(Date.now() + duration * 24 * 60 * 60 * 1000).toISOString()
-        });
+        await supabase
+          .from("listings")
+          .update({
+            is_ad: true,
+            ad_tier: request.adTier || "basic",
+            ad_duration_days: duration,
+            ad_expires_at: new Date(Date.now() + duration * 24 * 60 * 60 * 1000).toISOString(),
+          })
+          .eq("id", request.listingId);
       } else {
-        // Standard wallet balance refill request
-        const newCredits = currentCredits + request.amount;
-        await updateDoc(userRef, {
-          simulatedCredits: newCredits
-        });
+        const { data: userRow } = await supabase
+          .from("users")
+          .select("simulated_credits")
+          .eq("uid", request.userId)
+          .maybeSingle();
+        const currentCredits = Number(userRow?.simulated_credits ?? 5000);
+        await supabase
+          .from("users")
+          .update({ simulated_credits: currentCredits + Number(request.amount) })
+          .eq("uid", request.userId);
       }
 
-      // 3. Mark the refill request as approved
-      await updateDoc(doc(db, "refill_requests", request.id), {
-        status: "approved",
-        approvedAt: new Date().toISOString(),
-        reviewedBy: currentUser?.phoneNumber || currentUser?.email || "Admin"
-      });
+      setRequests((prev) => prev.map((r) => (r.id === request.id ? { ...r, status: "approved" } : r)));
 
       setActionSuccessMsg(
         language === "bn" 
@@ -438,11 +469,14 @@ export function AdminPanel({ language, currentUser, listings: listingsProp, isUs
     setActionSuccessMsg("");
 
     try {
-      await updateDoc(doc(db, "refill_requests", request.id), {
-        status: "rejected",
-        rejectedAt: new Date().toISOString(),
-        reviewedBy: currentUser?.phoneNumber || currentUser?.email || "Admin"
-      });
+      const { error } = await supabase
+        .from("refill_requests")
+        .update({ status: "rejected" })
+        .eq("id", request.id)
+        .eq("status", "pending");
+      if (error) throw error;
+
+      setRequests((prev) => prev.map((r) => (r.id === request.id ? { ...r, status: "rejected" } : r)));
 
       setActionSuccessMsg(
         language === "bn" 
@@ -468,10 +502,19 @@ export function AdminPanel({ language, currentUser, listings: listingsProp, isUs
     setActionSuccessMsg("");
 
     try {
-      await deleteDoc(doc(db, "listings", listingId));
+      // Supabase silently returns 0 rows deleted (no error) when RLS blocks
+      // a delete -- checking only `error` made this look like it always
+      // succeeded even when nothing was actually removed. .select("id")
+      // lets us confirm a row was really deleted.
+      const { data, error } = await supabase.from("listings").delete().eq("id", listingId).select("id");
+      if (error) throw error;
+      if (!data || data.length === 0) {
+        throw new Error("PERMISSION_DENIED_OR_NOT_FOUND");
+      }
       // Remove instantly from the local list so the admin sees the
       // updated count/grid without needing to reload the page.
       setListings((prev) => prev.filter((l) => l.id !== listingId));
+      setAdminListings((prev) => prev.filter((l) => l.id !== listingId));
       setActionSuccessMsg(
         language === "bn"
           ? "লিস্টিংটি সফলভাবে গেটওয়ে ও ডাটাবেস থেকে মুছে ফেলা হয়েছে!"
@@ -479,10 +522,15 @@ export function AdminPanel({ language, currentUser, listings: listingsProp, isUs
       );
     } catch (err: any) {
       console.error("Error deleting listing:", err);
+      const isPermission = err?.message === "PERMISSION_DENIED_OR_NOT_FOUND";
       setActionSuccessMsg(
-        language === "bn"
-          ? "লিস্টিং মুছে ফেলতে সমস্যা হয়েছে। অনুগ্রহ করে পুনরায় চেষ্টা করুন।"
-          : "Failed to delete listing. Please try again."
+        isPermission
+          ? (language === "bn"
+              ? "মুছে ফেলা যায়নি -- আপনার admin সেশনে সমস্যা থাকতে পারে। লগআউট করে আবার লগইন করে দেখুন।"
+              : "Delete blocked -- your admin session may be stale. Try logging out and back in.")
+          : (language === "bn"
+              ? "লিস্টিং মুছে ফেলতে সমস্যা হয়েছে। অনুগ্রহ করে পুনরায় চেষ্টা করুন।"
+              : "Failed to delete listing. Please try again.")
       );
     } finally {
       setDeleteLoadingId(null);
@@ -768,26 +816,6 @@ export function AdminPanel({ language, currentUser, listings: listingsProp, isUs
                     ? `অভিযোগ প্রাপ্ত বিজ্ঞাপন (${adminListings.filter(i => (i.reportCount || 0) > 0).length})` 
                     : `Reported Only (${adminListings.filter(i => (i.reportCount || 0) > 0).length})`}
                 </span>
-              </button>
-
-              {/* Seed Database Action Button */}
-              <button
-                type="button"
-                disabled={seeding}
-                onClick={handleSeedMockListings}
-                className="px-3 py-2 bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-slate-950 font-bold rounded-xl text-xs flex items-center gap-1.5 transition cursor-pointer"
-              >
-                {seeding ? (
-                  <>
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    <span>{language === "bn" ? "যোগ হচ্ছে..." : "Seeding..."}</span>
-                  </>
-                ) : (
-                  <>
-                    <Coins className="w-3.5 h-3.5" />
-                    <span>{language === "bn" ? "মক লিস্টিং যোগ করুন" : "Seed Mock Listings"}</span>
-                  </>
-                )}
               </button>
 
               {/* Search Input Filter */}
