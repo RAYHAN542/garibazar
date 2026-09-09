@@ -45,6 +45,31 @@ async function resolveCallerUid(token: string): Promise<string | null> {
   return null;
 }
 
+// 🔧 FIX: same root cause as api/delete-account.ts -- a migrated ("restore
+// old account") user's real app-wide uid (listings.seller_id, users.uid) is
+// their OLD legacy id, not the fresh Supabase Auth id their current login
+// session carries. Without this resolution step, `listing.seller_id !== uid`
+// was comparing the listing's legacy owner id against the raw auth id and
+// always failing -- so every migrated seller trying to spin the daily boost
+// lottery on their OWN listing got "এই প্রোডাক্টটি আপনার নয়" (not your
+// product), and the once-per-day cooldown check against `users.uid` never
+// matched their real row either.
+async function resolveAppUid(authUid: string): Promise<string> {
+  if (!supabaseAdmin) return authUid;
+  try {
+    const { data, error } = await supabaseAdmin
+      .from("user_auth_links")
+      .select("app_uid")
+      .eq("auth_uid", authUid)
+      .maybeSingle();
+    if (error) throw error;
+    return data?.app_uid || authUid;
+  } catch (e) {
+    console.error("[draw] app uid resolution failed, using auth uid:", e);
+    return authUid;
+  }
+}
+
 const getTodayInDhaka = (): string => {
   return new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Dhaka" });
 };
@@ -68,10 +93,11 @@ export default async function handler(req: any, res: any) {
     if (!token) {
       return res.status(401).json({ error: "অননুমোদিত অনুরোধ। প্রথমে লগইন করুন।" });
     }
-    const uid = await resolveCallerUid(token);
-    if (!uid) {
+    const authUid = await resolveCallerUid(token);
+    if (!authUid) {
       return res.status(401).json({ error: "অননুমোদিত অনুরোধ। প্রথমে লগইন করুন।" });
     }
+    const uid = await resolveAppUid(authUid);
 
     const { listingId } = req.body || {};
     if (!listingId || typeof listingId !== "string") {

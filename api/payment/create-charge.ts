@@ -44,6 +44,33 @@ async function resolveCallerUid(token: string): Promise<string | null> {
   return null;
 }
 
+// 🔧 FIX: same root cause as api/delete-account.ts and api/draw.ts -- a
+// migrated ("restore old account") user's real app-wide uid
+// (refill_requests.user_id, listings.seller_id, users.uid) is their OLD
+// legacy id, not the fresh Supabase Auth id their current login session
+// carries. Without this, every ownership check below (`request.user_id !==
+// uid`, `listingRow.seller_id !== uid`) compared the real owner id against
+// the wrong id and always failed -- so migrated sellers could never
+// actually pay for a wallet refill or ad promotion; every attempt returned
+// "এই রিকোয়েস্ট/লিস্টিং আপনার নয়" (not yours). It also fed the wrong uid
+// into the payment's metadata, which is what the webhook later uses to
+// credit the right account.
+async function resolveAppUid(authUid: string): Promise<string> {
+  if (!supabaseAdmin) return authUid;
+  try {
+    const { data, error } = await supabaseAdmin
+      .from("user_auth_links")
+      .select("app_uid")
+      .eq("auth_uid", authUid)
+      .maybeSingle();
+    if (error) throw error;
+    return data?.app_uid || authUid;
+  } catch (e) {
+    console.error("[create-charge] app uid resolution failed, using auth uid:", e);
+    return authUid;
+  }
+}
+
 const SITE_URL = "https://garibazar.shop";
 
 const AD_PACKAGE_PRICES: Record<string, { durationDays: number; price: number }> = {
@@ -74,10 +101,11 @@ export default async function handler(req: any, res: any) {
     if (!token) {
       return res.status(401).json({ error: "অননুমোদিত অনুরোধ।" });
     }
-    const uid = await resolveCallerUid(token);
-    if (!uid) {
+    const authUid = await resolveCallerUid(token);
+    if (!authUid) {
       return res.status(401).json({ error: "অননুমোদিত অনুরোধ।" });
     }
+    const uid = await resolveAppUid(authUid);
 
     const { requestId } = req.body || {};
     if (!requestId) {
