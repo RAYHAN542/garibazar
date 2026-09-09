@@ -1,5 +1,19 @@
 import { createClient } from "@supabase/supabase-js";
+import { initializeApp, getApps, cert } from "firebase-admin/app";
+import { getAuth } from "firebase-admin/auth";
 import { applyCors } from "../_lib/cors.js";
+
+if (!getApps().length) {
+  const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
+  if (serviceAccountJson) {
+    try {
+      const serviceAccount = JSON.parse(serviceAccountJson);
+      initializeApp({ credential: cert(serviceAccount) });
+    } catch (e) {
+      console.error("Failed to parse FIREBASE_SERVICE_ACCOUNT_KEY:", e);
+    }
+  }
+}
 
 const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -47,31 +61,10 @@ async function isRateLimited(key: string): Promise<boolean> {
   return newCount > RATE_LIMIT_MAX;
 }
 
-// ---------------------------------------------------------------------------
-// 🔧 FIX (Firebase -> Supabase migration): পুরনো ইউজারদের প্রোফাইল (users
-// টেবিল) migrate হয়েছে, কিন্তু তাদের পাসওয়ার্ড/অ্যাকাউন্ট Firebase Auth-এ
-// ছিল -- Supabase Auth-এ কোনো অ্যাকাউন্ট তৈরি হয়নি। ফলে পুরনো নম্বর দিয়ে
-// লগইন করলে সবসময় "ভুল পাসওয়ার্ড অথবা এই নম্বরে কোনো অ্যাকাউন্ট নেই" আসত,
-// আর signup করতে গেলেও পুরনো লিস্টিং/চ্যাট হারিয়ে যেত (নতুন uid হতো)।
-//
-// সমাধান: লগইন ব্যর্থ হলে দেখা হয় users টেবিলে এই নম্বরের পুরনো প্রোফাইল
-// আছে কিনা এবং Supabase Auth-এ ওই নম্বরের অ্যাকাউন্ট আদৌ আছে কিনা। পুরনো
-// প্রোফাইল আছে অথচ Auth অ্যাকাউন্ট নেই -- মানে এটা migrate হওয়া ইউজার:
-// তখন প্রথম লগইনের পাসওয়ার্ড দিয়েই তার Auth অ্যাকাউন্ট বানিয়ে দেওয়া হয়
-// (one-time claim) এবং তার পুরনো uid-ই ফেরত দেওয়া হয়, যাতে আগের সব
-// listing, chat আর dashboard আগের মতোই থাকে।
-//
-// 🔧 SECOND FIX (এই আপডেটে যোগ করা হয়েছে): উপরের claim flow-এ নতুন Supabase
-// Auth user তৈরি হয় (auth.users.id = একটা নতুন UUID), কিন্তু অ্যাপের uid
-// (users.uid, listings.seller_id, chats.participant_a/b ইত্যাদি সব জায়গায়)
-// থেকে যায় পুরনো legacy uid -- এই দুটো আলাদা। RLS-এর current_uid() ফাংশন
-// user_auth_links টেবিল দেখে এই ম্যাপিং বের করে (auth_uid -> app_uid), কিন্তু
-// এতদিন কোথাও এই টেবিলে write হচ্ছিল না -- ফলে claim হওয়া প্রতিটা ইউজারের
-// জন্য current_uid() ভুল uid (নতুন auth uid) রিটার্ন করত, আর chats/listings/
-// user_limits-এর RLS policy তাদের নিজের ডেটাই দেখতে/লিখতে দিত না (silently
-// খালি ফলাফল বা permission-denied)। এখন প্রতিটা claim/signup/login-এর পর
-// linkAuthUser() কল করে এই ম্যাপিং সেভ করা হয়।
-// ---------------------------------------------------------------------------
+// 🔧 Fixes the RLS mapping bug: without this, current_uid() (used by every
+// chats/listings/user_limits RLS policy) returns the wrong uid for anyone
+// whose Supabase Auth id differs from their app uid (i.e. every migrated
+// legacy user) -- see the long comment in the previous revision of this file.
 async function linkAuthUser(authUid: string, appUid: string): Promise<void> {
   if (!authUid || !appUid || authUid === appUid) return;
   try {
@@ -81,6 +74,27 @@ async function linkAuthUser(authUid: string, appUid: string): Promise<void> {
     if (error) console.error("[phone auth] user_auth_links upsert failed:", error.message);
   } catch (e) {
     console.error("[phone auth] failed to link auth_uid -> app_uid:", e);
+  }
+}
+
+// 🔧 REGRESSION FIX: a previous revision of this file dropped firebase-admin
+// entirely, assuming nothing needed it anymore -- but App.tsx's reviews,
+// purchases, and my-listings real-time listeners still read from Firestore
+// and gate on Firebase's OWN auth session (onAuthStateChanged), not the
+// Supabase session set via setSession() on the client. Without a Firebase
+// custom token minted here, AuthModal's bridgeFirebaseSession() silently
+// no-ops and those three tabs go quietly empty for anyone logging in via
+// phone. Restored: mint a token for the *app* uid (not the Supabase auth
+// uid) so it matches what those Firestore queries filter on. Safe to delete
+// this function (and the firebase-admin imports/init above) once App.tsx's
+// remaining Firestore reads are migrated to Supabase.
+async function mintFirebaseToken(appUid: string): Promise<string | null> {
+  if (!getApps().length) return null;
+  try {
+    return await getAuth().createCustomToken(appUid);
+  } catch (e) {
+    console.error("[phone auth] mintFirebaseToken failed (non-fatal):", e);
+    return null;
   }
 }
 
@@ -116,7 +130,6 @@ async function findLegacyProfile(intlPhone: string): Promise<{ uid: string } | n
   return match ? { uid: match.uid } : null;
 }
 
-/** লগইন করা Auth ইউজারের জন্য অ্যাপের আসল uid (পুরনো হলে legacy uid)। */
 async function resolveAppUid(authUserId: string, intlPhone: string): Promise<string> {
   const legacy = await findLegacyProfile(intlPhone);
   return legacy?.uid || authUserId;
@@ -154,6 +167,7 @@ async function handleSignup(req: any, res: any) {
             auth_uid: existingSession.user.id,
             phone,
             claimed: true,
+            firebaseToken: await mintFirebaseToken(legacy.uid),
           });
         }
       }
@@ -182,6 +196,7 @@ async function handleSignup(req: any, res: any) {
     uid: appUid,
     auth_uid: sessionData.user.id,
     phone,
+    firebaseToken: await mintFirebaseToken(appUid),
   });
 }
 
@@ -248,6 +263,7 @@ async function handleLogin(req: any, res: any) {
               auth_uid: claimedSession.user.id,
               phone,
               claimed: true,
+              firebaseToken: await mintFirebaseToken(legacy.uid),
             });
           }
         }
@@ -270,6 +286,7 @@ async function handleLogin(req: any, res: any) {
     uid: appUid,
     auth_uid: sessionData.user!.id,
     phone,
+    firebaseToken: await mintFirebaseToken(appUid),
   });
 }
 

@@ -1,14 +1,6 @@
 import React, { useState, useRef } from "react";
-import { auth, db, googleProvider, facebookProvider } from "../firebase";
-import {
-  signInWithPopup,
-  signInWithRedirect,
-  signInWithCustomToken,
-  getRedirectResult,
-  signOut,
-  User as FirebaseUser,
-} from "firebase/auth";
-import { doc, getDoc, setDoc } from "firebase/firestore";
+import { auth } from "../firebase";
+import { signInWithCustomToken, signOut } from "firebase/auth";
 import { X, MapPin, Loader2, Sparkles, Camera, Phone, ArrowLeft } from "lucide-react";
 import { CITIES } from "../translations";
 import { SupportedLanguage } from "../types";
@@ -17,6 +9,9 @@ import { apiUrl } from "../utils/apiBase";
 import { supabase } from "../supabase";
 
 const isInAppBrowser = typeof navigator !== "undefined" && /FBAN|FBAV|Instagram|Messenger/i.test(navigator.userAgent);
+// 🔧 চালু করার আগে Supabase Dashboard -> Authentication -> Providers -এ
+// Google ও Facebook-এর Client ID/Secret বসিয়ে, আর Redirect URLs-এ এই
+// সাইটের ঠিকানা যোগ করে নিতে হবে -- নাহলে signInWithOAuth সরাসরি ব্যর্থ হবে।
 const SOCIAL_LOGIN_ENABLED = false;
 
 const openInChrome = () => {
@@ -99,10 +94,12 @@ export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModa
   const [loading, setLoading] = useState(false);
 
   const [step, setStep] = useState<"start" | "phone" | "profile">("start");
-  const [googleUser, setGoogleUser] = useState<FirebaseUser | null>(null);
+  // 🔧 Migrated Firebase -> Supabase OAuth: this used to hold a Firebase
+  // `User` object from signInWithPopup/signInWithRedirect. Now it holds the
+  // Supabase auth user (from supabase.auth.onAuthStateChange) once a brand
+  // new Google/Facebook sign-in needs the extra phone/district step.
+  const [socialAuthUser, setSocialAuthUser] = useState<any>(null);
   const [otpPhone, setOtpPhone] = useState("");
-  // phoneAuthMode: OTP/SMS gateway সরিয়ে ফোন নম্বর + পাসওয়ার্ড দিয়ে লগইন/সাইনআপ করা হয়,
-  // কারণ SMS gateway (Android ফোন-ভিত্তিক) মাঝেমধ্যে অফলাইন/ব্যর্থ হয়ে যায়।
   const [phoneAuthMode, setPhoneAuthMode] = useState<"login" | "signup" | "legacy">("login");
   const [phonePassword, setPhonePassword] = useState("");
   const [phonePasswordConfirm, setPhonePasswordConfirm] = useState("");
@@ -130,39 +127,21 @@ export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModa
     if (isMountedRef.current) setError(val);
   };
 
-  // popup/redirect উভয় auth flow-এর জন্য একই bilingual error mapping ব্যবহার করা হয়,
-  // যাতে কোথাও কোনো error code মিস না হয়ে যায়। null রিটার্ন করলে সেটা silently
-  // ignore করা উচিত (যেমন: ইউজার নিজেই popup বন্ধ করেছে)।
+  // Supabase OAuth errors are much sparser than Firebase's (no popup, so no
+  // popup-closed/popup-blocked codes) -- this mostly covers provider
+  // misconfiguration and network issues now.
   const getAuthErrorMessage = (err: any, provider: "google" | "facebook"): string | null => {
     const providerName = provider === "google" ? "Google" : "Facebook";
-    if (err?.message === "popup-timeout") {
+    const msg = String(err?.message || "");
+    if (/provider is not enabled/i.test(msg)) {
       return language === "bn"
-        ? "সাইন-ইন সাড়া দিচ্ছে না। এই ব্রাউজারের Privacy/Tracking Protection সেটিংস ব্লক করছে হয়তো — Chrome ব্রাউজার দিয়ে চেষ্টা করুন, অথবা এই সাইটের জন্য Tracking Protection বন্ধ করুন।"
-        : "Sign-in isn't responding. This browser's Privacy/Tracking Protection may be blocking sign-in — try Chrome, or turn off Tracking Protection for this site.";
+        ? `${providerName} সাইন-ইন এখনো চালু করা হয়নি (Supabase Dashboard-এ configure করা দরকার)।`
+        : `${providerName} sign-in isn't enabled yet (needs to be configured in the Supabase Dashboard).`;
     }
-    const code = err?.code || "";
-    if (code === "auth/popup-closed-by-user" || code === "auth/cancelled-popup-request") {
-      return null; // ইউজার নিজেই popup বন্ধ করেছে, এটা error না
-    }
-    if (code === "auth/unauthorized-domain") {
-      return language === "bn"
-        ? "এই ওয়েবসাইট ডোমেইনটি Firebase-এ অনুমোদিত না। এটা এডমিনকে জানাতে হবে (Firebase Console -> Authentication -> Settings -> Authorized domains)।"
-        : "This website's domain isn't authorized for sign-in yet. Please report this — it needs to be added in Firebase Console -> Authentication -> Settings -> Authorized domains.";
-    }
-    if (code === "auth/account-exists-with-different-credential") {
-      return language === "bn"
-        ? "এই ইমেইল দিয়ে আগে অন্য পদ্ধতিতে (Google/Facebook) অ্যাকাউন্ট খোলা আছে। সেটা দিয়ে সাইন-ইন করুন।"
-        : "An account already exists with this email using a different sign-in method. Please use that instead.";
-    }
-    if (code === "auth/network-request-failed") {
+    if (/network/i.test(msg)) {
       return language === "bn"
         ? "ইন্টারনেট সংযোগে সমস্যা হচ্ছে। নেটওয়ার্ক চেক করে আবার চেষ্টা করুন।"
         : "Network problem. Please check your connection and try again.";
-    }
-    if (code === "auth/popup-blocked" || code === "auth/operation-not-supported-in-this-environment") {
-      return language === "bn"
-        ? "আপনার ব্রাউজার পপ-আপ ব্লক করেছে। ব্রাউজারের ঠিকানা বারে পপ-আপ আইকনে ট্যাপ করে অনুমতি দিন, তারপর আবার চেষ্টা করুন।"
-        : "Your browser blocked the sign-in pop-up. Allow pop-ups for this site (tap the pop-up icon in the address bar) and try again.";
     }
     console.error(err);
     return language === "bn"
@@ -170,42 +149,21 @@ export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModa
       : `${providerName} sign-in failed. Please try again.`;
   };
 
-  const handlePostGoogleAuth = async (fbUser: FirebaseUser) => {
-    const userDocRef = doc(db, "users", fbUser.uid);
-    const userSnap = await getDoc(userDocRef);
-
-    let isAdminUser = false;
+  // 🔧 ROOT-CAUSE FIX (kept from the phone-auth migration): App.tsx's
+  // myListings, reviews, unread chats, profile realtime sync, and
+  // AdminPanel's visitor analytics all still gate on Firebase's own
+  // onAuthStateChanged, since those Firestore listeners haven't been
+  // migrated to Supabase yet. Signing into Firebase too (via a custom token
+  // minted server-side) keeps them working during the transition. Token
+  // missing/failed doesn't block login -- those specific listeners just
+  // silently show nothing, same as today.
+  const bridgeFirebaseSession = async (firebaseToken?: string | null) => {
+    if (!firebaseToken) return;
     try {
-      const adminDoc = await getDoc(doc(db, "admins", fbUser.uid));
-      isAdminUser = adminDoc.exists();
+      await signInWithCustomToken(auth, firebaseToken);
     } catch (err) {
-      console.error("Admin check at login failed:", err);
+      console.error("Firebase bridge sign-in failed (non-fatal):", err);
     }
-
-    if (userSnap.exists()) {
-      const existingData = userSnap.data() as any;
-      const sessionUser = {
-        uid: fbUser.uid,
-        displayName: existingData.displayName,
-        email: existingData.email || fbUser.email,
-        phoneNumber: existingData.phoneNumber,
-        city: existingData.city,
-        profilePicture: existingData.profilePicture || fbUser.photoURL || PRESET_AVATARS[0],
-        simulatedCredits: existingData.simulatedCredits ?? 5000,
-        referralCode: existingData.referralCode,
-        isAdmin: isAdminUser,
-      };
-      localStorage.setItem("gari_bazar_session_user", JSON.stringify(sessionUser));
-      trackEvent("login", fbUser.uid, sessionUser.email || sessionUser.phoneNumber);
-      onAuthSuccess(sessionUser);
-      onClose();
-      return;
-    }
-
-    setGoogleUser(fbUser);
-    setDisplayName(fbUser.displayName || "");
-    setProfilePhotoPreview(fbUser.photoURL || null);
-    setStep("profile");
   };
 
   const handlePostPhoneAuth = async (uid: string, phone: string, authUid?: string) => {
@@ -214,8 +172,6 @@ export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModa
 
     const sessionUser = {
       uid,
-      // uid is kept as the legacy app id so migrated listings/chats still
-      // resolve. authUid is the real Supabase Auth id used by RLS writes.
       authUid,
       displayName: userRow?.name,
       email: userRow?.email,
@@ -232,21 +188,70 @@ export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModa
     onClose();
   };
 
+  // 🔧 Migrated Firebase -> Supabase: profile lookup/creation for Google/
+  // Facebook sign-ins now reads the Supabase `users` table (already
+  // migrated) instead of a Firestore doc. Brand-new social sign-ins have no
+  // legacy account, so their Supabase auth uid IS the app uid directly --
+  // no user_auth_links mapping needed (that's only for legacy-claimed phone
+  // accounts, handled server-side in api/auth/phone.ts).
+  const handlePostSocialAuth = async (authUser: any, firebaseToken?: string | null) => {
+    await bridgeFirebaseSession(firebaseToken);
+
+    const { data: userRow } = await supabase.from("users").select("*").eq("uid", authUser.id).maybeSingle();
+
+    if (userRow) {
+      const { data: adminRow } = await supabase.from("admins").select("uid").eq("uid", authUser.id).maybeSingle();
+      const sessionUser = {
+        uid: authUser.id,
+        authUid: authUser.id,
+        displayName: userRow.name,
+        email: userRow.email || authUser.email,
+        phoneNumber: userRow.phone,
+        city: userRow.city,
+        profilePicture: userRow.profile_picture || authUser.user_metadata?.avatar_url || PRESET_AVATARS[0],
+        simulatedCredits: userRow.simulated_credits ?? 5000,
+        referralCode: userRow.referral_code,
+        isAdmin: !!adminRow,
+      };
+      localStorage.setItem("gari_bazar_session_user", JSON.stringify(sessionUser));
+      trackEvent("login", authUser.id, sessionUser.email || sessionUser.phoneNumber);
+      onAuthSuccess(sessionUser);
+      onClose();
+      return;
+    }
+
+    // Brand new Google/Facebook sign-in -- collect phone/district before
+    // creating the profile row (same "profile" step as before).
+    setSocialAuthUser(authUser);
+    setDisplayName(authUser.user_metadata?.full_name || authUser.user_metadata?.name || "");
+    setProfilePhotoPreview(authUser.user_metadata?.avatar_url || null);
+    setStep("profile");
+  };
+
+  // Catches the return from Supabase's OAuth redirect (Google/Facebook both
+  // navigate away and back, unlike Firebase's popup option -- Supabase-js
+  // only supports the redirect flow in the browser). Fires once per real
+  // sign-in event; phone login resolves synchronously in its own handlers
+  // below and isn't affected by this listener.
   React.useEffect(() => {
-    (async () => {
+    const { data: sub } = supabase.auth.onAuthStateChange(async (event, session) => {
+      const provider = session?.user?.app_metadata?.provider;
+      if (event !== "SIGNED_IN" || !session?.user || provider === "phone" || !provider) return;
+
+      safeSetLoading(true);
       try {
-        const result = await getRedirectResult(auth);
-        if (result?.user) {
-          await handlePostGoogleAuth(result.user);
-        }
-      } catch (err: any) {
-        console.error("Redirect sign-in failed:", err);
-        const msg = getAuthErrorMessage(err, "google");
-        if (msg) safeSetError(msg);
+        const bridgeResp = await fetch(apiUrl("/api/auth/firebase-bridge"), {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
+        }).then((r) => r.json()).catch(() => null);
+        await handlePostSocialAuth(session.user, bridgeResp?.firebaseToken);
+      } catch (err) {
+        console.error("Social sign-in post-processing failed:", err);
       } finally {
         safeSetLoading(false);
       }
-    })();
+    });
+    return () => sub.subscription.unsubscribe();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -284,16 +289,17 @@ export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModa
     setProfilePhotoPreview(URL.createObjectURL(file));
   };
 
+  // 🔧 Migrated: Google sign-in now goes through Supabase's own OAuth
+  // (signInWithOAuth), which always does a full-page redirect in the
+  // browser client -- there's no popup option like Firebase's
+  // signInWithPopup. The result is picked up by the onAuthStateChange
+  // listener above after the redirect back.
   const handleGoogleSignIn = async () => {
     if (authInProgressRef.current) return; // duplicate tap guard
     authInProgressRef.current = true;
     safeSetError("");
     safeSetLoading(true);
 
-    // Google-এর নিজস্ব নীতিতে Facebook/Instagram/Messenger-এর ভেতরের in-app
-    // browser (embedded WebView)-এ OAuth popup ও redirect দুটোই ব্লক করে দেয়
-    // ("disallowed_useragent") -- এটা কোনো bug না, তাই popup/redirect চেষ্টা
-    // করে সময় নষ্ট না করে সরাসরি আসল Chrome ব্রাউজারে খুলতে বলা হচ্ছে।
     if (isInAppBrowser) {
       safeSetError(
         language === "bn"
@@ -306,45 +312,16 @@ export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModa
     }
 
     try {
-      // Popup first on every device. signInWithRedirect depends on Firebase's
-      // authDomain (garibazar-bd.firebaseapp.com) sharing storage/cookies with
-      // this app's real hosting domain to hand back the result — Chrome's
-      // third-party storage partitioning breaks that bridge, which is why
-      // redirect sign-in was silently failing to persist. Popup avoids that
-      // entirely since it completes and resolves in the same tab session.
-      const popupResult = signInWithPopup(auth, googleProvider);
-      const timeout = new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error("popup-timeout")), 30000);
+      const { error: oauthError } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: { redirectTo: window.location.origin + window.location.pathname },
       });
-      const result = await Promise.race([popupResult, timeout]);
-      await handlePostGoogleAuth(result.user);
+      if (oauthError) throw oauthError;
+      // Browser navigates away here -- nothing more to do this tick. Loading
+      // state intentionally stays true; the page is about to unload.
     } catch (err: any) {
-      const code = err?.code || "";
-      const shouldFallbackToRedirect =
-        err?.message === "popup-timeout" ||
-        code === "auth/popup-blocked" ||
-        code === "auth/operation-not-supported-in-this-environment";
-
-      if (shouldFallbackToRedirect) {
-        try {
-          // পুরো পেজ Google-এর সাইটে নিয়ে যাবে এবং ফিরে এসে getRedirectResult
-          // effect-এ ফলাফল ধরা পড়বে -- তাই এখানে loading=true রাখাই ঠিক,
-          // finally ব্লক এই কেসে চালানো হচ্ছে না (নিচে return দিয়ে skip করা)।
-          await signInWithRedirect(auth, googleProvider);
-          return;
-        } catch (redirectErr: any) {
-          console.error("Redirect fallback also failed:", redirectErr);
-          const msg = getAuthErrorMessage(redirectErr, "google");
-          if (msg) safeSetError(msg);
-          safeSetLoading(false);
-          authInProgressRef.current = false;
-          return;
-        }
-      }
-
       const msg = getAuthErrorMessage(err, "google");
       if (msg) safeSetError(msg);
-    } finally {
       safeSetLoading(false);
       authInProgressRef.current = false;
     }
@@ -355,38 +332,16 @@ export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModa
     authInProgressRef.current = true;
     safeSetError("");
     safeSetLoading(true);
+
     try {
-      const popupResult = signInWithPopup(auth, facebookProvider);
-      const timeout = new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error("popup-timeout")), 30000);
+      const { error: oauthError } = await supabase.auth.signInWithOAuth({
+        provider: "facebook",
+        options: { redirectTo: window.location.origin + window.location.pathname },
       });
-      const result = await Promise.race([popupResult, timeout]);
-      await handlePostGoogleAuth(result.user);
+      if (oauthError) throw oauthError;
     } catch (err: any) {
-      const code = err?.code || "";
-      const shouldFallbackToRedirect =
-        err?.message === "popup-timeout" ||
-        code === "auth/popup-blocked" ||
-        code === "auth/operation-not-supported-in-this-environment" ||
-        isInAppBrowser;
-
-      if (shouldFallbackToRedirect) {
-        try {
-          await signInWithRedirect(auth, facebookProvider);
-          return;
-        } catch (redirectErr: any) {
-          console.error("Redirect fallback also failed:", redirectErr);
-          const msg = getAuthErrorMessage(redirectErr, "facebook");
-          if (msg) safeSetError(msg);
-          safeSetLoading(false);
-          authInProgressRef.current = false;
-          return;
-        }
-      }
-
       const msg = getAuthErrorMessage(err, "facebook");
       if (msg) safeSetError(msg);
-    } finally {
       safeSetLoading(false);
       authInProgressRef.current = false;
     }
@@ -417,9 +372,6 @@ export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModa
           setPhoneAuthMode("signup");
         }
         if (data.code === "LEGACY_SET_PASSWORD") {
-          // A migrated Firebase profile cannot be checked against its old
-          // Firebase password in Supabase. Move the user into the one-time
-          // claim form instead of leaving them on a login error screen.
           setPhoneAuthMode("legacy");
           setPhonePassword("");
           setPhonePasswordConfirm("");
@@ -432,6 +384,7 @@ export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModa
         refresh_token: data.refresh_token,
       });
       if (sessionError) throw sessionError;
+      await bridgeFirebaseSession(data.firebaseToken);
       await handlePostPhoneAuth(data.uid, data.phone, data.auth_uid);
     } catch (err: any) {
       console.error(err);
@@ -484,9 +437,8 @@ export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModa
         refresh_token: data.refresh_token,
       });
       if (sessionError) throw sessionError;
+      await bridgeFirebaseSession(data.firebaseToken);
 
-      // নাম ও (ঐচ্ছিক) প্রোফাইল ছবি সেভ করা হচ্ছে -- একাউন্ট Supabase-এ তৈরি
-      // হয়ে গেছে ও সেশন সেট হয়ে গেছে, তাই RLS অনুযায়ী নিজের রো আপডেট করা যাবে।
       const sanitizedDisplayName = sanitizeText(displayName, 50);
       const profileUpdate: Record<string, string> = { name: sanitizedDisplayName };
 
@@ -500,7 +452,6 @@ export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModa
           );
           profileUpdate.profile_picture = await Promise.race([uploadPromise, timeoutPromise]);
         } catch (photoErr) {
-          // ছবি আপলোড ব্যর্থ হলেও একাউন্ট তৈরি আটকানো ঠিক না -- নাম দিয়েই এগিয়ে যাওয়া হচ্ছে।
           console.error("Signup photo upload failed:", photoErr);
         } finally {
           setUploadingPhoto(false);
@@ -523,16 +474,19 @@ export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModa
   };
 
   const handleCancelProfileStep = async () => {
+    try { await supabase.auth.signOut(); } catch { /* ignore */ }
     try { await signOut(auth); } catch { /* ignore */ }
-    setGoogleUser(null);
+    setSocialAuthUser(null);
     setStep("start");
     setError("");
   };
 
+  // 🔧 Migrated: profile creation for a brand-new Google/Facebook sign-in
+  // now upserts into Supabase `users` instead of a Firestore setDoc.
   const handleCompleteProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
-    if (!googleUser) return;
+    if (!socialAuthUser) return;
 
     const cleanPhone = phoneNumber.replace(/\D/g, "");
     if (!validateBanglaPhone(cleanPhone)) {
@@ -542,10 +496,13 @@ export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModa
 
     setLoading(true);
     try {
-      const sanitizedDisplayName = sanitizeText(displayName || googleUser.displayName || "Gari Bazar Seller", 50);
+      const sanitizedDisplayName = sanitizeText(
+        displayName || socialAuthUser.user_metadata?.full_name || "Gari Bazar Seller",
+        50
+      );
       const myReferralCode = `GB-${cleanPhone.slice(-4)}`;
 
-      let uploadedPhotoUrl = googleUser.photoURL || PRESET_AVATARS[0];
+      let uploadedPhotoUrl = socialAuthUser.user_metadata?.avatar_url || PRESET_AVATARS[0];
       if (profilePhotoFile) {
         setUploadingPhoto(true);
         try {
@@ -569,23 +526,37 @@ export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModa
         setUploadingPhoto(false);
       }
 
-      const savedData = {
-        uid: googleUser.uid,
-        displayName: sanitizedDisplayName,
-        email: googleUser.email,
-        phoneNumber: cleanPhone,
+      const savedRow = {
+        uid: socialAuthUser.id,
+        name: sanitizedDisplayName,
+        email: socialAuthUser.email,
+        phone: cleanPhone,
         city: sanitizeText(city, 50),
+        profile_picture: uploadedPhotoUrl,
+        created_at: new Date().toISOString(),
+        simulated_credits: 5000,
+        referral_code: myReferralCode,
+      };
+
+      const { error: upsertError } = await supabase.from("users").upsert(savedRow, { onConflict: "uid" });
+      if (upsertError) throw upsertError;
+
+      const sessionUser = {
+        uid: socialAuthUser.id,
+        authUid: socialAuthUser.id,
+        displayName: sanitizedDisplayName,
+        email: socialAuthUser.email,
+        phoneNumber: cleanPhone,
+        city: savedRow.city,
         profilePicture: uploadedPhotoUrl,
-        createdAt: new Date().toISOString(),
         simulatedCredits: 5000,
         referralCode: myReferralCode,
         isAdmin: false,
       };
 
-      await setDoc(doc(db, "users", googleUser.uid), savedData);
-      localStorage.setItem("gari_bazar_session_user", JSON.stringify(savedData));
-      trackEvent("signup", googleUser.uid, savedData.email || savedData.phoneNumber);
-      onAuthSuccess(savedData);
+      localStorage.setItem("gari_bazar_session_user", JSON.stringify(sessionUser));
+      trackEvent("signup", socialAuthUser.id, sessionUser.email || sessionUser.phoneNumber);
+      onAuthSuccess(sessionUser);
       onClose();
     } catch (err) {
       console.error(err);
