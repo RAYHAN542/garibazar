@@ -272,19 +272,15 @@ export function AdminPanel({ language, currentUser, listings: listingsProp, isUs
   // আবার fetch হয় -- অটো-পোলিং নেই।
   const fetchAnalyticsStats = async () => {
     try {
-      // Totals are now spread across 10 shard docs (see api/track-event.ts) to
-      // avoid a single hot document under real concurrent traffic. Sum all
-      // shards client-side to get the true total.
-      const shardsSnap = await getDocs(collection(db, "analytics_stats", "summary", "shards"));
-      const totals: any = { totalVisits: 0, totalLogins: 0, totalSignups: 0, totalInstalls: 0 };
-      shardsSnap.forEach((shardDoc) => {
-        const data = shardDoc.data() as any;
-        totals.totalVisits += data.totalVisits || 0;
-        totals.totalLogins += data.totalLogins || 0;
-        totals.totalSignups += data.totalSignups || 0;
-        totals.totalInstalls += data.totalInstalls || 0;
+      const { data, error } = await supabase.rpc("site_visits_stats");
+      if (error) throw error;
+      const row = data?.[0];
+      setAnalyticsStats({
+        totalVisits: Number(row?.total_visits) || 0,
+        totalLogins: Number(row?.total_logins) || 0,
+        totalSignups: Number(row?.total_signups) || 0,
+        totalInstalls: 0,
       });
-      setAnalyticsStats(totals);
     } catch (err) {
       console.error("Could not fetch analytics summary:", err);
     }
@@ -292,16 +288,22 @@ export function AdminPanel({ language, currentUser, listings: listingsProp, isUs
 
   const fetchSiteVisits = async () => {
     try {
-      const q = query(
-        collection(db, "site_visits"),
-        orderBy("createdAt", "desc"),
-        limit(25)
-      );
-      const snapshot = await getDocs(q);
-      const list: any[] = [];
-      snapshot.forEach((doc) => {
-        list.push({ id: doc.id, ...doc.data() });
-      });
+      const { data, error } = await supabase
+        .from("site_visits")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(25);
+      if (error) throw error;
+      const list = (data || []).map((row: any) => ({
+        id: row.id,
+        type: row.type,
+        city: row.city,
+        country: row.country,
+        ip: row.ip,
+        referrer: row.referrer,
+        identifier: row.identifier,
+        createdAt: row.created_at,
+      }));
       setVisitEvents(list);
     } catch (err) {
       console.error("Could not fetch site visits:", err);
@@ -1174,8 +1176,8 @@ export function AdminPanel({ language, currentUser, listings: listingsProp, isUs
                     </div>
                   </div>
                   <span className="text-[9px] text-slate-400 font-mono shrink-0">
-                    {ev.createdAt?.toDate
-                      ? ev.createdAt.toDate().toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })
+                    {ev.createdAt
+                      ? new Date(ev.createdAt).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })
                       : ""}
                   </span>
                 </div>
