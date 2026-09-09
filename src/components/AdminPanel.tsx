@@ -320,10 +320,9 @@ export function AdminPanel({ language, currentUser, listings: listingsProp, isUs
   };
 
   useEffect(() => {
-    if (!authReady) return;
     fetchAnalyticsStats();
     fetchSiteVisits();
-  }, [authReady]);
+  }, []);
 
   const loadMoreRefillRequests = async () => {
     if (!refillHasMore || refillLoadingMore) return;
