@@ -3,33 +3,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-// ============================================================
-// api/auth/phone.ts  (Firebase → Supabase migration, Phase 1)
-// ============================================================
-// আগে এটা Firestore + firebase-admin দিয়ে পাসওয়ার্ড চেক করে Firebase
-// custom token ফেরত দিত। এখন Supabase Auth-ই পাসওয়ার্ডের আসল মালিক --
-// এই ফাইল শুধু দুইটা কাজ করে:
-//
-//   ১. পুরনো (Firestore-migrated) ইউজারদের জন্য "lazy migration" ব্রিজ --
-//      legacy_phone_auth টেবিলে থাকা পুরনো scrypt hash মিলিয়ে দেখে,
-//      মিললে নিঃশব্দে Supabase Auth-এ রিয়েল অ্যাকাউন্ট বানিয়ে দেয় আর
-//      migrate_legacy_uid() RPC কল করে তাদের পুরনো ডেটা (listings,
-//      chats, ইত্যাদি) নতুন UUID-এর সাথে re-link করে দেয়। ইউজার কিছুই
-//      টের পায় না -- স্বাভাবিক লগইনই মনে হয়।
-//   ২. নতুন signup-এর জন্য সরাসরি Supabase Auth-এ অ্যাকাউন্ট বানায়
-//      (phone_confirm: true দিয়ে, তাই SMS OTP লাগে না -- আগের মতোই)।
-//
-// দুই ক্ষেত্রেই শেষে server-side signInWithPassword() কল করে আসল
-// Supabase session (access_token/refresh_token) বানিয়ে ক্লায়েন্টকে
-// ফেরত দেওয়া হয়। ক্লায়েন্ট সেটা supabase.auth.setSession() দিয়ে
-// adopt করবে (AuthModal.tsx-এ পরের ধাপে করা হবে)।
-//
-// action: "login" | "signup" body ফিল্ড দিয়ে বলে দিতে হবে কোনটা।
-
 import { createClient } from "@supabase/supabase-js";
-<<<<<<< HEAD
 import { initializeApp, getApps, cert } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
+import crypto from "crypto";
 import { applyCors } from "../_lib/cors.js";
 
 if (!getApps().length) {
@@ -44,34 +21,21 @@ if (!getApps().length) {
   }
 }
 
-const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
-const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
-=======
-import crypto from "crypto";
-import { applyCors } from "../_lib/cors.js";
-
-const SUPABASE_URL = process.env.VITE_SUPABASE_URL as string;
+const SUPABASE_URL = (process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL) as string;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY as string;
->>>>>>> 241ffae85be28a1733245ef217effb892350c1de
+const SUPABASE_ANON_KEY = process.env.VITE_SUPABASE_PUBLISHABLE_KEY as string;
 
-// service-role client: RLS বাইপাস করে, তাই এটা কখনো ক্লায়েন্টে পাঠানো
-// হয় না -- শুধু এই সার্ভার ফাংশনের ভেতরেই থাকে।
 const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
   auth: { autoRefreshToken: false, persistSession: false },
 });
-
-// signInWithPassword() আসলে Supabase-এর নিজস্ব GoTrue auth সার্ভারে
-// যায় (RLS/service-role-এর আওতার বাইরে), তাই এর জন্য আলাদা anon-key
-// ক্লায়েন্ট লাগে -- admin ক্লায়েন্ট দিয়ে password verify করা যায় না।
-const SUPABASE_ANON_KEY = process.env.VITE_SUPABASE_PUBLISHABLE_KEY as string;
 const supabaseAnon = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: { autoRefreshToken: false, persistSession: false },
 });
 
 const MAX_FAILED_ATTEMPTS = 5;
-const LOCK_DURATION_MS = 15 * 60 * 1000; // 15 minutes
+const LOCK_DURATION_MS = 15 * 60 * 1000;
 const RATE_LIMIT_WINDOW_MS = 60 * 1000;
-const RATE_LIMIT_MAX = 10; // 10 attempts/min per IP
+const RATE_LIMIT_MAX = 10;
 
 function normalizeBanglaPhone(raw: string): string | null {
   const digits = String(raw || "").replace(/[^\d]/g, "");
@@ -82,12 +46,6 @@ function normalizeBanglaPhone(raw: string): string | null {
   return `+880${local}`;
 }
 
-// 🔧 public.users.phone পুরনো ডেটায় local format-এ আছে ("01XXXXXXXXX"),
-// কিন্তু normalizeBanglaPhone() সবসময় "+880XXXXXXXXX" ফেরত দেয় -- এই
-// mismatch-এর কারণে oldUid lookup সবসময় null পেত, ফলে password ঠিক
-// থাকলেও migrate_legacy_uid() কখনো চলত না আর user-এর পুরনো listing/chat/
-// purchase ডেটা নতুন অ্যাকাউন্টের সাথে link হতো না। দুই format-ই চেক করা
-// হচ্ছে যাতে stored data যেকোনো ফরম্যাটেই থাকুক না কেন মিলে যায়।
 function localBanglaPhoneVariant(e164Phone: string): string {
   return "0" + e164Phone.replace("+880", "");
 }
@@ -102,90 +60,19 @@ function getClientIp(req: any): string {
   return req.socket?.remoteAddress || "unknown";
 }
 
-<<<<<<< HEAD
-async function isRateLimited(key: string): Promise<boolean> {
-  const now = new Date();
-  const { data } = await supabaseAdmin.from("rate_limits").select("*").eq("key", key).maybeSingle();
-
-  if (!data || now.getTime() - new Date(data.window_start).getTime() > RATE_LIMIT_WINDOW_MS) {
-    await supabaseAdmin.from("rate_limits").upsert({ key, count: 1, window_start: now.toISOString() });
-    return false;
-  }
-
-  const newCount = (data.count || 0) + 1;
-  await supabaseAdmin.from("rate_limits").update({ count: newCount }).eq("key", key);
-  return newCount > RATE_LIMIT_MAX;
-}
-
-// 🔧 Fixes the RLS mapping bug: without this, current_uid() (used by every
-// chats/listings/user_limits RLS policy) returns the wrong uid for anyone
-// whose Supabase Auth id differs from their app uid (i.e. every migrated
-// legacy user) -- see the long comment in the previous revision of this file.
-async function linkAuthUser(authUid: string, appUid: string): Promise<void> {
-  if (!authUid || !appUid || authUid === appUid) return;
-  try {
-    const { error } = await supabaseAdmin
-      .from("user_auth_links")
-      .upsert({ auth_uid: authUid, app_uid: appUid }, { onConflict: "auth_uid" });
-    if (error) console.error("[phone auth] user_auth_links upsert failed:", error.message);
-  } catch (e) {
-    console.error("[phone auth] failed to link auth_uid -> app_uid:", e);
-  }
-}
-
-// 🔧 REGRESSION FIX: a previous revision of this file dropped firebase-admin
-// entirely, assuming nothing needed it anymore -- but App.tsx's reviews,
-// purchases, and my-listings real-time listeners still read from Firestore
-// and gate on Firebase's OWN auth session (onAuthStateChanged), not the
-// Supabase session set via setSession() on the client. Without a Firebase
-// custom token minted here, AuthModal's bridgeFirebaseSession() silently
-// no-ops and those three tabs go quietly empty for anyone logging in via
-// phone. Restored: mint a token for the *app* uid (not the Supabase auth
-// uid) so it matches what those Firestore queries filter on. Safe to delete
-// this function (and the firebase-admin imports/init above) once App.tsx's
-// remaining Firestore reads are migrated to Supabase.
-async function mintFirebaseToken(appUid: string): Promise<string | null> {
-  if (!getApps().length) return null;
-  try {
-    return await getAuth().createCustomToken(appUid);
-  } catch (e) {
-    console.error("[phone auth] mintFirebaseToken failed (non-fatal):", e);
-    return null;
-  }
-}
-
-function phoneVariants(intlPhone: string): string[] {
-  const local = intlPhone.replace("+880", "");
-  return [intlPhone, `880${local}`, `0${local}`, local];
-}
-
-async function findLegacyProfile(intlPhone: string): Promise<{ uid: string } | null> {
-  const { data, error } = await supabaseAdmin
-    .from("users")
-    .select("uid, phone, created_at")
-    .in("phone", phoneVariants(intlPhone))
-    .order("created_at", { ascending: true })
-    .limit(1);
-=======
 async function checkRateLimit(key: string): Promise<boolean> {
   const { data, error } = await supabaseAdmin.rpc("check_and_bump_rate_limit", {
     p_key: key,
     p_window_ms: RATE_LIMIT_WINDOW_MS,
     p_max_count: RATE_LIMIT_MAX,
   });
->>>>>>> 241ffae85be28a1733245ef217effb892350c1de
   if (error) {
     console.error("rate limit RPC failed, failing open:", error);
-    return true; // rate-limiter নিজেই ভেঙে গেলে লগইন ব্লক করে দেওয়া ঠিক না
+    return true;
   }
   return data === true;
 }
 
-<<<<<<< HEAD
-async function resolveAppUid(authUserId: string, intlPhone: string): Promise<string> {
-  const legacy = await findLegacyProfile(intlPhone);
-  return legacy?.uid || authUserId;
-=======
 async function checkLockout(phone: string): Promise<{ locked: boolean; waitMin?: number }> {
   const { data } = await supabaseAdmin
     .from("login_lockouts")
@@ -218,18 +105,29 @@ async function clearFailedAttempts(phone: string) {
   await supabaseAdmin.from("login_lockouts").delete().eq("phone", phone);
 }
 
-// signInWithPassword() করে আসল Supabase session বানিয়ে ফেরত দেয়।
+async function mintFirebaseToken(appUid: string): Promise<string | null> {
+  if (!getApps().length) return null;
+  try {
+    return await getAuth().createCustomToken(appUid);
+  } catch (e) {
+    console.error("[phone auth] mintFirebaseToken failed (non-fatal):", e);
+    return null;
+  }
+}
+
 async function signInAndRespond(res: any, phone: string, password: string) {
   const { data, error } = await supabaseAnon.auth.signInWithPassword({ phone, password });
   if (error || !data.session) {
     console.error("post-provision signInWithPassword failed:", error);
-    return res.status(500).json({ error: "লগইন সম্পন্ন করা যায়নি। আবার চেষ্টা করুন।" });
+    return res.status(500).json({ error: "Login failed. Please try again." });
   }
   return res.status(200).json({
     access_token: data.session.access_token,
     refresh_token: data.session.refresh_token,
     uid: data.user.id,
+    auth_uid: data.user.id,
     phone,
+    firebaseToken: await mintFirebaseToken(data.user.id),
   });
 }
 
@@ -238,19 +136,16 @@ async function handleLogin(req: any, res: any) {
   const password = String(req.body?.password || "");
 
   if (!phone || !password) {
-    return res.status(400).json({ error: "মোবাইল নম্বর ও পাসওয়ার্ড দিন।" });
+    return res.status(400).json({ error: "Enter phone number and password." });
   }
 
   const lockStatus = await checkLockout(phone);
   if (lockStatus.locked) {
     return res.status(429).json({
-      error: `অনেকবার ভুল পাসওয়ার্ড দেওয়া হয়েছে। ${lockStatus.waitMin} মিনিট পর আবার চেষ্টা করুন।`,
+      error: `Too many wrong attempts. Try again in ${lockStatus.waitMin} minutes.`,
     });
   }
 
-  // ধাপ ১: ইতিমধ্যে Supabase Auth-এ থাকা ইউজার কিনা (নতুন signup, বা
-  // আগেই lazy-migrate হয়ে যাওয়া পুরনো ইউজার) -- সরাসরি Supabase নিজেই
-  // পাসওয়ার্ড verify করবে।
   {
     const { data, error } = await supabaseAnon.auth.signInWithPassword({ phone, password });
     if (!error && data.session) {
@@ -259,13 +154,13 @@ async function handleLogin(req: any, res: any) {
         access_token: data.session.access_token,
         refresh_token: data.session.refresh_token,
         uid: data.user.id,
+        auth_uid: data.user.id,
         phone,
+        firebaseToken: await mintFirebaseToken(data.user.id),
       });
     }
   }
 
-  // ধাপ ২: Supabase-এ নেই/পাসওয়ার্ড মেলেনি -- পুরনো (Firestore থেকে
-  // migrate করা) legacy hash-এর বিরুদ্ধে চেক করা হচ্ছে।
   const { data: legacy } = await supabaseAdmin
     .from("legacy_phone_auth")
     .select("password_hash, salt")
@@ -274,7 +169,7 @@ async function handleLogin(req: any, res: any) {
 
   if (!legacy) {
     return res.status(404).json({
-      error: "এই নম্বরে কোনো অ্যাকাউন্ট পাওয়া যায়নি। নতুন অ্যাকাউন্ট তৈরি করুন।",
+      error: "No account found for this number. Please create a new account.",
       code: "NOT_REGISTERED",
     });
   }
@@ -286,16 +181,11 @@ async function handleLogin(req: any, res: any) {
 
   if (!matches) {
     await bumpFailedAttempt(phone);
-    return res.status(400).json({ error: "ভুল পাসওয়ার্ড। আবার চেষ্টা করুন।" });
+    return res.status(400).json({ error: "Wrong password. Try again." });
   }
 
   await clearFailedAttempts(phone);
 
-  // ধাপ ৩: পাসওয়ার্ড মিলেছে -- এখনই নিঃশব্দে lazy-migrate করে ফেলা।
-  // public.users-এ তাদের পুরনো (Firestore) uid এখনো বসে আছে, সেটা
-  // আগে থেকে পড়ে রাখতে হবে -- admin.createUser() নতুন auth.users রো
-  // বানানোর সাথে সাথেই trigger নতুন uid দিয়ে একটা blank users রো বানিয়ে
-  // ফেলবে, তাই পুরনো uid টা তার আগেই জেনে রাখা জরুরি।
   const { data: oldUserRow } = await supabaseAdmin
     .from("users")
     .select("uid")
@@ -310,7 +200,7 @@ async function handleLogin(req: any, res: any) {
   });
   if (createErr || !created?.user) {
     console.error("lazy-migration createUser failed:", createErr);
-    return res.status(500).json({ error: "লগইন সম্পন্ন করা যায়নি। আবার চেষ্টা করুন।" });
+    return res.status(500).json({ error: "Login failed. Please try again." });
   }
   const newUid = created.user.id;
 
@@ -320,22 +210,14 @@ async function handleLogin(req: any, res: any) {
       p_new_uid: newUid,
     });
     if (relinkErr) {
-      // ডেটা re-link ব্যর্থ হলে half-migrated অবস্থায় ছেড়ে দেওয়া
-      // ঠিক না -- লগ রেখে transient error হিসেবে জানানো হচ্ছে, retry
-      // করলে আবার একই ব্রিজ-পাথ ট্রাই হবে (auth.users-এ রো তৈরি হয়ে
-      // গেলেও legacy_phone_auth ডিলিট হয়নি, তাই এই ফ্লো আবার চলবে,
-      // শুধু createUser() দ্বিতীয়বার ফেইল করবে -- সেই কেসটাও handle
-      // করার দরকার হলে ভবিষ্যতে upsert-style করা যাবে)।
       console.error("migrate_legacy_uid RPC failed:", relinkErr);
-      return res.status(500).json({ error: "লগইন সম্পন্ন করা যায়নি। আবার চেষ্টা করুন।" });
+      return res.status(500).json({ error: "Login failed. Please try again." });
     }
   }
 
-  // পুরনো legacy hash আর দরকার নেই।
   await supabaseAdmin.from("legacy_phone_auth").delete().eq("phone", phone);
 
   return signInAndRespond(res, phone, password);
->>>>>>> 241ffae85be28a1733245ef217effb892350c1de
 }
 
 async function handleSignup(req: any, res: any) {
@@ -343,79 +225,12 @@ async function handleSignup(req: any, res: any) {
   const password = String(req.body?.password || "");
 
   if (!phone) {
-    return res.status(400).json({ error: "সঠিক মোবাইল নম্বর দিন (যেমন: 01XXXXXXXXX)।" });
+    return res.status(400).json({ error: "Enter a valid phone number (e.g. 01XXXXXXXXX)." });
   }
   if (password.length < 8) {
-    return res.status(400).json({ error: "পাসওয়ার্ড কমপক্ষে ৮ ক্যারেক্টার হতে হবে।" });
+    return res.status(400).json({ error: "Password must be at least 8 characters." });
   }
 
-<<<<<<< HEAD
-  const legacy = await findLegacyProfile(phone);
-  const { error: createError } = await supabaseAdmin.auth.admin.createUser({
-    phone,
-    password,
-    phone_confirm: true,
-  });
-
-  if (createError) {
-    if (createError.status === 422 || /already.*registered|already.*exists/i.test(createError.message || "")) {
-      if (legacy) {
-        const { data: existingSession, error: existingSignInError } =
-          await supabaseAdmin.auth.signInWithPassword({ phone, password });
-        if (!existingSignInError && existingSession.session) {
-          await linkAuthUser(existingSession.user.id, legacy.uid);
-          return res.status(200).json({
-            access_token: existingSession.session.access_token,
-            refresh_token: existingSession.session.refresh_token,
-            uid: legacy.uid,
-            auth_uid: existingSession.user.id,
-            phone,
-            claimed: true,
-            firebaseToken: await mintFirebaseToken(legacy.uid),
-          });
-        }
-      }
-      return res.status(409).json({
-        error: "এই নম্বরে আগে থেকেই অ্যাকাউন্ট আছে। লগইন করুন।",
-        code: "ALREADY_REGISTERED",
-      });
-    }
-    throw createError;
-  }
-
-  const { data: sessionData, error: signInError } = await supabaseAdmin.auth.signInWithPassword({ phone, password });
-  if (signInError || !sessionData.session) throw signInError || new Error("no session after signup");
-
-  const appUid = legacy?.uid || (await resolveAppUid(sessionData.user.id, phone));
-  await linkAuthUser(sessionData.user.id, appUid);
-
-  await supabaseAdmin.from("users").upsert(
-    { uid: appUid, phone, created_at: new Date().toISOString() },
-    { onConflict: "uid" }
-  );
-
-  return res.status(200).json({
-    access_token: sessionData.session.access_token,
-    refresh_token: sessionData.session.refresh_token,
-    uid: appUid,
-    auth_uid: sessionData.user.id,
-    phone,
-    firebaseToken: await mintFirebaseToken(appUid),
-  });
-}
-
-async function handleLogin(req: any, res: any) {
-  const phone = normalizeBanglaPhone(req.body?.phone);
-  const password = String(req.body?.password || "");
-
-  if (!phone || !password) {
-    return res.status(400).json({ error: "মোবাইল নম্বর ও পাসওয়ার্ড দিন।" });
-  }
-
-  const { data: lockRow } = await supabaseAdmin
-    .from("login_lockouts")
-    .select("*")
-=======
   const { data: existingUser } = await supabaseAdmin
     .from("users")
     .select("uid")
@@ -424,93 +239,24 @@ async function handleLogin(req: any, res: any) {
   const { data: existingLegacy } = await supabaseAdmin
     .from("legacy_phone_auth")
     .select("phone")
->>>>>>> 241ffae85be28a1733245ef217effb892350c1de
     .eq("phone", phone)
     .maybeSingle();
 
   if (existingUser || existingLegacy) {
     return res.status(409).json({
-      error: "এই নম্বরে আগে থেকেই অ্যাকাউন্ট আছে। লগইন করুন।",
+      error: "An account already exists for this number. Please log in.",
       code: "ALREADY_REGISTERED",
     });
   }
 
-<<<<<<< HEAD
-  const { data: sessionData, error } = await supabaseAdmin.auth.signInWithPassword({ phone, password });
-
-  if (error) {
-    const failedAttempts = (lockRow?.failed_attempts || 0) + 1;
-    const update: any = { phone, failed_attempts: failedAttempts, updated_at: new Date().toISOString() };
-    if (failedAttempts >= MAX_FAILED_ATTEMPTS) {
-      update.lock_until = new Date(now + LOCK_DURATION_MS).toISOString();
-      update.failed_attempts = 0;
-    }
-    await supabaseAdmin.from("login_lockouts").upsert(update, { onConflict: "phone" });
-
-    if (/invalid login credentials/i.test(error.message || "")) {
-      const legacy = await findLegacyProfile(phone);
-      if (legacy) {
-        if (password.length < 8) {
-          return res.status(400).json({
-            error: "আপনার পুরনো অ্যাকাউন্ট নতুন সিস্টেমে এসেছে। এখন কমপক্ষে ৮ ক্যারেক্টারের একটি নতুন পাসওয়ার্ড দিন — সেটাই আপনার পাসওয়ার্ড হয়ে যাবে।",
-            code: "LEGACY_SET_PASSWORD",
-          });
-        }
-        const { data: created, error: createError } = await supabaseAdmin.auth.admin.createUser({
-          phone,
-          password,
-          phone_confirm: true,
-        });
-        if (!createError && created?.user) {
-          const { data: claimedSession, error: claimSignInError } =
-            await supabaseAdmin.auth.signInWithPassword({ phone, password });
-          if (!claimSignInError && claimedSession?.session) {
-            await linkAuthUser(claimedSession.user.id, legacy.uid);
-            await supabaseAdmin
-              .from("login_lockouts")
-              .update({ failed_attempts: 0, lock_until: null })
-              .eq("phone", phone);
-            return res.status(200).json({
-              access_token: claimedSession.session.access_token,
-              refresh_token: claimedSession.session.refresh_token,
-              uid: legacy.uid,
-              auth_uid: claimedSession.user.id,
-              phone,
-              claimed: true,
-              firebaseToken: await mintFirebaseToken(legacy.uid),
-            });
-          }
-        }
-      }
-      return res.status(400).json({ error: "ভুল পাসওয়ার্ড অথবা এই নম্বরে কোনো অ্যাকাউন্ট নেই।" });
-    }
-    throw error;
-  }
-
-  if (lockRow?.failed_attempts || lockRow?.lock_until) {
-    await supabaseAdmin.from("login_lockouts").update({ failed_attempts: 0, lock_until: null }).eq("phone", phone);
-  }
-
-  const appUid = await resolveAppUid(sessionData.user!.id, phone);
-  await linkAuthUser(sessionData.user!.id, appUid);
-
-  return res.status(200).json({
-    access_token: sessionData.session!.access_token,
-    refresh_token: sessionData.session!.refresh_token,
-    uid: appUid,
-    auth_uid: sessionData.user!.id,
-    phone,
-    firebaseToken: await mintFirebaseToken(appUid),
-=======
   const { error: createErr } = await supabaseAdmin.auth.admin.createUser({
     phone,
     password,
-    phone_confirm: true, // SMS OTP costs এড়াতে -- এখন যেভাবে চলছে, ঠিক তেমনই
->>>>>>> 241ffae85be28a1733245ef217effb892350c1de
+    phone_confirm: true,
   });
   if (createErr) {
     console.error("signup createUser failed:", createErr);
-    return res.status(500).json({ error: "অ্যাকাউন্ট তৈরি করা যায়নি। আবার চেষ্টা করুন।" });
+    return res.status(500).json({ error: "Could not create account. Please try again." });
   }
 
   return signInAndRespond(res, phone, password);
@@ -526,11 +272,11 @@ export default async function handler(req: any, res: any) {
     const clientIp = getClientIp(req);
     const allowed = await checkRateLimit(`phone_auth_ip_${clientIp}`);
     if (!allowed) {
-      return res.status(429).json({ error: "অনেকবার চেষ্টা করা হয়েছে। কিছুক্ষণ পর আবার চেষ্টা করুন।" });
+      return res.status(429).json({ error: "Too many attempts. Please try again later." });
     }
 
     if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY || !SUPABASE_ANON_KEY) {
-      return res.status(500).json({ error: "সার্ভার কনফিগারেশনে সমস্যা।" });
+      return res.status(500).json({ error: "Server configuration error." });
     }
 
     const action = req.body?.action;
@@ -543,6 +289,6 @@ export default async function handler(req: any, res: any) {
     }
   } catch (err: any) {
     console.error("phone auth failed:", err);
-    return res.status(500).json({ error: "অনুরোধটি সম্পন্ন করা যায়নি। আবার চেষ্টা করুন।" });
+    return res.status(500).json({ error: "Request failed. Please try again." });
   }
 }
