@@ -164,9 +164,14 @@ export function AdminPanel({ language, currentUser, listings: listingsProp, isUs
   useEffect(() => {
     const fetchPaymentInfo = async () => {
       try {
-        const docSnap = await getDoc(doc(db, "settings", "payment_info"));
-        if (docSnap.exists()) {
-          const data = docSnap.data();
+        const { data: row, error } = await supabase
+          .from("app_config")
+          .select("value")
+          .eq("key", "payment_info")
+          .maybeSingle();
+        if (error) throw error;
+        if (row?.value) {
+          const data = row.value as any;
           setBkash(data.bkash || "01783457173 (Personal)");
           setNagad(data.nagad || "01783457173 (Personal)");
           setRocket(data.rocket || "01783457173 (Personal)");
@@ -383,13 +388,19 @@ export function AdminPanel({ language, currentUser, listings: listingsProp, isUs
     setSaveSuccess(false);
 
     try {
-      await setDoc(doc(db, "settings", "payment_info"), {
-        bkash: bkash.trim(),
-        nagad: nagad.trim(),
-        rocket: rocket.trim(),
-        updatedAt: new Date().toISOString(),
-        updatedBy: currentUser?.phoneNumber || currentUser?.email || "Admin"
-      }, { merge: true });
+      const { error } = await supabase
+        .from("app_config")
+        .upsert({
+          key: "payment_info",
+          value: {
+            bkash: bkash.trim(),
+            nagad: nagad.trim(),
+            rocket: rocket.trim(),
+            updatedAt: new Date().toISOString(),
+            updatedBy: currentUser?.phoneNumber || currentUser?.email || "Admin"
+          }
+        });
+      if (error) throw error;
 
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 3000);
