@@ -17,6 +17,7 @@ import { Capacitor } from "@capacitor/core";
 import { FirebaseAppCheck } from "@capacitor-firebase/app-check";
 import { logger } from "./utils/logger";
 import { apiUrl } from "./utils/apiBase";
+import { supabase } from "./supabase";
 
 const requiredEnv = (key: string, value: string | undefined): string => {
   if (!value) {
@@ -190,20 +191,33 @@ export const storage = getStorage(app);
 export const logAnalyticsEvent = (eventName: string, eventParams?: any) => {
   logger.debug(`Analytics Event: ${eventName}`, eventParams);
 
-  // Only real page visits / login / signup are worth 2 Firestore writes
-  // (site_visits.add + analytics_stats/summary increment) each. Click-level
-  // events (search, listing_view, select_category, select_location,
-  // contact_seller_click, ad_promote, seller_review_submitted, ...) were
-  // previously ALSO being sent here and silently relabeled "visit" -- costing
-  // 2 extra Firestore writes per click for no benefit, since the admin panel
-  // only ever distinguishes "login" / "signup" / generic "visit" anyway.
-  // Those events still get the console.debug log above; they just no longer
-  // hit Firestore.
+  // Only real page visits / login / signup are worth a row here. Click-level
+  // events (search, listing_view, select_category, ...) just get the
+  // console.debug log above and stop there.
   if (eventName !== "login" && eventName !== "signup" && eventName !== "visit") {
     return;
   }
 
-  // api/track-event.ts removed (Vercel 12-function limit)
+  // 🔧 api/track-event.ts was removed (Vercel Hobby 12-function limit), so
+  // this now writes directly to Supabase from the client instead of going
+  // through a serverless endpoint. site_visits has an INSERT-only RLS
+  // policy for anon/authenticated -- this can add rows but never read them
+  // back, so it's safe to call straight from here. No IP/city/country geo
+  // lookup anymore (that required a server to see the real request IP);
+  // path/referrer/uid are still recorded.
+  supabase
+    .from("site_visits")
+    .insert({
+      type: eventName,
+      uid: eventParams?.uid || null,
+      identifier: eventParams?.identifier || null,
+      referrer: typeof document !== "undefined" ? document.referrer || null : null,
+      path: typeof window !== "undefined" ? window.location.pathname : null,
+      user_agent: typeof navigator !== "undefined" ? navigator.userAgent : null,
+    })
+    .then(({ error }) => {
+      if (error) logger.debug("site_visits insert failed:", error.message);
+    });
 };
 
 export default app;
