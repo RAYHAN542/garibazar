@@ -291,7 +291,7 @@ export default function App() {
   // Purchases Pagination States
   const [firebasePurchases, setFirebasePurchases] = useState<any[]>([]);
   const [morePurchases, setMorePurchases] = useState<any[]>([]);
-  const [lastPurchasesDoc, setLastPurchasesDoc] = useState<DocumentSnapshot | null>(null);
+  const [lastPurchasesDoc, setLastPurchasesDoc] = useState<string | null>(null);
   const [hasMorePurchases, setHasMorePurchases] = useState(false);
   const [loadingMorePurchases, setLoadingMorePurchases] = useState(false);
   
@@ -839,83 +839,141 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
+  // 🔧 FIX (Firebase -> Supabase migration, part 2): reviews, profile
+  // credits/name sync, and the unread-chats badge were all still reading
+  // from Firestore and gated on `firebaseAuthUser` -- same root cause as
+  // the myListings bug fixed earlier (see refetchMyListings above), and
+  // ChatView.tsx's own messages/threads already moved to Supabase (with a
+  // polling fallback, since that session found Supabase Realtime alone
+  // unreliable here) -- so App.tsx's unread-chats count was reading a
+  // completely different, empty dataset than the chat list actually shows.
+  // These three now read from Supabase directly, each with the same
+  // fetch-once + light poll + custom-event-refetch pattern, for the same
+  // reliability reason as ChatView's polling fallback.
+
   // Fetch reviews for the currently logged-in user to display in "My Shop"
   useEffect(() => {
-    if (!authReady || !firebaseAuthUser?.uid || !user?.uid) {
+    if (!user?.uid) {
       setCurrentUserReviews([]);
       return;
     }
+    let cancelled = false;
     setCurrentUserReviewsLoading(true);
-    const q = query(
-      collection(db, "seller_reviews"),
-      where("sellerId", "==", user.uid),
-      orderBy("createdAt", "desc"),
-      limit(30)
-    );
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const list: any[] = [];
-      snapshot.forEach((docSnap) => {
-        list.push({ id: docSnap.id, ...docSnap.data() });
-      });
-      list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-      setCurrentUserReviews(list);
-      setCurrentUserReviewsLoading(false);
-    }, (err) => {
-      console.warn("Failed to subscribe to current user reviews:", err);
-      setCurrentUserReviewsLoading(false);
-    });
+    const fetchReviews = async () => {
+      try {
+        const { data, error } = await supabase
+          .from("seller_reviews")
+          .select("*")
+          .eq("seller_id", user.uid)
+          .order("created_at", { ascending: false })
+          .limit(30);
+        if (error) throw error;
+        if (cancelled) return;
+        setCurrentUserReviews(
+          (data || []).map((row: any) => ({
+            id: row.id,
+            sellerId: row.seller_id,
+            reviewerId: row.reviewer_id,
+            rating: row.rating,
+            comment: row.comment,
+            createdAt: row.created_at,
+          }))
+        );
+      } catch (err) {
+        console.warn("Failed to fetch current user reviews:", err);
+      } finally {
+        if (!cancelled) setCurrentUserReviewsLoading(false);
+      }
+    };
+    fetchReviews();
+    window.addEventListener("gari_bazar_refreshed_data", fetchReviews);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("gari_bazar_refreshed_data", fetchReviews);
+    };
+  }, [user?.uid]);
 
-    return () => unsubscribe();
-  }, [authReady, firebaseAuthUser?.uid, user?.uid]);
-
-  // Sync profile metadata real-time (e.g. simulated credits recharge instantly)
+  // Sync profile metadata (e.g. simulated credits recharge, name/photo
+  // edits) -- polled instead of Firestore onSnapshot; interval is short
+  // enough that an admin-approved wallet refill still feels near-instant.
   useEffect(() => {
-    if (!authReady || !firebaseAuthUser?.uid || !user?.uid) return;
+    if (!user?.uid) return;
+    let cancelled = false;
 
-    const userRef = doc(db, "users", user.uid);
-    const unsubscribe = onSnapshot(userRef, (docSnap) => {
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        setUserMetadata((prev: any) => ({ ...prev, ...data }));
-        
-        // Sync back to local storage
+    const syncProfile = async () => {
+      try {
+        const { data, error } = await supabase.from("users").select("*").eq("uid", user.uid).maybeSingle();
+        if (error) throw error;
+        if (cancelled || !data) return;
+        const mapped = {
+          displayName: data.name,
+          email: data.email,
+          phoneNumber: data.phone,
+          city: data.city,
+          profilePicture: data.profile_picture,
+          simulatedCredits: data.simulated_credits,
+          referralCode: data.referral_code,
+          blockedUids: data.blocked_uids,
+        };
+        setUserMetadata((prev: any) => ({ ...prev, ...mapped }));
+
         const stored = localStorage.getItem("gari_bazar_session_user");
         if (stored) {
           try {
             const parsed = JSON.parse(stored);
-            localStorage.setItem("gari_bazar_session_user", JSON.stringify({ ...parsed, ...data }));
+            localStorage.setItem("gari_bazar_session_user", JSON.stringify({ ...parsed, ...mapped }));
           } catch (e) {}
         }
+      } catch (err) {
+        console.warn("Failed to sync profile metadata:", err);
       }
-    });
+    };
 
-    return () => unsubscribe();
-  }, [authReady, firebaseAuthUser?.uid, user?.uid]);
+    syncProfile();
+    const pollId = setInterval(syncProfile, 20000);
+    window.addEventListener("gari_bazar_refreshed_data", syncProfile);
+    return () => {
+      cancelled = true;
+      clearInterval(pollId);
+      window.removeEventListener("gari_bazar_refreshed_data", syncProfile);
+    };
+  }, [user?.uid]);
 
-  // Unread Chats Listener
+  // Unread Chats Counter
   const [unreadChatsCount, setUnreadChatsCount] = useState(0);
   useEffect(() => {
-    if (!authReady || !firebaseAuthUser?.uid || !user?.uid) {
+    if (!user?.uid) {
       setUnreadChatsCount(0);
       return;
     }
-    const q = query(
-      collection(db, "chats"),
-      where("participants", "array-contains", user.uid),
-      orderBy("lastMessageAt", "desc"),
-      limit(50)
-    );
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      let count = 0;
-      snapshot.forEach(docSnap => {
-        const data = docSnap.data();
-        const unreadForMe = data.unreadCount?.[user.uid] || 0;
-        if (unreadForMe > 0) count++;
-      });
-      setUnreadChatsCount(count);
-    });
-    return () => unsubscribe();
-  }, [authReady, firebaseAuthUser?.uid, user?.uid]);
+    let cancelled = false;
+
+    const fetchUnread = async () => {
+      try {
+        const { data, error } = await supabase
+          .from("chats")
+          .select("unread_count")
+          .or(`participant_a.eq.${user.uid},participant_b.eq.${user.uid}`)
+          .order("last_message_at", { ascending: false })
+          .limit(50);
+        if (error) throw error;
+        if (cancelled) return;
+        const count = (data || []).filter((row: any) => (row.unread_count?.[user.uid] || 0) > 0).length;
+        setUnreadChatsCount(count);
+      } catch (err) {
+        console.warn("Failed to fetch unread chats count:", err);
+      }
+    };
+
+    fetchUnread();
+    const pollId = setInterval(fetchUnread, 20000);
+    window.addEventListener("gari_bazar_chats_updated", fetchUnread);
+    return () => {
+      cancelled = true;
+      clearInterval(pollId);
+      window.removeEventListener("gari_bazar_chats_updated", fetchUnread);
+    };
+  }, [user?.uid]);
 
   // 1b. My Own Listings — সরাসরি seller_id দিয়ে Supabase থেকে fetch করা হয়,
   // হোমপেজের ২০-টা পেজিনেটেড লিস্ট থেকে না। এভাবে Dashboard আর Lottery
@@ -1192,43 +1250,56 @@ export default function App() {
     }
   };
 
-  // 3. Real-time Purchases Sync (capped to 20 documents)
+  // 3. Purchases Sync -- Firebase -> Supabase migration. purchases rows keep
+  // their actual fields inside a `data` jsonb blob (id/buyer_id/created_at
+  // are the only real columns), so this flattens each row the same shape
+  // the rest of the app already expects (item.price, item.title, etc.) --
+  // see mapPurchaseRow. `lastPurchasesDoc` here holds the oldest loaded
+  // row's created_at as a keyset-pagination cursor, not a Firestore
+  // DocumentSnapshot anymore.
+  const mapPurchaseRow = (row: any) => ({
+    id: row.id,
+    buyerId: row.buyer_id,
+    createdAt: row.created_at,
+    ...(row.data || {}),
+  });
+
   useEffect(() => {
-    if (!user) {
+    if (!user?.uid) {
       setFirebasePurchases([]);
       setMorePurchases([]);
       setLastPurchasesDoc(null);
       setHasMorePurchases(false);
       return;
     }
+    let cancelled = false;
 
-    const q = query(collection(db, "purchases"), where("buyerId", "==", user.uid), orderBy("createdAt", "desc"), limit(20));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      if (snapshot.empty) {
-        setFirebasePurchases([]);
-        setLastPurchasesDoc(null);
-        setHasMorePurchases(false);
-      } else {
-        const firestoreList: any[] = [];
-        snapshot.forEach((doc) => {
-          const data = doc.data();
-          if (data.buyerId === user.uid || data.sellerContact === userMetadata?.phoneNumber) {
-            firestoreList.push({ id: doc.id, ...data });
-          }
-        });
-
-        setFirebasePurchases(firestoreList);
-        setLastPurchasesDoc(snapshot.docs[snapshot.docs.length - 1]);
-        setHasMorePurchases(snapshot.docs.length === 20);
+    const fetchPurchases = async () => {
+      try {
+        const { data, error } = await supabase
+          .from("purchases")
+          .select("*")
+          .eq("buyer_id", user.uid)
+          .order("created_at", { ascending: false })
+          .limit(20);
+        if (error) throw error;
+        if (cancelled) return;
+        const rows = data || [];
+        setFirebasePurchases(rows.map(mapPurchaseRow));
+        setLastPurchasesDoc(rows.length > 0 ? rows[rows.length - 1].created_at : null);
+        setHasMorePurchases(rows.length === 20);
+      } catch (err) {
+        console.warn("Failed to fetch purchases:", err);
       }
-    }, (err) => {
-      console.warn("Using offline purchases:", err);
-    });
-
-    return () => {
-      unsubscribe();
     };
-  }, [user, userMetadata?.phoneNumber]);
+
+    fetchPurchases();
+    window.addEventListener("gari_bazar_refreshed_data", fetchPurchases);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("gari_bazar_refreshed_data", fetchPurchases);
+    };
+  }, [user?.uid]);
 
   // 3b. Merge real-time, loaded-more, and local purchases
   useEffect(() => {
@@ -1279,27 +1350,26 @@ export default function App() {
 
   // 3c. Purchases Pagination Loader helper
   const handleLoadMorePurchases = async () => {
-    if (!user || !lastPurchasesDoc || loadingMorePurchases) return;
+    if (!user?.uid || !lastPurchasesDoc || loadingMorePurchases) return;
     setLoadingMorePurchases(true);
     try {
-      const q = query(
-        collection(db, "purchases"),
-        where("buyerId", "==", user.uid),
-        orderBy("createdAt", "desc"),
-        startAfter(lastPurchasesDoc),
-        limit(20)
+      const { data, error } = await withTimeout(
+        supabase
+          .from("purchases")
+          .select("*")
+          .eq("buyer_id", user.uid)
+          .lt("created_at", lastPurchasesDoc as string)
+          .order("created_at", { ascending: false })
+          .limit(20),
+        12000,
+        "loadMorePurchases"
       );
-      const snapshot = await withTimeout(getDocs(q), 12000, "loadMorePurchases");
-      if (snapshot.empty) {
+      if (error) throw error;
+      const rows = data || [];
+      if (rows.length === 0) {
         setHasMorePurchases(false);
       } else {
-        const nextList: any[] = [];
-        snapshot.forEach((doc) => {
-          const data = doc.data();
-          if (data.buyerId === user.uid || data.sellerContact === userMetadata?.phoneNumber) {
-            nextList.push({ id: doc.id, ...data });
-          }
-        });
+        const nextList = rows.map(mapPurchaseRow);
 
         setMorePurchases(prev => {
           const combined = [...prev];
@@ -1311,8 +1381,8 @@ export default function App() {
           return combined;
         });
 
-        setLastPurchasesDoc(snapshot.docs[snapshot.docs.length - 1]);
-        setHasMorePurchases(snapshot.docs.length === 20);
+        setLastPurchasesDoc(rows[rows.length - 1].created_at);
+        setHasMorePurchases(rows.length === 20);
       }
     } catch (err) {
       console.warn("Failed to load more purchases:", err);
