@@ -45,6 +45,28 @@ async function resolveCallerUid(token: string): Promise<string | null> {
   return null;
 }
 
+// 🔧 FIX: cosmetic but worth fixing for consistency -- a migrated user's
+// real app-wide uid (users.uid) is their legacy id, not the fresh Supabase
+// Auth id their session carries. Doesn't block anything here (no ownership
+// check gates this endpoint), but without this the ticket's stored user_id
+// wouldn't match users.uid, so an admin cross-referencing "who filed this"
+// would silently fail to find them.
+async function resolveAppUid(authUid: string): Promise<string> {
+  if (!supabaseAdmin) return authUid;
+  try {
+    const { data, error } = await supabaseAdmin
+      .from("user_auth_links")
+      .select("app_uid")
+      .eq("auth_uid", authUid)
+      .maybeSingle();
+    if (error) throw error;
+    return data?.app_uid || authUid;
+  } catch (e) {
+    console.error("[submit-support-ticket] app uid resolution failed, using auth uid:", e);
+    return authUid;
+  }
+}
+
 const GUEST_WINDOW_MS = 60 * 60 * 1000;
 const GUEST_MAX = 3;
 const USER_WINDOW_MS = 60 * 60 * 1000;
@@ -73,7 +95,8 @@ export default async function handler(req: any, res: any) {
     const token = authHeader.replace("Bearer ", "");
     let uid: string | null = null;
     if (token) {
-      uid = await resolveCallerUid(token);
+      const authUid = await resolveCallerUid(token);
+      uid = authUid ? await resolveAppUid(authUid) : null;
     }
 
     const allowed = uid
