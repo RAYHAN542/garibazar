@@ -1,7 +1,6 @@
 import React, { useState } from "react";
 import { Trash2, AlertTriangle, ArrowLeft, Globe, Loader2, CheckCircle, Mail } from "lucide-react";
 import { SupportedLanguage } from "../types";
-import { auth } from "../firebase";
 import { supabase } from "../supabase";
 import { apiUrl } from "../utils/apiBase";
 
@@ -26,7 +25,7 @@ export default function DataDeletionPage({
   React.useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setSupaUser(data.user));
   }, []);
-  const currentUser = supaUser || auth.currentUser;
+  const currentUser = supaUser;
 
   const handleDataDeletion = async () => {
     if (!currentUser) {
@@ -44,10 +43,7 @@ export default function DataDeletionPage({
 
     try {
       const { data: sessionData } = await supabase.auth.getSession();
-      let token = sessionData.session?.access_token;
-      if (!token) {
-        token = await auth.currentUser?.getIdToken();
-      }
+      const token = sessionData.session?.access_token;
       if (!token) throw new Error("লগইন সেশন পাওয়া যায়নি।");
 
       const res = await fetch(apiUrl("/api/delete-account"), {

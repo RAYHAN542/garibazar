@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { PartListing, SupportedLanguage } from "../types";
 import { X, MapPin, Sparkles, Play, SquarePlay, Flag, ShieldAlert, CheckCircle2, ChevronLeft, ChevronRight, Loader2, ShoppingBag, MessageSquare, Share2 } from "lucide-react";
-import { auth, logAnalyticsEvent } from "../firebase";
+import { logAnalyticsEvent } from "../firebase";
 import { supabase } from "../supabase";
 import { trackListingClick } from "../utils/counters";
 import { getOptimizedImageUrl } from "../utils/cloudinary";
@@ -215,11 +215,6 @@ export function ListingDetailModal({ listing, language, currentUser, onClose, on
       const { data } = await supabase.auth.getSession();
       token = data.session?.access_token;
     } catch (_) { /* ignore */ }
-    if (!token) {
-      try {
-        token = await auth.currentUser?.getIdToken();
-      } catch (_) { /* ignore */ }
-    }
     if (!token) throw new Error("লগইন সেশন পাওয়া যায়নি");
 
     const resp = await fetch(apiUrl("/api/get-seller-contact"), {

@@ -1507,7 +1507,8 @@ export default function App() {
       // (guest হলে IP-ভিত্তিক, লগইন থাকলে uid-ভিত্তিক সীমা) -- দেখুন
       // api/submit-support-ticket.ts, আর firestore.rules-এ support_tickets
       // এখন client-এর জন্য সম্পূর্ণ বন্ধ।
-      const idToken = user?.uid ? await auth.currentUser?.getIdToken().catch(() => null) : null;
+      const { data: sessionData } = await supabase.auth.getSession();
+      const idToken = sessionData.session?.access_token || null;
       const resp = await fetch(apiUrl("/api/submit-support-ticket"), {
         method: "POST",
         headers: {

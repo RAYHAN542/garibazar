@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { auth, logAnalyticsEvent } from "../firebase";
+import { logAnalyticsEvent } from "../firebase";
 import { supabase } from "../supabase";
 import { SupportedLanguage } from "../types";
 import { apiUrl } from "../utils/apiBase";
@@ -59,10 +59,7 @@ export function useAdPromotion({
       // 1. Create a pending refill_request — the UddoktaPay webhook verifies
       //    payment and activates the ad automatically. No TxID needed.
       const { data: sessionData } = await supabase.auth.getSession();
-      let token = sessionData.session?.access_token;
-      if (!token) {
-        token = await auth.currentUser?.getIdToken();
-      }
+      const token = sessionData.session?.access_token;
       if (!token) throw new Error("লগইন সেশন পাওয়া যায়নি।");
 
       const { data: inserted, error: insertErr } = await supabase

@@ -1,5 +1,4 @@
 import { logger } from "./logger";
-import { auth } from "../firebase";
 import { supabase } from "../supabase";
 import { apiUrl } from "./apiBase";
 
@@ -77,18 +76,8 @@ export const uploadToCloudinary = async (file: File | Blob): Promise<string> => 
     }
   }
 
-  // Phone login is now Supabase Auth. Keep Firebase as a compatibility
-  // fallback for the still-Firebase social login path.
-  let idToken: string | undefined;
-  try {
-    const { data } = await supabase.auth.getSession();
-    idToken = data.session?.access_token;
-  } catch {
-    // Firebase fallback below
-  }
-  if (!idToken) {
-    idToken = await auth.currentUser?.getIdToken();
-  }
+  const { data: sessionData } = await supabase.auth.getSession();
+  const idToken = sessionData.session?.access_token;
   if (!idToken) {
     throw new Error("ছবি আপলোড করতে হলে লগইন থাকতে হবে। / You must be logged in to upload images.");
   }

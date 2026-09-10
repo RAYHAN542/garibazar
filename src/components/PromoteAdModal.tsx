@@ -3,7 +3,6 @@ import { PartListing, SupportedLanguage } from "../types";
 import { X, CheckCircle, ShieldAlert, Award, Loader2, CreditCard, Lock } from "lucide-react";
 import { AD_PACKAGES } from "../translations";
 import { apiUrl } from "../utils/apiBase";
-import { auth } from "../firebase";
 import { supabase } from "../supabase";
 
 interface PromoteAdModalProps {
@@ -48,10 +47,7 @@ export function PromoteAdModal({ listing, language, currentUser, onClose, onProm
       // 1. Create a pending refill_request — the UddoktaPay webhook will
       //    verify the payment and activate the ad automatically.
       const { data: sessionData } = await supabase.auth.getSession();
-      let token = sessionData.session?.access_token;
-      if (!token) {
-        token = await auth.currentUser?.getIdToken();
-      }
+      const token = sessionData.session?.access_token;
       if (!token) {
         throw new Error(language === "bn" ? "লগইন সেশন পাওয়া যায়নি।" : "Login session not found.");
       }
