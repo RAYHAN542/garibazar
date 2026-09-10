@@ -1,6 +1,4 @@
 import React, { useState, useRef } from "react";
-import { auth } from "../firebase";
-import { signInWithCustomToken, signOut } from "firebase/auth";
 import { X, MapPin, Loader2, Sparkles, Camera, Phone, ArrowLeft } from "lucide-react";
 import { CITIES } from "../translations";
 import { SupportedLanguage } from "../types";
@@ -149,23 +147,6 @@ export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModa
       : `${providerName} sign-in failed. Please try again.`;
   };
 
-  // 🔧 ROOT-CAUSE FIX (kept from the phone-auth migration): App.tsx's
-  // myListings, reviews, unread chats, profile realtime sync, and
-  // AdminPanel's visitor analytics all still gate on Firebase's own
-  // onAuthStateChanged, since those Firestore listeners haven't been
-  // migrated to Supabase yet. Signing into Firebase too (via a custom token
-  // minted server-side) keeps them working during the transition. Token
-  // missing/failed doesn't block login -- those specific listeners just
-  // silently show nothing, same as today.
-  const bridgeFirebaseSession = async (firebaseToken?: string | null) => {
-    if (!firebaseToken) return;
-    try {
-      await signInWithCustomToken(auth, firebaseToken);
-    } catch (err) {
-      console.error("Firebase bridge sign-in failed (non-fatal):", err);
-    }
-  };
-
   const handlePostPhoneAuth = async (uid: string, phone: string, authUid?: string) => {
     const { data: userRow } = await supabase.from("users").select("*").eq("uid", uid).maybeSingle();
     const { data: adminRow } = await supabase.from("admins").select("uid").eq("uid", uid).maybeSingle();
@@ -194,9 +175,7 @@ export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModa
   // legacy account, so their Supabase auth uid IS the app uid directly --
   // no user_auth_links mapping needed (that's only for legacy-claimed phone
   // accounts, handled server-side in api/auth/phone.ts).
-  const handlePostSocialAuth = async (authUser: any, firebaseToken?: string | null) => {
-    await bridgeFirebaseSession(firebaseToken);
-
+  const handlePostSocialAuth = async (authUser: any) => {
     const { data: userRow } = await supabase.from("users").select("*").eq("uid", authUser.id).maybeSingle();
 
     if (userRow) {
@@ -240,11 +219,7 @@ export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModa
 
       safeSetLoading(true);
       try {
-        const bridgeResp = await fetch(apiUrl("/api/auth/firebase-bridge"), {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
-        }).then((r) => r.json()).catch(() => null);
-        await handlePostSocialAuth(session.user, bridgeResp?.firebaseToken);
+        await handlePostSocialAuth(session.user);
       } catch (err) {
         console.error("Social sign-in post-processing failed:", err);
       } finally {
@@ -384,7 +359,6 @@ export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModa
         refresh_token: data.refresh_token,
       });
       if (sessionError) throw sessionError;
-      await bridgeFirebaseSession(data.firebaseToken);
       await handlePostPhoneAuth(data.uid, data.phone, data.auth_uid);
     } catch (err: any) {
       console.error(err);
@@ -437,7 +411,6 @@ export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModa
         refresh_token: data.refresh_token,
       });
       if (sessionError) throw sessionError;
-      await bridgeFirebaseSession(data.firebaseToken);
 
       const sanitizedDisplayName = sanitizeText(displayName, 50);
       const profileUpdate: Record<string, string> = { name: sanitizedDisplayName };
@@ -475,7 +448,6 @@ export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModa
 
   const handleCancelProfileStep = async () => {
     try { await supabase.auth.signOut(); } catch { /* ignore */ }
-    try { await signOut(auth); } catch { /* ignore */ }
     setSocialAuthUser(null);
     setStep("start");
     setError("");
