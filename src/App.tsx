@@ -9,7 +9,6 @@ import { supabase } from "./supabase";
 import { logger } from "./utils/logger";
 import { trackEvent } from "./utils/trackEvent";
 import { signOut, onAuthStateChanged } from "firebase/auth";
-import { collection, onSnapshot, query, orderBy, getDocs, doc, getDoc, updateDoc, where, addDoc, serverTimestamp, limit, startAfter, DocumentSnapshot } from "firebase/firestore";
 import { withTimeout, TimeoutError } from "./utils/withTimeout";
 import { apiUrl } from "./utils/apiBase";
 import { incrementListingView } from "./utils/counters";
