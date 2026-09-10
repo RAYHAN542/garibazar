@@ -1,7 +1,6 @@
 import React, { useState, useRef } from "react";
 import { SupportedLanguage } from "../types";
 import { Camera, Loader2, AlertTriangle, X } from "lucide-react";
-import { auth } from "../firebase";
 import { supabase } from "../supabase";
 import { sanitizeText, validatePriceInput, validateBanglaPhone } from "../utils/sanitizer";
 import { uploadToCloudinary } from "../utils/cloudinary";
@@ -201,12 +200,9 @@ export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPromp
       return;
     }
 
-    // Firebase থেকে Supabase Auth-এ আসার পর phone login-এর Firebase user
-    // থাকে না। তাই Firebase currentUser দেখে এখানে valid Supabase session-কে
-    // ভুল করে expired বলা যাবে না।
     try {
       const { data: sessionData } = await supabase.auth.getSession();
-      if (!sessionData.session && !auth.currentUser) {
+      if (!sessionData.session) {
         setError(
           language === "bn"
             ? "আপনার লগইন সেশন মেয়াদোত্তীর্ণ হয়ে গেছে। অনুগ্রহ করে আবার লগইন করুন।"
