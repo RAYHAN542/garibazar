@@ -1,5 +1,3 @@
-import { initializeApp, getApps, cert } from "firebase-admin/app";
-import { getAuth } from "firebase-admin/auth";
 import crypto from "crypto";
 import { applyCors } from "./_lib/cors.js";
 import { checkAndBumpRateLimit } from "./_lib/rateLimit.js";
@@ -12,18 +10,6 @@ import { createClient } from "@supabase/supabase-js";
 // short-lived signature, proving the request came from a real logged-in
 // user of this app, before uploading anything to Cloudinary.
 // ------------------------------------------------------------------------
-
-if (!getApps().length) {
-  const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
-  if (serviceAccountJson) {
-    try {
-      const serviceAccount = JSON.parse(serviceAccountJson);
-      initializeApp({ credential: cert(serviceAccount) });
-    } catch (e) {
-      console.error("Failed to parse FIREBASE_SERVICE_ACCOUNT_KEY:", e);
-    }
-  }
-}
 
 const RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000; // 1 hour
 const RATE_LIMIT_MAX = 40; // signatures per user per hour
@@ -44,14 +30,6 @@ async function resolveCallerUid(token: string): Promise<string | null> {
       if (!error && data?.user?.id) return data.user.id;
     } catch (e) {
       console.error("[cloudinary-sign] supabase token check failed:", e);
-    }
-  }
-  if (getApps().length) {
-    try {
-      const decoded = await getAuth().verifyIdToken(token);
-      return decoded.uid;
-    } catch (e) {
-      console.error("[cloudinary-sign] firebase token check failed:", (e as any)?.message || e);
     }
   }
   return null;

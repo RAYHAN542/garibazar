@@ -81,14 +81,6 @@ async function resolveCallerUid(token: string): Promise<string | null> {
       console.error("[get-seller-contact] supabase token check failed:", e);
     }
   }
-  if (getApps().length) {
-    try {
-      const decoded = await getAuth().verifyIdToken(token);
-      return decoded.uid;
-    } catch (e) {
-      console.error("[get-seller-contact] firebase token check failed:", (e as any)?.message || e);
-    }
-  }
   return null;
 }
 

@@ -1,19 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
-import { initializeApp, getApps, cert } from "firebase-admin/app";
-import { getAuth } from "firebase-admin/auth";
 import { applyCors } from "../_lib/cors.js";
-
-if (!getApps().length) {
-  const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
-  if (serviceAccountJson) {
-    try {
-      const serviceAccount = JSON.parse(serviceAccountJson);
-      initializeApp({ credential: cert(serviceAccount) });
-    } catch (e) {
-      console.error("Failed to parse FIREBASE_SERVICE_ACCOUNT_KEY:", e);
-    }
-  }
-}
 
 const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -31,14 +17,6 @@ async function resolveCallerUid(token: string): Promise<string | null> {
       if (!error && data?.user?.id) return data.user.id;
     } catch (e) {
       console.error("[create-charge] supabase token check failed:", e);
-    }
-  }
-  if (getApps().length) {
-    try {
-      const decoded = await getAuth().verifyIdToken(token);
-      return decoded.uid;
-    } catch (e) {
-      console.error("[create-charge] firebase token check failed:", (e as any)?.message || e);
     }
   }
   return null;
