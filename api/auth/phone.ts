@@ -1,19 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
-import { initializeApp, getApps, cert } from "firebase-admin/app";
-import { getAuth } from "firebase-admin/auth";
 import { applyCors } from "../_lib/cors.js";
-
-if (!getApps().length) {
-  const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
-  if (serviceAccountJson) {
-    try {
-      const serviceAccount = JSON.parse(serviceAccountJson);
-      initializeApp({ credential: cert(serviceAccount) });
-    } catch (e) {
-      console.error("Failed to parse FIREBASE_SERVICE_ACCOUNT_KEY:", e);
-    }
-  }
-}
 
 const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -74,27 +60,6 @@ async function linkAuthUser(authUid: string, appUid: string): Promise<void> {
     if (error) console.error("[phone auth] user_auth_links upsert failed:", error.message);
   } catch (e) {
     console.error("[phone auth] failed to link auth_uid -> app_uid:", e);
-  }
-}
-
-// 🔧 REGRESSION FIX: a previous revision of this file dropped firebase-admin
-// entirely, assuming nothing needed it anymore -- but App.tsx's reviews,
-// purchases, and my-listings real-time listeners still read from Firestore
-// and gate on Firebase's OWN auth session (onAuthStateChanged), not the
-// Supabase session set via setSession() on the client. Without a Firebase
-// custom token minted here, AuthModal's bridgeFirebaseSession() silently
-// no-ops and those three tabs go quietly empty for anyone logging in via
-// phone. Restored: mint a token for the *app* uid (not the Supabase auth
-// uid) so it matches what those Firestore queries filter on. Safe to delete
-// this function (and the firebase-admin imports/init above) once App.tsx's
-// remaining Firestore reads are migrated to Supabase.
-async function mintFirebaseToken(appUid: string): Promise<string | null> {
-  if (!getApps().length) return null;
-  try {
-    return await getAuth().createCustomToken(appUid);
-  } catch (e) {
-    console.error("[phone auth] mintFirebaseToken failed (non-fatal):", e);
-    return null;
   }
 }
 
@@ -167,7 +132,6 @@ async function handleSignup(req: any, res: any) {
             auth_uid: existingSession.user.id,
             phone,
             claimed: true,
-            firebaseToken: await mintFirebaseToken(legacy.uid),
           });
         }
       }
@@ -196,7 +160,6 @@ async function handleSignup(req: any, res: any) {
     uid: appUid,
     auth_uid: sessionData.user.id,
     phone,
-    firebaseToken: await mintFirebaseToken(appUid),
   });
 }
 
@@ -263,7 +226,6 @@ async function handleLogin(req: any, res: any) {
               auth_uid: claimedSession.user.id,
               phone,
               claimed: true,
-              firebaseToken: await mintFirebaseToken(legacy.uid),
             });
           }
         }
@@ -286,7 +248,6 @@ async function handleLogin(req: any, res: any) {
     uid: appUid,
     auth_uid: sessionData.user!.id,
     phone,
-    firebaseToken: await mintFirebaseToken(appUid),
   });
 }
 
