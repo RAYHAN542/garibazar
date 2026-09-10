@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { PartListing, SupportedLanguage } from "../types";
 import { X, MapPin, Phone, MessageSquare, ShoppingBag, Search, Sparkles, Loader2 } from "lucide-react";
-import { doc, getDoc } from "firebase/firestore";
-import { db } from "../firebase";
 import { supabase } from "../supabase";
 import { mapRowToListing } from "../utils/listingsApi";
 import { ListingCard } from "./ListingCard";
@@ -78,15 +76,6 @@ export function SellerShopPage({
 
         if (active && row) {
           setSellerProfile({ displayName: row.name, profilePicture: row.profile_picture, city: row.city });
-        } else if (active) {
-          // Not migrated yet -- fall back to Firestore (matches the same
-          // dual-source pattern used for listings/contacts during this
-          // transitional period).
-          const userRef = doc(db, "users", sellerId);
-          const userSnap = await getDoc(userRef);
-          if (active && userSnap.exists()) {
-            setSellerProfile(userSnap.data());
-          }
         }
       } catch (err) {
         console.warn("Failed to fetch seller profile:", err);
