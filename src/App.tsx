@@ -4,11 +4,10 @@
  */
 
 import { useState, useEffect, useMemo, useRef, useCallback, lazy, Suspense } from "react";
-import { auth, db, logAnalyticsEvent } from "./firebase";
+import { logAnalyticsEvent } from "./firebase";
 import { supabase } from "./supabase";
 import { logger } from "./utils/logger";
 import { trackEvent } from "./utils/trackEvent";
-import { signOut } from "firebase/auth";
 import { withTimeout, TimeoutError } from "./utils/withTimeout";
 import { apiUrl } from "./utils/apiBase";
 import { incrementListingView } from "./utils/counters";
@@ -1489,7 +1488,6 @@ export default function App() {
 
   // 6. Sign out trigger
   const handleLogout = () => {
-    signOut(auth).catch((err) => console.warn("Firebase signOut failed:", err));
     supabase.auth.signOut().catch((err) => console.warn("Supabase signOut failed:", err));
     localStorage.removeItem("gari_bazar_session_user");
     setUser(null);
