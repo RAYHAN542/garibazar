@@ -1,8 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { db, auth } from "../firebase";
 import { supabase } from "../supabase";
-import { onAuthStateChanged } from "firebase/auth";
-import {collection, onSnapshot, query, orderBy, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, limit, getAggregateFromServer, sum, count, startAfter} from "firebase/firestore";
 import { ShieldAlert, CheckCircle2, XCircle, Coins, Loader2, Save, Check, Smartphone, User, Clock, Mail, Trash2, Search, TrendingUp, Grid, Inbox, Flag, Activity, Globe, Users, MapPin, Eye, RefreshCw } from "lucide-react";
 import { SupportedLanguage } from "../types";
 
@@ -137,14 +134,6 @@ export function AdminPanel({ language, currentUser, listings: listingsProp, isUs
   const [visitEvents, setVisitEvents] = useState<any[]>([]);
   const [loadingVisits, setLoadingVisits] = useState(true);
   const [analyticsStats, setAnalyticsStats] = useState<{ totalVisits?: number; totalLogins?: number; totalSignups?: number; totalInstalls?: number }>({});
-
-  const [authReady, setAuthReady] = useState(!!auth.currentUser);
-  useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (u) => {
-      setAuthReady(!!u);
-    });
-    return () => unsub();
-  }, []);
 
   // Support tickets states
   const [ticketsList, setTicketsList] = useState<any[]>([]);
