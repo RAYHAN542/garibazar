@@ -389,9 +389,11 @@ export default function App() {
     // Last resort: fetch just this one document directly.
     (async () => {
       try {
-        const snap = await getDoc(doc(db, "listings", sharedListingId));
-        if (snap.exists()) {
-          setSelectedListing({ id: snap.id, ...snap.data() } as PartListing);
+        const { data, error } = await supabase.from("listings").select("*").eq("id", sharedListingId).maybeSingle();
+        if (error) throw error;
+        if (data) {
+          const { mapRowToListing } = await import("./utils/listingsApi");
+          setSelectedListing(mapRowToListing(data));
         }
       } catch (err) {
         console.warn("Could not fetch shared listing directly:", err);
@@ -1418,11 +1420,11 @@ export default function App() {
             localStorage.setItem("gari_bazar_local_listings", JSON.stringify(updated));
             window.dispatchEvent(new Event("storage"));
           } else {
-            const listingRef = doc(db, "listings", item.id);
-            await updateDoc(listingRef, {
-              isAd: false,
-              adExpiresAt: null
-            });
+            const { error } = await supabase
+              .from("listings")
+              .update({ is_ad: false, ad_expires_at: null })
+              .eq("id", item.id);
+            if (error) throw error;
           }
         } catch (err) {
           console.error("Error resetting expired advertisement promotion:", err);
