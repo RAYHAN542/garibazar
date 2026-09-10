@@ -8,7 +8,7 @@ import { auth, db, logAnalyticsEvent } from "./firebase";
 import { supabase } from "./supabase";
 import { logger } from "./utils/logger";
 import { trackEvent } from "./utils/trackEvent";
-import { signOut, onAuthStateChanged } from "firebase/auth";
+import { signOut } from "firebase/auth";
 import { withTimeout, TimeoutError } from "./utils/withTimeout";
 import { apiUrl } from "./utils/apiBase";
 import { incrementListingView } from "./utils/counters";
@@ -118,19 +118,6 @@ export default function App() {
   // Firebase Auth states
   const [user, setUser] = useState<any>(null);
   const [userMetadata, setUserMetadata] = useState<any>(null);
-  const [firebaseAuthUser, setFirebaseAuthUser] = useState<any>(null);
-  // 🔧 Fixes local-session/Firebase-Auth race condition: `user` above is set
-  // instantly from localStorage on startup so the UI feels fast (avatar,
-  // name, etc. show immediately). But Firestore security rules check
-  // `request.auth.uid`, which comes from the Firebase SDK's own async auth
-  // restoration -- NOT from this localStorage copy. If a uid-scoped listener
-  // (reviews, own listings, chats, profile sync) fires before Firebase
-  // Auth has actually finished restoring, it can run with `request.auth ==
-  // null` and get silently denied, or run against a stale/mismatched uid.
-  // `authReady` becomes true only once onAuthStateChanged has fired for the
-  // first time (whether the result is a user or null), and every uid-scoped
-  // listener below now waits for it.
-  const [authReady, setAuthReady] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [isPersonalInfoOpen, setIsPersonalInfoOpen] = useState(false);
   const [isLanguageOpen, setIsLanguageOpen] = useState(false);
@@ -824,20 +811,6 @@ export default function App() {
         console.error("Local session parsing failed:", err);
       }
     }
-  }, []);
-
-  // 🔧 Waits for Firebase's own auth restoration to actually finish before
-  // letting any uid-scoped Firestore listener subscribe -- see the
-  // `authReady` comment above for why this matters. This fires exactly
-  // once per app load (whether the restored user is null or real);
-  // subsequent sign-in/sign-out during the session still update `user` via
-  // the normal login/logout code paths elsewhere in the app.
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
-      setFirebaseAuthUser(firebaseUser);
-      setAuthReady(true);
-    });
-    return () => unsubscribe();
   }, []);
 
   // 🔧 FIX (Firebase -> Supabase migration, part 2): reviews, profile
