@@ -790,26 +790,55 @@ export default function App() {
     };
   }, [isAuthOpen, selectedListing, promotingListing, editingListing, isLegalOpen, isLotteryOpen]);
 
-  // 1. Custom Profile Authentication Listener & Real-time Firestore Sync
-  useEffect(() => {
-    // Read locally logged in profile on startup
+  const applyStoredSession = () => {
     const stored = localStorage.getItem("gari_bazar_session_user");
-    if (stored) {
-      try {
-        const parsed = JSON.parse(stored);
-        setUser({
-          uid: parsed.uid,
-          authUid: parsed.authUid,
-          displayName: parsed.displayName,
-          email: parsed.email,
-          photoURL: parsed.photoURL || parsed.profilePicture,
-          isAdmin: parsed.isAdmin === true
-        });
-        setUserMetadata(parsed);
-      } catch (err) {
-        console.error("Local session parsing failed:", err);
-      }
+    if (!stored) return false;
+    try {
+      const parsed = JSON.parse(stored);
+      setUser({
+        uid: parsed.uid,
+        authUid: parsed.authUid,
+        displayName: parsed.displayName,
+        email: parsed.email,
+        photoURL: parsed.photoURL || parsed.profilePicture,
+        isAdmin: parsed.isAdmin === true
+      });
+      setUserMetadata(parsed);
+      return true;
+    } catch (err) {
+      console.error("Local session parsing failed:", err);
+      return false;
     }
+  };
+
+  useEffect(() => {
+    (async () => {
+      const hadCachedProfile = applyStoredSession();
+      if (!hadCachedProfile) return;
+
+      try {
+        const { data } = await supabase.auth.getSession();
+        if (!data.session) {
+          localStorage.removeItem("gari_bazar_session_user");
+          setUser(null);
+          setUserMetadata(null);
+        }
+      } catch (err) {
+        console.warn("Session verification failed (non-fatal):", err);
+      }
+    })();
+
+    const { data: authListener } = supabase.auth.onAuthStateChange((event) => {
+      if (event === "SIGNED_OUT") {
+        localStorage.removeItem("gari_bazar_session_user");
+        setUser(null);
+        setUserMetadata(null);
+      }
+    });
+
+    return () => {
+      authListener?.subscription?.unsubscribe();
+    };
   }, []);
 
   // 🔧 FIX (Firebase -> Supabase migration, part 2): reviews, profile
