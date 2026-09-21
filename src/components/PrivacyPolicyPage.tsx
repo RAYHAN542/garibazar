@@ -351,8 +351,8 @@ export default function PrivacyPolicyPage({
                   3. Cloud Services & Data Architecture
                 </h2>
                 <p>
-                  All database and user records are stored securely in <strong>Google Firebase/Firestore</strong> servers. 
-                  We deploy automated Firebase Auth protection layers, encryption-in-transit (HTTPS/SSL), and explicit security rules to prevent information leaks.
+                  All database and user records are stored securely in <strong>Supabase (PostgreSQL)</strong> servers. 
+                  We deploy automated authentication protection layers, encryption-in-transit (HTTPS/SSL), and explicit security rules to prevent information leaks.
                 </p>
               </section>
 
