@@ -45,7 +45,7 @@
     "typescript": "~5.8.2"
   },
   "overrides": {
-    "jose": "^4.15.9",
+    "jose": "^5.9.6",
     "@capacitor-firebase/app-check": {}
   },
   "allowScripts": {
