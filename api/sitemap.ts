@@ -1,13 +1,17 @@
-import { createClient } from "@supabase/supabase-js";
+import { initializeApp, getApps, cert } from "firebase-admin/app";
+import { getFirestore } from "firebase-admin/firestore";
 
-const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
-const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const supabaseAdmin =
-  SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY
-    ? createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
-        auth: { autoRefreshToken: false, persistSession: false },
-      })
-    : null;
+if (!getApps().length) {
+  const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
+  if (serviceAccountJson) {
+    try {
+      const serviceAccount = JSON.parse(serviceAccountJson);
+      initializeApp({ credential: cert(serviceAccount) });
+    } catch (e) {
+      console.error("Failed to parse FIREBASE_SERVICE_ACCOUNT_KEY:", e);
+    }
+  }
+}
 
 const SITE_URL = "https://garibazar.shop";
 
@@ -34,23 +38,34 @@ export default async function handler(req: any, res: any) {
   let listingUrls: { loc: string; changefreq: string; priority: string; lastmod?: string }[] = [];
 
   try {
-    if (supabaseAdmin) {
-      const { data, error } = await supabaseAdmin
-        .from("listings")
-        .select("id, created_at, is_sold, is_deleted")
-        .order("created_at", { ascending: false })
-        .limit(5000);
+    if (getApps().length) {
+      const db = getFirestore();
+      const snap = await db
+        .collection("listings")
+        .orderBy("createdAt", "desc")
+        .limit(5000)
+        .get();
 
-      if (!error && data) {
-        listingUrls = data
-          .filter((row: any) => !row.is_deleted && !row.is_sold)
-          .map((row: any) => ({
-            loc: `${SITE_URL}/l/${row.id}`,
+      listingUrls = snap.docs
+        .filter((doc) => {
+          const d = doc.data() as any;
+          return d.status !== "deleted" && d.status !== "sold" && d.status !== "removed";
+        })
+        .map((doc) => {
+          const d = doc.data() as any;
+          let lastmod: string | undefined;
+          try {
+            if (d.createdAt?.toDate) lastmod = d.createdAt.toDate().toISOString().slice(0, 10);
+          } catch {
+            // ignore
+          }
+          return {
+            loc: `${SITE_URL}/l/${doc.id}`,
             changefreq: "weekly",
             priority: "0.8",
-            lastmod: row.created_at ? String(row.created_at).slice(0, 10) : undefined,
-          }));
-      }
+            lastmod,
+          };
+        });
     }
   } catch (e) {
     console.error("sitemap generation error:", e);

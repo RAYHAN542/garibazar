@@ -196,8 +196,8 @@ export default function PrivacyPolicyPage({
                   ৩. ডেটা স্টোরেজ ও নিরাপত্তা (Storage & Security)
                 </h2>
                 <p>
-                  আমরা আপনার সমস্ত লিস্টিং, অবস্থান এবং প্রফাইল তথ্য <strong>গুগল ফায়ারবেস ফায়ারস্টোর (Supabase - PostgreSQL)</strong> ক্লাউড প্রযুক্তির মাধ্যমে সুরক্ষিত অবস্থায় সংরক্ষণ করি। 
-                  অননুমোদিত প্রবেশ ঠেকাতে আমরা কঠোর সিকিউরিটি রুলস (Row Level Security - RLS) এবং এসএসএল ট্রান্সমিশন এনক্রিপশন ব্যবহার করি।
+                  আমরা আপনার সমস্ত লিস্টিং, অবস্থান এবং প্রফাইল তথ্য <strong>গুগল ফায়ারবেস ফায়ারস্টোর (Google Firebase Firestore)</strong> ক্লাউড প্রযুক্তির মাধ্যমে সুরক্ষিত অবস্থায় সংরক্ষণ করি। 
+                  অননুমোদিত প্রবেশ ঠেকাতে আমরা কঠোর সিকিউরিটি রুলস (Firestore Security Rules) এবং এসএসএল ট্রান্সমিশন এনক্রিপশন ব্যবহার করি।
                 </p>
               </section>
 
@@ -351,8 +351,8 @@ export default function PrivacyPolicyPage({
                   3. Cloud Services & Data Architecture
                 </h2>
                 <p>
-                  All database and user records are stored securely in <strong>Supabase (PostgreSQL)</strong> servers. 
-                  We deploy automated authentication protection layers, encryption-in-transit (HTTPS/SSL), and explicit security rules to prevent information leaks.
+                  All database and user records are stored securely in <strong>Google Firebase/Firestore</strong> servers. 
+                  We deploy automated Firebase Auth protection layers, encryption-in-transit (HTTPS/SSL), and explicit security rules to prevent information leaks.
                 </p>
               </section>
 

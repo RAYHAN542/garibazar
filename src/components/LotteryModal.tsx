@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from "react";
 import { X, PartyPopper, Frown, Loader2, ShieldAlert, Gift, ChevronDown, Check } from "lucide-react";
 import { PartListing, SupportedLanguage } from "../types";
-import { supabase } from "../supabase";
+import { auth } from "../firebase";
 import { apiUrl } from "../utils/apiBase";
 
 interface LotteryModalProps {
@@ -85,11 +85,10 @@ export function LotteryModal({ isOpen, onClose, language, currentUser, userMetad
     spinStartTimeRef.current = Date.now();
 
     try {
-      const { data: sessionData } = await supabase.auth.getSession();
-      const token = sessionData.session?.access_token;
+      const idToken = await auth.currentUser?.getIdToken();
       const res = await fetch(apiUrl("/api/draw"), {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
         body: JSON.stringify({ listingId: activeListingId }),
       });
 

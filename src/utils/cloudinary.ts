@@ -1,5 +1,5 @@
 import { logger } from "./logger";
-import { supabase } from "../supabase";
+import { auth } from "../firebase";
 import { apiUrl } from "./apiBase";
 
 const MAX_UPLOAD_DIMENSION = 1600;
@@ -76,8 +76,7 @@ export const uploadToCloudinary = async (file: File | Blob): Promise<string> => 
     }
   }
 
-  const { data: sessionData } = await supabase.auth.getSession();
-  const idToken = sessionData.session?.access_token;
+  const idToken = await auth.currentUser?.getIdToken();
   if (!idToken) {
     throw new Error("ছবি আপলোড করতে হলে লগইন থাকতে হবে। / You must be logged in to upload images.");
   }

@@ -13,12 +13,8 @@ const LOCK_DURATION_MS = 15 * 60 * 1000;
 const RATE_LIMIT_WINDOW_MS = 60 * 1000;
 const RATE_LIMIT_MAX = 10;
 
-function toEnglishDigits(raw: string): string {
-  return String(raw || "").replace(/[০-৯]/g, (digit) => String("০১২৩৪৫৬৭৮৯".indexOf(digit)));
-}
-
 function normalizeBanglaPhone(raw: string): string | null {
-  const digits = toEnglishDigits(raw).replace(/[^\d]/g, "");
+  const digits = String(raw || "").replace(/[^\d]/g, "");
   let local = digits;
   if (local.startsWith("880")) local = local.slice(3);
   if (local.startsWith("0")) local = local.slice(1);
@@ -47,59 +43,6 @@ async function isRateLimited(key: string): Promise<boolean> {
   return newCount > RATE_LIMIT_MAX;
 }
 
-// 🔧 Fixes the RLS mapping bug: without this, current_uid() (used by every
-// chats/listings/user_limits RLS policy) returns the wrong uid for anyone
-// whose Supabase Auth id differs from their app uid (i.e. every migrated
-// legacy user) -- see the long comment in the previous revision of this file.
-async function linkAuthUser(authUid: string, appUid: string): Promise<void> {
-  if (!authUid || !appUid || authUid === appUid) return;
-  try {
-    const { error } = await supabaseAdmin
-      .from("user_auth_links")
-      .upsert({ auth_uid: authUid, app_uid: appUid }, { onConflict: "auth_uid" });
-    if (error) console.error("[phone auth] user_auth_links upsert failed:", error.message);
-  } catch (e) {
-    console.error("[phone auth] failed to link auth_uid -> app_uid:", e);
-  }
-}
-
-function phoneVariants(intlPhone: string): string[] {
-  const local = intlPhone.replace("+880", "");
-  return [intlPhone, `880${local}`, `0${local}`, local];
-}
-
-async function findLegacyProfile(intlPhone: string): Promise<{ uid: string } | null> {
-  const { data, error } = await supabaseAdmin
-    .from("users")
-    .select("uid, phone, created_at")
-    .in("phone", phoneVariants(intlPhone))
-    .order("created_at", { ascending: true })
-    .limit(1);
-  if (error) {
-    console.error("legacy profile lookup failed:", error.message);
-  } else if (data && data[0]) {
-    return { uid: data[0].uid };
-  }
-
-  const { data: candidates, error: fallbackError } = await supabaseAdmin
-    .from("users")
-    .select("uid, phone, created_at")
-    .not("phone", "is", null)
-    .order("created_at", { ascending: true });
-  if (fallbackError) {
-    console.error("legacy profile fallback lookup failed:", fallbackError.message);
-    return null;
-  }
-
-  const match = (candidates || []).find((candidate: any) => normalizeBanglaPhone(candidate.phone) === intlPhone);
-  return match ? { uid: match.uid } : null;
-}
-
-async function resolveAppUid(authUserId: string, intlPhone: string): Promise<string> {
-  const legacy = await findLegacyProfile(intlPhone);
-  return legacy?.uid || authUserId;
-}
-
 async function handleSignup(req: any, res: any) {
   const phone = normalizeBanglaPhone(req.body?.phone);
   const password = String(req.body?.password || "");
@@ -111,7 +54,6 @@ async function handleSignup(req: any, res: any) {
     return res.status(400).json({ error: "পাসওয়ার্ড কমপক্ষে ৮ ক্যারেক্টার হতে হবে।" });
   }
 
-  const legacy = await findLegacyProfile(phone);
   const { error: createError } = await supabaseAdmin.auth.admin.createUser({
     phone,
     password,
@@ -120,21 +62,6 @@ async function handleSignup(req: any, res: any) {
 
   if (createError) {
     if (createError.status === 422 || /already.*registered|already.*exists/i.test(createError.message || "")) {
-      if (legacy) {
-        const { data: existingSession, error: existingSignInError } =
-          await supabaseAdmin.auth.signInWithPassword({ phone, password });
-        if (!existingSignInError && existingSession.session) {
-          await linkAuthUser(existingSession.user.id, legacy.uid);
-          return res.status(200).json({
-            access_token: existingSession.session.access_token,
-            refresh_token: existingSession.session.refresh_token,
-            uid: legacy.uid,
-            auth_uid: existingSession.user.id,
-            phone,
-            claimed: true,
-          });
-        }
-      }
       return res.status(409).json({
         error: "এই নম্বরে আগে থেকেই অ্যাকাউন্ট আছে। লগইন করুন।",
         code: "ALREADY_REGISTERED",
@@ -146,19 +73,15 @@ async function handleSignup(req: any, res: any) {
   const { data: sessionData, error: signInError } = await supabaseAdmin.auth.signInWithPassword({ phone, password });
   if (signInError || !sessionData.session) throw signInError || new Error("no session after signup");
 
-  const appUid = legacy?.uid || (await resolveAppUid(sessionData.user.id, phone));
-  await linkAuthUser(sessionData.user.id, appUid);
-
   await supabaseAdmin.from("users").upsert(
-    { uid: appUid, phone, created_at: new Date().toISOString() },
+    { uid: sessionData.user.id, phone, created_at: new Date().toISOString() },
     { onConflict: "uid" }
   );
 
   return res.status(200).json({
     access_token: sessionData.session.access_token,
     refresh_token: sessionData.session.refresh_token,
-    uid: appUid,
-    auth_uid: sessionData.user.id,
+    uid: sessionData.user.id,
     phone,
   });
 }
@@ -197,39 +120,6 @@ async function handleLogin(req: any, res: any) {
     await supabaseAdmin.from("login_lockouts").upsert(update, { onConflict: "phone" });
 
     if (/invalid login credentials/i.test(error.message || "")) {
-      const legacy = await findLegacyProfile(phone);
-      if (legacy) {
-        if (password.length < 8) {
-          return res.status(400).json({
-            error: "আপনার পুরনো অ্যাকাউন্ট নতুন সিস্টেমে এসেছে। এখন কমপক্ষে ৮ ক্যারেক্টারের একটি নতুন পাসওয়ার্ড দিন — সেটাই আপনার পাসওয়ার্ড হয়ে যাবে।",
-            code: "LEGACY_SET_PASSWORD",
-          });
-        }
-        const { data: created, error: createError } = await supabaseAdmin.auth.admin.createUser({
-          phone,
-          password,
-          phone_confirm: true,
-        });
-        if (!createError && created?.user) {
-          const { data: claimedSession, error: claimSignInError } =
-            await supabaseAdmin.auth.signInWithPassword({ phone, password });
-          if (!claimSignInError && claimedSession?.session) {
-            await linkAuthUser(claimedSession.user.id, legacy.uid);
-            await supabaseAdmin
-              .from("login_lockouts")
-              .update({ failed_attempts: 0, lock_until: null })
-              .eq("phone", phone);
-            return res.status(200).json({
-              access_token: claimedSession.session.access_token,
-              refresh_token: claimedSession.session.refresh_token,
-              uid: legacy.uid,
-              auth_uid: claimedSession.user.id,
-              phone,
-              claimed: true,
-            });
-          }
-        }
-      }
       return res.status(400).json({ error: "ভুল পাসওয়ার্ড অথবা এই নম্বরে কোনো অ্যাকাউন্ট নেই।" });
     }
     throw error;
@@ -239,14 +129,10 @@ async function handleLogin(req: any, res: any) {
     await supabaseAdmin.from("login_lockouts").update({ failed_attempts: 0, lock_until: null }).eq("phone", phone);
   }
 
-  const appUid = await resolveAppUid(sessionData.user!.id, phone);
-  await linkAuthUser(sessionData.user!.id, appUid);
-
   return res.status(200).json({
     access_token: sessionData.session!.access_token,
     refresh_token: sessionData.session!.refresh_token,
-    uid: appUid,
-    auth_uid: sessionData.user!.id,
+    uid: sessionData.user!.id,
     phone,
   });
 }
