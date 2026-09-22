@@ -3,6 +3,7 @@ import { getAuth } from "firebase-admin/auth";
 import { getFirestore } from "firebase-admin/firestore";
 import { applyCors } from "./_lib/cors.js";
 import { checkAndBumpRateLimit } from "./_lib/rateLimit.js";
+import { verifySupabaseToken } from "./_lib/verifyJwt.js";
 import { createClient } from "@supabase/supabase-js";
 
 // ------------------------------------------------------------------------
@@ -26,6 +27,16 @@ import { createClient } from "@supabase/supabase-js";
 // number now. firestore.rules' listings/{id}/private/{docId} read rule is
 // locked down to owner+admin only (see the rule comment), so a client
 // trying to bypass this endpoint and read Firestore directly gets denied.
+//
+// 🔧 SECOND FIX (2026-09-23): this endpoint only ever verified a Firebase
+// ID token. Login moved to Supabase months ago, so the frontend has been
+// sending a Supabase access token here -- getAuth().verifyIdToken() always
+// threw on that (wrong signer entirely), so EVERY "Show number" click by a
+// regular signed-in buyer failed and rendered "—". Owners/admins didn't
+// notice because that path fetches the number a different way (direct
+// Supabase RPC from the client, see ListingDetailModal.tsx). Now this
+// tries the current Supabase token first, and only falls back to the old
+// Firebase check for any still-cached legacy sessions.
 // ------------------------------------------------------------------------
 
 if (!getApps().length) {
@@ -52,39 +63,53 @@ export default async function handler(req: any, res: any) {
   }
 
   try {
-    if (!getApps().length) {
-      return res.status(500).json({ error: "সার্ভার কনফিগারেশনে সমস্যা।" });
-    }
-
     const authHeader = req.headers.authorization || "";
     const idToken = authHeader.replace("Bearer ", "");
     if (!idToken) {
       return res.status(401).json({ error: "লগইন করা প্রয়োজন।" });
     }
-    const decoded = await getAuth().verifyIdToken(idToken); // throws if invalid/expired
+
+    // Try the current login system (Supabase) first.
+    let uid: string | null = await verifySupabaseToken(idToken);
+
+    // Fall back to a legacy Firebase ID token, if any cached session still
+    // sends one and Firebase Admin is configured.
+    if (!uid) {
+      if (!getApps().length) {
+        return res.status(401).json({ error: "যাচাই ব্যর্থ হয়েছে।" });
+      }
+      try {
+        const decoded = await getAuth().verifyIdToken(idToken);
+        uid = decoded.uid;
+      } catch (e) {
+        return res.status(401).json({ error: "যাচাই ব্যর্থ হয়েছে।" });
+      }
+    }
 
     const { listingId } = req.body || {};
     if (!listingId || typeof listingId !== "string") {
       return res.status(400).json({ error: "listingId প্রয়োজন।" });
     }
 
-    const allowed = await checkAndBumpRateLimit(`contact_reveal_${decoded.uid}`, RATE_LIMIT_WINDOW_MS, RATE_LIMIT_MAX);
+    const allowed = await checkAndBumpRateLimit(`contact_reveal_${uid}`, RATE_LIMIT_WINDOW_MS, RATE_LIMIT_MAX);
     if (!allowed) {
       return res.status(429).json({
         error: "অনেকবার নম্বর দেখার চেষ্টা হয়েছে। কিছুক্ষণ পর আবার চেষ্টা করুন।",
       });
     }
 
-    const db = getFirestore();
-    const contactSnap = await db
-      .collection("listings")
-      .doc(listingId)
-      .collection("private")
-      .doc("contact")
-      .get();
+    if (getApps().length) {
+      const db = getFirestore();
+      const contactSnap = await db
+        .collection("listings")
+        .doc(listingId)
+        .collection("private")
+        .doc("contact")
+        .get();
 
-    if (contactSnap.exists && contactSnap.data()?.contactNumber) {
-      return res.status(200).json({ contactNumber: contactSnap.data()?.contactNumber });
+      if (contactSnap.exists && contactSnap.data()?.contactNumber) {
+        return res.status(200).json({ contactNumber: contactSnap.data()?.contactNumber });
+      }
     }
 
     // Not in Firestore - this listing was created after the Supabase
@@ -93,8 +118,8 @@ export default async function handler(req: any, res: any) {
     // query rather than the get_listing_contact_number RPC - that RPC's
     // own "must be signed in" check reads the caller's Supabase session
     // JWT, which doesn't exist when called with a plain service-role
-    // client. This endpoint already did its own Firebase-token auth +
-    // rate limit above, so re-checking via RLS here would be redundant.
+    // client. This endpoint already did its own auth + rate limit above,
+    // so re-checking via RLS here would be redundant.
     const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
     const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
     if (!supabaseUrl || !supabaseServiceKey) {
