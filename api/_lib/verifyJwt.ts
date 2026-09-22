@@ -1,22 +1,25 @@
-import { jwtVerify } from "jose";
+import { createRemoteJWKSet, jwtVerify } from "jose";
 
-// Verifies a Supabase Auth access token LOCALLY (HS256, shared secret) --
-// no network round-trip to Supabase's Auth server, unlike
-// supabaseAdmin.auth.getUser(token). This matches how Firebase's
-// verifyIdToken() used to work (cryptographic check against a cached key),
-// which is why removing the Firebase bridge made things feel slower --
-// every authenticated request was paying for an extra network hop that
-// didn't exist before.
-const JWT_SECRET = process.env.SUPABASE_JWT_SECRET;
-const secretKey = JWT_SECRET ? new TextEncoder().encode(JWT_SECRET) : null;
+// 🔧 FIX: this project signs session tokens with an asymmetric key
+// (ES256), not the legacy shared HS256 secret -- SUPABASE_JWT_SECRET
+// doesn't apply here. Verify against Supabase's own public JWKS instead.
+// `jose`'s createRemoteJWKSet caches the keys in memory after the first
+// fetch (keeping this warm across invocations on the same serverless
+// instance), so this is still a locally-verified check on almost every
+// request -- not a getUser() network round-trip every time.
+const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+
+const JWKS = SUPABASE_URL
+  ? createRemoteJWKSet(new URL(`${SUPABASE_URL}/auth/v1/.well-known/jwks.json`))
+  : null;
 
 export async function verifySupabaseToken(token: string): Promise<string | null> {
-  if (!secretKey) {
-    console.error("[verifyJwt] SUPABASE_JWT_SECRET not set -- cannot verify tokens locally.");
+  if (!JWKS) {
+    console.error("[verifyJwt] SUPABASE_URL not set -- cannot verify tokens.");
     return null;
   }
   try {
-    const { payload } = await jwtVerify(token, secretKey, { algorithms: ["HS256"] });
+    const { payload } = await jwtVerify(token, JWKS);
     if (payload.sub && payload.aud === "authenticated") {
       return payload.sub as string;
     }
