@@ -39,19 +39,20 @@ const PRESET_AVATARS = [
 ];
 
 const compressImageToBlob = async (file: File, maxWidth = 512, maxHeight = 512): Promise<Blob> => {
-  const img = await new Promise<HTMLImageElement>((resolve, reject) => {
-    const objectUrl = URL.createObjectURL(file);
-    const image = new Image();
-    image.onload = () => {
-      URL.revokeObjectURL(objectUrl);
-      resolve(image);
-    };
-    image.onerror = () => {
-      URL.revokeObjectURL(objectUrl);
-      reject(new Error("Failed to load image for compression"));
-    };
-    image.src = objectUrl;
-  });
+  try {
+    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const objectUrl = URL.createObjectURL(file);
+      const image = new Image();
+      image.onload = () => {
+        URL.revokeObjectURL(objectUrl);
+        resolve(image);
+      };
+      image.onerror = () => {
+        URL.revokeObjectURL(objectUrl);
+        reject(new Error("Failed to load image for compression"));
+      };
+      image.src = objectUrl;
+    });
 
   let { width, height } = img;
   if (width > height) {
@@ -71,12 +72,19 @@ const compressImageToBlob = async (file: File, maxWidth = 512, maxHeight = 512):
   if (!ctx) throw new Error("Canvas context is null");
   ctx.drawImage(img, 0, 0, width, height);
 
-  return await new Promise<Blob>((resolve, reject) => {
-    canvas.toBlob((b) => {
-      if (!b) reject(new Error("Failed to convert canvas to Blob"));
-      else resolve(b);
-    }, "image/jpeg", 0.8);
-  });
+    return await new Promise<Blob>((resolve, reject) => {
+      canvas.toBlob((b) => {
+        if (!b) reject(new Error("Failed to convert canvas to Blob"));
+        else resolve(b);
+      }, "image/jpeg", 0.8);
+    });
+  } catch (err) {
+    // Some Android browsers cannot decode iPhone HEIC/HEIF. Cloudinary can
+    // receive the original file, so don't block signup just because local
+    // browser compression is unavailable.
+    console.warn("Image compression skipped; uploading original file.", err);
+    return file;
+  }
 };
 
 const GoogleIcon = () => (
@@ -266,12 +274,16 @@ export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModa
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (!file.type.startsWith("image/")) {
+    const fileName = file.name.toLowerCase();
+    const isHeic = fileName.endsWith(".heic") || fileName.endsWith(".heif") ||
+      file.type === "image/heic" || file.type === "image/heif";
+
+    if (!file.type.startsWith("image/") && !isHeic) {
       setError(language === "bn" ? "শুধু ছবি ফাইল দিতে পারবেন" : "Only image files are allowed");
       return;
     }
-    if (file.size > 5 * 1024 * 1024) {
-      setError(language === "bn" ? "ছবির সাইজ ৫MB এর কম হতে হবে" : "Photo must be under 5MB");
+    if (file.size > 10 * 1024 * 1024) {
+      setError(language === "bn" ? "ছবির সাইজ ১০MB এর কম হতে হবে" : "Photo must be under 10MB");
       return;
     }
 
