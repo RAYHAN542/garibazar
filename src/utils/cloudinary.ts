@@ -1,5 +1,5 @@
 import { logger } from "./logger";
-import { auth } from "../firebase";
+import { supabase } from "../supabase";
 import { apiUrl } from "./apiBase";
 
 const MAX_UPLOAD_DIMENSION = 1600;
@@ -62,8 +62,9 @@ export const uploadToCloudinary = async (file: File | Blob): Promise<string> => 
   // from completely outside the site, burning storage/bandwidth quota with
   // junk files. Now: ask our own /api/cloudinary-sign endpoint for a
   // short-lived signature first -- that endpoint verifies the caller is a
-  // real logged-in user of this app (via Firebase ID token) before signing
-  // anything, so an outsider with just the preset name can no longer upload.
+  // real logged-in user of this app (via Supabase access token) before
+  // signing anything, so an outsider with just the preset name can no
+  // longer upload.
 
   // Validate before doing any work: only real images, and not absurdly large
   // (a corrupted/huge file would otherwise hang the compression step below).
@@ -76,8 +77,13 @@ export const uploadToCloudinary = async (file: File | Blob): Promise<string> => 
     }
   }
 
-  const idToken = await auth.currentUser?.getIdToken();
-  if (!idToken) {
+  // 🔧 Firebase -> Supabase migration: login is 100% Supabase Auth now
+  // (auth.currentUser was always null for phone-registered users, since
+  // phone signup/login never touches Firebase at all -- every upload was
+  // failing at this exact step before this fix).
+  const { data: sessionData } = await supabase.auth.getSession();
+  const accessToken = sessionData.session?.access_token;
+  if (!accessToken) {
     throw new Error("ছবি আপলোড করতে হলে লগইন থাকতে হবে। / You must be logged in to upload images.");
   }
 
@@ -95,8 +101,8 @@ export const uploadToCloudinary = async (file: File | Blob): Promise<string> => 
   }
 
   // Ask our server for a signature. This also doubles as the auth check --
-  // if the ID token is missing/expired, this call fails before anything is
-  // ever sent to Cloudinary.
+  // if the access token is missing/expired, this call fails before anything
+  // is ever sent to Cloudinary.
   //
   // Wrapped separately from the Cloudinary upload fetch below: a
   // network-level failure here (CORS block, DNS, offline) throws the exact
@@ -108,7 +114,7 @@ export const uploadToCloudinary = async (file: File | Blob): Promise<string> => 
   try {
     signRes = await fetch(apiUrl("/api/cloudinary-sign"), {
       method: "POST",
-      headers: { Authorization: `Bearer ${idToken}` },
+      headers: { Authorization: `Bearer ${accessToken}` },
     });
   } catch (err: any) {
     throw new Error(`[SIGN] ${err?.message || err}`);
