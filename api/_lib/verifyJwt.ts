@@ -20,8 +20,10 @@ export async function verifySupabaseToken(token: string): Promise<string | null>
     if (payload.sub && payload.aud === "authenticated") {
       return payload.sub as string;
     }
+    console.error("[verifyJwt] token verified but aud/sub unexpected:", JSON.stringify({ aud: payload.aud, hasSub: !!payload.sub }));
     return null;
-  } catch (e) {
+  } catch (e: any) {
+    console.error("[verifyJwt] verification failed:", e?.code || e?.name, e?.message);
     return null;
   }
 }
