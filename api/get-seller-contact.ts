@@ -1,3 +1,4 @@
+import { verifySupabaseToken } from "./_lib/verifyJwt.js";
 import { applyCors } from "./_lib/cors.js";
 import { checkAndBumpRateLimit } from "./_lib/rateLimit.js";
 import { createClient } from "@supabase/supabase-js";
@@ -35,14 +36,7 @@ const RATE_LIMIT_MAX = 50; // reveals per user per hour -- generous for a
 // harvesting the whole marketplace's phone numbers in one sweep.
 
 async function resolveCallerUid(token: string): Promise<string | null> {
-  if (!supabaseAdmin) return null;
-  try {
-    const { data, error } = await supabaseAdmin.auth.getUser(token);
-    if (!error && data?.user?.id) return data.user.id;
-  } catch (e) {
-    console.error("[get-seller-contact] supabase token check failed:", e);
-  }
-  return null;
+  return verifySupabaseToken(token);
 }
 
 async function lookupSupabaseContact(listingId: string): Promise<string | null> {

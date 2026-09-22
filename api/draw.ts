@@ -1,3 +1,4 @@
+import { verifySupabaseToken } from "./_lib/verifyJwt.js";
 import { createClient } from "@supabase/supabase-js";
 import { randomInt } from "crypto";
 import { applyCors } from "./_lib/cors.js";
@@ -12,15 +13,7 @@ const supabaseAdmin =
     : null;
 
 async function resolveCallerUid(token: string): Promise<string | null> {
-  if (supabaseAdmin) {
-    try {
-      const { data, error } = await supabaseAdmin.auth.getUser(token);
-      if (!error && data?.user?.id) return data.user.id;
-    } catch (e) {
-      console.error("[draw] supabase token check failed:", e);
-    }
-  }
-  return null;
+  return verifySupabaseToken(token);
 }
 
 // 🔧 FIX: same root cause as api/delete-account.ts -- a migrated ("restore

@@ -1,3 +1,4 @@
+import { verifySupabaseToken } from "./_lib/verifyJwt.js";
 import crypto from "crypto";
 import { applyCors } from "./_lib/cors.js";
 import { checkAndBumpRateLimit } from "./_lib/rateLimit.js";
@@ -24,15 +25,7 @@ const supabaseAdmin =
     : null;
 
 async function resolveCallerUid(token: string): Promise<string | null> {
-  if (supabaseAdmin) {
-    try {
-      const { data, error } = await supabaseAdmin.auth.getUser(token);
-      if (!error && data?.user?.id) return data.user.id;
-    } catch (e) {
-      console.error("[cloudinary-sign] supabase token check failed:", e);
-    }
-  }
-  return null;
+  return verifySupabaseToken(token);
 }
 
 export default async function handler(req: any, res: any) {

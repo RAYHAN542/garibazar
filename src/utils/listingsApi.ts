@@ -130,3 +130,30 @@ export async function fetchMyListings(uid: string, authUid?: string | null, limi
   if (error) throw error;
   return (data || []).map(mapRowToListing);
 }
+
+// 🔧 App.tsx-এ শেয়ার-করা লিংক (?listing=<id>) সরাসরি খোলার জন্য এতদিন
+// সরাসরি Firestore getDoc() ব্যবহার হতো -- Supabase-এ migrate হওয়া
+// নতুন listing (Firestore-এ কখনো ছিলই না) এভাবে খুললে সবসময় ব্যর্থ হতো।
+export async function fetchListingById(id: string): Promise<PartListing | null> {
+  const { data, error } = await supabase
+    .from("listings")
+    .select("*")
+    .eq("id", id)
+    .eq("is_deleted", false)
+    .maybeSingle();
+
+  if (error) throw error;
+  if (!data) return null;
+  return mapRowToListing(data);
+}
+
+// 🔧 মেয়াদ শেষ হওয়া ad promotion রিসেট করাও আগে সরাসরি Firestore
+// updateDoc() দিয়ে হতো -- একই কারণে নতুন (Supabase-only) listing-এর জন্য
+// silently ব্যর্থ হতো, ad মেয়াদ শেষ হওয়ার পরও isAd:true থেকে যেত।
+export async function resetExpiredAdPromotion(id: string): Promise<void> {
+  const { error } = await supabase
+    .from("listings")
+    .update({ is_ad: false, ad_expires_at: null })
+    .eq("id", id);
+  if (error) throw error;
+}
