@@ -4,6 +4,7 @@ import { getAuth } from "firebase-admin/auth";
 import { createClient } from "@supabase/supabase-js";
 import { applyCors } from "./_lib/cors.js";
 import { checkAndBumpRateLimit } from "./_lib/rateLimit.js";
+import { verifySupabaseToken } from "./_lib/verifyJwt.js";
 
 // একই IP থেকে মিনিটে ৩০ বারের বেশি রিকোয়েস্ট এলে চুপচাপ বাদ দেওয়া হয়, যাতে
 // কেউ ইচ্ছাকৃতভাবে স্প্যাম করে না পারে। এটা in-memory (ওয়ার্ম ইনস্ট্যান্সে টিকে
@@ -57,9 +58,13 @@ if (!getApps().length) {
 // table instead of Firestore. `analytics_daily` (the rollup Admin Panel reads)
 // updates itself automatically via a DB trigger (`trg_bump_analytics_daily`)
 // on every site_visits insert -- no extra write needed here for that path.
-// Per-listing view/click/save/unsave (handleListingInteraction below) is
-// UNCHANGED and still uses Firestore -- that part isn't broken and is out of
-// scope for this fix.
+// Per-listing view/click/save/unsave (handleListingInteraction below) still
+// writes to Firestore (unchanged) -- only its AUTH check was fixed
+// (2026-09-24): it used to verify Firebase ID tokens only, so a
+// Supabase-logged-in user's click/save/unsave always failed with "লগইন করা
+// প্রয়োজন।" even though they were signed in (view didn't need login, so
+// that one worked fine). Now tries Supabase first, Firebase as fallback,
+// same pattern as every other endpoint here.
 const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const supabaseAdmin =
@@ -111,18 +116,21 @@ async function handleListingInteraction(req: any, res: any, listingId: string, t
   }
 
   // click/save/unsave all require a real signed-in user -- verify the
-  // Firebase ID token the same way every other authenticated endpoint here
-  // does, rather than trusting a client-supplied uid.
+  // token server-side rather than trusting a client-supplied uid. Tries
+  // the current Supabase token first, legacy Firebase ID token as fallback.
   const authHeader = req.headers.authorization || "";
   const idToken = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
   if (!idToken) return res.status(401).json({ error: "লগইন করা প্রয়োজন।" });
-  let uid: string;
-  try {
-    const decoded = await getAuth().verifyIdToken(idToken);
-    uid = decoded.uid;
-  } catch {
-    return res.status(401).json({ error: "সেশন মেয়াদোত্তীর্ণ, আবার লগইন করুন।" });
+  let uid: string | null = await verifySupabaseToken(idToken);
+  if (!uid && getApps().length) {
+    try {
+      const decoded = await getAuth().verifyIdToken(idToken);
+      uid = decoded.uid;
+    } catch {
+      uid = null;
+    }
   }
+  if (!uid) return res.status(401).json({ error: "সেশন মেয়াদোত্তীর্ণ, আবার লগইন করুন।" });
 
   if (type === "click") {
     // Once per user per listing per day -- repeatedly tapping "Show Number"
