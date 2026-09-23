@@ -2,9 +2,9 @@ import React, { useState } from "react";
 import { PartListing, SupportedLanguage } from "../types";
 import { X, CheckCircle, ShieldAlert, Award, Loader2, CreditCard, Lock } from "lucide-react";
 import { AD_PACKAGES } from "../translations";
-import { collection, addDoc } from "firebase/firestore";
 import { apiUrl } from "../utils/apiBase";
-import { db, auth } from "../firebase";
+import { auth } from "../firebase";
+import { supabase } from "../supabase";
 
 interface PromoteAdModalProps {
   listing: PartListing;
@@ -29,9 +29,8 @@ export function PromoteAdModal({ listing, language, currentUser, onClose, onProm
       return;
     }
 
-    // firestore.rules এখন শুধু নিজের listing promote করার অনুমতি দেয় (item
-    // #21 fix) -- অন্য কারো (সংরক্ষিত/সেভ করা) পোস্টে এই মোডাল খোলা থাকলে,
-    // চেষ্টা করে raw "insufficient permissions" এরর দেখানোর বদলে আগেই
+    // শুধু নিজের listing promote করার অনুমতি -- অন্য কারো (সংরক্ষিত/সেভ করা)
+    // পোস্টে এই মোডাল খোলা থাকলে, চেষ্টা করে raw এরর দেখানোর বদলে আগেই
     // স্পষ্ট বাংলা মেসেজ দেখানো হচ্ছে।
     if (listing.sellerId && listing.sellerId !== currentUser.uid) {
       setError(
@@ -47,27 +46,39 @@ export function PromoteAdModal({ listing, language, currentUser, onClose, onProm
     try {
       // 1. Create a pending refill_request — the UddoktaPay webhook will
       //    verify the payment and activate the ad automatically.
-      const docData = {
-        userId: currentUser.uid,
-        userName: currentUser.displayName || "Seller",
-        userEmail: currentUser.email || "",
-        amount: Number(selectedPackage.price),
-        status: "pending",
-        type: "ad_promotion",
-        listingId: listing.id,
-        listingTitle: listing.title,
-        adTier: selectedPackage.tier,
-        durationDays: selectedPackage.durationDays,
-        createdAt: new Date().toISOString()
-      };
-      const docRef = await addDoc(collection(db, "refill_requests"), docData);
+      //    🔧 (2026-09-23) এটা আগে Firestore-এ addDoc হতো, কিন্তু
+      //    firestore.rules-এর এই কালেকশনে request.auth.uid লাগে -- যেটা
+      //    Supabase দিয়ে লগইন করা ইউজারের কখনোই থাকে না। ফলে এই write
+      //    সবসময় permission-denied দিয়ে ব্যর্থ হতো। refill_requests টেবিল
+      //    Supabase-এও আছে RLS পলিসিসহ, তাই এখন সরাসরি সেখানেই লেখা হয়।
+      const { data: inserted, error: insertErr } = await supabase
+        .from("refill_requests")
+        .insert({
+          user_id: currentUser.uid,
+          user_name: currentUser.displayName || "Seller",
+          user_email: currentUser.email || "",
+          amount: Number(selectedPackage.price),
+          status: "pending",
+          type: "ad_promotion",
+          listing_id: listing.id,
+          listing_title: listing.title,
+          ad_tier: selectedPackage.tier,
+          duration_days: selectedPackage.durationDays,
+        })
+        .select("id")
+        .single();
+
+      if (insertErr || !inserted) {
+        throw new Error(insertErr?.message || "রিকোয়েস্ট তৈরি করা যায়নি।");
+      }
 
       // 2. Ask our server to open a real UddoktaPay checkout session for this request.
-      const idToken = await auth.currentUser?.getIdToken();
+      const { data: sessionData } = await supabase.auth.getSession();
+      const idToken = sessionData?.session?.access_token || (await auth.currentUser?.getIdToken());
       const res = await fetch(apiUrl("/api/payment/create-charge"), {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
-        body: JSON.stringify({ requestId: docRef.id })
+        body: JSON.stringify({ requestId: inserted.id })
       });
       const data = await res.json();
 
@@ -107,7 +118,7 @@ export function PromoteAdModal({ listing, language, currentUser, onClose, onProm
             </div>
             
             <h3 className="text-2xl font-black text-slate-900 dark:text-white font-sans tracking-tight">
-              {language === "bn" ? "পেমেন্ট রিকোয়েস্ট সাবমিট হয়েছে!" : "Payment Submitted!"}
+              {language === "bn" ? "পেমেন্ট রিকোয়েস্ট সাবমিট হয়েছে!" : "Payment Submitted!"}
             </h3>
             
             <div className="bg-slate-50 dark:bg-slate-950 border rounded-xl p-4 max-w-sm text-xs text-slate-500 dark:text-slate-400 leading-relaxed text-left space-y-2">
@@ -155,7 +166,7 @@ export function PromoteAdModal({ listing, language, currentUser, onClose, onProm
               </h3>
               <p className="text-slate-500 dark:text-slate-450 text-xs mt-1 leading-relaxed">
                 {language === "bn" 
-                  ? "যে প্যাকেজটি নিতে চান সেটি সিলেক্ট করে সরাসরি নিচে দেয়া নাম্বারে পেমেন্ট সম্পন্ন করে ট্রানজেকশন সাবমিট করুন।"
+                  ? "যে প্যাকেজটি নিতে চান সেটি সিলেক্ট করে সরাসরি নিচে দেয়া নাম্বারে পেমেন্ট সম্পন্ন করে ট্রানজেকশন সাবমিট করুন।"
                   : "Select an ad duration package, clear the dynamic invoice via Mobile Payment, and enter the TxID of transaction below."}
               </p>
             </div>
@@ -170,7 +181,7 @@ export function PromoteAdModal({ listing, language, currentUser, onClose, onProm
             {/* Step 1: Select package/duration in hours */}
             <div className="space-y-2">
               <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">
-                {language === "bn" ? "ধাপ ১: বিজ্ঞাপন প্যাকেজ এবং সময় সিলেক্ট করুন" : "STEP 1: CHOOSE BUDGET & HOURS DURATION"}
+                {language === "bn" ? "ধাপ ১: বিজ্ঞাপন প্যাকেজ এবং সময় সিলেক্ট করুন" : "STEP 1: CHOOSE BUDGET & HOURS DURATION"}
               </span>
 
               <div className="space-y-2.5">
