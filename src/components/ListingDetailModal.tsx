@@ -236,6 +236,39 @@ export function ListingDetailModal({ listing, language, currentUser, onClose, on
   // "owner" ধরে ফেলার (false positive) ঝুঁকি থাকে।
   const isOwner = !!currentUser?.uid && listing.sellerId === currentUser.uid;
 
+  // 🔧 (2026-09-23) নম্বর আনার জন্য এখন একটাই path: সবসময় /api/get-seller-contact
+  // সার্ভার API কল হয় (আগে owner/admin-দের জন্য ব্রাউজার থেকে সরাসরি
+  // supabase.rpc("get_listing_contact_number", ...) কল হতো)। কারণ:
+  // direct client-side RPC PostgREST-কে ঠিকভাবে JWT পাঠানোর উপর নির্ভর করে,
+  // আর এই hybrid Firebase→Supabase লগইন সিস্টেমে সেই client session
+  // মাঝেমধ্যেই ফাঁকা/অসিঙ্ক থেকে যাচ্ছিল -- ফলে admin অ্যাকাউন্ট দিয়ে
+  // দেখলেও নম্বর "—" দেখাত, যদিও ডাটাবেজে নম্বর ঠিকই ছিল। সার্ভার API নিজে
+  // token verify করে (verifyJwt.ts দিয়ে, Supabase অথবা লিগ্যাসি Firebase
+  // দুটোই), তাই client-side session state-এর উপর নির্ভর করে না।
+  const getAuthToken = async (): Promise<string | null> => {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const supaToken = sessionData?.session?.access_token;
+    if (supaToken) return supaToken;
+    const fbToken = await auth.currentUser?.getIdToken().catch(() => undefined);
+    return fbToken || null;
+  };
+
+  const fetchContactNumberViaApi = async (): Promise<string | null> => {
+    const idToken = await getAuthToken();
+    if (!idToken) throw new Error("লগইন সেশন পাওয়া যায়নি");
+    const resp = await fetch(apiUrl("/api/get-seller-contact"), {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${idToken}`,
+      },
+      body: JSON.stringify({ listingId: listing.id }),
+    });
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data?.error || "নম্বর আনা যায়নি");
+    return (data.contactNumber as string) || null;
+  };
+
   // owner/admin হলে নম্বর সাথে সাথেই fetch করা হয় (তাদের যেভাবেই হোক দেখার
   // অধিকার আছে); সাধারণ দর্শকের জন্য শুধু "Show number" চাপলে fetch হবে
   // (নিচের showPhoneNumber-এর useEffect-এ)।
@@ -247,19 +280,8 @@ export function ListingDetailModal({ listing, language, currentUser, onClose, on
     setContactLoading(true);
     (async () => {
       try {
-        const snap = await getDoc(doc(db, "listings", listing.id, "private", "contact"));
-        if (active && snap.exists() && snap.data()?.contactNumber) {
-          setFetchedContactNumber(snap.data().contactNumber as string);
-          return;
-        }
-        // Not in Firestore - this listing was created after the Supabase
-        // migration, so its number only lives in Supabase.
-        const { data, error } = await supabase.rpc("get_listing_contact_number", {
-          p_external_id: listing.id,
-        });
-        if (active && !error && data) {
-          setFetchedContactNumber(data as string);
-        }
+        const number = await fetchContactNumberViaApi();
+        if (active && number) setFetchedContactNumber(number);
       } catch (err) {
         console.error("Failed to fetch contact number:", err);
       } finally {
@@ -270,9 +292,6 @@ export function ListingDetailModal({ listing, language, currentUser, onClose, on
   }, [listing.id, isOwner, isAdmin, currentUser?.uid, fetchedContactNumber]);
 
   // "Show number" চাপার পর fetch — লগইন করা থাকলেই কাজ করবে।
-  // 🔧 এখন সরাসরি Firestore read না করে /api/get-seller-contact দিয়ে যায় --
-  // rule-এ non-owner-এর জন্য direct read বন্ধ করা হয়েছে (bulk scraping ঠেকাতে,
-  // দেখুন firestore.rules-এর কমেন্ট), তাই সাধারণ buyer-দের এই API-ই একমাত্র পথ।
   useEffect(() => {
     if (!showPhoneNumber || fetchedContactNumber) return;
     if (!currentUser?.uid) {
@@ -284,32 +303,8 @@ export function ListingDetailModal({ listing, language, currentUser, onClose, on
     setContactLoading(true);
     (async () => {
       try {
-        // 🔧 লগইন এখন Supabase দিয়ে হয় -- আগে এখানে শুধু Firebase-এর
-        // auth.currentUser?.getIdToken() কল হতো, যেটা Supabase দিয়ে
-        // সাইন-ইন করা ইউজারদের জন্য সবসময় undefined থাকত (Firebase-এ
-        // কখনো লগইনই করা হয়নি), তাই "Show number" চাপলে এই fetch সবসময়
-        // ব্যর্থ হতো এবং নম্বর কখনো "—" ছাড়া অন্য কিছু দেখাত না। এখন আগে
-        // Supabase-এর নিজস্ব session token ব্যবহার করা হয়, আর কোনো পুরনো
-        // cached Firebase সেশন থাকলে সেটাকে fallback হিসেবে রাখা হয়েছে।
-        const { data: sessionData } = await supabase.auth.getSession();
-        let idToken = sessionData?.session?.access_token;
-        if (!idToken) {
-          idToken = await auth.currentUser?.getIdToken();
-        }
-        if (!idToken) throw new Error("লগইন সেশন পাওয়া যায়নি");
-        const resp = await fetch(apiUrl("/api/get-seller-contact"), {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${idToken}`,
-          },
-          body: JSON.stringify({ listingId: listing.id }),
-        });
-        const data = await resp.json();
-        if (!resp.ok) throw new Error(data?.error || "নম্বর আনা যায়নি");
-        if (active && data.contactNumber) {
-          setFetchedContactNumber(data.contactNumber as string);
-        }
+        const number = await fetchContactNumberViaApi();
+        if (active && number) setFetchedContactNumber(number);
       } catch (err) {
         console.error("Failed to fetch contact number:", err);
       } finally {
