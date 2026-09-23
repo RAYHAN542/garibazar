@@ -194,7 +194,7 @@ export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPromp
 
   // ফর্ম সাবমিট করলে সরাসরি পোস্ট হয় না -- আগে সব ফিল্ড ভ্যালিডেট করে
   // ক্যাটাগরি বাছাইয়ের মডাল দেখানো হয়। ইউজার গাড়ি/পার্ট বাছাই করলে
-  // submitListing() আসল Firestore write টা করে।
+  // submitListing() আসল Supabase write টা করে।
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!currentUser) {
@@ -202,23 +202,15 @@ export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPromp
       return;
     }
 
-    // পোস্ট করার আগে Firebase টোকেন জোর করে রিফ্রেশ করা হচ্ছে, যাতে পুরনো/
-    // মেয়াদোত্তীর্ণ সেশনের কারণে "permission denied" এরর না আসে। বেশিরভাগ
-    // ক্ষেত্রে এটা নিঃশব্দে ঠিক হয়ে যাবে, ইউজার কিছু বুঝতেও পারবে না।
-    try {
-      await auth.currentUser?.getIdToken(true);
-    } catch (tokenErr) {
-      console.error("Token refresh failed:", tokenErr);
-    }
-    if (!auth.currentUser) {
-      setError(
-        language === "bn"
-          ? "আপনার লগইন সেশন মেয়াদোত্তীর্ণ হয়ে গেছে। অনুগ্রহ করে আবার লগইন করুন।"
-          : "Your session has expired. Please log in again."
-      );
-      onLoginPrompt();
-      return;
-    }
+    // 🔧 (2026-09-24) আগে এখানে auth.currentUser (Firebase) চেক করে জোর করে
+    // token রিফ্রেশ করা হতো, আর সেটা না পেলে "session expired" দেখিয়ে আটকে
+    // দেওয়া হতো। কিন্তু লগইন এখন সম্পূর্ণ Supabase দিয়ে হয় -- Firebase Auth-এ
+    // কখনো সাইন-ইনই করা হয় না, তাই auth.currentUser সবসময় null ছিল। ফলে
+    // Supabase দিয়ে সত্যিকারের ভ্যালিড সেশনসহ লগইন করা প্রতিটা ইউজারও পোস্ট
+    // করতে গেলেই "session expired" পেত (নিচের submitListing পুরোপুরি Supabase
+    // দিয়েই লেখে, Firebase কখনো ব্যবহারই হয় না)। এই dead চেকটা সরিয়ে ফেলা
+    // হলো -- currentUser (app-এর নিজস্ব Supabase-backed session state) থাকলেই
+    // যথেষ্ট; সত্যিই সেশন invalid হলে insert নিজেই RLS-এ ব্যর্থ হয়ে ধরা পড়বে।
 
     if (!description.trim()) {
       setError(language === "bn" ? "অনুগ্রহ করে বিবরণ লিখুন" : "Please write a description");
