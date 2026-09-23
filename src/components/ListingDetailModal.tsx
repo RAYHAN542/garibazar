@@ -1,12 +1,17 @@
 import React, { useState, useEffect } from "react";
 import { PartListing, SupportedLanguage } from "../types";
 import { X, MapPin, Sparkles, Play, SquarePlay, Flag, ShieldAlert, CheckCircle2, ChevronLeft, ChevronRight, Loader2, ShoppingBag, MessageSquare, Share2 } from "lucide-react";
-import { logAnalyticsEvent } from "../firebase";
+import { doc, getDoc, updateDoc, collection, addDoc, query, increment } from "firebase/firestore";
+import { db, auth, logAnalyticsEvent } from "../firebase";
 import { supabase } from "../supabase";
 import { trackListingClick } from "../utils/counters";
 import { getOptimizedImageUrl } from "../utils/cloudinary";
 import { apiUrl } from "../utils/apiBase";
 
+// Masks all but the last 4 digits so the full number isn't visible in plain
+// text to anonymous visitors or scrapers. The underlying tel: link still
+// uses the real number, so calling still works without the digits being
+// shown on screen until the viewer explicitly taps to reveal them.
 const maskPhoneNumber = (num?: string): string => {
   if (!num) return "";
   const digits = num.trim();
@@ -30,14 +35,21 @@ export function ListingDetailModal({ listing, language, currentUser, onClose, on
   const [isPlayingVideo, setIsPlayingVideo] = useState(false);
   const [showPhoneNumber, setShowPhoneNumber] = useState(false);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
+  // ফোন নম্বর আর listing ডকে থাকে না (প্রাইভেসি ফিক্স) — দরকার হলে
+  // listings/{id}/private/contact থেকে আলাদাভাবে fetch করা হয়, শুধু
+  // owner/admin হলে বা ইউজার "Show number" চাপলে (সবসময় না, যাতে
+  // অকারণে extra read না হয়)।
   const [fetchedContactNumber, setFetchedContactNumber] = useState<string | undefined>(listing.contactNumber);
   const [contactLoading, setContactLoading] = useState(false);
-  const [contactError, setContactError] = useState<string | null>(null);
   
   const modalImages = listing.images && listing.images.length > 0 ? listing.images : [listing.image];
 
+  // Track which images have already finished loading so we can show a spinner only while waiting
   const [loadedImageIndexes, setLoadedImageIndexes] = useState<Set<number>>(new Set());
 
+  // Preload every image in the carousel in the background so arrow navigation is instant instead of waiting for each image to download.
+  // Preload order starts from the currently active image, then expands outward to its neighbours first,
+  // since those are the images the user is most likely to navigate to next.
   useEffect(() => {
     setLoadedImageIndexes(new Set());
     const order: number[] = [];
@@ -64,6 +76,7 @@ export function ListingDetailModal({ listing, language, currentUser, onClose, on
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [listing.id]);
   
+  // Favorites bookmark tracking
   const [isFavorite, setIsFavorite] = useState<boolean>(() => {
     try {
       const favs = localStorage.getItem("gari_bazar_favorites") || "[]";
@@ -74,9 +87,11 @@ export function ListingDetailModal({ listing, language, currentUser, onClose, on
     }
   });
 
+  // Toggle states
   const [isSold, setIsSold] = useState(listing.isSold || false);
   const [soldLoading, setSoldLoading] = useState(false);
 
+  // Content Flag/Report states
   const [hasReported, setHasReported] = useState<boolean>(() => {
     if (!currentUser) return false;
     return listing.reportedBy?.includes(currentUser.uid) || false;
@@ -90,9 +105,15 @@ export function ListingDetailModal({ listing, language, currentUser, onClose, on
   const [addToDashboardSuccess, setAddToDashboardSuccess] = useState(false);
   const [addToDashboardError, setAddToDashboardError] = useState<string | null>(null);
 
+  // Share state (shows "Link Copied" feedback when Web Share API isn't available)
   const [shareCopied, setShareCopied] = useState(false);
 
   const handleShareListing = async () => {
+    // এই লিংকটা মানুষ কপি করে বাইরে (WhatsApp, Facebook ইত্যাদি) শেয়ার করে,
+    // তাই window.location.origin ব্যবহার করা যাবে না -- Capacitor APK-তে
+    // (local bundle মোডে) origin হয় "https://localhost", ওয়েব প্রিভিউ/স্টেজিং
+    // ডোমেইনে origin হয় ভিন্ন কিছু। পাবলিক শেয়ার লিংক সবসময় আসল ডোমেইনই
+    // হতে হবে, যেখান থেকেই শেয়ার করা হোক না কেন।
     const shareUrl = `https://garibazar.shop/l/${listing.id}`;
     const shareTitle = listing.title;
     const shareText = language === "bn"
@@ -105,7 +126,7 @@ export function ListingDetailModal({ listing, language, currentUser, onClose, on
         return;
       }
     } catch (e) {
-      // user cancelled share sheet or it failed silently
+      // user cancelled share sheet or it failed silently — fall through to clipboard copy
     }
 
     try {
@@ -116,6 +137,8 @@ export function ListingDetailModal({ listing, language, currentUser, onClose, on
       console.error("Could not copy share link:", e);
     }
   };
+
+  // Seller Trust/Reviews Rating Integration -- removed
 
   const handleAddToDashboard = async () => {
     if (!currentUser) {
@@ -152,6 +175,7 @@ export function ListingDetailModal({ listing, language, currentUser, onClose, on
 
     const tempId = "local_" + Date.now();
 
+    // 1. Immediately save to local storage for instant reactive sync
     try {
       const stored = localStorage.getItem("gari_bazar_local_purchases") || "[]";
       let localPurchases = JSON.parse(stored);
@@ -160,22 +184,23 @@ export function ListingDetailModal({ listing, language, currentUser, onClose, on
       const updatedLocal = [{ id: tempId, ...newPurchaseDoc }, ...localPurchases];
       localStorage.setItem("gari_bazar_local_purchases", JSON.stringify(updatedLocal));
 
+      // Dispatch storage event so App.tsx synced listener gets triggered instantly
       window.dispatchEvent(new Event("storage"));
     } catch (e) {
       console.error("Local storage purchase save fail:", e);
     }
 
+    // 2. Submit to Firestore - the real source of truth. Firestore is the
+    // thing that actually matters here; if it fails, roll back the
+    // optimistic local entry and tell the user honestly instead of
+    // showing a fake success.
     try {
-      const addPromise = supabase.from("purchases").insert({
-        buyer_id: currentUser.uid,
-        data: newPurchaseDoc
-      });
+      const addPromise = addDoc(collection(db, "purchases"), newPurchaseDoc);
       const timeoutPromise = new Promise((_, reject) =>
         setTimeout(() => reject(new Error("Timeout")), 8000)
       );
 
-      const { error: purchaseErr } = (await Promise.race([addPromise, timeoutPromise])) as any;
-      if (purchaseErr) throw purchaseErr;
+      await Promise.race([addPromise, timeoutPromise]);
 
       setAddToDashboardSuccess(true);
       if (onPurchaseAdded) {
@@ -186,6 +211,7 @@ export function ListingDetailModal({ listing, language, currentUser, onClose, on
       }, 3500);
     } catch (err) {
       console.error("Failed to save purchase to Firestore:", err);
+      // Roll back the optimistic local entry - it never actually saved.
       try {
         const stored = localStorage.getItem("gari_bazar_local_purchases") || "[]";
         let localPurchases = JSON.parse(stored);
@@ -205,41 +231,57 @@ export function ListingDetailModal({ listing, language, currentUser, onClose, on
     }
   };
 
-  const isOwner =
-    !!currentUser?.uid &&
-    (listing.sellerId === currentUser.uid || listing.sellerId === currentUser.authUid);
+  // ownership শুধু sellerId দিয়ে চেক করা হয় — phone number দিয়ে চেক করলে
+  // দুইজনের contact নম্বর মিলে গেলে বা placeholder নম্বর ব্যবহার হলে ভুলভাবে
+  // "owner" ধরে ফেলার (false positive) ঝুঁকি থাকে।
+  const isOwner = !!currentUser?.uid && listing.sellerId === currentUser.uid;
 
-  const fetchContactNumber = React.useCallback(async (): Promise<string | null> => {
-    let token: string | undefined;
-    try {
-      const { data } = await supabase.auth.getSession();
-      token = data.session?.access_token;
-    } catch (_) { /* ignore */ }
-    if (!token) throw new Error("লগইন সেশন পাওয়া যায়নি");
+  // 🔧 (2026-09-23) নম্বর আনার জন্য এখন একটাই path: সবসময় /api/get-seller-contact
+  // সার্ভার API কল হয় (আগে owner/admin-দের জন্য ব্রাউজার থেকে সরাসরি
+  // supabase.rpc("get_listing_contact_number", ...) কল হতো)। কারণ:
+  // direct client-side RPC PostgREST-কে ঠিকভাবে JWT পাঠানোর উপর নির্ভর করে,
+  // আর এই hybrid Firebase→Supabase লগইন সিস্টেমে সেই client session
+  // মাঝেমধ্যেই ফাঁকা/অসিঙ্ক থেকে যাচ্ছিল -- ফলে admin অ্যাকাউন্ট দিয়ে
+  // দেখলেও নম্বর "—" দেখাত, যদিও ডাটাবেজে নম্বর ঠিকই ছিল। সার্ভার API নিজে
+  // token verify করে (verifyJwt.ts দিয়ে, Supabase অথবা লিগ্যাসি Firebase
+  // দুটোই), তাই client-side session state-এর উপর নির্ভর করে না।
+  const getAuthToken = async (): Promise<string | null> => {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const supaToken = sessionData?.session?.access_token;
+    if (supaToken) return supaToken;
+    const fbToken = await auth.currentUser?.getIdToken().catch(() => undefined);
+    return fbToken || null;
+  };
 
+  const fetchContactNumberViaApi = async (): Promise<string | null> => {
+    const idToken = await getAuthToken();
+    if (!idToken) throw new Error("লগইন সেশন পাওয়া যায়নি");
     const resp = await fetch(apiUrl("/api/get-seller-contact"), {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
+        Authorization: `Bearer ${idToken}`,
       },
       body: JSON.stringify({ listingId: listing.id }),
     });
-    const data = await resp.json().catch(() => ({}));
+    const data = await resp.json();
     if (!resp.ok) throw new Error(data?.error || "নম্বর আনা যায়নি");
     return (data.contactNumber as string) || null;
-  }, [listing.id]);
+  };
 
+  // owner/admin হলে নম্বর সাথে সাথেই fetch করা হয় (তাদের যেভাবেই হোক দেখার
+  // অধিকার আছে); সাধারণ দর্শকের জন্য শুধু "Show number" চাপলে fetch হবে
+  // (নিচের showPhoneNumber-এর useEffect-এ)।
   useEffect(() => {
-    if (fetchedContactNumber) return;
+    if (fetchedContactNumber) return; // ইতিমধ্যে আছে (props থেকে বা আগেই fetch হয়েছে)
     if (!currentUser?.uid) return;
     if (!isOwner && !isAdmin) return;
     let active = true;
     setContactLoading(true);
     (async () => {
       try {
-        const num = await fetchContactNumber();
-        if (active && num) setFetchedContactNumber(num);
+        const number = await fetchContactNumberViaApi();
+        if (active && number) setFetchedContactNumber(number);
       } catch (err) {
         console.error("Failed to fetch contact number:", err);
       } finally {
@@ -247,8 +289,9 @@ export function ListingDetailModal({ listing, language, currentUser, onClose, on
       }
     })();
     return () => { active = false; };
-  }, [listing.id, isOwner, isAdmin, currentUser?.uid, fetchedContactNumber, fetchContactNumber]);
+  }, [listing.id, isOwner, isAdmin, currentUser?.uid, fetchedContactNumber]);
 
+  // "Show number" চাপার পর fetch — লগইন করা থাকলেই কাজ করবে।
   useEffect(() => {
     if (!showPhoneNumber || fetchedContactNumber) return;
     if (!currentUser?.uid) {
@@ -258,22 +301,18 @@ export function ListingDetailModal({ listing, language, currentUser, onClose, on
     }
     let active = true;
     setContactLoading(true);
-    setContactError(null);
     (async () => {
       try {
-        const num = await fetchContactNumber();
-        if (active && num) setFetchedContactNumber(num);
-        else if (active) setContactError(language === "bn" ? "নম্বর পাওয়া যায়নি।" : "Number not found.");
-      } catch (err: any) {
+        const number = await fetchContactNumberViaApi();
+        if (active && number) setFetchedContactNumber(number);
+      } catch (err) {
         console.error("Failed to fetch contact number:", err);
-        if (active) setContactError(err?.message || (language === "bn" ? "নম্বর আনা যায়নি।" : "Couldn't load the number."));
       } finally {
         if (active) setContactLoading(false);
       }
     })();
     return () => { active = false; };
-  }, [showPhoneNumber, listing.id, currentUser?.uid, fetchedContactNumber, onLoginPrompt, fetchContactNumber, language]);
-
+  }, [showPhoneNumber, listing.id, currentUser?.uid, fetchedContactNumber, onLoginPrompt]);
 
   const toggleFavorite = () => {
     try {
@@ -301,13 +340,13 @@ export function ListingDetailModal({ listing, language, currentUser, onClose, on
     setSoldLoading(true);
     try {
       const newSoldStatus = !isSold;
-      const { error: soldErr } = await supabase
-        .from("listings")
-        .update({ is_sold: newSoldStatus })
-        .eq("id", listing.id);
-      if (soldErr) throw soldErr;
+      const docRef = doc(db, "listings", listing.id);
+      await updateDoc(docRef, {
+        isSold: newSoldStatus
+      });
       setIsSold(newSoldStatus);
       
+      // Sync offline listings cache
       const localListingsStr = localStorage.getItem("gari_bazar_local_listings") || "[]";
       try {
         const localListings = JSON.parse(localListingsStr);
@@ -335,29 +374,25 @@ export function ListingDetailModal({ listing, language, currentUser, onClose, on
     if (hasReported) return;
     setReportLoading(true);
     try {
-      const { data, error: fetchErr } = await supabase
-        .from("listings")
-        .select("reported_by, report_count")
-        .eq("id", listing.id)
-        .single();
-      if (fetchErr) throw fetchErr;
-      if (data) {
-        const currentReportedBy = data.reported_by || [];
-        const uidKey = currentUser.authUid || currentUser.uid;
-
-        if (!currentReportedBy.includes(uidKey)) {
-          const nextReportedBy = [...currentReportedBy, uidKey];
-          const nextReportCount = (data.report_count || 0) + 1;
-
-          const { error: updateErr } = await supabase
-            .from("listings")
-            .update({ report_count: nextReportCount, reported_by: nextReportedBy })
-            .eq("id", listing.id);
-          if (updateErr) throw updateErr;
-
+      const docRef = doc(db, "listings", listing.id);
+      const docSnap = await getDoc(docRef);
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        const currentReportedBy = data.reportedBy || [];
+        
+        if (!currentReportedBy.includes(currentUser.uid)) {
+          const nextReportedBy = [...currentReportedBy, currentUser.uid];
+          const nextReportCount = (data.reportCount || 0) + 1;
+          
+          await updateDoc(docRef, {
+            reportCount: nextReportCount,
+            reportedBy: nextReportedBy
+          });
+          
           setHasReported(true);
           setReportSuccess(true);
           
+          // Instantly hide the flagged document locally
           const hiddenStr = localStorage.getItem("gari_bazar_hidden_listings") || "[]";
           try {
             const hidden = JSON.parse(hiddenStr);
@@ -377,6 +412,7 @@ export function ListingDetailModal({ listing, language, currentUser, onClose, on
   };
 
   const handleContactClick = async () => {
+    // Log contact seller click event in Analytics
     logAnalyticsEvent("contact_seller_click", {
       listingId: listing.id,
       title: listing.title,
@@ -384,6 +420,14 @@ export function ListingDetailModal({ listing, language, currentUser, onClose, on
       contactNumber: fetchedContactNumber
     });
 
+    // 🔧 Was: a direct client-side updateDoc() writing `clicks` and
+    // `dailyStats.{today}.clicks` straight to the listing document. That's
+    // now rejected by firestore.rules (those fields are admin/server-only,
+    // see api/track-event.ts's comment) -- this was silently failing every
+    // time (caught below, never surfaced), so click counts and the seller's
+    // analytics graph have been stuck. trackListingClick() goes through the
+    // server, which is the only path that's actually allowed to write these
+    // fields now.
     try {
       await trackListingClick(listing.id);
     } catch (err) {
@@ -395,6 +439,7 @@ export function ListingDetailModal({ listing, language, currentUser, onClose, on
     <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex justify-center items-start sm:items-center p-0 sm:p-4 z-[60] overflow-y-auto">
       <div className="bg-white dark:bg-slate-900 w-full min-h-screen sm:min-h-fit sm:max-w-2xl shadow-2xl border-0 sm:border border-slate-200 dark:border-slate-800 relative overflow-hidden sm:rounded-2xl sm:my-8">
         
+        {/* Colorful status highlight for ads */}
         {listing.isAd && (
           <div className="bg-gradient-to-r from-amber-500 to-orange-500 py-1.5 px-4 text-xs font-bold text-slate-950 flex items-center gap-1.5 justify-center">
             <Sparkles className="w-3.5 h-3.5 fill-slate-950" />
@@ -413,9 +458,11 @@ export function ListingDetailModal({ listing, language, currentUser, onClose, on
         </button>
 
         <div className="flex flex-col">
+          {/* Top Image or Video player */}
           <div className="relative w-full h-72 sm:h-96 bg-slate-950 flex items-center justify-center overflow-hidden">
             {isPlayingVideo ? (
               <div className="relative w-full h-full bg-black flex flex-col justify-center items-center">
+                {/* Elegant simulated media component */}
                 <div className="absolute inset-0 bg-gradient-to-tr from-slate-900 to-slate-800 flex flex-col justify-center items-center">
                   <div className="text-center p-6 flex flex-col items-center">
                     <div className="w-12 h-12 bg-amber-500/15 text-amber-500 rounded-full flex items-center justify-center mb-3 animate-bounce">
@@ -430,6 +477,7 @@ export function ListingDetailModal({ listing, language, currentUser, onClose, on
                         : `Live walkthrough of ${listing.title} performance condition`}
                     </p>
                     
+                    {/* Media state visuals */}
                     <div className="mt-6 flex items-center gap-2">
                       <span className="w-2.5 h-2.5 bg-red-500 rounded-full animate-ping"></span>
                       <span className="text-slate-100 text-[11px] font-mono">0:14 / 2:30</span>
@@ -437,6 +485,7 @@ export function ListingDetailModal({ listing, language, currentUser, onClose, on
                   </div>
                 </div>
                 
+                {/* Controls overlay */}
                 <div className="absolute bottom-4 left-4 right-4 flex justify-between items-center bg-black/60 p-2.5 rounded-lg border border-slate-800 text-white text-xs">
                   <button 
                     onClick={() => setIsPlayingVideo(false)}
@@ -471,6 +520,7 @@ export function ListingDetailModal({ listing, language, currentUser, onClose, on
                 )}
                 <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-slate-950/85 to-transparent pointer-events-none"></div>
                 
+                {/* Image Navigator Overlay */}
                 {modalImages.length > 1 && (
                   <>
                     <button
@@ -488,6 +538,7 @@ export function ListingDetailModal({ listing, language, currentUser, onClose, on
                       <ChevronRight className="w-5 h-5" />
                     </button>
 
+                    {/* Miniature Dots Indicator */}
                     <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-1.5 z-10">
                       {modalImages.map((_, idx) => (
                         <button
@@ -499,12 +550,12 @@ export function ListingDetailModal({ listing, language, currentUser, onClose, on
                           }`}
                         />
                       ))}
-      
                     </div>
                   </>
                 )}
 
                 {listing.hasVideo && (
+                  /* Floating Action Button inside photo to play video walkthrough */
                   <button
                     onClick={() => setIsPlayingVideo(true)}
                     className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-amber-500 hover:bg-amber-600 text-slate-950 px-5 py-3 rounded-full font-bold text-xs flex items-center gap-2 transition-all shadow-xl shadow-amber-500/20 active:scale-95 cursor-pointer"
@@ -517,8 +568,10 @@ export function ListingDetailModal({ listing, language, currentUser, onClose, on
             )}
           </div>
 
+          {/* Content Details */}
           <div className="p-6 space-y-6">
             
+            {/* Sold alert banner */}
             {isSold && (
               <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-xl flex items-center gap-3">
                 <ShieldAlert className="w-5 h-5 text-red-500 shrink-0 animate-bounce" />
@@ -533,6 +586,7 @@ export function ListingDetailModal({ listing, language, currentUser, onClose, on
               </div>
             )}
 
+            {/* 1. Dam (Price) */}
             <div className="bg-amber-500/10 border border-amber-500/20 p-4 rounded-xl flex items-center justify-between">
               <div>
                 <span className="text-xs font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wider block">
@@ -549,6 +603,7 @@ export function ListingDetailModal({ listing, language, currentUser, onClose, on
               </div>
             </div>
 
+            {/* 2. Part name / Model */}
             <div>
               <div className="flex items-center gap-2 mb-1.5 flex-wrap">
                 <span className="bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs px-2.5 py-0.5 rounded-md font-bold uppercase tracking-tight">
@@ -579,6 +634,7 @@ export function ListingDetailModal({ listing, language, currentUser, onClose, on
                 </p>
               </div>
 
+              {/* Spares description details block */}
               <div className="mt-3">
                 <span className="text-slate-400 text-[10px] uppercase font-bold tracking-wider block mb-1">
                   {language === "bn" ? "প্রোডাক্টের বিবরণ" : "Parts Detail Description"}
@@ -588,7 +644,10 @@ export function ListingDetailModal({ listing, language, currentUser, onClose, on
                 </p>
               </div>
 
+              {/* Seller Trust ratings segment removed */}
             </div>
+
+            {/* 3. Seller number / Seller information */}
             <div className="p-4 bg-slate-50 dark:bg-slate-950 border border-slate-150 dark:border-slate-850 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               {isAdmin ? (
                 <div 
@@ -647,22 +706,10 @@ export function ListingDetailModal({ listing, language, currentUser, onClose, on
                       id="detail-contact-tele"
                       href={`tel:${fetchedContactNumber || ""}`} 
                       onClick={handleContactClick}
-                      className="font-mono font-black text-xl text-amber-500 hover:text-amber-600 hover:underline flex items-center gap-2 cursor-pointer"
+                      className="font-mono font-black text-xl text-amber-500 hover:text-amber-600 hover:underline block cursor-pointer"
                     >
-                      {contactLoading ? (
-                        <>
-                          <Loader2 className="w-5 h-5 animate-spin shrink-0" />
-                          <span className="text-sm font-sans font-bold text-slate-450">
-                            {language === "bn" ? "নম্বর লোড হচ্ছে…" : "Loading number…"}
-                          </span>
-                        </>
-                      ) : (
-                        <span>📞 {(isOwner || isAdmin || showPhoneNumber) ? (fetchedContactNumber || "—") : maskPhoneNumber(fetchedContactNumber)}</span>
-                      )}
+                      📞 {contactLoading ? "..." : (isOwner || isAdmin || showPhoneNumber) ? (fetchedContactNumber || "—") : maskPhoneNumber(fetchedContactNumber)}
                     </a>
-                    {contactError && (
-                      <p className="w-full text-xs text-red-500">{contactError}</p>
-                    )}
                     {!isOwner && !isAdmin && !showPhoneNumber && (
                       <button
                         type="button"
@@ -680,6 +727,8 @@ export function ListingDetailModal({ listing, language, currentUser, onClose, on
                 )}
               </div>
             </div>
+
+            {/* Quick Actions (Add to Dashboard, Report) */}
             <div className="pt-2 border-t border-slate-150 dark:border-slate-800/80 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
               {!isOwner && (
               <div className="flex-1">
@@ -740,6 +789,7 @@ export function ListingDetailModal({ listing, language, currentUser, onClose, on
                 </div>
               )}
 
+              {/* Share Option */}
               <button
                 type="button"
                 onClick={handleShareListing}
@@ -758,6 +808,7 @@ export function ListingDetailModal({ listing, language, currentUser, onClose, on
                 </span>
               </button>
 
+              {/* Report Option */}
               {!isOwner && (
                 <button
                   type="button"
@@ -780,6 +831,7 @@ export function ListingDetailModal({ listing, language, currentUser, onClose, on
               )}
             </div>
 
+            {/* Report selection form */}
             {showReportForm && !hasReported && (
               <div className="p-4 bg-slate-50 dark:bg-slate-950 rounded-xl border border-slate-200 dark:border-slate-800 space-y-3 shadow-md">
                 <div className="flex justify-between items-center">

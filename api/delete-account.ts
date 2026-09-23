@@ -1,3 +1,4 @@
+import { verifySupabaseToken } from "./_lib/verifyJwt.js";
 import { createClient } from "@supabase/supabase-js";
 import { applyCors } from "./_lib/cors.js";
 
@@ -11,15 +12,8 @@ const supabaseAdmin =
     : null;
 
 async function resolveCallerUid(token: string): Promise<{ authUid: string } | null> {
-  if (supabaseAdmin) {
-    try {
-      const { data, error } = await supabaseAdmin.auth.getUser(token);
-      if (!error && data?.user?.id) return { authUid: data.user.id };
-    } catch (e) {
-      console.error("[delete-account] supabase token check failed:", e);
-    }
-  }
-  return null;
+  const uid = await verifySupabaseToken(token);
+  return uid ? { authUid: uid } : null;
 }
 
 // ---------------------------------------------------------------------------

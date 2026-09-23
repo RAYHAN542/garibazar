@@ -1,54 +1,49 @@
-import { createClient } from "@supabase/supabase-js";
+import { initializeApp, getApps, cert } from "firebase-admin/app";
+import { getAuth } from "firebase-admin/auth";
+import { getFirestore } from "firebase-admin/firestore";
 import { applyCors } from "./_lib/cors.js";
 import { checkAndBumpRateLimit, getClientIp } from "./_lib/rateLimit.js";
 
-const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
-const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const supabaseAdmin =
-  SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY
-    ? createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
-        auth: { autoRefreshToken: false, persistSession: false },
-      })
-    : null;
+// ------------------------------------------------------------------------
+// 🔧 Fixes: "Guest support ticket unlimited creation; guest spam is easy"
+// (audit item, Medium priority).
+//
+// Before: the client called addDoc() straight to Firestore for BOTH guests
+// and signed-in users, with a rule that only checked the shape of the
+// document (userId matches auth state) -- nothing capped HOW MANY tickets
+// either could file. A guest has no auth.uid at all, so Firestore rules
+// have no stable per-guest identity to even attempt a rate limit against.
+//
+// Now: guests and signed-in users both submit through this endpoint, which
+// enforces a rate limit server-side --
+//   - Guests: limited per IP address (the only identity a guest has).
+//   - Signed-in users: limited per uid (more generous, since a real
+//     account is harder to mass-create than an anonymous request).
+// firestore.rules' support_tickets collection is locked to admin-only
+// writes now, so a client bypassing this endpoint and writing directly to
+// Firestore is rejected outright.
+// ------------------------------------------------------------------------
 
-async function resolveCallerUid(token: string): Promise<string | null> {
-  if (supabaseAdmin) {
+if (!getApps().length) {
+  const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
+  if (serviceAccountJson) {
     try {
-      const { data, error } = await supabaseAdmin.auth.getUser(token);
-      if (!error && data?.user?.id) return data.user.id;
+      const serviceAccount = JSON.parse(serviceAccountJson);
+      initializeApp({ credential: cert(serviceAccount) });
     } catch (e) {
-      console.error("[submit-support-ticket] supabase token check failed:", e);
+      console.error("Failed to parse FIREBASE_SERVICE_ACCOUNT_KEY:", e);
     }
   }
-  return null;
 }
 
-// 🔧 FIX: cosmetic but worth fixing for consistency -- a migrated user's
-// real app-wide uid (users.uid) is their legacy id, not the fresh Supabase
-// Auth id their session carries. Doesn't block anything here (no ownership
-// check gates this endpoint), but without this the ticket's stored user_id
-// wouldn't match users.uid, so an admin cross-referencing "who filed this"
-// would silently fail to find them.
-async function resolveAppUid(authUid: string): Promise<string> {
-  if (!supabaseAdmin) return authUid;
-  try {
-    const { data, error } = await supabaseAdmin
-      .from("user_auth_links")
-      .select("app_uid")
-      .eq("auth_uid", authUid)
-      .maybeSingle();
-    if (error) throw error;
-    return data?.app_uid || authUid;
-  } catch (e) {
-    console.error("[submit-support-ticket] app uid resolution failed, using auth uid:", e);
-    return authUid;
-  }
-}
+const GUEST_WINDOW_MS = 60 * 60 * 1000; // 1 hour
+const GUEST_MAX = 3; // per IP -- a real visitor rarely files more than one
+// or two tickets in an hour; a script hammering the form does not get far.
 
-const GUEST_WINDOW_MS = 60 * 60 * 1000;
-const GUEST_MAX = 3;
 const USER_WINDOW_MS = 60 * 60 * 1000;
-const USER_MAX = 10;
+const USER_MAX = 10; // per signed-in uid -- more generous than a guest,
+// since creating many real accounts is a much higher bar than just
+// resending an anonymous request.
 
 export default async function handler(req: any, res: any) {
   if (applyCors(req, res)) return;
@@ -57,7 +52,7 @@ export default async function handler(req: any, res: any) {
   }
 
   try {
-    if (!supabaseAdmin) {
+    if (!getApps().length) {
       return res.status(500).json({ error: "সার্ভার কনফিগারেশনে সমস্যা।" });
     }
 
@@ -69,12 +64,21 @@ export default async function handler(req: any, res: any) {
       return res.status(400).json({ error: "বার্তা অনেক বড়।" });
     }
 
+    // Signed-in users identify themselves with their ID token (optional
+    // header); anyone without one is treated as a guest and rate-limited
+    // by IP instead.
     const authHeader = req.headers.authorization || "";
-    const token = authHeader.replace("Bearer ", "");
+    const idToken = authHeader.replace("Bearer ", "");
     let uid: string | null = null;
-    if (token) {
-      const authUid = await resolveCallerUid(token);
-      uid = authUid ? await resolveAppUid(authUid) : null;
+    if (idToken) {
+      try {
+        const decoded = await getAuth().verifyIdToken(idToken);
+        uid = decoded.uid;
+      } catch {
+        // Invalid/expired token -- fall back to treating this as a guest
+        // rather than hard-failing the whole request.
+        uid = null;
+      }
     }
 
     const allowed = uid
@@ -87,20 +91,15 @@ export default async function handler(req: any, res: any) {
       });
     }
 
-    const { error: insertErr } = await supabaseAdmin.from("support_tickets").insert({
-      user_id: uid || "guest",
+    const db = getFirestore();
+    await db.collection("support_tickets").add({
+      name: (name || "").toString().slice(0, 200) || (uid ? "User" : "Anonymous"),
+      email: (email || "").toString().slice(0, 200) || "anonymous@garibazar.com",
+      message: message.trim().slice(0, 2000),
+      createdAt: new Date().toISOString(),
+      userId: uid || "guest",
       status: "open",
-      data: {
-        name: (name || "").toString().slice(0, 200) || (uid ? "User" : "Anonymous"),
-        email: (email || "").toString().slice(0, 200) || "anonymous@garibazar.com",
-        message: message.trim().slice(0, 2000),
-      },
     });
-
-    if (insertErr) {
-      console.error("[submit-support-ticket] insert failed:", insertErr.message);
-      return res.status(500).json({ error: "টিকেট জমা দেওয়া যায়নি। আবার চেষ্টা করুন।" });
-    }
 
     return res.status(200).json({ success: true });
   } catch (err: any) {

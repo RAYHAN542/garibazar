@@ -1,8 +1,9 @@
 import React, { useState } from "react";
 import { Trash2, AlertTriangle, ArrowLeft, Globe, Loader2, CheckCircle, Mail } from "lucide-react";
 import { SupportedLanguage } from "../types";
-import { supabase } from "../supabase";
-import { apiUrl } from "../utils/apiBase";
+import { auth, db } from "../firebase";
+import { deleteUser } from "firebase/auth";
+import { collection, query, where, getDocs, deleteDoc, doc } from "firebase/firestore";
 
 interface DataDeletionPageProps {
   language?: SupportedLanguage;
@@ -21,11 +22,7 @@ export default function DataDeletionPage({
   const [error, setError] = useState("");
   const [confirmationInput, setConfirmationInput] = useState("");
 
-  const [supaUser, setSupaUser] = useState<any>(null);
-  React.useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => setSupaUser(data.user));
-  }, []);
-  const currentUser = supaUser;
+  const currentUser = auth.currentUser;
 
   const handleDataDeletion = async () => {
     if (!currentUser) {
@@ -42,20 +39,22 @@ export default function DataDeletionPage({
     setError("");
 
     try {
-      const { data: sessionData } = await supabase.auth.getSession();
-      const token = sessionData.session?.access_token;
-      if (!token) throw new Error("লগইন সেশন পাওয়া যায়নি।");
+      const uid = currentUser.uid;
 
-      const res = await fetch(apiUrl("/api/delete-account"), {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        throw new Error(data.error || "অ্যাকাউন্ট ডিলিট করতে সমস্যা হয়েছে।");
+      // 1. Delete listings owned by user
+      const listingsQuery = query(collection(db, "listings"), where("sellerId", "==", uid));
+      const listingsSnapshot = await getDocs(listingsQuery);
+      for (const d of listingsSnapshot.docs) {
+        await deleteDoc(doc(db, "listings", d.id));
       }
 
-      await supabase.auth.signOut();
+      // 2. Delete public profiles and user private accounts
+      await deleteDoc(doc(db, "users", uid));
+      await deleteDoc(doc(db, "public_profiles", uid));
+
+      // 3. Delete the auth user record
+      await deleteUser(currentUser);
+
       setCompleted(true);
     } catch (err: any) {
       console.error("Account & Data deletion failed:", err);

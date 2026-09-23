@@ -1,6 +1,8 @@
 import React, { useState, useRef } from "react";
 import { SupportedLanguage } from "../types";
 import { Camera, Loader2, AlertTriangle, X } from "lucide-react";
+import { collection, doc, addDoc, writeBatch, serverTimestamp, getDoc } from "firebase/firestore";
+import { db, auth } from "../firebase";
 import { supabase } from "../supabase";
 import { sanitizeText, validatePriceInput, validateBanglaPhone } from "../utils/sanitizer";
 import { uploadToCloudinary } from "../utils/cloudinary";
@@ -200,19 +202,22 @@ export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPromp
       return;
     }
 
+    // পোস্ট করার আগে Firebase টোকেন জোর করে রিফ্রেশ করা হচ্ছে, যাতে পুরনো/
+    // মেয়াদোত্তীর্ণ সেশনের কারণে "permission denied" এরর না আসে। বেশিরভাগ
+    // ক্ষেত্রে এটা নিঃশব্দে ঠিক হয়ে যাবে, ইউজার কিছু বুঝতেও পারবে না।
     try {
-      const { data: sessionData } = await supabase.auth.getSession();
-      if (!sessionData.session) {
-        setError(
-          language === "bn"
-            ? "আপনার লগইন সেশন মেয়াদোত্তীর্ণ হয়ে গেছে। অনুগ্রহ করে আবার লগইন করুন।"
-            : "Your session has expired. Please log in again."
-        );
-        onLoginPrompt();
-        return;
-      }
+      await auth.currentUser?.getIdToken(true);
     } catch (tokenErr) {
-      console.error("Auth session check failed:", tokenErr);
+      console.error("Token refresh failed:", tokenErr);
+    }
+    if (!auth.currentUser) {
+      setError(
+        language === "bn"
+          ? "আপনার লগইন সেশন মেয়াদোত্তীর্ণ হয়ে গেছে। অনুগ্রহ করে আবার লগইন করুন।"
+          : "Your session has expired. Please log in again."
+      );
+      onLoginPrompt();
+      return;
     }
 
     if (!description.trim()) {
@@ -269,7 +274,7 @@ export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPromp
           description: cleanDesc,
           location: detectedLocation,
           images: uploadedUrls,
-          seller_id: currentUser.authUid || currentUser.uid,
+          seller_id: currentUser.uid,
           seller_name: currentUser.displayName || "Rayhan",
           type: selectedType
         })
@@ -287,7 +292,7 @@ export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPromp
         .from("listing_contacts")
         .insert({
           listing_id: insertedListing.id,
-          seller_id: currentUser.authUid || currentUser.uid,
+          seller_id: currentUser.uid,
           phone: cleanPhone
         });
 

@@ -1,15 +1,19 @@
 import { createClient } from "@supabase/supabase-js";
 
+// 🔧 (2026-09-23) এই ওয়েবহুক আগে সম্পূর্ণ Firestore-নির্ভর ছিল --
+// refill_requests, listings, users সবকিছু Firestore-এ read/write হতো।
+// migration-এর পর এই টেবিলগুলো Supabase-এ থাকে (client-side create এখন
+// Supabase-এ হয়, দেখুন useAdPromotion.ts/PromoteAdModal.tsx), তাই এই
+// ওয়েবহুক কখনো আসল refill_request খুঁজেই পেত না -- payment confirm হলেও
+// বিজ্ঞাপন কখনো লাইভ হতো না। এখন পুরো ফ্লো Supabase-এ।
+//
+// Firestore-এর transaction()-এর মতো নেই বলে atomicity এভাবে করা হয়েছে:
+// প্রথমে সব validation (owner check, amount match, replay protection) একটা
+// read দিয়ে করা হয়, তারপর status='pending' শর্তসহ একটা conditional UPDATE
+// দিয়ে request-টা "claim" করা হয় -- দুইটা webhook call একসাথে এলেও শুধু
+// একটাই claim সফল হবে (রেসের ঝুঁকি ন্যূনতম, একই payment provider থেকে
+// duplicate delivery ঠেকানোই মূল উদ্দেশ্য)।
 class PermanentWebhookError extends Error {}
-
-const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
-const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const supabaseAdmin =
-  SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY
-    ? createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
-        auth: { autoRefreshToken: false, persistSession: false },
-      })
-    : null;
 
 export default async function handler(req: any, res: any) {
   if (req.method !== "POST") {
@@ -17,15 +21,18 @@ export default async function handler(req: any, res: any) {
   }
 
   try {
-    if (!supabaseAdmin) {
-      return res.status(500).json({ error: "সার্ভার কনফিগারেশনে সমস্যা।" });
-    }
-
     const apiKey = process.env.UDDOKTAPAY_API_KEY;
     if (!apiKey) {
       return res.status(500).json({ error: "পেমেন্ট গেটওয়ে কনফিগার করা নেই।" });
     }
+    const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!supabaseUrl || !supabaseServiceKey) {
+      return res.status(500).json({ error: "সার্ভার কনফিগারেশনে সমস্যা।" });
+    }
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
+    // 1. Verify this webhook really came from UddoktaPay
     const headerKey = req.headers["rt-uddoktapay-api-key"];
     if (!headerKey || headerKey !== apiKey) {
       return res.status(401).json({ error: "Unauthorized webhook." });
@@ -48,22 +55,29 @@ export default async function handler(req: any, res: any) {
       return res.status(200).json({ received: true });
     }
 
-    const { data: request, error: reqErr } = await supabaseAdmin
+    // 2. Load + validate before claiming
+    const { data: request, error: fetchErr } = await supabase
       .from("refill_requests")
       .select("*")
       .eq("id", requestId)
       .maybeSingle();
 
-    if (reqErr || !request) {
+    if (fetchErr) {
+      // Transient DB error — ask UddoktaPay to retry.
+      throw new Error(`refill_requests lookup failed: ${fetchErr.message}`);
+    }
+    if (!request) {
       throw new PermanentWebhookError(`refill_request ${requestId} not found`);
     }
-
     if (request.status !== "pending") {
+      // Already processed (e.g. duplicate webhook delivery) — do nothing.
       return res.status(200).json({ received: true });
     }
 
+    // Replay protection: the same real transaction_id must never be able
+    // to approve a SECOND refill_requests row.
     if (transactionId) {
-      const { data: reused } = await supabaseAdmin
+      const { data: reused } = await supabase
         .from("refill_requests")
         .select("id")
         .eq("transaction_id", transactionId)
@@ -85,7 +99,27 @@ export default async function handler(req: any, res: any) {
       );
     }
 
-    const { data: claimed, error: claimErr } = await supabaseAdmin
+    if (request.type === "ad_promotion" && request.listing_id) {
+      // Defense-in-depth: re-check ownership at approval time too, not just
+      // at request-creation time (listing ownership could have changed since).
+      const { data: listingRow, error: listingErr } = await supabase
+        .from("listings")
+        .select("seller_id")
+        .eq("id", request.listing_id)
+        .maybeSingle();
+      if (listingErr) throw new Error(`listing lookup failed: ${listingErr.message}`);
+      if (!listingRow) {
+        throw new PermanentWebhookError(`ad_promotion target listing ${request.listing_id} not found`);
+      }
+      if (listingRow.seller_id !== request.user_id) {
+        throw new PermanentWebhookError(
+          `ad_promotion requester ${request.user_id} does not own listing ${request.listing_id}`
+        );
+      }
+    }
+
+    // 3. Claim the request atomically (only succeeds if still "pending")
+    const { data: claimed, error: claimErr } = await supabase
       .from("refill_requests")
       .update({
         status: "approved",
@@ -95,48 +129,36 @@ export default async function handler(req: any, res: any) {
       })
       .eq("id", requestId)
       .eq("status", "pending")
-      .select("*")
+      .select("id")
       .maybeSingle();
 
-    if (claimErr || !claimed) {
+    if (claimErr) throw new Error(`refill_requests claim failed: ${claimErr.message}`);
+    if (!claimed) {
+      // Lost the race to a concurrent webhook delivery — already handled.
       return res.status(200).json({ received: true });
     }
 
-    if (claimed.type === "ad_promotion" && claimed.listing_id) {
-      const { data: listingRow } = await supabaseAdmin
-        .from("listings")
-        .select("seller_id")
-        .eq("id", claimed.listing_id)
-        .maybeSingle();
-      if (!listingRow) {
-        throw new PermanentWebhookError(`ad_promotion target listing ${claimed.listing_id} not found`);
-      }
-      if (listingRow.seller_id !== claimed.user_id) {
-        throw new PermanentWebhookError(
-          `ad_promotion requester ${claimed.user_id} does not own listing ${claimed.listing_id}`
-        );
-      }
-      const duration = Number(claimed.duration_days || 3);
-      await supabaseAdmin
+    // 4. Apply the actual effect now that the request is safely claimed.
+    if (request.type === "ad_promotion" && request.listing_id) {
+      const duration = Number(request.duration_days || 3);
+      const { error: updateErr } = await supabase
         .from("listings")
         .update({
           is_ad: true,
-          ad_tier: claimed.ad_tier || "basic",
+          ad_tier: request.ad_tier || "basic",
           ad_duration_days: duration,
           ad_expires_at: new Date(Date.now() + duration * 24 * 60 * 60 * 1000).toISOString(),
         })
-        .eq("id", claimed.listing_id);
+        .eq("id", request.listing_id);
+      if (updateErr) console.error("payment webhook: failed to activate ad:", updateErr.message);
     } else {
-      const { data: userRow } = await supabaseAdmin
-        .from("users")
-        .select("simulated_credits")
-        .eq("uid", claimed.user_id)
-        .maybeSingle();
-      const currentCredits = Number(userRow?.simulated_credits || 0);
-      await supabaseAdmin
-        .from("users")
-        .update({ simulated_credits: currentCredits + Number(claimed.amount) })
-        .eq("uid", claimed.user_id);
+      // Atomic increment via a Postgres expression, not a read-then-write --
+      // avoids losing a concurrent top-up.
+      const { error: creditErr } = await supabase.rpc("increment_simulated_credits", {
+        p_uid: request.user_id,
+        p_amount: Number(request.amount),
+      });
+      if (creditErr) console.error("payment webhook: failed to credit wallet:", creditErr.message);
     }
 
     return res.status(200).json({ received: true });

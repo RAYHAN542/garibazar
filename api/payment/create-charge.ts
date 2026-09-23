@@ -1,56 +1,36 @@
+import { initializeApp, getApps, cert } from "firebase-admin/app";
+import { getAuth } from "firebase-admin/auth";
 import { createClient } from "@supabase/supabase-js";
 import { applyCors } from "../_lib/cors.js";
+import { verifySupabaseToken } from "../_lib/verifyJwt.js";
 
-const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
-const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const supabaseAdmin =
-  SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY
-    ? createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
-        auth: { autoRefreshToken: false, persistSession: false },
-      })
-    : null;
-
-async function resolveCallerUid(token: string): Promise<string | null> {
-  if (supabaseAdmin) {
+// 🔧 (2026-09-23) এই এন্ডপয়েন্ট আগে সম্পূর্ণ Firebase+Firestore নির্ভর ছিল --
+// auth টোকেন Firebase-only যাচাই হতো (Supabase দিয়ে লগইন করা ইউজারদের জন্য
+// সবসময় ব্যর্থ হতো), আর refill_requests/listings/users সবই Firestore থেকে
+// পড়া হতো, যেখানে migration-এর পর এগুলো Supabase-এ থাকে। ফলাফল: প্রায়
+// কারো জন্যই "Ad Promote" পেমেন্ট কাজ করত না। এখন auth Supabase টোকেন
+// (Firebase fallback সহ) আর ডেটা Supabase থেকে পড়া হয়।
+if (!getApps().length) {
+  const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
+  if (serviceAccountJson) {
     try {
-      const { data, error } = await supabaseAdmin.auth.getUser(token);
-      if (!error && data?.user?.id) return data.user.id;
+      const serviceAccount = JSON.parse(serviceAccountJson);
+      initializeApp({ credential: cert(serviceAccount) });
     } catch (e) {
-      console.error("[create-charge] supabase token check failed:", e);
+      console.error("Failed to parse FIREBASE_SERVICE_ACCOUNT_KEY:", e);
     }
-  }
-  return null;
-}
-
-// 🔧 FIX: same root cause as api/delete-account.ts and api/draw.ts -- a
-// migrated ("restore old account") user's real app-wide uid
-// (refill_requests.user_id, listings.seller_id, users.uid) is their OLD
-// legacy id, not the fresh Supabase Auth id their current login session
-// carries. Without this, every ownership check below (`request.user_id !==
-// uid`, `listingRow.seller_id !== uid`) compared the real owner id against
-// the wrong id and always failed -- so migrated sellers could never
-// actually pay for a wallet refill or ad promotion; every attempt returned
-// "এই রিকোয়েস্ট/লিস্টিং আপনার নয়" (not yours). It also fed the wrong uid
-// into the payment's metadata, which is what the webhook later uses to
-// credit the right account.
-async function resolveAppUid(authUid: string): Promise<string> {
-  if (!supabaseAdmin) return authUid;
-  try {
-    const { data, error } = await supabaseAdmin
-      .from("user_auth_links")
-      .select("app_uid")
-      .eq("auth_uid", authUid)
-      .maybeSingle();
-    if (error) throw error;
-    return data?.app_uid || authUid;
-  } catch (e) {
-    console.error("[create-charge] app uid resolution failed, using auth uid:", e);
-    return authUid;
   }
 }
 
 const SITE_URL = "https://garibazar.shop";
 
+// সার্ভার-সাইড দামের তালিকা -- src/translations.ts-এর AD_PACKAGES-এর সাথে
+// হুবহু মিলিয়ে রাখতে হবে (দাম বদলালে দুই জায়গাতেই বদলাতে হবে)। ক্লায়েন্ট
+// থেকে পাঠানো amount/adTier/durationDays আগে সরাসরি বিশ্বাস করে UddoktaPay-কে
+// পাঠানো হতো -- কেউ চাইলে ব্রাউজার কনসোল থেকে সরাসরি ডাটাবেসে
+// amount:1, adTier:"featured", durationDays:30 লিখে মাত্র ৳১ দিয়ে ৩০ দিনের
+// প্রোমোশন কিনে ফেলতে পারত। এখন adTier+durationDays-এর জন্য সঠিক দাম না
+// মিললে চার্জ তৈরিই হবে না।
 const AD_PACKAGE_PRICES: Record<string, { durationDays: number; price: number }> = {
   basic: { durationDays: 2, price: 100 },
   premium: { durationDays: 4, price: 200 },
@@ -64,39 +44,56 @@ export default async function handler(req: any, res: any) {
   }
 
   try {
-    if (!supabaseAdmin) {
-      return res.status(500).json({ error: "সার্ভার কনফিগারেশনে সমস্যা।" });
-    }
-
     const apiKey = process.env.UDDOKTAPAY_API_KEY;
     const baseUrl = process.env.UDDOKTAPAY_BASE_URL;
     if (!apiKey || !baseUrl) {
       return res.status(500).json({ error: "পেমেন্ট গেটওয়ে কনফিগার করা নেই।" });
     }
 
-    const authHeader = req.headers.authorization || "";
-    const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7).trim() : authHeader;
-    if (!token) {
-      return res.status(401).json({ error: "অননুমোদিত অনুরোধ।" });
+    const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!supabaseUrl || !supabaseServiceKey) {
+      return res.status(500).json({ error: "সার্ভার কনফিগারেশনে সমস্যা।" });
     }
-    const authUid = await resolveCallerUid(token);
-    if (!authUid) {
-      return res.status(401).json({ error: "অননুমোদিত অনুরোধ।" });
-    }
-    const uid = await resolveAppUid(authUid);
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
+    // 1. Verify the caller is signed in -- Supabase session first, legacy
+    // Firebase ID token as a fallback for any still-cached old session.
+    const authHeader = req.headers.authorization || "";
+    const idToken = authHeader.replace("Bearer ", "");
+    if (!idToken) {
+      return res.status(401).json({ error: "অননুমোদিত অনুরোধ।" });
+    }
+    let uid: string | null = await verifySupabaseToken(idToken);
+    if (!uid && getApps().length) {
+      try {
+        const decoded = await getAuth().verifyIdToken(idToken);
+        uid = decoded.uid;
+      } catch {
+        // fall through -- uid stays null, handled below
+      }
+    }
+    if (!uid) {
+      return res.status(401).json({ error: "যাচাই ব্যর্থ হয়েছে।" });
+    }
+
+    // 2. Load the pending refill_request the user already created client-side
     const { requestId } = req.body || {};
     if (!requestId) {
       return res.status(400).json({ error: "requestId প্রয়োজন।" });
     }
 
-    const { data: request, error: reqErr } = await supabaseAdmin
+    const { data: request, error: reqErr } = await supabase
       .from("refill_requests")
       .select("*")
       .eq("id", requestId)
       .maybeSingle();
 
-    if (reqErr || !request) {
+    if (reqErr) {
+      console.error("create-charge: refill_requests lookup error:", reqErr.message);
+      return res.status(500).json({ error: "সার্ভারে সমস্যা হয়েছে।" });
+    }
+    if (!request) {
       return res.status(404).json({ error: "রিকোয়েস্ট খুঁজে পাওয়া যায়নি।" });
     }
     if (request.user_id !== uid) {
@@ -110,6 +107,9 @@ export default async function handler(req: any, res: any) {
       return res.status(400).json({ error: "সঠিক পরিমাণ নেই।" });
     }
 
+    // ad_promotion requests must match a real package's price+duration exactly --
+    // wallet top-ups (type !== "ad_promotion") are exempt since any positive
+    // top-up amount is legitimately user-chosen.
     if (request.type === "ad_promotion") {
       const canonical = AD_PACKAGE_PRICES[request.ad_tier];
       if (!canonical || canonical.durationDays !== Number(request.duration_days) || canonical.price !== amount) {
@@ -119,15 +119,23 @@ export default async function handler(req: any, res: any) {
         return res.status(400).json({ error: "প্যাকেজের তথ্য মেলেনি। অনুগ্রহ করে আবার চেষ্টা করুন।" });
       }
 
+      // The request being for THIS user's own account isn't enough on its
+      // own - also confirm the listing being promoted actually belongs to
+      // them, otherwise someone could pay to promote a listing that isn't
+      // theirs by pointing listingId at someone else's.
       if (!request.listing_id) {
         return res.status(400).json({ error: "কোন লিস্টিং প্রোমোট করতে চান তা পাওয়া যায়নি।" });
       }
-      const { data: listingRow, error: listingErr } = await supabaseAdmin
+      const { data: listingRow, error: listingErr } = await supabase
         .from("listings")
         .select("seller_id")
         .eq("id", request.listing_id)
         .maybeSingle();
-      if (listingErr || !listingRow) {
+      if (listingErr) {
+        console.error("create-charge: listing lookup error:", listingErr.message);
+        return res.status(500).json({ error: "সার্ভারে সমস্যা হয়েছে।" });
+      }
+      if (!listingRow) {
         return res.status(404).json({ error: "লিস্টিংটি খুঁজে পাওয়া যায়নি।" });
       }
       if (listingRow.seller_id !== uid) {
@@ -138,15 +146,18 @@ export default async function handler(req: any, res: any) {
       }
     }
 
-    const { data: userRow } = await supabaseAdmin
+    // 3. Look up the user's profile for name/phone (used as billing info)
+    const { data: userRow } = await supabase
       .from("users")
       .select("name, phone")
       .eq("uid", uid)
       .maybeSingle();
     const displayName = userRow?.name || "Gari Bazar User";
     const phoneNumber = userRow?.phone || "";
+    // UddoktaPay requires an email; users in this app only have phone numbers, so synthesize one.
     const syntheticEmail = `${phoneNumber || uid}@garibazar.app`;
 
+    // 4. Create the charge with UddoktaPay
     const checkoutUrl = new URL("api/checkout-v2", baseUrl).toString();
     const uddoktaRes = await fetch(checkoutUrl, {
       method: "POST",
@@ -157,8 +168,7 @@ export default async function handler(req: any, res: any) {
       body: JSON.stringify({
         full_name: displayName,
         email: syntheticEmail,
-        amount: String(amount),
-        currency: "BDT",
+        amount: String(amount),currency: "BDT",
         metadata: {
           requestId,
           uid,

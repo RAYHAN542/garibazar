@@ -3,11 +3,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useEffect, useMemo, useRef, useCallback, lazy, Suspense } from "react";
-import { logAnalyticsEvent } from "./firebase";
+import { useState, useEffect, useMemo, useRef, lazy, Suspense } from "react";
+import { db, logAnalyticsEvent } from "./firebase";
 import { supabase } from "./supabase";
 import { logger } from "./utils/logger";
 import { trackEvent } from "./utils/trackEvent";
+import { collection, onSnapshot, query, orderBy, getDocs, doc, getDoc, updateDoc, where, addDoc, serverTimestamp, limit, startAfter, DocumentSnapshot } from "firebase/firestore";
 import { withTimeout, TimeoutError } from "./utils/withTimeout";
 import { apiUrl } from "./utils/apiBase";
 import { incrementListingView } from "./utils/counters";
@@ -15,7 +16,6 @@ import {
   fetchInitialListings as fetchInitialListingsFromSupabase,
   fetchMoreListings as fetchMoreListingsFromSupabase,
   fetchAdListings as fetchAdListingsFromSupabase,
-  fetchMyListings as fetchMyListingsFromSupabase,
 } from "./utils/listingsApi";
 import { useAdPromotion } from "./hooks/useAdPromotion";
 import { Car, Search, User, LogOut, Globe, Loader2, ShoppingBag, Phone, ChevronRight, ShieldCheck, Send, Check, Download, Smartphone } from "lucide-react";
@@ -117,6 +117,18 @@ export default function App() {
   // Firebase Auth states
   const [user, setUser] = useState<any>(null);
   const [userMetadata, setUserMetadata] = useState<any>(null);
+  // 🔧 Fixes local-session/Firebase-Auth race condition: `user` above is set
+  // instantly from localStorage on startup so the UI feels fast (avatar,
+  // name, etc. show immediately). But Firestore security rules check
+  // `request.auth.uid`, which comes from the Firebase SDK's own async auth
+  // restoration -- NOT from this localStorage copy. If a uid-scoped listener
+  // (reviews, own listings, chats, profile sync) fires before Firebase
+  // Auth has actually finished restoring, it can run with `request.auth ==
+  // null` and get silently denied, or run against a stale/mismatched uid.
+  // `authReady` becomes true only once onAuthStateChanged has fired for the
+  // first time (whether the result is a user or null), and every uid-scoped
+  // listener below now waits for it.
+  const [authReady, setAuthReady] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [isPersonalInfoOpen, setIsPersonalInfoOpen] = useState(false);
   const [isLanguageOpen, setIsLanguageOpen] = useState(false);
@@ -276,7 +288,7 @@ export default function App() {
   // Purchases Pagination States
   const [firebasePurchases, setFirebasePurchases] = useState<any[]>([]);
   const [morePurchases, setMorePurchases] = useState<any[]>([]);
-  const [lastPurchasesDoc, setLastPurchasesDoc] = useState<string | null>(null);
+  const [lastPurchasesDoc, setLastPurchasesDoc] = useState<DocumentSnapshot | null>(null);
   const [hasMorePurchases, setHasMorePurchases] = useState(false);
   const [loadingMorePurchases, setLoadingMorePurchases] = useState(false);
   
@@ -374,11 +386,9 @@ export default function App() {
     // Last resort: fetch just this one document directly.
     (async () => {
       try {
-        const { data, error } = await supabase.from("listings").select("*").eq("id", sharedListingId).maybeSingle();
-        if (error) throw error;
-        if (data) {
-          const { mapRowToListing } = await import("./utils/listingsApi");
-          setSelectedListing(mapRowToListing(data));
+        const snap = await getDoc(doc(db, "listings", sharedListingId));
+        if (snap.exists()) {
+          setSelectedListing({ id: snap.id, ...snap.data() } as PartListing);
         }
       } catch (err) {
         console.warn("Could not fetch shared listing directly:", err);
@@ -790,224 +800,173 @@ export default function App() {
     };
   }, [isAuthOpen, selectedListing, promotingListing, editingListing, isLegalOpen, isLotteryOpen]);
 
-  const applyStoredSession = () => {
-    const stored = localStorage.getItem("gari_bazar_session_user");
-    if (!stored) return false;
-    try {
-      const parsed = JSON.parse(stored);
-      setUser({
-        uid: parsed.uid,
-        authUid: parsed.authUid,
-        displayName: parsed.displayName,
-        email: parsed.email,
-        photoURL: parsed.photoURL || parsed.profilePicture,
-        isAdmin: parsed.isAdmin === true
-      });
-      setUserMetadata(parsed);
-      return true;
-    } catch (err) {
-      console.error("Local session parsing failed:", err);
-      return false;
-    }
-  };
-
+  // 1. Custom Passwordless Profile Authentication Listener & Real-time Firestore Sync
   useEffect(() => {
-    (async () => {
-      const hadCachedProfile = applyStoredSession();
-      if (!hadCachedProfile) return;
-
+    // Read locally logged in profile on startup
+    const stored = localStorage.getItem("gari_bazar_session_user");
+    if (stored) {
       try {
-        const { data } = await supabase.auth.getSession();
-        if (!data.session) {
-          localStorage.removeItem("gari_bazar_session_user");
-          setUser(null);
-          setUserMetadata(null);
-        }
+        const parsed = JSON.parse(stored);
+        setUser({
+          uid: parsed.uid,
+          displayName: parsed.displayName,
+          email: parsed.email,
+          photoURL: parsed.photoURL || parsed.profilePicture,
+          isAdmin: parsed.isAdmin === true
+        });
+        setUserMetadata(parsed);
       } catch (err) {
-        console.warn("Session verification failed (non-fatal):", err);
+        console.error("Local session parsing failed:", err);
       }
-    })();
+    }
+  }, []);
 
-    const { data: authListener } = supabase.auth.onAuthStateChange((event) => {
-      if (event === "SIGNED_OUT") {
-        localStorage.removeItem("gari_bazar_session_user");
+  // Supabase auth restoration. AuthModal already stores the app profile locally,
+  // but Supabase is now the source of truth for the authenticated session.
+  useEffect(() => {
+    let mounted = true;
+
+    const syncSession = async () => {
+      const { data } = await supabase.auth.getSession();
+      if (!mounted) return;
+      if (data.session?.user) {
+        const authUser = data.session.user;
+        setUser((prev: any) => ({
+          ...(prev || {}),
+          uid: authUser.id,
+          email: authUser.email || prev?.email,
+          phone: authUser.phone || prev?.phone,
+        }));
+      }
+      setAuthReady(true);
+    };
+
+    syncSession();
+    const { data: subscription } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!mounted) return;
+      if (session?.user) {
+        const authUser = session.user;
+        setUser((prev: any) => ({
+          ...(prev || {}),
+          uid: authUser.id,
+          email: authUser.email || prev?.email,
+          phone: authUser.phone || prev?.phone,
+        }));
+      } else {
         setUser(null);
         setUserMetadata(null);
       }
+      setAuthReady(true);
     });
 
     return () => {
-      authListener?.subscription?.unsubscribe();
+      mounted = false;
+      subscription.subscription.unsubscribe();
     };
   }, []);
 
-  // 🔧 FIX (Firebase -> Supabase migration, part 2): reviews, profile
-  // credits/name sync, and the unread-chats badge were all still reading
-  // from Firestore and gated on `firebaseAuthUser` -- same root cause as
-  // the myListings bug fixed earlier (see refetchMyListings above), and
-  // ChatView.tsx's own messages/threads already moved to Supabase (with a
-  // polling fallback, since that session found Supabase Realtime alone
-  // unreliable here) -- so App.tsx's unread-chats count was reading a
-  // completely different, empty dataset than the chat list actually shows.
-  // These three now read from Supabase directly, each with the same
-  // fetch-once + light poll + custom-event-refetch pattern, for the same
-  // reliability reason as ChatView's polling fallback.
-
   // Fetch reviews for the currently logged-in user to display in "My Shop"
   useEffect(() => {
-    if (!user?.uid) {
+    if (!authReady || !user?.uid) {
       setCurrentUserReviews([]);
       return;
     }
-    let cancelled = false;
     setCurrentUserReviewsLoading(true);
-    const fetchReviews = async () => {
-      try {
-        const { data, error } = await supabase
-          .from("seller_reviews")
-          .select("*")
-          .eq("seller_id", user.uid)
-          .order("created_at", { ascending: false })
-          .limit(30);
-        if (error) throw error;
-        if (cancelled) return;
-        setCurrentUserReviews(
-          (data || []).map((row: any) => ({
-            id: row.id,
-            sellerId: row.seller_id,
-            reviewerId: row.reviewer_id,
-            rating: row.rating,
-            comment: row.comment,
-            createdAt: row.created_at,
-          }))
-        );
-      } catch (err) {
-        console.warn("Failed to fetch current user reviews:", err);
-      } finally {
-        if (!cancelled) setCurrentUserReviewsLoading(false);
-      }
-    };
-    fetchReviews();
-    window.addEventListener("gari_bazar_refreshed_data", fetchReviews);
-    return () => {
-      cancelled = true;
-      window.removeEventListener("gari_bazar_refreshed_data", fetchReviews);
-    };
-  }, [user?.uid]);
+    const q = query(
+      collection(db, "seller_reviews"),
+      where("sellerId", "==", user.uid),
+      orderBy("createdAt", "desc"),
+      limit(30)
+    );
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const list: any[] = [];
+      snapshot.forEach((docSnap) => {
+        list.push({ id: docSnap.id, ...docSnap.data() });
+      });
+      list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      setCurrentUserReviews(list);
+      setCurrentUserReviewsLoading(false);
+    }, (err) => {
+      console.warn("Failed to subscribe to current user reviews:", err);
+      setCurrentUserReviewsLoading(false);
+    });
 
-  // Sync profile metadata (e.g. simulated credits recharge, name/photo
-  // edits) -- polled instead of Firestore onSnapshot; interval is short
-  // enough that an admin-approved wallet refill still feels near-instant.
+    return () => unsubscribe();
+  }, [authReady, user?.uid]);
+
+  // Sync profile metadata real-time (e.g. simulated credits recharge instantly)
   useEffect(() => {
-    if (!user?.uid) return;
-    let cancelled = false;
+    if (!authReady || !user?.uid) return;
 
-    const syncProfile = async () => {
-      try {
-        const { data, error } = await supabase.from("users").select("*").eq("uid", user.uid).maybeSingle();
-        if (error) throw error;
-        if (cancelled || !data) return;
-        const mapped = {
-          displayName: data.name,
-          email: data.email,
-          phoneNumber: data.phone,
-          city: data.city,
-          profilePicture: data.profile_picture,
-          simulatedCredits: data.simulated_credits,
-          referralCode: data.referral_code,
-          blockedUids: data.blocked_uids,
-        };
-        setUserMetadata((prev: any) => ({ ...prev, ...mapped }));
-
+    const userRef = doc(db, "users", user.uid);
+    const unsubscribe = onSnapshot(userRef, (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        setUserMetadata((prev: any) => ({ ...prev, ...data }));
+        
+        // Sync back to local storage
         const stored = localStorage.getItem("gari_bazar_session_user");
         if (stored) {
           try {
             const parsed = JSON.parse(stored);
-            localStorage.setItem("gari_bazar_session_user", JSON.stringify({ ...parsed, ...mapped }));
+            localStorage.setItem("gari_bazar_session_user", JSON.stringify({ ...parsed, ...data }));
           } catch (e) {}
         }
-      } catch (err) {
-        console.warn("Failed to sync profile metadata:", err);
       }
-    };
+    });
 
-    syncProfile();
-    const pollId = setInterval(syncProfile, 20000);
-    window.addEventListener("gari_bazar_refreshed_data", syncProfile);
-    return () => {
-      cancelled = true;
-      clearInterval(pollId);
-      window.removeEventListener("gari_bazar_refreshed_data", syncProfile);
-    };
-  }, [user?.uid]);
+    return () => unsubscribe();
+  }, [authReady, user?.uid]);
 
-  // Unread Chats Counter
+  // Unread Chats Listener
   const [unreadChatsCount, setUnreadChatsCount] = useState(0);
   useEffect(() => {
-    if (!user?.uid) {
+    if (!authReady || !user?.uid) {
       setUnreadChatsCount(0);
       return;
     }
-    let cancelled = false;
+    const q = query(
+      collection(db, "chats"),
+      where("participants", "array-contains", user.uid),
+      orderBy("lastMessageAt", "desc"),
+      limit(50)
+    );
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      let count = 0;
+      snapshot.forEach(docSnap => {
+        const data = docSnap.data();
+        const unreadForMe = data.unreadCount?.[user.uid] || 0;
+        if (unreadForMe > 0) count++;
+      });
+      setUnreadChatsCount(count);
+    });
+    return () => unsubscribe();
+  }, [authReady, user?.uid]);
 
-    const fetchUnread = async () => {
-      try {
-        const { data, error } = await supabase
-          .from("chats")
-          .select("unread_count")
-          .or(`participant_a.eq.${user.uid},participant_b.eq.${user.uid}`)
-          .order("last_message_at", { ascending: false })
-          .limit(50);
-        if (error) throw error;
-        if (cancelled) return;
-        const count = (data || []).filter((row: any) => (row.unread_count?.[user.uid] || 0) > 0).length;
-        setUnreadChatsCount(count);
-      } catch (err) {
-        console.warn("Failed to fetch unread chats count:", err);
-      }
-    };
-
-    fetchUnread();
-    const pollId = setInterval(fetchUnread, 20000);
-    window.addEventListener("gari_bazar_chats_updated", fetchUnread);
-    return () => {
-      cancelled = true;
-      clearInterval(pollId);
-      window.removeEventListener("gari_bazar_chats_updated", fetchUnread);
-    };
-  }, [user?.uid]);
-
-  // 1b. My Own Listings — সরাসরি seller_id দিয়ে Supabase থেকে fetch করা হয়,
-  // হোমপেজের ২০-টা পেজিনেটেড লিস্ট থেকে না। এভাবে Dashboard আর Lottery
-  // সবসময় ইউজারের আসল ১০০% পোস্ট দেখাবে।
-  //
-  // 🔧 FIX (Firebase -> Supabase auth migration): আগে এটা Firestore
-  // onSnapshot দিয়ে হতো এবং `firebaseAuthUser` না থাকলে চলতোই না। লগইন এখন
-  // Supabase (ফোন + পাসওয়ার্ড) দিয়ে হয়, তাই `firebaseAuthUser` কখনোই সেট
-  // হয় না -- ফলে myListings সবসময় খালি থাকতো, "My Shop"/"Products" ট্যাবে
-  // পোস্ট করা সব লিস্টিং থাকা সত্ত্বেও "০ পোস্ট" দেখাতো। এখন সরাসরি Supabase
-  // থেকে fetch হয়, শুধু `user?.uid` থাকলেই চলে (firebaseAuthUser লাগে না)।
-  const refetchMyListings = useCallback(async () => {
-    if (!user?.uid) {
+  // 1b. My Own Listings — সরাসরি sellerId দিয়ে কোয়েরি করা, হোমপেজের ২০-টা পেজিনেটেড লিস্ট থেকে না।
+  // এভাবে Dashboard আর Lottery সবসময় ইউজারের আসল ১০০% পোস্ট দেখাবে।
+  useEffect(() => {
+    if (!authReady || !user?.uid) {
       setMyListings([]);
       return;
     }
-    try {
-      const list = await fetchMyListingsFromSupabase(user.uid, 200);
+    const q = query(collection(db, "listings"), where("sellerId", "==", user.uid), orderBy("createdAt", "desc"), limit(100));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const list: PartListing[] = [];
+      snapshot.forEach((docSnap) => {
+        const data = docSnap.data();
+        if (data.isDeleted === true) return; // soft-deleted, in its 30-day recovery window
+        const normalizedCreatedAt = data.createdAt && typeof data.createdAt.toDate === "function"
+          ? data.createdAt.toDate().toISOString()
+          : data.createdAt;
+        list.push({ id: docSnap.id, ...data, createdAt: normalizedCreatedAt } as PartListing);
+      });
       setMyListings(list);
-    } catch (err) {
-      logger.error("Failed to fetch my listings:", err);
-    }
-  }, [user?.uid]);
-
-  useEffect(() => {
-    refetchMyListings();
-  }, [refetchMyListings]);
-
-  useEffect(() => {
-    window.addEventListener("gari_bazar_refreshed_data", refetchMyListings);
-    return () => window.removeEventListener("gari_bazar_refreshed_data", refetchMyListings);
-  }, [refetchMyListings]);
+    }, (err) => {
+      logger.error("Failed to sync my listings:", err);
+    });
+    return () => unsubscribe();
+  }, [authReady, user?.uid]);
 
   // 1c. সব লাইভ বুস্ট করা অ্যাড — হোমপেজের "Load More" পেজিনেশনের ওপর নির্ভর না করে সরাসরি fetch করা,
   // যাতে পেজ লোড হওয়ার সাথে সাথেই বুস্ট ব্যানার দেখা যায়, Load More চাপার আগেই।
@@ -1252,56 +1211,43 @@ export default function App() {
     }
   };
 
-  // 3. Purchases Sync -- Firebase -> Supabase migration. purchases rows keep
-  // their actual fields inside a `data` jsonb blob (id/buyer_id/created_at
-  // are the only real columns), so this flattens each row the same shape
-  // the rest of the app already expects (item.price, item.title, etc.) --
-  // see mapPurchaseRow. `lastPurchasesDoc` here holds the oldest loaded
-  // row's created_at as a keyset-pagination cursor, not a Firestore
-  // DocumentSnapshot anymore.
-  const mapPurchaseRow = (row: any) => ({
-    id: row.id,
-    buyerId: row.buyer_id,
-    createdAt: row.created_at,
-    ...(row.data || {}),
-  });
-
+  // 3. Real-time Purchases Sync (capped to 20 documents)
   useEffect(() => {
-    if (!user?.uid) {
+    if (!user) {
       setFirebasePurchases([]);
       setMorePurchases([]);
       setLastPurchasesDoc(null);
       setHasMorePurchases(false);
       return;
     }
-    let cancelled = false;
 
-    const fetchPurchases = async () => {
-      try {
-        const { data, error } = await supabase
-          .from("purchases")
-          .select("*")
-          .eq("buyer_id", user.uid)
-          .order("created_at", { ascending: false })
-          .limit(20);
-        if (error) throw error;
-        if (cancelled) return;
-        const rows = data || [];
-        setFirebasePurchases(rows.map(mapPurchaseRow));
-        setLastPurchasesDoc(rows.length > 0 ? rows[rows.length - 1].created_at : null);
-        setHasMorePurchases(rows.length === 20);
-      } catch (err) {
-        console.warn("Failed to fetch purchases:", err);
+    const q = query(collection(db, "purchases"), where("buyerId", "==", user.uid), orderBy("createdAt", "desc"), limit(20));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      if (snapshot.empty) {
+        setFirebasePurchases([]);
+        setLastPurchasesDoc(null);
+        setHasMorePurchases(false);
+      } else {
+        const firestoreList: any[] = [];
+        snapshot.forEach((doc) => {
+          const data = doc.data();
+          if (data.buyerId === user.uid || data.sellerContact === userMetadata?.phoneNumber) {
+            firestoreList.push({ id: doc.id, ...data });
+          }
+        });
+
+        setFirebasePurchases(firestoreList);
+        setLastPurchasesDoc(snapshot.docs[snapshot.docs.length - 1]);
+        setHasMorePurchases(snapshot.docs.length === 20);
       }
-    };
+    }, (err) => {
+      console.warn("Using offline purchases:", err);
+    });
 
-    fetchPurchases();
-    window.addEventListener("gari_bazar_refreshed_data", fetchPurchases);
     return () => {
-      cancelled = true;
-      window.removeEventListener("gari_bazar_refreshed_data", fetchPurchases);
+      unsubscribe();
     };
-  }, [user?.uid]);
+  }, [user, userMetadata?.phoneNumber]);
 
   // 3b. Merge real-time, loaded-more, and local purchases
   useEffect(() => {
@@ -1352,26 +1298,27 @@ export default function App() {
 
   // 3c. Purchases Pagination Loader helper
   const handleLoadMorePurchases = async () => {
-    if (!user?.uid || !lastPurchasesDoc || loadingMorePurchases) return;
+    if (!user || !lastPurchasesDoc || loadingMorePurchases) return;
     setLoadingMorePurchases(true);
     try {
-      const { data, error } = await withTimeout(
-        supabase
-          .from("purchases")
-          .select("*")
-          .eq("buyer_id", user.uid)
-          .lt("created_at", lastPurchasesDoc as string)
-          .order("created_at", { ascending: false })
-          .limit(20),
-        12000,
-        "loadMorePurchases"
+      const q = query(
+        collection(db, "purchases"),
+        where("buyerId", "==", user.uid),
+        orderBy("createdAt", "desc"),
+        startAfter(lastPurchasesDoc),
+        limit(20)
       );
-      if (error) throw error;
-      const rows = data || [];
-      if (rows.length === 0) {
+      const snapshot = await withTimeout(getDocs(q), 12000, "loadMorePurchases");
+      if (snapshot.empty) {
         setHasMorePurchases(false);
       } else {
-        const nextList = rows.map(mapPurchaseRow);
+        const nextList: any[] = [];
+        snapshot.forEach((doc) => {
+          const data = doc.data();
+          if (data.buyerId === user.uid || data.sellerContact === userMetadata?.phoneNumber) {
+            nextList.push({ id: doc.id, ...data });
+          }
+        });
 
         setMorePurchases(prev => {
           const combined = [...prev];
@@ -1383,8 +1330,8 @@ export default function App() {
           return combined;
         });
 
-        setLastPurchasesDoc(rows[rows.length - 1].created_at);
-        setHasMorePurchases(rows.length === 20);
+        setLastPurchasesDoc(snapshot.docs[snapshot.docs.length - 1]);
+        setHasMorePurchases(snapshot.docs.length === 20);
       }
     } catch (err) {
       console.warn("Failed to load more purchases:", err);
@@ -1420,11 +1367,11 @@ export default function App() {
             localStorage.setItem("gari_bazar_local_listings", JSON.stringify(updated));
             window.dispatchEvent(new Event("storage"));
           } else {
-            const { error } = await supabase
-              .from("listings")
-              .update({ is_ad: false, ad_expires_at: null })
-              .eq("id", item.id);
-            if (error) throw error;
+            const listingRef = doc(db, "listings", item.id);
+            await updateDoc(listingRef, {
+              isAd: false,
+              adExpiresAt: null
+            });
           }
         } catch (err) {
           console.error("Error resetting expired advertisement promotion:", err);
@@ -1466,8 +1413,6 @@ export default function App() {
           .eq("id", itemId);
         if (deleteError) throw deleteError;
       }
-      // মুছে ফেলা লিস্টিং এখন My Shop/Products ট্যাব থেকেও তাৎক্ষণিক সরে যাক।
-      setMyListings((prev) => prev.filter((item) => item.id !== itemId));
     } catch (err) {
       console.error("Error deleting listing:", err);
       alert(language === "bn" ? "মুছে ফেলতে ব্যর্থ হয়েছে" : "Failed to delete listing.");
@@ -1534,8 +1479,8 @@ export default function App() {
       // (guest হলে IP-ভিত্তিক, লগইন থাকলে uid-ভিত্তিক সীমা) -- দেখুন
       // api/submit-support-ticket.ts, আর firestore.rules-এ support_tickets
       // এখন client-এর জন্য সম্পূর্ণ বন্ধ।
-      const { data: sessionData } = await supabase.auth.getSession();
-      const idToken = sessionData.session?.access_token || null;
+      const { data: { session } } = await supabase.auth.getSession();
+      const idToken = user?.uid ? (session?.access_token || null) : null;
       const resp = await fetch(apiUrl("/api/submit-support-ticket"), {
         method: "POST",
         headers: {
@@ -2003,7 +1948,6 @@ export default function App() {
                   language={language}
                   currentUser={userMetadata}
                   onPostSuccess={() => {
-                    refetchMyListings();
                     setActiveTab("market");
                   }}
                   onLoginPrompt={() => {
@@ -2677,7 +2621,6 @@ export default function App() {
         onAuthSuccess={(sessionUser) => {
           setUser({
             uid: sessionUser.uid,
-            authUid: sessionUser.authUid,
             displayName: sessionUser.displayName,
             email: sessionUser.email,
             photoURL: sessionUser.photoURL || sessionUser.profilePicture,
@@ -2728,7 +2671,7 @@ export default function App() {
           currentUser={user}
           onClose={() => setPromotingListing(null)}
           onPromotionSuccess={() => {
-            refetchMyListings();
+            // listing gets updated automatically via listener hook
           }}
         />
       )}
@@ -2753,7 +2696,7 @@ export default function App() {
         listing={editingListing}
         language={language}
         onSaveSuccess={() => {
-          refetchMyListings();
+          // listings get updated automatically via firestore or local triggers
         }}
       />
 

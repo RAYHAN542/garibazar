@@ -39,6 +39,9 @@ export default defineConfig(({ mode }) => {
             // উপকার করে: দুটো আলাদা content-hashed ফাইল হওয়ায়, auth কোড না
             // বদলালে firestore আপডেট হলেও ইউজারের browser cache থেকে
             // firebase-auth চাঙ্কটা পুনরায় ডাউনলোড করা লাগবে না (এবং উল্টোটাও)।
+            'firebase-app': ['firebase/app'],
+            'firebase-auth': ['firebase/auth'],
+            'firebase-firestore': ['firebase/firestore'],
             'react-vendor': ['react', 'react-dom'],
             'icons-vendor': ['lucide-react'],
             'search-vendor': ['fuse.js'],

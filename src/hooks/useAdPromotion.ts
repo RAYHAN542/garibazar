@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { logAnalyticsEvent } from "../firebase";
+import { auth, logAnalyticsEvent } from "../firebase";
 import { supabase } from "../supabase";
 import { SupportedLanguage } from "../types";
 import { apiUrl } from "../utils/apiBase";
@@ -13,7 +13,7 @@ interface UseAdPromotionParams {
   selectedPromoPkg: any;
 }
 
-// Dashboard "launch ad campaign" flow: creates a pending refill_request doc,
+// Dashboard "launch ad campaign" flow: creates a pending refill_request row,
 // asks the server to open a UddoktaPay checkout session for it, then sends
 // the user there. On successful payment, the webhook (server-side) activates
 // the ad automatically -- this hook's job ends at "redirect to checkout".
@@ -58,14 +58,17 @@ export function useAdPromotion({
 
       // 1. Create a pending refill_request — the UddoktaPay webhook verifies
       //    payment and activates the ad automatically. No TxID needed.
-      const { data: sessionData } = await supabase.auth.getSession();
-      const token = sessionData.session?.access_token;
-      if (!token) throw new Error("লগইন সেশন পাওয়া যায়নি।");
-
+      //    🔧 (2026-09-23) এটা আগে Firestore-এ addDoc হতো, কিন্তু
+      //    firestore.rules-এর এই কালেকশনে request.auth.uid লাগে -- যেটা
+      //    Supabase দিয়ে লগইন করা ইউজারের কখনোই থাকে না (তারা Firebase Auth-এ
+      //    কখনো সাইন-ইনই করেনি)। ফলে এই write সবসময় permission-denied দিয়ে
+      //    ব্যর্থ হতো, প্রতিটা "Promote" ক্লিকই ভেঙে পড়ত। refill_requests
+      //    টেবিল Supabase-এও আছে RLS পলিসিসহ (নিজের user_id দিয়ে pending
+      //    insert করা যায়), তাই এখন সরাসরি সেখানেই লেখা হয়।
       const { data: inserted, error: insertErr } = await supabase
         .from("refill_requests")
         .insert({
-          user_id: user.authUid || user.uid,
+          user_id: user.uid,
           user_name: user.displayName || "Seller",
           user_email: user.email || "",
           amount: Number(selectedPromoPkg.price),
@@ -74,17 +77,22 @@ export function useAdPromotion({
           listing_id: targetListing.id,
           listing_title: targetListing.title,
           ad_tier: selectedPromoPkg.tier,
-          duration_days: selectedPromoPkg.durationDays
+          duration_days: selectedPromoPkg.durationDays,
+          current_views: targetListing.views || 0,
         })
         .select("id")
         .single();
 
-      if (insertErr) throw insertErr;
+      if (insertErr || !inserted) {
+        throw new Error(insertErr?.message || "রিকোয়েস্ট তৈরি করা যায়নি।");
+      }
 
       // 2. Ask our server to open a real UddoktaPay checkout session for this request.
+      const { data: sessionData } = await supabase.auth.getSession();
+      const idToken = sessionData?.session?.access_token || (await auth.currentUser?.getIdToken());
       const res = await fetch(apiUrl("/api/payment/create-charge"), {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
         body: JSON.stringify({ requestId: inserted.id })
       });
       const data = await res.json();
