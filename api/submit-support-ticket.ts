@@ -3,6 +3,7 @@ import { getAuth } from "firebase-admin/auth";
 import { getFirestore } from "firebase-admin/firestore";
 import { applyCors } from "./_lib/cors.js";
 import { checkAndBumpRateLimit, getClientIp } from "./_lib/rateLimit.js";
+import { verifySupabaseToken } from "./_lib/verifyJwt.js";
 
 // ------------------------------------------------------------------------
 // 🔧 Fixes: "Guest support ticket unlimited creation; guest spam is easy"
@@ -22,6 +23,15 @@ import { checkAndBumpRateLimit, getClientIp } from "./_lib/rateLimit.js";
 // firestore.rules' support_tickets collection is locked to admin-only
 // writes now, so a client bypassing this endpoint and writing directly to
 // Firestore is rejected outright.
+//
+// 🔧 SECOND FIX (2026-09-24): this only ever tried getAuth().verifyIdToken
+// (Firebase) -- so every Supabase-logged-in user's token failed silently
+// and they got treated as a "Guest" (uid lost, and the stricter 3/hour
+// guest limit applied instead of the 10/hour signed-in limit). Now tries
+// the current Supabase token first, same pattern as
+// api/get-seller-contact.ts / api/draw.ts / api/payment/create-charge.ts,
+// with the old Firebase check kept as a fallback for any cached legacy
+// session.
 // ------------------------------------------------------------------------
 
 if (!getApps().length) {
@@ -52,10 +62,6 @@ export default async function handler(req: any, res: any) {
   }
 
   try {
-    if (!getApps().length) {
-      return res.status(500).json({ error: "সার্ভার কনফিগারেশনে সমস্যা।" });
-    }
-
     const { name, email, message } = req.body || {};
     if (!message || typeof message !== "string" || !message.trim()) {
       return res.status(400).json({ error: "বার্তা লিখুন।" });
@@ -65,19 +71,22 @@ export default async function handler(req: any, res: any) {
     }
 
     // Signed-in users identify themselves with their ID token (optional
-    // header); anyone without one is treated as a guest and rate-limited
-    // by IP instead.
+    // header); anyone without one, or whose token fails both checks, is
+    // treated as a guest and rate-limited by IP instead.
     const authHeader = req.headers.authorization || "";
     const idToken = authHeader.replace("Bearer ", "");
     let uid: string | null = null;
     if (idToken) {
-      try {
-        const decoded = await getAuth().verifyIdToken(idToken);
-        uid = decoded.uid;
-      } catch {
-        // Invalid/expired token -- fall back to treating this as a guest
-        // rather than hard-failing the whole request.
-        uid = null;
+      uid = await verifySupabaseToken(idToken);
+      if (!uid && getApps().length) {
+        try {
+          const decoded = await getAuth().verifyIdToken(idToken);
+          uid = decoded.uid;
+        } catch {
+          // Invalid/expired token -- fall back to treating this as a guest
+          // rather than hard-failing the whole request.
+          uid = null;
+        }
       }
     }
 
@@ -91,6 +100,9 @@ export default async function handler(req: any, res: any) {
       });
     }
 
+    if (!getApps().length) {
+      return res.status(500).json({ error: "সার্ভার কনফিগারেশনে সমস্যা।" });
+    }
     const db = getFirestore();
     await db.collection("support_tickets").add({
       name: (name || "").toString().slice(0, 200) || (uid ? "User" : "Anonymous"),
