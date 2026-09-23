@@ -13,7 +13,35 @@ import { createClient } from "@supabase/supabase-js";
 // দিয়ে request-টা "claim" করা হয় -- দুইটা webhook call একসাথে এলেও শুধু
 // একটাই claim সফল হবে (রেসের ঝুঁকি ন্যূনতম, একই payment provider থেকে
 // duplicate delivery ঠেকানোই মূল উদ্দেশ্য)।
+//
+// 🔧 (2026-09-24 security audit) আগে শুধু header-এর API key মিলিয়েই
+// payload.status === "COMPLETED" বিশ্বাস করে নেওয়া হতো। সমস্যা: এই একই
+// API key ব্যবহার করে create-charge.ts নিজেও UddoktaPay-কে কল করে, তাই সেই
+// key কোনোভাবে ফাঁস হলে (env var leak, লগে থেকে যাওয়া ইত্যাদি) যে কেউ
+// সরাসরি এই ওয়েবহুক এন্ডপয়েন্টে ভুয়া "COMPLETED" payload পাঠিয়ে বিনামূল্যে
+// বিজ্ঞাপন লাইভ করে ফেলতে পারত -- payload নিজে কখনো UddoktaPay-এর সার্ভার
+// পর্যন্ত পৌঁছায়ইনি তা যাচাই করার কোনো উপায় ছিল না। এখন payload-কে সরাসরি
+// বিশ্বাস না করে, invoice_id দিয়ে UddoktaPay-এর নিজস্ব verify-payment API-কে
+// আলাদাভাবে কল করে সত্যিকারের status/amount চাওয়া হয় -- সেটাই একমাত্র সত্য
+// উৎস।
 class PermanentWebhookError extends Error {}
+
+async function verifyWithUddoktaPay(invoiceId: string, apiKey: string, baseUrl: string) {
+  const verifyUrl = new URL("api/verify-payment", baseUrl).toString();
+  const res = await fetch(verifyUrl, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "RT-UDDOKTAPAY-API-KEY": apiKey,
+    },
+    body: JSON.stringify({ invoice_id: invoiceId }),
+  });
+  const data = await res.json().catch(() => null);
+  if (!res.ok || !data) {
+    throw new Error(`UddoktaPay verify-payment call failed (HTTP ${res.status})`);
+  }
+  return data;
+}
 
 export default async function handler(req: any, res: any) {
   if (req.method !== "POST") {
@@ -22,7 +50,8 @@ export default async function handler(req: any, res: any) {
 
   try {
     const apiKey = process.env.UDDOKTAPAY_API_KEY;
-    if (!apiKey) {
+    const baseUrl = process.env.UDDOKTAPAY_BASE_URL;
+    if (!apiKey || !baseUrl) {
       return res.status(500).json({ error: "পেমেন্ট গেটওয়ে কনফিগার করা নেই।" });
     }
     const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
@@ -32,30 +61,46 @@ export default async function handler(req: any, res: any) {
     }
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // 1. Verify this webhook really came from UddoktaPay
+    // 1. Verify this webhook call itself carries our API key (first line of defense)
     const headerKey = req.headers["rt-uddoktapay-api-key"];
     if (!headerKey || headerKey !== apiKey) {
       return res.status(401).json({ error: "Unauthorized webhook." });
     }
 
     const payload = req.body || {};
-    const status = payload.status;
     const metadata = payload.metadata || {};
     const requestId = metadata.requestId;
-    const chargedAmount = Number(payload.amount || payload.charged_amount || 0);
-    const transactionId = payload.transaction_id || "";
     const invoiceId = payload.invoice_id || "";
 
     if (!requestId) {
       console.error("Webhook missing requestId in metadata:", payload);
       return res.status(200).json({ received: true });
     }
-
-    if (status !== "COMPLETED") {
-      return res.status(200).json({ received: true });
+    if (!invoiceId) {
+      throw new PermanentWebhookError(`Webhook payload missing invoice_id for request ${requestId}`);
     }
 
-    // 2. Load + validate before claiming
+    // 2. Never trust payload.status directly -- ask UddoktaPay itself.
+    let verified: any;
+    try {
+      verified = await verifyWithUddoktaPay(invoiceId, apiKey, baseUrl);
+    } catch (e: any) {
+      // Transient network/gateway error -- ask UddoktaPay to retry the webhook later.
+      throw new Error(`verify-payment call errored: ${e.message}`);
+    }
+    if (verified.status !== "COMPLETED") {
+      return res.status(200).json({ received: true });
+    }
+    const chargedAmount = Number(verified.amount || verified.charged_amount || 0);
+    const transactionId = verified.transaction_id || "";
+    const verifiedMetadata = verified.metadata || metadata;
+    if (verifiedMetadata.requestId !== requestId) {
+      throw new PermanentWebhookError(
+        `verify-payment metadata.requestId (${verifiedMetadata.requestId}) does not match webhook payload (${requestId})`
+      );
+    }
+
+    // 3. Load + validate before claiming
     const { data: request, error: fetchErr } = await supabase
       .from("refill_requests")
       .select("*")
@@ -91,11 +136,11 @@ export default async function handler(req: any, res: any) {
     }
 
     if (!chargedAmount || chargedAmount <= 0) {
-      throw new PermanentWebhookError(`Missing or zero charged amount for ${requestId}: ${chargedAmount}`);
+      throw new PermanentWebhookError(`Missing or zero verified charged amount for ${requestId}: ${chargedAmount}`);
     }
     if (Math.abs(chargedAmount - Number(request.amount)) > 1) {
       throw new PermanentWebhookError(
-        `Amount mismatch for ${requestId}: requested ${request.amount}, charged ${chargedAmount}`
+        `Amount mismatch for ${requestId}: requested ${request.amount}, verified charge ${chargedAmount}`
       );
     }
 
@@ -118,7 +163,7 @@ export default async function handler(req: any, res: any) {
       }
     }
 
-    // 3. Claim the request atomically (only succeeds if still "pending")
+    // 4. Claim the request atomically (only succeeds if still "pending")
     const { data: claimed, error: claimErr } = await supabase
       .from("refill_requests")
       .update({
@@ -138,7 +183,7 @@ export default async function handler(req: any, res: any) {
       return res.status(200).json({ received: true });
     }
 
-    // 4. Apply the actual effect now that the request is safely claimed.
+    // 5. Apply the actual effect now that the request is safely claimed.
     if (request.type === "ad_promotion" && request.listing_id) {
       const duration = Number(request.duration_days || 3);
       const { error: updateErr } = await supabase
