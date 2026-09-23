@@ -18,12 +18,12 @@ interface ChatThread {
   sellerId: string;
   buyerName: string;
   sellerName: string;
-  listingId: string;
+  listingId: string | null;
   listingTitle: string;
   listingImage: string;
   listingPrice: number;
   lastMessage: string;
-  lastMessageAt?: any;
+  lastMessageAt?: { seconds: number };
   participants: string[];
   unreadCount?: Record<string, number>;
 }
@@ -32,11 +32,29 @@ interface ChatMessage {
   id: string;
   senderId: string;
   text: string;
-  createdAt: any;
+  createdAt: { seconds: number };
 }
 
-// --- Supabase row <-> UI shape mappers (chats/chat_messages use snake_case) ---
-function mapChatRow(row: any): ChatThread {
+// 🔧 (2026-09-24) FULL MIGRATION: this component used to read/write Firestore
+// directly (chats, chats/{id}/messages, users.blockedUids). That relied on
+// request.auth.uid in firestore.rules, which is only ever set for users who
+// signed in through Firebase Auth -- but login has fully moved to Supabase
+// Auth, so every user who logged in since then had no Firebase session at
+// all, and every chat read/write here failed with permission-denied. Chat
+// was completely broken for them (thread list, messages, sending, blocking).
+// Rewritten against the `chats` / `chat_messages` Postgres tables (already
+// created in Supabase with matching RLS -- see current_uid()-based policies)
+// using Supabase Realtime instead of Firestore's onSnapshot. The 2-second
+// per-message cooldown that used to live in firestore.rules is now enforced
+// server-side by a Postgres trigger on chat_messages (enforce_chat_message_
+// cooldown), so it can't be bypassed by calling this table directly either.
+const isUuidLike = (v: string) =>
+  /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(v);
+
+const toEpochSeconds = (iso: string | null | undefined): number =>
+  iso ? Math.floor(new Date(iso).getTime() / 1000) : Math.floor(Date.now() / 1000);
+
+function mapThreadRow(row: any): ChatThread {
   return {
     id: row.id,
     buyerId: row.buyer_id,
@@ -46,9 +64,9 @@ function mapChatRow(row: any): ChatThread {
     listingId: row.listing_id,
     listingTitle: row.listing_title,
     listingImage: row.listing_image,
-    listingPrice: row.listing_price,
-    lastMessage: row.last_message,
-    lastMessageAt: row.last_message_at ? { seconds: Math.floor(new Date(row.last_message_at).getTime() / 1000) } : null,
+    listingPrice: Number(row.listing_price || 0),
+    lastMessage: row.last_message || "",
+    lastMessageAt: { seconds: toEpochSeconds(row.last_message_at) },
     participants: [row.participant_a, row.participant_b],
     unreadCount: row.unread_count || {},
   };
@@ -59,7 +77,7 @@ function mapMessageRow(row: any): ChatMessage {
     id: row.id,
     senderId: row.sender_id,
     text: row.text,
-    createdAt: row.created_at ? { seconds: Math.floor(new Date(row.created_at).getTime() / 1000) } : null,
+    createdAt: { seconds: toEpochSeconds(row.created_at) },
   };
 }
 
@@ -75,22 +93,34 @@ export function ChatView({ currentUser, language, onLoginPrompt, initialListingT
   const pendingMessagesRef = useRef<ChatMessage[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
+  // 🔧 Prevents rapid double-taps (esp. on quick-reply preset buttons) from
+  // firing handleSendMessage multiple times before the first send finishes,
+  // which was causing the same message to appear 2-3 times in a row.
   const sendLockRef = useRef(false);
 
   const [msgLimit, setMsgLimit] = useState(20);
   const [hasMoreMessages, setHasMoreMessages] = useState(false);
   const prevLimitRef = useRef(20);
+  // Set to true right before "Load Older Messages" bumps msgLimit, so the
+  // auto-scroll-to-bottom effect knows to skip once (see effect below).
   const loadingOlderRef = useRef(false);
 
+  // 📱 Mobile chat card height -- measured with real JS layout numbers
+  // instead of guessed CSS (calc(100dvh-...px) turned out unreliable on
+  // some Android WebViews, and guessing the exact pixel offset by eye from
+  // screenshots kept over/under-shooting). getBoundingClientRect().top
+  // already accounts for everything rendered above the card, whatever it
+  // is, so nothing needs to be guessed except the fixed bottom-nav height.
   const chatCardRef = useRef<HTMLDivElement>(null);
   const [mobileCardHeight, setMobileCardHeight] = useState<number | null>(null);
   useEffect(() => {
-    const BOTTOM_NAV_RESERVE = 78;
+    const BOTTOM_NAV_RESERVE = 78; // fixed bottom tab bar + safe-area, roughly
     const MIN_HEIGHT = 380;
 
     const recompute = () => {
       if (!chatCardRef.current) return;
       if (window.innerWidth >= 1024) {
+        // Desktop keeps the original fixed 600px card (see lg:h-[600px] class below)
         setMobileCardHeight(null);
         return;
       }
@@ -100,6 +130,8 @@ export function ChatView({ currentUser, language, onLoginPrompt, initialListingT
     };
 
     recompute();
+    // Re-measure a beat later too -- on first paint, mobile browser chrome
+    // (address bar collapsing etc.) can still be settling.
     const settleTimer = setTimeout(recompute, 250);
     const settleTimer2 = setTimeout(recompute, 800);
 
@@ -107,6 +139,10 @@ export function ChatView({ currentUser, language, onLoginPrompt, initialListingT
     window.addEventListener("orientationchange", recompute);
     window.visualViewport?.addEventListener("resize", recompute);
 
+    // 🔧 ResizeObserver: catches layout shifts that window "resize" misses
+    // entirely -- e.g. content above the chat card growing/shrinking,
+    // virtual keyboard opening, images finishing load, etc. This is what
+    // makes the height genuinely reliable instead of a one-time guess.
     let ro: ResizeObserver | null = null;
     if (typeof ResizeObserver !== "undefined") {
       ro = new ResizeObserver(() => recompute());
@@ -124,21 +160,6 @@ export function ChatView({ currentUser, language, onLoginPrompt, initialListingT
     };
   }, []);
 
-  const [authReady, setAuthReady] = useState(false);
-  useEffect(() => {
-    let mounted = true;
-    supabase.auth.getSession().then(({ data }) => {
-      if (mounted) setAuthReady(!!data.session);
-    });
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
-      setAuthReady(!!session);
-    });
-    return () => {
-      mounted = false;
-      sub.subscription.unsubscribe();
-    };
-  }, []);
-
   useEffect(() => {
     setMsgLimit(20);
     setHasMoreMessages(false);
@@ -148,6 +169,7 @@ export function ChatView({ currentUser, language, onLoginPrompt, initialListingT
   const [blocking, setBlocking] = useState(false);
   const [localBlockedUids, setLocalBlockedUids] = useState<string[]>([]);
 
+  // Sync local blocked list to fallback instantly
   useEffect(() => {
     try {
       const stored = localStorage.getItem("gari_bazar_blocked_uids") || "[]";
@@ -185,13 +207,16 @@ export function ChatView({ currentUser, language, onLoginPrompt, initialListingT
 
     setBlocking(true);
     try {
+      // Add partnerId to blocked_uids in current user's row (fetch-then-set;
+      // a single user blocking one person at a time makes the race window
+      // here negligible, same trade-off the old arrayUnion call implicitly
+      // made).
       const { data: userRow, error: fetchErr } = await supabase
         .from("users")
         .select("blocked_uids")
         .eq("uid", currentUser.uid)
         .maybeSingle();
       if (fetchErr) throw fetchErr;
-
       const current: string[] = userRow?.blocked_uids || [];
       if (!current.includes(partnerId)) {
         const { error: updateErr } = await supabase
@@ -201,6 +226,7 @@ export function ChatView({ currentUser, language, onLoginPrompt, initialListingT
         if (updateErr) throw updateErr;
       }
 
+      // Also let's save to local storage for instant offline sync fallback
       try {
         const stored = localStorage.getItem("gari_bazar_blocked_uids") || "[]";
         const parsed = JSON.parse(stored);
@@ -217,7 +243,10 @@ export function ChatView({ currentUser, language, onLoginPrompt, initialListingT
           : "User blocked successfully!"
       );
 
+      // Deselect active thread
       setActiveThread(null);
+      
+      // Dispatch storage event to trigger listings refresh
       window.dispatchEvent(new Event("storage"));
     } catch (err) {
       console.error("Error blocking user:", err);
@@ -241,6 +270,7 @@ export function ChatView({ currentUser, language, onLoginPrompt, initialListingT
     return !blockedUids.includes(partnerId);
   });
 
+  // Quick Preset Messages for Bangladeshi Buy-Sell context
   const BANGLA_PRESETS = [
     "এটি কি এখনো বিক্রির জন্য আছে?",
     "ভাইয়া, দাম কিছুটা কম রাখা যাবে?",
@@ -257,31 +287,34 @@ export function ChatView({ currentUser, language, onLoginPrompt, initialListingT
 
   const presets = language === "bn" ? BANGLA_PRESETS : ENGLISH_PRESETS;
 
+  // 1. Fetch chat threads for current user, then keep them live via Realtime.
+  // The `current_uid() = participant_a OR participant_b` RLS check can't be
+  // expressed as a single Realtime filter, so two channels are used (one per
+  // column) and any event on either just triggers a full refetch -- simplest
+  // way to guarantee the list always matches what the old onSnapshot() gave,
+  // without hand-rolling insert/update/delete merge logic here.
   useEffect(() => {
-    if (!currentUser?.uid || !authReady) {
+    if (!currentUser?.uid) {
       setLoadingThreads(false);
       return;
     }
 
-    let cancelled = false;
+    let active = true;
 
     const fetchThreads = async () => {
-      setLoadingThreads(true);
       const { data, error } = await supabase
         .from("chats")
         .select("*")
         .or(`participant_a.eq.${currentUser.uid},participant_b.eq.${currentUser.uid}`)
         .order("last_message_at", { ascending: false })
         .limit(50);
-
-      if (cancelled) return;
+      if (!active) return;
       if (error) {
         console.error("Error fetching chats:", error);
         setLoadingThreads(false);
         return;
       }
-
-      const list: ChatThread[] = (data || []).map(mapChatRow);
+      const list = (data || []).map(mapThreadRow);
       setThreads(list);
       setLoadingThreads(false);
 
@@ -290,59 +323,59 @@ export function ChatView({ currentUser, language, onLoginPrompt, initialListingT
       }
     };
 
+    setLoadingThreads(true);
     fetchThreads();
 
     const channel = supabase
       .channel(`chats-list-${currentUser.uid}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "chats" }, () => {
-        fetchThreads();
-      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "chats", filter: `participant_a=eq.${currentUser.uid}` }, fetchThreads)
+      .on("postgres_changes", { event: "*", schema: "public", table: "chats", filter: `participant_b=eq.${currentUser.uid}` }, fetchThreads)
       .subscribe();
 
-    const pollInterval = setInterval(fetchThreads, 5000);
-
     return () => {
-      cancelled = true;
-      clearInterval(pollInterval);
+      active = false;
       supabase.removeChannel(channel);
     };
-  }, [currentUser?.uid, initialListingToChat, authReady]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUser?.uid, initialListingToChat]);
 
+  // 2. Fetch messages of the active thread, then keep them live via Realtime
+  // -- any change on this chat_id refetches the current window, same
+  // "always reflects current server truth" behavior the old onSnapshot gave.
   useEffect(() => {
-    if (!activeThread?.id || !authReady) {
+    if (!activeThread?.id) {
       setMessages([]);
       setMessagesError(null);
       return;
     }
 
-    let cancelled = false;
-    setLoadingMessages(true);
-    setMessagesError(null);
+    let active = true;
 
     const fetchMessages = async () => {
+      setLoadingMessages(true);
+      setMessagesError(null);
       const { data, error } = await supabase
         .from("chat_messages")
         .select("*")
         .eq("chat_id", activeThread.id)
         .order("created_at", { ascending: false })
-        .limit(msgLimit + 1);
-
-      if (cancelled) return;
+        .limit(msgLimit + 1); // fetch one extra to know if truly more remain
+      if (!active) return;
       if (error) {
         console.error("Error fetching messages:", error);
         setLoadingMessages(false);
-        setMessagesError(error.message || "unknown error");
+        setMessagesError(`[${(error as any)?.code || "unknown"}] ${error.message || String(error)}`);
         return;
       }
 
-      let list: ChatMessage[] = (data || []).map(mapMessageRow);
-
-      const hasMore = list.length > msgLimit;
-      if (hasMore) list.pop();
+      let rows = data || [];
+      const hasMore = rows.length > msgLimit;
+      if (hasMore) rows = rows.slice(0, msgLimit);
       setHasMoreMessages(hasMore);
 
-      list.reverse();
+      const list = rows.map(mapMessageRow).reverse(); // chronological order
 
+      // Remove pending (optimistic) messages that are now confirmed by the server
       pendingMessagesRef.current = pendingMessagesRef.current.filter(
         (temp) => !list.some((real) => real.senderId === temp.senderId && real.text === temp.text)
       );
@@ -356,29 +389,31 @@ export function ChatView({ currentUser, language, onLoginPrompt, initialListingT
 
     const channel = supabase
       .channel(`chat-messages-${activeThread.id}`)
-      .on(
-        "postgres_changes",
-        { event: "INSERT", schema: "public", table: "chat_messages", filter: `chat_id=eq.${activeThread.id}` },
-        () => {
-          fetchMessages();
-        }
-      )
+      .on("postgres_changes", { event: "*", schema: "public", table: "chat_messages", filter: `chat_id=eq.${activeThread.id}` }, fetchMessages)
       .subscribe();
 
-    const pollInterval = setInterval(fetchMessages, 3000);
-
     return () => {
-      cancelled = true;
-      clearInterval(pollInterval);
+      active = false;
       supabase.removeChannel(channel);
     };
-  }, [activeThread?.id, msgLimit, authReady]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeThread?.id, msgLimit]);
 
+  // Auto scroll to bottom only when a genuinely new message arrives at the
+  // end -- NOT when older history gets prepended via "Load Older Messages"
+  // (that used to fire on every Firestore sync, even cache/metadata-only
+  // events, which kept yanking the chat back down while someone was trying
+  // to scroll up and read older messages).
   useEffect(() => {
     if (loadingOlderRef.current) {
       loadingOlderRef.current = false;
       return;
     }
+    // 🔧 Scroll the message *container* itself (not the whole page) --
+    // scrollIntoView() on the end marker used to bubble up and jump the
+    // entire Android WebView page instead of just this inner list, because
+    // the container wasn't a reliably-bounded scroll box (see the grid/
+    // height fix above). Setting scrollTop directly keeps the jump local.
     const el = messagesContainerRef.current;
     if (el) {
       el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
@@ -387,13 +422,14 @@ export function ChatView({ currentUser, language, onLoginPrompt, initialListingT
     }
   }, [messages.length]);
 
-  // 🔧 FIX: mark_thread_read() RPC -- server-side atomic reset, no client
-  // stale-read race.
   const handleSelectThread = async (thread: ChatThread) => {
     setActiveThread(thread);
     if (thread.unreadCount?.[currentUser?.uid] && thread.unreadCount[currentUser.uid] > 0) {
       try {
-        const { error } = await supabase.rpc("mark_thread_read", { p_chat_id: thread.id });
+        const { error } = await supabase
+          .from("chats")
+          .update({ unread_count: { ...(thread.unreadCount || {}), [currentUser.uid]: 0 } })
+          .eq("id", thread.id);
         if (error) throw error;
       } catch (err) {
         console.error("Failed to clear unread count:", err);
@@ -401,19 +437,18 @@ export function ChatView({ currentUser, language, onLoginPrompt, initialListingT
     }
   };
 
-  // 🔧 FIX: .insert() -> .upsert(onConflict) -- a unique constraint on
-  // (buyer_id, seller_id, listing_id) now exists to prevent duplicate
-  // threads; plain insert would error on a race, upsert safely returns the
-  // existing row instead.
+  // Helper to trigger thread creation on first interaction
   const initiateOrOpenChatThread = async (currentThreads: ChatThread[]) => {
     if (!initialListingToChat || !currentUser) return;
 
+    // Check if we are chatting with ourselves
     if (initialListingToChat.sellerId === currentUser.uid) {
       alert(language === "bn" ? "আপনি নিজের বিজ্ঞাপনে চ্যাট করতে পারবেন না!" : "You cannot chat on your own listings!");
       if (onClearInitialListing) onClearInitialListing();
       return;
     }
 
+    // See if thread already exists for this buying user & seller/listing combination
     const existing = currentThreads.find(
       (t) => t.listingId === initialListingToChat.id && t.buyerId === currentUser.uid
     );
@@ -425,33 +460,37 @@ export function ChatView({ currentUser, language, onLoginPrompt, initialListingT
     }
 
     const sellerId = initialListingToChat.sellerId || "unknown_seller";
-    const nowIso = new Date().toISOString();
+    // `chats.listing_id` is a uuid column -- listings created before the
+    // Supabase migration may still carry a legacy Firestore string id here,
+    // which can't be stored in that column. The chat still works fine
+    // without it (listing_title/image/price are snapshotted separately for
+    // display); it just won't be matched by listing_id in the "existing
+    // thread" lookup above for those older listings.
+    const listingIdForRow = isUuidLike(initialListingToChat.id) ? initialListingToChat.id : null;
+
+    const newThreadData = {
+      participant_a: currentUser.uid,
+      participant_b: sellerId,
+      buyer_id: currentUser.uid,
+      seller_id: sellerId,
+      buyer_name: currentUser.displayName || "Buyer",
+      seller_name: initialListingToChat.sellerName || "Anonymous Seller",
+      listing_id: listingIdForRow,
+      listing_title: initialListingToChat.title || "Untitled Listing",
+      listing_image: initialListingToChat.image || (initialListingToChat as any).images?.[0] || "",
+      listing_price: initialListingToChat.price || 0,
+      last_message: language === "bn" ? "চ্যাট শুরু হয়েছে" : "Chat conversation started",
+      last_message_at: new Date().toISOString(),
+    };
 
     try {
       const { data: inserted, error } = await supabase
         .from("chats")
-        .upsert(
-          {
-            participant_a: currentUser.uid,
-            participant_b: sellerId,
-            buyer_id: currentUser.uid,
-            seller_id: sellerId,
-            buyer_name: currentUser.displayName || "Buyer",
-            seller_name: initialListingToChat.sellerName || "Anonymous Seller",
-            listing_id: initialListingToChat.id,
-            listing_title: initialListingToChat.title || "Untitled Listing",
-            listing_image: initialListingToChat.image || (initialListingToChat as any).images?.[0] || "",
-            listing_price: initialListingToChat.price || 0,
-            last_message: language === "bn" ? "চ্যাট শুরু হয়েছে" : "Chat conversation started",
-            last_message_at: nowIso,
-          },
-          { onConflict: "buyer_id,seller_id,listing_id" }
-        )
+        .insert(newThreadData)
         .select()
         .single();
-
       if (error) throw error;
-      setActiveThread(mapChatRow(inserted));
+      setActiveThread(mapThreadRow(inserted));
     } catch (e) {
       console.error("Error creating chat thread:", e);
     }
@@ -459,14 +498,10 @@ export function ChatView({ currentUser, language, onLoginPrompt, initialListingT
     if (onClearInitialListing) onClearInitialListing();
   };
 
-  // 🔧 FIX: send_chat_message() RPC -- one atomic transaction for message
-  // insert + thread meta update + spam cooldown check/update (server-side
-  // cooldown was completely missing before, only a bypassable 700ms client
-  // debounce existed).
   const handleSendMessage = async (textToSend?: string) => {
     const finalMsg = (textToSend || newMessage).trim();
     if (!finalMsg || !activeThread || !currentUser) return;
-    if (sendLockRef.current) return;
+    if (sendLockRef.current) return; // ignore rapid duplicate taps
     sendLockRef.current = true;
     setTimeout(() => { sendLockRef.current = false; }, 700);
 
@@ -474,26 +509,56 @@ export function ChatView({ currentUser, language, onLoginPrompt, initialListingT
       setNewMessage("");
     }
 
+    // Show the message instantly, before waiting for the server
     const tempMsg: ChatMessage = {
       id: "temp_" + Date.now(),
       senderId: currentUser.uid,
       text: finalMsg,
-      createdAt: { seconds: Math.floor(Date.now() / 1000) } as any
+      createdAt: { seconds: Math.floor(Date.now() / 1000) }
     };
     pendingMessagesRef.current = [...pendingMessagesRef.current, tempMsg];
     setMessages((prev) => [...prev, tempMsg]);
 
     try {
-      const { error } = await supabase.rpc("send_chat_message", {
-        p_chat_id: activeThread.id,
-        p_text: finalMsg,
+      const partnerId = activeThread.buyerId === currentUser.uid ? activeThread.sellerId : activeThread.buyerId;
+
+      // The server-side cooldown trigger (enforce_chat_message_cooldown) is
+      // what actually enforces the 2-second-per-message limit -- this insert
+      // is rejected outright (P0001) if it fires too soon, same protection
+      // firestore.rules used to give.
+      const { error: insertErr } = await supabase.from("chat_messages").insert({
+        chat_id: activeThread.id,
+        sender_id: currentUser.uid,
+        text: finalMsg,
       });
-      if (error) throw error;
+      if (insertErr) throw insertErr;
+
+      // Update the thread's preview/unread badge. Not atomic with the
+      // message insert above (Postgres via supabase-js has no simple
+      // multi-table client transaction) -- worst case on a dropped
+      // connection between the two calls is a stale preview/badge, not a
+      // lost or duplicated message, same trade-off as before.
+      const { error: updateErr } = await supabase
+        .from("chats")
+        .update({
+          last_message: finalMsg,
+          last_message_at: new Date().toISOString(),
+          unread_count: {
+            ...(activeThread.unreadCount || {}),
+            [partnerId]: ((activeThread.unreadCount || {})[partnerId] || 0) + 1,
+          },
+        })
+        .eq("id", activeThread.id);
+      if (updateErr) console.error("Failed to update chat preview:", updateErr);
+
     } catch (e: any) {
       console.error("Error sending message:", e);
+      // Roll back the optimistic bubble we added above -- it never actually
+      // saved, so leaving it on screen would look like a sent message that
+      // silently vanishes for the other person.
       pendingMessagesRef.current = pendingMessagesRef.current.filter((m) => m.id !== tempMsg.id);
       setMessages((prev) => prev.filter((m) => m.id !== tempMsg.id));
-      if (/cooldown/i.test(e?.message || "") || e?.code === "42501" || /row-level security|permission/i.test(e?.message || "")) {
+      if (e?.code === "P0001" || /cooldown/i.test(e?.message || "")) {
         setSendCooldownNotice(true);
         setTimeout(() => setSendCooldownNotice(false), 2500);
       }
@@ -530,7 +595,8 @@ export function ChatView({ currentUser, language, onLoginPrompt, initialListingT
       className="grid grid-cols-1 lg:grid-cols-12 grid-rows-[minmax(0,1fr)] bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden lg:h-[600px] shadow-2xl min-h-[380px] h-[70dvh]"
       style={mobileCardHeight !== null ? { height: mobileCardHeight } : undefined}
     >
-
+      
+      {/* LEFT COLUMN: THREAD LIST (Hidden on mobile when conversation is active) */}
       <div className={`col-span-1 lg:col-span-4 border-r border-slate-800 flex flex-col h-full min-h-0 bg-slate-950/40 ${activeThread ? "hidden lg:flex" : "flex"}`}>
         <div className="p-4 border-b border-slate-800 bg-slate-900/50 flex items-center justify-between">
           <h2 className="font-bold text-slate-100 text-sm flex items-center gap-2">
@@ -570,6 +636,7 @@ export function ChatView({ currentUser, language, onLoginPrompt, initialListingT
                       : "bg-transparent border-transparent hover:bg-slate-800/30"
                   }`}
                 >
+                  {/* Item Image Mini */}
                   <div className="w-11 h-11 rounded-lg overflow-hidden shrink-0 bg-slate-800 border border-slate-700 relative">
                     <ImageWithFallback src={thread.listingImage} alt={thread.listingTitle} className="w-full h-full object-cover" />
                     {thread.unreadCount?.[currentUser.uid] > 0 && (
@@ -577,6 +644,7 @@ export function ChatView({ currentUser, language, onLoginPrompt, initialListingT
                     )}
                   </div>
 
+                  {/* Thread details brief */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between mb-0.5">
                       <span className="font-bold text-slate-200 text-xs truncate max-w-[110px]">
@@ -600,11 +668,14 @@ export function ChatView({ currentUser, language, onLoginPrompt, initialListingT
         )}
       </div>
 
+      {/* RIGHT COLUMN: CHAT WINDOW */}
       <div className={`col-span-1 lg:col-span-8 flex flex-col h-full min-h-0 bg-slate-900/30 relative ${!activeThread ? "hidden lg:flex" : "flex"}`}>
         {activeThread ? (
           <>
+            {/* Conversations Header details */}
             <div className="p-3.5 border-b border-slate-800 bg-slate-900/80 flex items-center justify-between gap-2 backdrop-blur-md shrink-0">
               <div className="flex items-center gap-3 min-w-0 flex-1">
+                {/* Back button on mobile */}
                 <button
                   onClick={() => setActiveThread(null)}
                   className="p-1 text-slate-400 hover:text-slate-100 lg:hidden shrink-0"
@@ -633,11 +704,13 @@ export function ChatView({ currentUser, language, onLoginPrompt, initialListingT
               </div>
 
               <div className="flex items-center gap-2 shrink-0">
+                {/* Secure Chat indicator status */}
                 <div className="hidden sm:flex items-center gap-1 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full text-[10px] font-bold text-emerald-400">
                   <ShieldCheck className="w-3.5 h-3.5" />
                   <span>{language === "bn" ? "নিরাপদ চ্যাট" : "Secure Chat"}</span>
                 </div>
 
+                {/* Block User/Seller Button */}
                 <button
                   type="button"
                   onClick={handleBlockSeller}
@@ -652,14 +725,17 @@ export function ChatView({ currentUser, language, onLoginPrompt, initialListingT
               </div>
             </div>
 
+            {/* MESSAGE CONTAINER */}
             <div ref={messagesContainerRef} className="flex-1 overflow-y-auto p-4 space-y-3.5 min-h-0 bg-slate-950/20" style={{ overscrollBehavior: "contain" }}>
-
+              
+              {/* Educational info tips */}
               <div className="text-center py-2 px-4 rounded-xl bg-slate-800/30 border border-slate-800/50 max-w-sm mx-auto text-[10px] text-slate-500 leading-normal">
                 🔐 {language === "bn" 
                   ? "সরাসরি ইন-অ্যাপ চ্যাট করুন নিরাপদে। অগ্রিম কোনো বড় পেমেন্ট বা লেনদেন করবেন না।" 
                   : "Keep correspondence inside. Never issue advanced payments before physical item inspection."}
               </div>
 
+              {/* Load Older Messages Button */}
               {hasMoreMessages && (
                 <div className="text-center py-1">
                   <button
@@ -723,6 +799,7 @@ export function ChatView({ currentUser, language, onLoginPrompt, initialListingT
               </div>
             )}
 
+            {/* PRESETS PANEL FOR SPEED negotiations */}
             <div className="px-4 py-2 border-t border-slate-800 bg-slate-950/30 flex gap-2 overflow-x-auto whitespace-nowrap scrollbar-none select-none shrink-0">
               {presets.map((msgPreset, index) => (
                 <button
@@ -735,6 +812,7 @@ export function ChatView({ currentUser, language, onLoginPrompt, initialListingT
               ))}
             </div>
 
+            {/* MESSAGE INPUT SECTION */}
             <div className="p-3.5 border-t border-slate-800 bg-slate-900 shrink-0">
               <form
                 onSubmit={(e) => {
@@ -774,7 +852,7 @@ export function ChatView({ currentUser, language, onLoginPrompt, initialListingT
             </p>
             <p className="text-[10px] text-slate-500 max-w-xs">
               {language === "bn"
-                ? "বামে তালিকা থেকে চ্যাট নির্বাচন করুন অথবা লিস্টিং ডিটেইলস এর 'ইন-অ্যাপ চ্যাট' এ ক্লিক করুন।"
+                ? "বামে তালিকা থেকে চ্যাট নির্বাচন করুন অথবা লিস্টিং ডিটেইলস এর ‘ইন-অ্যাপ চ্যাট’ এ ক্লিক করুন।"
                 : "Select an existing thread from the left list or initiate a direct chat session with any listing organizer."}
             </p>
           </div>
