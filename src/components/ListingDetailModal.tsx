@@ -284,7 +284,18 @@ export function ListingDetailModal({ listing, language, currentUser, onClose, on
     setContactLoading(true);
     (async () => {
       try {
-        const idToken = await auth.currentUser?.getIdToken();
+        // 🔧 লগইন এখন Supabase দিয়ে হয় -- আগে এখানে শুধু Firebase-এর
+        // auth.currentUser?.getIdToken() কল হতো, যেটা Supabase দিয়ে
+        // সাইন-ইন করা ইউজারদের জন্য সবসময় undefined থাকত (Firebase-এ
+        // কখনো লগইনই করা হয়নি), তাই "Show number" চাপলে এই fetch সবসময়
+        // ব্যর্থ হতো এবং নম্বর কখনো "—" ছাড়া অন্য কিছু দেখাত না। এখন আগে
+        // Supabase-এর নিজস্ব session token ব্যবহার করা হয়, আর কোনো পুরনো
+        // cached Firebase সেশন থাকলে সেটাকে fallback হিসেবে রাখা হয়েছে।
+        const { data: sessionData } = await supabase.auth.getSession();
+        let idToken = sessionData?.session?.access_token;
+        if (!idToken) {
+          idToken = await auth.currentUser?.getIdToken();
+        }
         if (!idToken) throw new Error("লগইন সেশন পাওয়া যায়নি");
         const resp = await fetch(apiUrl("/api/get-seller-contact"), {
           method: "POST",
