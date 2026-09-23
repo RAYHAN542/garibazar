@@ -1,21 +1,23 @@
 import { initializeApp, getApps, cert } from "firebase-admin/app";
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import { getAuth } from "firebase-admin/auth";
+import { createClient } from "@supabase/supabase-js";
 import { applyCors } from "./_lib/cors.js";
 import { checkAndBumpRateLimit } from "./_lib/rateLimit.js";
 
-// একই IP থেকে মিনিটে ৩০ বারের বেশি রিকোয়েস্ট এলে চুপচাপ বাদ দেওয়া হয় (Firestore-এ
-// লেখা হয় না), যাতে কেউ ইচ্ছাকৃতভাবে স্প্যাম করে দৈনিক write কোটা শেষ করে দিতে না পারে।
-// এটা in-memory (ওয়ার্ম ইনস্ট্যান্সে টিকে থাকে), নিখুঁত না কিন্তু সহজ ও বিনামূল্যে সুরক্ষা দেয়।
+// একই IP থেকে মিনিটে ৩০ বারের বেশি রিকোয়েস্ট এলে চুপচাপ বাদ দেওয়া হয়, যাতে
+// কেউ ইচ্ছাকৃতভাবে স্প্যাম করে না পারে। এটা in-memory (ওয়ার্ম ইনস্ট্যান্সে টিকে
+// থাকে), নিখুঁত না কিন্তু সহজ ও বিনামূল্যে সুরক্ষা দেয়।
 const RATE_LIMIT_WINDOW_MS = 60 * 1000;
 const RATE_LIMIT_MAX = 30;
 const rateLimitMap = new Map<string, { count: number; windowStart: number }>();
 
-// একই IP বারবার পেজ রিফ্রেশ/নেভিগেট করলে প্রতিবারই site_visits-এ আলাদা ডক
-// লেখা হতো (visitor log-এর জন্য দরকারি হলেও এটাই দৈনিক write-quota-র সবচেয়ে
-// বড় খরচ)। এখন একই IP থেকে ৩০ মিনিটের মধ্যে দ্বিতীয়/তৃতীয় ভিজিট এলে detailed
-// log ডক আর লেখা হয় না (visitor log-এ ডুপ্লিকেট সারি কমে), কিন্তু analytics
-// counter shard-টা প্রতিবারই বাড়ে (তাই Total Visits সংখ্যা নির্ভুল থাকে)।
+// একই IP বারবার পেজ রিফ্রেশ/নেভিগেট করলে প্রতিবারই site_visits-এ আলাদা সারি
+// লেখা হতো। এখন একই IP থেকে ৩০ মিনিটের মধ্যে দ্বিতীয়/তৃতীয় ভিজিট এলে detailed
+// log সারি আর লেখা হয় না (visitor log-এ ডুপ্লিকেট কমে), কিন্তু analytics_daily
+// counter-টা প্রতিবারই বাড়ে (তাই Total Visits সংখ্যা নির্ভুল থাকে) — এই সময়
+// bump_analytics_daily RPC-টা সরাসরি কল করা হয় (নিচে দেখুন), কারণ trigger শুধু
+// আসল insert হলেই চলে।
 const DEDUP_WINDOW_MS = 30 * 60 * 1000;
 const recentlyLoggedIps = new Map<string, number>();
 function shouldSkipDetailedLog(ip: string): boolean {
@@ -49,6 +51,23 @@ if (!getApps().length) {
     }
   }
 }
+
+// 🔧 Firebase -> Supabase migration: site-wide visit/login/signup/install
+// analytics (this file's main path) now writes to Supabase's `site_visits`
+// table instead of Firestore. `analytics_daily` (the rollup Admin Panel reads)
+// updates itself automatically via a DB trigger (`trg_bump_analytics_daily`)
+// on every site_visits insert -- no extra write needed here for that path.
+// Per-listing view/click/save/unsave (handleListingInteraction below) is
+// UNCHANGED and still uses Firestore -- that part isn't broken and is out of
+// scope for this fix.
+const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const supabaseAdmin =
+  SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY
+    ? createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+        auth: { autoRefreshToken: false, persistSession: false },
+      })
+    : null;
 
 // ---------------------------------------------------------------------------
 // 🔧 Was: src/utils/counters.ts called POST /api/track-listing-interaction
@@ -204,7 +223,7 @@ async function lookupGeo(ip: string) {
 
 // Logs a site visit / login / signup event with the visitor's real IP and
 // approximate location, so the admin panel can show who is using the site
-// and where they're coming from. Uses the Admin SDK (bypasses Firestore
+// and where they're coming from. Uses service-role clients (bypasses RLS /
 // security rules) since the browser itself cannot see its own public IP.
 export default async function handler(req: any, res: any) {
   if (applyCors(req, res)) return;
@@ -213,18 +232,25 @@ export default async function handler(req: any, res: any) {
     return;
   }
 
-  if (!getApps().length) {
-    // Analytics is best-effort; never break the app over a missing service account.
-    res.status(200).json({ ok: false });
-    return;
-  }
-
   try {
     const body = typeof req.body === "string" ? JSON.parse(req.body || "{}") : (req.body || {});
 
     // New: per-listing view/click/save/unsave, routed to its own handler.
+    // This path still needs Firestore (unchanged), so only here do we
+    // require the Firebase Admin SDK to have initialized successfully.
     if (typeof body?.listingId === "string" && LISTING_INTERACTION_TYPES.has(body?.type)) {
+      if (!getApps().length) {
+        res.status(200).json({ ok: false });
+        return;
+      }
       return await handleListingInteraction(req, res, body.listingId, body.type);
+    }
+
+    // Site-wide visit/login/signup/install analytics — Supabase-only from here on.
+    if (!supabaseAdmin) {
+      // Analytics is best-effort; never break the app over a missing config.
+      res.status(200).json({ ok: false });
+      return;
     }
 
     const type = ALLOWED_TYPES.has(body?.type) ? body.type : "visit";
@@ -256,13 +282,16 @@ export default async function handler(req: any, res: any) {
       return;
     }
 
-    const db = getFirestore();
-
     // login/signup/install ইভেন্ট সবসময় লগ হয় (গুরুত্বপূর্ণ, কম ফ্রিকোয়েন্ট);
     // শুধু "visit" টাইপের জন্যই dedup প্রযোজ্য (এটাই বেশিরভাগ ট্রাফিক)।
     const skipDetailedLog = type === "visit" && shouldSkipDetailedLog(ip);
+    const metricCol =
+      type === "login" ? "total_logins" : type === "signup" ? "total_signups" : type === "install" ? "total_installs" : "total_visits";
+
     if (!skipDetailedLog) {
-      await db.collection("site_visits").add({
+      // Inserting the row is enough — a DB trigger (trg_bump_analytics_daily)
+      // automatically rolls this up into analytics_daily for today.
+      const { error: insertErr } = await supabaseAdmin.from("site_visits").insert({
         type,
         uid,
         identifier,
@@ -271,28 +300,19 @@ export default async function handler(req: any, res: any) {
         region: geo.region,
         country: geo.country,
         isp: geo.isp,
-        userAgent,
+        user_agent: userAgent,
         referrer,
         path,
-        createdAt: FieldValue.serverTimestamp(),
       });
+      if (insertErr) console.error("site_visits insert error:", insertErr);
+    } else {
+      // Detailed log skipped (dedup), but the daily total should still count
+      // this visit — bump analytics_daily directly since no row is being
+      // inserted (so the trigger won't fire).
+      const today = new Date().toISOString().slice(0, 10);
+      const { error: bumpErr } = await supabaseAdmin.rpc("bump_analytics_daily", { p_day: today, p_metric: metricCol });
+      if (bumpErr) console.error("bump_analytics_daily error:", bumpErr);
     }
-
-    // Sharded counter instead of a single "analytics_stats/summary" doc.
-    // A single doc has a hard Firestore write-rate ceiling (~1 write/sec
-    // sustained) -- fine at today's traffic, but a real bottleneck once
-    // visitor volume grows. Spreading increments across 10 shards removes
-    // that ceiling almost entirely (writes land on whichever shard is picked
-    // at random, so contention is divided by ~10). Reading the total sums
-    // all 10 shards -- unavoidable extra reads, but reads are far cheaper
-    // and less contended than writes.
-    const statsField =
-      type === "login" ? "totalLogins" : type === "signup" ? "totalSignups" : type === "install" ? "totalInstalls" : "totalVisits";
-    const shard = Math.floor(Math.random() * 10);
-    await db.doc(`analytics_stats/summary/shards/${shard}`).set(
-      { [statsField]: FieldValue.increment(1) },
-      { merge: true }
-    );
 
     res.status(200).json({ ok: true });
   } catch (e) {

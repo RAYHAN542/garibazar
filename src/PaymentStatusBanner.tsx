@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from "react";
-import { doc, onSnapshot } from "firebase/firestore";
-import { db } from "./firebase";
+import { supabase } from "./supabase";
 import { CheckCircle2, Loader2, X } from "lucide-react";
 
 const STORAGE_KEY = "gari_bazar_pending_payment";
+const POLL_INTERVAL_MS = 4000;
 
 export function PaymentStatusBanner() {
   const [pending, setPending] = useState<any>(null);
@@ -24,16 +24,32 @@ export function PaymentStatusBanner() {
     } catch (e) {}
   }, []);
 
+  // 🔧 (2026-09-23) refill_requests এখন Supabase-এ থাকে (আগে Firestore-এ
+  // onSnapshot দিয়ে রিয়েলটাইম শোনা হতো)। Supabase realtime চালু করার বদলে
+  // সহজ পোলিং ব্যবহার করা হয়েছে -- এই ব্যানারটা মিনিট দুয়েকের জন্য দেখানো
+  // হয় মাত্র, তাই কয়েক সেকেন্ড পরপর চেক করাই যথেষ্ট, আর কম জটিল।
   useEffect(() => {
-    if (!pending?.requestId) return;
-    const ref = doc(db, "refill_requests", pending.requestId);
-    const unsub = onSnapshot(ref, (snap) => {
-      if (snap.exists() && snap.data().status === "approved") {
+    if (!pending?.requestId || status === "approved") return;
+    let active = true;
+
+    const check = async () => {
+      const { data } = await supabase
+        .from("refill_requests")
+        .select("status")
+        .eq("id", pending.requestId)
+        .maybeSingle();
+      if (active && data?.status === "approved") {
         setStatus("approved");
       }
-    });
-    return () => unsub();
-  }, [pending]);
+    };
+
+    check();
+    const interval = setInterval(check, POLL_INTERVAL_MS);
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
+  }, [pending, status]);
 
   const handleClose = () => {
     localStorage.removeItem(STORAGE_KEY);

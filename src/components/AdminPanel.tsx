@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { db, auth } from "../firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import {collection, onSnapshot, query, orderBy, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, limit, getAggregateFromServer, sum, count, startAfter} from "firebase/firestore";
+import { supabase } from "../supabase";
 import { ShieldAlert, CheckCircle2, XCircle, Coins, Loader2, Save, Check, Smartphone, User, Clock, Mail, Trash2, Search, TrendingUp, Grid, Inbox, Flag, Activity, Globe, Users, MapPin, Eye, RefreshCw } from "lucide-react";
 import { SupportedLanguage } from "../types";
 
@@ -236,29 +237,47 @@ export function AdminPanel({ language, currentUser, listings: listingsProp, isUs
     return () => unsubscribe();
   }, []);
 
-  // Live summary counters -- total visits / logins / signups (one small doc,
-  // kept up to date atomically by the /api/track-event serverless function).
+  // Live summary counters -- total visits / logins / signups. Backed by
+  // Supabase (`analytics_daily` rollup + `site_visits` log), written by
+  // /api/track-event -- NOT Firestore anymore (see below for why).
   //
-  // 🔧 আগে এই দুটো effect প্রতি 30 সেকেন্ডে নিজে থেকে re-fetch করত
-  // (setInterval) -- fetchVisits একাই প্রতিবার 200 doc পড়ত, মানে অ্যাডমিন
-  // ট্যাবটা এক ঘণ্টা খোলা রাখলেই একাই 200 × 120 = 24,000 read (পুরো দিনের
-  // Firestore free quota-র প্রায় পুরোটা) শুধু এই একটা ট্যাব থেকে চলে যেত।
-  // এখন শুধু ট্যাব খোলার সময় একবার fetch হয়, আর নিচের রিফ্রেশ বাটনে চাপলে
-  // আবার fetch হয় -- অটো-পোলিং নেই।
+  // 🔧 আগে এটা Firestore-এর analytics_stats/summary/shards থেকে পড়ত, যেটার
+  // security rule চায় একটা Firebase Auth session (`request.auth`)। যেসব
+  // admin phone দিয়ে লগইন করেন (Supabase Auth-only, Firebase session তৈরিই
+  // হয় না), তাদের জন্য ওই read সবসময় permission-denied হয়ে চুপচাপ fail করত
+  // -- তাই Total Visits/Logins/Signups/Installs সবসময় 0 দেখাত। Supabase-এ
+  // সরিয়ে আনায় এখন phone/email/google -- সব ধরনের admin login-এই ঠিকভাবে
+  // কাজ করবে।
+  //
+  // আগে এই দুটো effect প্রতি 30 সেকেন্ডে নিজে থেকে re-fetch করত (setInterval) --
+  // এখন শুধু ট্যাব খোলার সময় একবার fetch হয়, আর নিচের রিফ্রেশ বাটনে চাপলে আবার
+  // fetch হয় -- অটো-পোলিং নেই।
   const fetchAnalyticsStats = async () => {
     try {
-      // Totals are now spread across 10 shard docs (see api/track-event.ts) to
-      // avoid a single hot document under real concurrent traffic. Sum all
-      // shards client-side to get the true total.
-      const shardsSnap = await getDocs(collection(db, "analytics_stats", "summary", "shards"));
-      const totals: any = { totalVisits: 0, totalLogins: 0, totalSignups: 0, totalInstalls: 0 };
-      shardsSnap.forEach((shardDoc) => {
-        const data = shardDoc.data() as any;
-        totals.totalVisits += data.totalVisits || 0;
-        totals.totalLogins += data.totalLogins || 0;
-        totals.totalSignups += data.totalSignups || 0;
-        totals.totalInstalls += data.totalInstalls || 0;
+      // Sum every day's row in analytics_daily to get the all-time total
+      // (this table is auto-maintained by a DB trigger on site_visits insert).
+      const { data: dailyRows, error: dailyErr } = await supabase
+        .from("analytics_daily")
+        .select("total_visits,total_logins,total_signups,total_installs");
+      if (dailyErr) throw dailyErr;
+
+      const totals = { totalVisits: 0, totalLogins: 0, totalSignups: 0, totalInstalls: 0 };
+      (dailyRows || []).forEach((row: any) => {
+        totals.totalVisits += row.total_visits || 0;
+        totals.totalLogins += row.total_logins || 0;
+        totals.totalSignups += row.total_signups || 0;
+        totals.totalInstalls += row.total_installs || 0;
       });
+
+      // Add any pre-migration legacy totals carried over from Firestore, if present.
+      const { data: offsetRows } = await supabase.from("analytics_legacy_offset").select("type,count");
+      (offsetRows || []).forEach((row: any) => {
+        if (row.type === "visit") totals.totalVisits += row.count || 0;
+        if (row.type === "login") totals.totalLogins += row.count || 0;
+        if (row.type === "signup") totals.totalSignups += row.count || 0;
+        if (row.type === "install") totals.totalInstalls += row.count || 0;
+      });
+
       setAnalyticsStats(totals);
     } catch (err) {
       console.error("Could not fetch analytics summary:", err);
@@ -267,16 +286,18 @@ export function AdminPanel({ language, currentUser, listings: listingsProp, isUs
 
   const fetchSiteVisits = async () => {
     try {
-      const q = query(
-        collection(db, "site_visits"),
-        orderBy("createdAt", "desc"),
-        limit(25)
-      );
-      const snapshot = await getDocs(q);
-      const list: any[] = [];
-      snapshot.forEach((doc) => {
-        list.push({ id: doc.id, ...doc.data() });
-      });
+      const { data, error } = await supabase
+        .from("site_visits")
+        .select("id,type,ip,city,region,country,isp,user_agent,referrer,path,identifier,created_at")
+        .order("created_at", { ascending: false })
+        .limit(25);
+      if (error) throw error;
+
+      const list = (data || []).map((row: any) => ({
+        ...row,
+        userAgent: row.user_agent,
+        createdAt: row.created_at ? new Date(row.created_at) : null,
+      }));
       setVisitEvents(list);
     } catch (err) {
       console.error("Could not fetch site visits:", err);
@@ -293,10 +314,9 @@ export function AdminPanel({ language, currentUser, listings: listingsProp, isUs
   };
 
   useEffect(() => {
-    if (!authReady) return;
     fetchAnalyticsStats();
     fetchSiteVisits();
-  }, [authReady]);
+  }, []);
 
   const loadMoreRefillRequests = async () => {
     if (!refillLastDoc || refillLoadingMore) return;
@@ -1135,8 +1155,8 @@ export function AdminPanel({ language, currentUser, listings: listingsProp, isUs
                     </div>
                   </div>
                   <span className="text-[9px] text-slate-400 font-mono shrink-0">
-                    {ev.createdAt?.toDate
-                      ? ev.createdAt.toDate().toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })
+                    {ev.createdAt instanceof Date
+                      ? ev.createdAt.toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })
                       : ""}
                   </span>
                 </div>
