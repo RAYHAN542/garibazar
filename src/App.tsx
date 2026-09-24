@@ -16,6 +16,7 @@ import {
   fetchInitialListings as fetchInitialListingsFromSupabase,
   fetchMoreListings as fetchMoreListingsFromSupabase,
   fetchAdListings as fetchAdListingsFromSupabase,
+  fetchMyListings as fetchMyListingsFromSupabase,
 } from "./utils/listingsApi";
 import { useAdPromotion } from "./hooks/useAdPromotion";
 import { Car, Search, User, LogOut, Globe, Loader2, ShoppingBag, Phone, ChevronRight, ShieldCheck, Send, Check, Download, Smartphone } from "lucide-react";
@@ -943,29 +944,32 @@ export default function App() {
     return () => unsubscribe();
   }, [authReady, user?.uid]);
 
-  // 1b. My Own Listings — সরাসরি sellerId দিয়ে কোয়েরি করা, হোমপেজের ২০-টা পেজিনেটেড লিস্ট থেকে না।
-  // এভাবে Dashboard আর Lottery সবসময় ইউজারের আসল ১০০% পোস্ট দেখাবে।
-  useEffect(() => {
+  // 1b. My Own Listings — সরাসরি seller_id দিয়ে Supabase থেকে fetch করা, হোমপেজের
+  // ২০-টা পেজিনেটেড লিস্ট থেকে না। এভাবে Dashboard আর Lottery সবসময় ইউজারের
+  // আসল ১০০% পোস্ট দেখাবে।
+  // 🔧 (2026-09-24) আগে এটা Firestore থেকে পড়ত (`collection(db, "listings")`),
+  // কিন্তু migration-এর পর নতুন পোস্ট শুধু Supabase-এ থাকে -- তাই এই কোয়েরি
+  // সবসময় খালি রেজাল্ট দিত এবং Dashboard/My Shop "০ পোস্ট" দেখাত, যদিও
+  // হোমপেজে (যেটা Supabase থেকেই পড়ে) পোস্টটা ঠিকই দেখা যেত। এখন একই টেবিল
+  // থেকে fetch করা হয়, আর একটা পোস্ট সাবমিট হওয়ার পর dispatch হওয়া
+  // "gari_bazar_refreshed_data" event শুনে রিফ্রেশও করে।
+  const refetchMyListings = async () => {
     if (!authReady || !user?.uid) {
       setMyListings([]);
       return;
     }
-    const q = query(collection(db, "listings"), where("sellerId", "==", user.uid), orderBy("createdAt", "desc"), limit(100));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const list: PartListing[] = [];
-      snapshot.forEach((docSnap) => {
-        const data = docSnap.data();
-        if (data.isDeleted === true) return; // soft-deleted, in its 30-day recovery window
-        const normalizedCreatedAt = data.createdAt && typeof data.createdAt.toDate === "function"
-          ? data.createdAt.toDate().toISOString()
-          : data.createdAt;
-        list.push({ id: docSnap.id, ...data, createdAt: normalizedCreatedAt } as PartListing);
-      });
+    try {
+      const list = await fetchMyListingsFromSupabase(user.uid);
       setMyListings(list);
-    }, (err) => {
-      logger.error("Failed to sync my listings:", err);
-    });
-    return () => unsubscribe();
+    } catch (err) {
+      logger.error("Failed to fetch my listings:", err);
+    }
+  };
+
+  useEffect(() => {
+    refetchMyListings();
+    window.addEventListener("gari_bazar_refreshed_data", refetchMyListings);
+    return () => window.removeEventListener("gari_bazar_refreshed_data", refetchMyListings);
   }, [authReady, user?.uid]);
 
   // 1c. সব লাইভ বুস্ট করা অ্যাড — হোমপেজের "Load More" পেজিনেশনের ওপর নির্ভর না করে সরাসরি fetch করা,
@@ -1412,6 +1416,7 @@ export default function App() {
           .update({ is_deleted: true, deleted_at: new Date().toISOString() })
           .eq("id", itemId);
         if (deleteError) throw deleteError;
+        window.dispatchEvent(new Event("gari_bazar_refreshed_data"));
       }
     } catch (err) {
       console.error("Error deleting listing:", err);
