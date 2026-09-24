@@ -919,29 +919,45 @@ export default function App() {
     return () => unsubscribe();
   }, [authReady, user?.uid]);
 
-  // Unread Chats Listener
+  // Unread Chats Listener — migrated to Supabase (chats table), matching
+  // ChatView.tsx's migration (2026-09-24). Was querying the old Firestore
+  // `chats` collection (participants/lastMessageAt/unreadCount fields) --
+  // new chats are written only to Supabase now, so this always showed 0.
   const [unreadChatsCount, setUnreadChatsCount] = useState(0);
   useEffect(() => {
     if (!authReady || !user?.uid) {
       setUnreadChatsCount(0);
       return;
     }
-    const q = query(
-      collection(db, "chats"),
-      where("participants", "array-contains", user.uid),
-      orderBy("lastMessageAt", "desc"),
-      limit(50)
-    );
-    const unsubscribe = onSnapshot(q, (snapshot) => {
+    let active = true;
+    const fetchUnread = async () => {
+      const { data, error } = await supabase
+        .from("chats")
+        .select("unread_count")
+        .or(`participant_a.eq.${user.uid},participant_b.eq.${user.uid}`)
+        .limit(50);
+      if (!active) return;
+      if (error) {
+        console.warn("Failed to fetch unread chats:", error);
+        return;
+      }
       let count = 0;
-      snapshot.forEach(docSnap => {
-        const data = docSnap.data();
-        const unreadForMe = data.unreadCount?.[user.uid] || 0;
+      (data || []).forEach((row: any) => {
+        const unreadForMe = row.unread_count?.[user.uid] || 0;
         if (unreadForMe > 0) count++;
       });
       setUnreadChatsCount(count);
-    });
-    return () => unsubscribe();
+    };
+    fetchUnread();
+    const channel = supabase
+      .channel(`unread-chats-${user.uid}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "chats", filter: `participant_a=eq.${user.uid}` }, fetchUnread)
+      .on("postgres_changes", { event: "*", schema: "public", table: "chats", filter: `participant_b=eq.${user.uid}` }, fetchUnread)
+      .subscribe();
+    return () => {
+      active = false;
+      supabase.removeChannel(channel);
+    };
   }, [authReady, user?.uid]);
 
   // 1b. My Own Listings — সরাসরি seller_id দিয়ে Supabase থেকে fetch করা, হোমপেজের
