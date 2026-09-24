@@ -33,6 +33,26 @@ const getTrafficSource = (referrer: string | undefined, language: SupportedLangu
   }
 };
 
+// 🔧 (2026-09-25) refill_requests এখন Supabase-এ থাকে (snake_case কলাম) --
+// এই ম্যাপার সেগুলোকে JSX-এর আগে থেকে ব্যবহৃত camelCase শেপে রূপান্তর করে,
+// যাতে নিচের রেন্ডার/handler কোড প্রায় অপরিবর্তিত থাকতে পারে।
+const mapRefillRow = (row: any) => ({
+  id: row.id,
+  userId: row.user_id,
+  userName: row.user_name,
+  userEmail: row.user_email,
+  amount: Number(row.amount) || 0,
+  status: row.status,
+  type: row.type,
+  listingId: row.listing_id,
+  listingTitle: row.listing_title,
+  adTier: row.ad_tier,
+  durationDays: row.duration_days,
+  txId: row.transaction_id,
+  invoiceId: row.invoice_id,
+  createdAt: row.created_at,
+});
+
 export function AdminPanel({ language, currentUser, listings: listingsProp, isUserAdmin }: AdminPanelProps) {
   // Local mirror of the listings prop so we can optimistically remove
   // deleted items instantly without waiting for a full page reload.
@@ -185,33 +205,49 @@ export function AdminPanel({ language, currentUser, listings: listingsProp, isUs
     fetchPaymentInfo();
   }, []);
 
-  // Listen to all refill requests across Gari Bazar platform
+  // 🔧 (2026-09-25) refill_requests আগে Firestore-এ ছিল, কিন্তু payment flow
+  // migration-এর পর client (useAdPromotion.ts/PromoteAdModal.tsx) এখন এই
+  // টেবিলে সরাসরি Supabase-এ লেখে, আর api/payment/webhook.ts approve করে
+  // সেখানেই। এই পুরনো Firestore listener কখনো নতুন কোনো রিকোয়েস্টই দেখতে
+  // পেত না -- Admin Panel-এ "Payment Requests" ট্যাব তাই সবসময় খালি দেখাত।
+  const REFILL_PAGE_SIZE = 20;
   const [refillHasMore, setRefillHasMore] = useState(true);
-  const [refillLastDoc, setRefillLastDoc] = useState<any>(null);
+  const [refillLastDoc, setRefillLastDoc] = useState<string | null>(null);
   const [refillLoadingMore, setRefillLoadingMore] = useState(false);
 
-  useEffect(() => {
-    const q = query(
-      collection(db, "refill_requests"),
-      orderBy("createdAt", "desc"),
-      limit(20)
-    );
-
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const list: any[] = [];
-      snapshot.forEach((doc) => {
-        list.push({ id: doc.id, ...doc.data() });
-      });
-      setRequests(list);
-      setRefillLastDoc(snapshot.docs[snapshot.docs.length - 1] || null);
-      setRefillHasMore(snapshot.docs.length === 20);
-      setLoadingRequests(false);
-    }, (err) => {
+  const fetchRefillRequests = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("refill_requests")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(REFILL_PAGE_SIZE);
+      if (error) throw error;
+      const rows = data || [];
+      setRequests(rows.map(mapRefillRow));
+      setRefillLastDoc(rows.length > 0 ? rows[rows.length - 1].created_at : null);
+      setRefillHasMore(rows.length === REFILL_PAGE_SIZE);
+    } catch (err) {
       console.error("Could not fetch refill requests:", err);
+    } finally {
       setLoadingRequests(false);
-    });
+    }
+  };
 
-    return () => unsubscribe();
+  useEffect(() => {
+    fetchRefillRequests();
+    // Realtime: re-fetch the first page whenever any refill_requests row
+    // changes (a new one created, or one approved/rejected by the webhook
+    // or another admin), so the panel stays live without manual refresh.
+    const channel = supabase
+      .channel("admin_refill_requests")
+      .on("postgres_changes", { event: "*", schema: "public", table: "refill_requests" }, () => {
+        fetchRefillRequests();
+      })
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   // Listen to all customer support tickets across Gari Bazar platform
@@ -322,20 +358,17 @@ export function AdminPanel({ language, currentUser, listings: listingsProp, isUs
     if (!refillLastDoc || refillLoadingMore) return;
     setRefillLoadingMore(true);
     try {
-      const q = query(
-        collection(db, "refill_requests"),
-        orderBy("createdAt", "desc"),
-        startAfter(refillLastDoc),
-        limit(20)
-      );
-      const snapshot = await getDocs(q);
-      const more: any[] = [];
-      snapshot.forEach((doc) => {
-        more.push({ id: doc.id, ...doc.data() });
-      });
-      setRequests((prev) => [...prev, ...more]);
-      setRefillLastDoc(snapshot.docs[snapshot.docs.length - 1] || null);
-      setRefillHasMore(snapshot.docs.length === 20);
+      const { data, error } = await supabase
+        .from("refill_requests")
+        .select("*")
+        .lt("created_at", refillLastDoc)
+        .order("created_at", { ascending: false })
+        .limit(REFILL_PAGE_SIZE);
+      if (error) throw error;
+      const rows = data || [];
+      setRequests((prev) => [...prev, ...rows.map(mapRefillRow)]);
+      setRefillLastDoc(rows.length > 0 ? rows[rows.length - 1].created_at : refillLastDoc);
+      setRefillHasMore(rows.length === REFILL_PAGE_SIZE);
     } catch (err) {
       console.error("Could not load more refill requests:", err);
     } finally {
@@ -396,46 +429,48 @@ export function AdminPanel({ language, currentUser, listings: listingsProp, isUs
     }
   };
 
+  // 🔧 (2026-09-25) নিচের দুটো handler এখন Supabase-এ লেখে -- অধিকাংশ
+  // ad_promotion রিকোয়েস্ট এমনিতেই api/payment/webhook.ts স্বয়ংক্রিয়ভাবে
+  // approve করে দেয় (UddoktaPay payment verify হওয়ার পর), তাই এই বাটনগুলো
+  // এখন মূলত ম্যানুয়াল/এজ-কেস রিভিউয়ের জন্য (যেমন webhook miss হলে) --
+  // approve করলে ঠিক ওই একই logic (listing-এ ad চালু, বা ওয়ালেটে টাকা যোগ)
+  // আবার নিরাপদভাবে চালানো হয়।
   const handleApproveRequest = async (request: any) => {
     setActionLoadingId(request.id);
     setActionSuccessMsg("");
 
     try {
-      // 1. Get current balance of target user
-      const userRef = doc(db, "users", request.userId);
-      const userSnap = await getDoc(userRef);
-      
-      let currentCredits = 5000; // default startup budget
-      if (userSnap.exists()) {
-        const data = userSnap.data();
-        currentCredits = data.simulatedCredits ?? 5000;
-      }
-
-      // 2. Process based on request type
       if (request.type === "ad_promotion" && request.listingId) {
-        // Automatically make the listing listing active and promoted with correct duration
-        const listingRef = doc(db, "listings", request.listingId);
         const duration = Number(request.durationDays || 3);
-        await updateDoc(listingRef, {
-          isAd: true,
-          adTier: request.adTier || "basic",
-          adDurationDays: duration,
-          adExpiresAt: new Date(Date.now() + duration * 24 * 60 * 60 * 1000).toISOString()
-        });
+        const { error: listingErr } = await supabase
+          .from("listings")
+          .update({
+            is_ad: true,
+            ad_tier: request.adTier || "basic",
+            ad_duration_days: duration,
+            ad_expires_at: new Date(Date.now() + duration * 24 * 60 * 60 * 1000).toISOString(),
+          })
+          .eq("id", request.listingId);
+        if (listingErr) throw listingErr;
       } else {
-        // Standard wallet balance refill request
-        const newCredits = currentCredits + request.amount;
-        await updateDoc(userRef, {
-          simulatedCredits: newCredits
+        const { error: creditErr } = await supabase.rpc("increment_simulated_credits", {
+          p_uid: request.userId,
+          p_amount: Number(request.amount),
         });
+        if (creditErr) throw creditErr;
       }
 
-      // 3. Mark the refill request as approved
-      await updateDoc(doc(db, "refill_requests", request.id), {
-        status: "approved",
-        approvedAt: new Date().toISOString(),
-        reviewedBy: currentUser?.phoneNumber || currentUser?.email || "Admin"
-      });
+      const { error: reqErr } = await supabase
+        .from("refill_requests")
+        .update({
+          status: "approved",
+          approved_at: new Date().toISOString(),
+          reviewed_by: currentUser?.phoneNumber || currentUser?.email || "Admin",
+        })
+        .eq("id", request.id);
+      if (reqErr) throw reqErr;
+
+      await fetchRefillRequests();
 
       setActionSuccessMsg(
         language === "bn" 
@@ -458,11 +493,17 @@ export function AdminPanel({ language, currentUser, listings: listingsProp, isUs
     setActionSuccessMsg("");
 
     try {
-      await updateDoc(doc(db, "refill_requests", request.id), {
-        status: "rejected",
-        rejectedAt: new Date().toISOString(),
-        reviewedBy: currentUser?.phoneNumber || currentUser?.email || "Admin"
-      });
+      const { error: reqErr } = await supabase
+        .from("refill_requests")
+        .update({
+          status: "rejected",
+          rejected_at: new Date().toISOString(),
+          reviewed_by: currentUser?.phoneNumber || currentUser?.email || "Admin",
+        })
+        .eq("id", request.id);
+      if (reqErr) throw reqErr;
+
+      await fetchRefillRequests();
 
       setActionSuccessMsg(
         language === "bn" 
@@ -1270,15 +1311,6 @@ export function AdminPanel({ language, currentUser, listings: listingsProp, isUs
                               ৳{req.amount?.toLocaleString() || "0"}
                             </span>
                           </div>
-
-                          <div className="flex justify-between items-center text-[11px] border-t border-slate-200/40 dark:border-slate-800/40 pt-1.5">
-                            <span className="text-slate-400">
-                              {language === "bn" ? "রিসিভার বিকাশ নম্বর:" : "Receiver bKash No:"}
-                            </span>
-                            <span className="font-bold text-slate-700 dark:text-slate-300 font-mono">
-                              {req.myNumber || "01993878271"}
-                            </span>
-                          </div>
                         </>
                       ) : (
                         <>
@@ -1286,33 +1318,15 @@ export function AdminPanel({ language, currentUser, listings: listingsProp, isUs
                             <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">{language === "bn" ? "অনুরোধকৃত বাজেট:" : "Requested Wallet:"}</span>
                             <span className="text-sm font-black text-amber-500 font-mono">৳{req.amount.toLocaleString()}</span>
                           </div>
-
-                          <div className="flex justify-between items-center border-t border-slate-200/50 dark:border-slate-800/50 pt-2 text-[11px]">
-                            <span className="text-slate-400">
-                              {language === "bn" ? "পদ্ধতি:" : "Channel:"}
-                            </span>
-                            <span className="font-extrabold text-slate-700 dark:text-slate-300 uppercase shrink-0">
-                              {req.method || "bKash"}
-                            </span>
-                          </div>
                         </>
                       )}
 
                       <div className="flex justify-between items-center text-[11px] border-t border-slate-200/40 dark:border-slate-800/40 pt-1.5">
                         <span className="text-slate-400">
-                          {language === "bn" ? "প্রেরক বিকাশ নম্বর:" : "Sender No:"}
+                          {language === "bn" ? "UddoktaPay লেনদেন আইডি:" : "UddoktaPay Transaction ID:"}
                         </span>
-                        <span className="font-bold text-slate-700 dark:text-slate-300 font-mono shrink-0">
-                          {req.senderNumber}
-                        </span>
-                      </div>
-
-                      <div className="flex justify-between items-center text-[11px]">
-                        <span className="text-slate-400">
-                          TxID:
-                        </span>
-                        <span className="font-extrabold text-slate-850 dark:text-slate-200 font-mono select-all shrink-0 uppercase">
-                          {req.txId}
+                        <span className="font-extrabold text-slate-850 dark:text-slate-200 font-mono select-all shrink-0 uppercase truncate max-w-[130px]" title={req.txId}>
+                          {req.txId || "—"}
                         </span>
                       </div>
                     </div>
