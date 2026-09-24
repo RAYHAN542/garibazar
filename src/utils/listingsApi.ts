@@ -111,3 +111,25 @@ export async function fetchAdListings(limit = 20): Promise<PartListing[]> {
   if (error) throw error;
   return (data || []).map(mapRowToListing);
 }
+
+// 🔧 (2026-09-24) Added: App.tsx's "My Own Listings" (Dashboard, My Shop,
+// the lottery's list of eligible posts) was still querying Firestore's
+// `listings` collection by sellerId. Every listing created after the
+// Supabase migration lives only in Postgres now (see AddPartForm.tsx), so
+// that Firestore query always came back empty for any post made since the
+// migration -- Dashboard/My Shop showed "0 posts" even right after a
+// successful post, even though the listing was live on the homepage (which
+// *does* read from Supabase). This fetches a seller's own listings from the
+// same table the rest of the app already reads from.
+export async function fetchMyListings(sellerId: string, limit = 100): Promise<PartListing[]> {
+  const { data, error } = await supabase
+    .from("listings")
+    .select("*")
+    .eq("seller_id", sellerId)
+    .eq("is_deleted", false)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+
+  if (error) throw error;
+  return (data || []).map(mapRowToListing);
+}

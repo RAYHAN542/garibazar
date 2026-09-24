@@ -16,6 +16,7 @@ import {
   fetchInitialListings as fetchInitialListingsFromSupabase,
   fetchMoreListings as fetchMoreListingsFromSupabase,
   fetchAdListings as fetchAdListingsFromSupabase,
+  fetchMyListings as fetchMyListingsFromSupabase,
 } from "./utils/listingsApi";
 import { useAdPromotion } from "./hooks/useAdPromotion";
 import { Car, Search, User, LogOut, Globe, Loader2, ShoppingBag, Phone, ChevronRight, ShieldCheck, Send, Check, Download, Smartphone } from "lucide-react";
@@ -865,33 +866,54 @@ export default function App() {
     };
   }, []);
 
-  // Fetch reviews for the currently logged-in user to display in "My Shop"
+  // Fetch reviews for the currently logged-in user to display in "My Shop".
+  // 🔧 (2026-09-24) Migrated to Supabase (`seller_reviews` table) -- this was
+  // still reading Firestore, which stayed empty once the reviews feature
+  // moved to Supabase, so "My Shop" always showed zero reviews even for
+  // sellers who had genuinely been reviewed.
   useEffect(() => {
     if (!authReady || !user?.uid) {
       setCurrentUserReviews([]);
       return;
     }
     setCurrentUserReviewsLoading(true);
-    const q = query(
-      collection(db, "seller_reviews"),
-      where("sellerId", "==", user.uid),
-      orderBy("createdAt", "desc"),
-      limit(30)
-    );
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const list: any[] = [];
-      snapshot.forEach((docSnap) => {
-        list.push({ id: docSnap.id, ...docSnap.data() });
-      });
-      list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    let active = true;
+
+    const fetchReviews = async () => {
+      const { data, error } = await supabase
+        .from("seller_reviews")
+        .select("id,reviewer_id,seller_id,rating,comment,created_at")
+        .eq("seller_id", user.uid)
+        .order("created_at", { ascending: false })
+        .limit(30);
+      if (!active) return;
+      if (error) {
+        console.warn("Failed to fetch current user reviews:", error);
+        setCurrentUserReviewsLoading(false);
+        return;
+      }
+      const list = (data || []).map((row: any) => ({
+        id: row.id,
+        reviewerId: row.reviewer_id,
+        sellerId: row.seller_id,
+        rating: row.rating,
+        comment: row.comment,
+        createdAt: row.created_at,
+      }));
       setCurrentUserReviews(list);
       setCurrentUserReviewsLoading(false);
-    }, (err) => {
-      console.warn("Failed to subscribe to current user reviews:", err);
-      setCurrentUserReviewsLoading(false);
-    });
+    };
 
-    return () => unsubscribe();
+    fetchReviews();
+    const channel = supabase
+      .channel(`seller-reviews-${user.uid}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "seller_reviews", filter: `seller_id=eq.${user.uid}` }, fetchReviews)
+      .subscribe();
+
+    return () => {
+      active = false;
+      supabase.removeChannel(channel);
+    };
   }, [authReady, user?.uid]);
 
   // Sync profile metadata real-time (e.g. simulated credits recharge instantly)
@@ -918,54 +940,73 @@ export default function App() {
     return () => unsubscribe();
   }, [authReady, user?.uid]);
 
-  // Unread Chats Listener
+  // Unread Chats Listener — migrated to Supabase (chats table), matching
+  // ChatView.tsx's migration (2026-09-24). Was querying the old Firestore
+  // `chats` collection (participants/lastMessageAt/unreadCount fields) --
+  // new chats are written only to Supabase now, so this always showed 0.
   const [unreadChatsCount, setUnreadChatsCount] = useState(0);
   useEffect(() => {
     if (!authReady || !user?.uid) {
       setUnreadChatsCount(0);
       return;
     }
-    const q = query(
-      collection(db, "chats"),
-      where("participants", "array-contains", user.uid),
-      orderBy("lastMessageAt", "desc"),
-      limit(50)
-    );
-    const unsubscribe = onSnapshot(q, (snapshot) => {
+    let active = true;
+    const fetchUnread = async () => {
+      const { data, error } = await supabase
+        .from("chats")
+        .select("unread_count")
+        .or(`participant_a.eq.${user.uid},participant_b.eq.${user.uid}`)
+        .limit(50);
+      if (!active) return;
+      if (error) {
+        console.warn("Failed to fetch unread chats:", error);
+        return;
+      }
       let count = 0;
-      snapshot.forEach(docSnap => {
-        const data = docSnap.data();
-        const unreadForMe = data.unreadCount?.[user.uid] || 0;
+      (data || []).forEach((row: any) => {
+        const unreadForMe = row.unread_count?.[user.uid] || 0;
         if (unreadForMe > 0) count++;
       });
       setUnreadChatsCount(count);
-    });
-    return () => unsubscribe();
+    };
+    fetchUnread();
+    const channel = supabase
+      .channel(`unread-chats-${user.uid}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "chats", filter: `participant_a=eq.${user.uid}` }, fetchUnread)
+      .on("postgres_changes", { event: "*", schema: "public", table: "chats", filter: `participant_b=eq.${user.uid}` }, fetchUnread)
+      .subscribe();
+    return () => {
+      active = false;
+      supabase.removeChannel(channel);
+    };
   }, [authReady, user?.uid]);
 
-  // 1b. My Own Listings — সরাসরি sellerId দিয়ে কোয়েরি করা, হোমপেজের ২০-টা পেজিনেটেড লিস্ট থেকে না।
-  // এভাবে Dashboard আর Lottery সবসময় ইউজারের আসল ১০০% পোস্ট দেখাবে।
-  useEffect(() => {
+  // 1b. My Own Listings — সরাসরি seller_id দিয়ে Supabase থেকে fetch করা, হোমপেজের
+  // ২০-টা পেজিনেটেড লিস্ট থেকে না। এভাবে Dashboard আর Lottery সবসময় ইউজারের
+  // আসল ১০০% পোস্ট দেখাবে।
+  // 🔧 (2026-09-24) আগে এটা Firestore থেকে পড়ত (`collection(db, "listings")`),
+  // কিন্তু migration-এর পর নতুন পোস্ট শুধু Supabase-এ থাকে -- তাই এই কোয়েরি
+  // সবসময় খালি রেজাল্ট দিত এবং Dashboard/My Shop "০ পোস্ট" দেখাত, যদিও
+  // হোমপেজে (যেটা Supabase থেকেই পড়ে) পোস্টটা ঠিকই দেখা যেত। এখন একই টেবিল
+  // থেকে fetch করা হয়, আর একটা পোস্ট সাবমিট হওয়ার পর dispatch হওয়া
+  // "gari_bazar_refreshed_data" event শুনে রিফ্রেশও করে।
+  const refetchMyListings = async () => {
     if (!authReady || !user?.uid) {
       setMyListings([]);
       return;
     }
-    const q = query(collection(db, "listings"), where("sellerId", "==", user.uid), orderBy("createdAt", "desc"), limit(100));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const list: PartListing[] = [];
-      snapshot.forEach((docSnap) => {
-        const data = docSnap.data();
-        if (data.isDeleted === true) return; // soft-deleted, in its 30-day recovery window
-        const normalizedCreatedAt = data.createdAt && typeof data.createdAt.toDate === "function"
-          ? data.createdAt.toDate().toISOString()
-          : data.createdAt;
-        list.push({ id: docSnap.id, ...data, createdAt: normalizedCreatedAt } as PartListing);
-      });
+    try {
+      const list = await fetchMyListingsFromSupabase(user.uid);
       setMyListings(list);
-    }, (err) => {
-      logger.error("Failed to sync my listings:", err);
-    });
-    return () => unsubscribe();
+    } catch (err) {
+      logger.error("Failed to fetch my listings:", err);
+    }
+  };
+
+  useEffect(() => {
+    refetchMyListings();
+    window.addEventListener("gari_bazar_refreshed_data", refetchMyListings);
+    return () => window.removeEventListener("gari_bazar_refreshed_data", refetchMyListings);
   }, [authReady, user?.uid]);
 
   // 1c. সব লাইভ বুস্ট করা অ্যাড — হোমপেজের "Load More" পেজিনেশনের ওপর নির্ভর না করে সরাসরি fetch করা,
@@ -1412,6 +1453,7 @@ export default function App() {
           .update({ is_deleted: true, deleted_at: new Date().toISOString() })
           .eq("id", itemId);
         if (deleteError) throw deleteError;
+        window.dispatchEvent(new Event("gari_bazar_refreshed_data"));
       }
     } catch (err) {
       console.error("Error deleting listing:", err);
