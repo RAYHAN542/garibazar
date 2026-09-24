@@ -1382,6 +1382,11 @@ export default function App() {
   };
 
   // 3b. Expired Ad Promotion Resetter & Delete / Edit Helpers
+  // 🔧 (2026-09-24) The else-branch used to update a Firestore listing doc --
+  // but adListings now comes from Supabase, so item.id is a Supabase UUID
+  // with no matching Firestore doc, and updateDoc() silently created/touched
+  // nothing. Expired boosted ads never actually got un-boosted. Now updates
+  // the Supabase `listings` row directly (same table adListings is read from).
   useEffect(() => {
     if (adListings.length === 0) return;
     
@@ -1408,11 +1413,11 @@ export default function App() {
             localStorage.setItem("gari_bazar_local_listings", JSON.stringify(updated));
             window.dispatchEvent(new Event("storage"));
           } else {
-            const listingRef = doc(db, "listings", item.id);
-            await updateDoc(listingRef, {
-              isAd: false,
-              adExpiresAt: null
-            });
+            const { error } = await supabase
+              .from("listings")
+              .update({ is_ad: false, ad_expires_at: null })
+              .eq("id", item.id);
+            if (error) throw error;
           }
         } catch (err) {
           console.error("Error resetting expired advertisement promotion:", err);
