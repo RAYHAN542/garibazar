@@ -866,33 +866,54 @@ export default function App() {
     };
   }, []);
 
-  // Fetch reviews for the currently logged-in user to display in "My Shop"
+  // Fetch reviews for the currently logged-in user to display in "My Shop".
+  // 🔧 (2026-09-24) Migrated to Supabase (`seller_reviews` table) -- this was
+  // still reading Firestore, which stayed empty once the reviews feature
+  // moved to Supabase, so "My Shop" always showed zero reviews even for
+  // sellers who had genuinely been reviewed.
   useEffect(() => {
     if (!authReady || !user?.uid) {
       setCurrentUserReviews([]);
       return;
     }
     setCurrentUserReviewsLoading(true);
-    const q = query(
-      collection(db, "seller_reviews"),
-      where("sellerId", "==", user.uid),
-      orderBy("createdAt", "desc"),
-      limit(30)
-    );
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const list: any[] = [];
-      snapshot.forEach((docSnap) => {
-        list.push({ id: docSnap.id, ...docSnap.data() });
-      });
-      list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    let active = true;
+
+    const fetchReviews = async () => {
+      const { data, error } = await supabase
+        .from("seller_reviews")
+        .select("id,reviewer_id,seller_id,rating,comment,created_at")
+        .eq("seller_id", user.uid)
+        .order("created_at", { ascending: false })
+        .limit(30);
+      if (!active) return;
+      if (error) {
+        console.warn("Failed to fetch current user reviews:", error);
+        setCurrentUserReviewsLoading(false);
+        return;
+      }
+      const list = (data || []).map((row: any) => ({
+        id: row.id,
+        reviewerId: row.reviewer_id,
+        sellerId: row.seller_id,
+        rating: row.rating,
+        comment: row.comment,
+        createdAt: row.created_at,
+      }));
       setCurrentUserReviews(list);
       setCurrentUserReviewsLoading(false);
-    }, (err) => {
-      console.warn("Failed to subscribe to current user reviews:", err);
-      setCurrentUserReviewsLoading(false);
-    });
+    };
 
-    return () => unsubscribe();
+    fetchReviews();
+    const channel = supabase
+      .channel(`seller-reviews-${user.uid}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "seller_reviews", filter: `seller_id=eq.${user.uid}` }, fetchReviews)
+      .subscribe();
+
+    return () => {
+      active = false;
+      supabase.removeChannel(channel);
+    };
   }, [authReady, user?.uid]);
 
   // Sync profile metadata real-time (e.g. simulated credits recharge instantly)
