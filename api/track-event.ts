@@ -58,13 +58,9 @@ if (!getApps().length) {
 // table instead of Firestore. `analytics_daily` (the rollup Admin Panel reads)
 // updates itself automatically via a DB trigger (`trg_bump_analytics_daily`)
 // on every site_visits insert -- no extra write needed here for that path.
-// Per-listing view/click/save/unsave (handleListingInteraction below) still
-// writes to Firestore (unchanged) -- only its AUTH check was fixed
-// (2026-09-24): it used to verify Firebase ID tokens only, so a
-// Supabase-logged-in user's click/save/unsave always failed with "লগইন করা
-// প্রয়োজন।" even though they were signed in (view didn't need login, so
-// that one worked fine). Now tries Supabase first, Firebase as fallback,
-// same pattern as every other endpoint here.
+// Per-listing view/click/save/unsave (handleListingInteraction below) is
+// UNCHANGED and still uses Firestore -- that part isn't broken and is out of
+// scope for this fix.
 const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const supabaseAdmin =
@@ -115,22 +111,26 @@ async function handleListingInteraction(req: any, res: any, listingId: string, t
     return res.status(200).json({ ok: true, counted: true });
   }
 
-  // click/save/unsave all require a real signed-in user -- verify the
-  // token server-side rather than trusting a client-supplied uid. Tries
-  // the current Supabase token first, legacy Firebase ID token as fallback.
+  // click/save/unsave all require a real signed-in user. Try the current
+  // login system (Supabase) first, then fall back to a legacy Firebase ID
+  // token -- same dual-auth pattern as get-seller-contact.ts and api/draw.ts.
+  // 🔧 Before, this ONLY checked Firebase, which always throws on a Supabase
+  // access token (wrong signer) -- so "Show Number" clicks and Save/Unsave
+  // silently failed with a 401 for every Supabase-authenticated user (i.e.
+  // everyone who has logged in since the Supabase migration), even though
+  // the button appeared to do nothing rather than show a visible error.
   const authHeader = req.headers.authorization || "";
   const idToken = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
   if (!idToken) return res.status(401).json({ error: "লগইন করা প্রয়োজন।" });
   let uid: string | null = await verifySupabaseToken(idToken);
-  if (!uid && getApps().length) {
+  if (!uid) {
     try {
       const decoded = await getAuth().verifyIdToken(idToken);
       uid = decoded.uid;
     } catch {
-      uid = null;
+      return res.status(401).json({ error: "সেশন মেয়াদোত্তীর্ণ, আবার লগইন করুন।" });
     }
   }
-  if (!uid) return res.status(401).json({ error: "সেশন মেয়াদোত্তীর্ণ, আবার লগইন করুন।" });
 
   if (type === "click") {
     // Once per user per listing per day -- repeatedly tapping "Show Number"
