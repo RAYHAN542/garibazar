@@ -1,9 +1,9 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Trash2, AlertTriangle, ArrowLeft, Globe, Loader2, CheckCircle, Mail } from "lucide-react";
 import { SupportedLanguage } from "../types";
-import { auth, db } from "../firebase";
-import { deleteUser } from "firebase/auth";
-import { collection, query, where, getDocs, deleteDoc, doc } from "firebase/firestore";
+import { auth } from "../firebase";
+import { supabase } from "../supabase";
+import { apiUrl } from "../utils/apiBase";
 
 interface DataDeletionPageProps {
   language?: SupportedLanguage;
@@ -22,14 +22,41 @@ export default function DataDeletionPage({
   const [error, setError] = useState("");
   const [confirmationInput, setConfirmationInput] = useState("");
 
-  const currentUser = auth.currentUser;
+  // 🔧 (2026-09-26) আগে এই পেজ শুধু auth.currentUser (legacy Firebase Auth)
+  // চেক করত। ফোন-লগইন ইউজাররা এখন Supabase Auth দিয়ে সাইন ইন করে -- তাই
+  // তারা আসলে লগইন থাকলেও এই পেজ সবসময় "আগে লগইন করুন" দেখাত, আর
+  // properly-built Supabase-based delete_account হ্যান্ডলার কখনোই কল হতো
+  // না। এখন dual-auth চেক করা হয় (আগে Supabase, fallback হিসেবে legacy
+  // Firebase) -- ঠিক ListingDetailModal.tsx-এর getAuthToken()-এর মতো একই
+  // প্যাটার্ন।
+  const [checkingAuth, setCheckingAuth] = useState(true);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      try {
+        const { data } = await supabase.auth.getSession();
+        if (!active) return;
+        if (data?.session?.user || auth.currentUser) {
+          setIsLoggedIn(true);
+        }
+      } finally {
+        if (active) setCheckingAuth(false);
+      }
+    })();
+    return () => { active = false; };
+  }, []);
+
+  const getAuthToken = async (): Promise<string | null> => {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const supaToken = sessionData?.session?.access_token;
+    if (supaToken) return supaToken;
+    const fbToken = await auth.currentUser?.getIdToken().catch(() => undefined);
+    return fbToken || null;
+  };
 
   const handleDataDeletion = async () => {
-    if (!currentUser) {
-      setError(lang === "bn" ? "ডাটা ডিলিট করতে প্রথমে লগইন করুন।" : "Please sign in first to execute account deletion.");
-      return;
-    }
-
     if (confirmationInput.toLowerCase() !== "delete") {
       setError(lang === "bn" ? "নিশ্চিত করতে নিচে ফর্মে 'DELETE' লিখুন।" : "Please type 'DELETE' to confirm.");
       return;
@@ -39,34 +66,45 @@ export default function DataDeletionPage({
     setError("");
 
     try {
-      const uid = currentUser.uid;
-
-      // 1. Delete listings owned by user
-      const listingsQuery = query(collection(db, "listings"), where("sellerId", "==", uid));
-      const listingsSnapshot = await getDocs(listingsQuery);
-      for (const d of listingsSnapshot.docs) {
-        await deleteDoc(doc(db, "listings", d.id));
+      const idToken = await getAuthToken();
+      if (!idToken) {
+        throw new Error(
+          lang === "bn"
+            ? "লগইন সেশন পাওয়া যায়নি। আবার লগইন করে চেষ্টা করুন।"
+            : "No active login session found. Please sign in again and retry."
+        );
       }
 
-      // 2. Delete public profiles and user private accounts
-      await deleteDoc(doc(db, "users", uid));
-      await deleteDoc(doc(db, "public_profiles", uid));
+      // 🔧 আগে এখানে সরাসরি ক্লায়েন্ট থেকে Firestore deleteDoc/deleteUser কল
+      // হতো, যেটা শুধু legacy Firebase ডাটা মুছত, আসল Supabase রেকর্ড না।
+      // এখন properly-built, Supabase-based /api/account-actions
+      // (action: "delete_account") সার্ভার সাইডে service role দিয়ে
+      // listings/public_profiles/users/user_auth_links মুছে এবং Supabase
+      // Auth থেকে ইউজারকে ডিলিট করে।
+      const resp = await fetch(apiUrl("/api/account-actions"), {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({ action: "delete_account" }),
+      });
+      const data = await resp.json();
+      if (!resp.ok) {
+        throw new Error(data?.error || (lang === "bn" ? "অ্যাকাউন্ট ডিলিট করতে সমস্যা হয়েছে।" : "Failed to purge account data."));
+      }
 
-      // 3. Delete the auth user record
-      await deleteUser(currentUser);
+      try {
+        localStorage.removeItem("gari_bazar_session_user");
+      } catch {}
+      try {
+        await supabase.auth.signOut();
+      } catch {}
 
       setCompleted(true);
     } catch (err: any) {
       console.error("Account & Data deletion failed:", err);
-      if (err.code === "auth/requires-recent-login") {
-        setError(
-          lang === "bn" 
-            ? "নিরাপত্তার স্বার্থে, এই স্পর্শকাতর কাজের জন্য পুনরায় লগইন করে সঙ্গে সঙ্গে চেষ্টা করুন।" 
-            : "For safety reasons, please log out, log back in, and try deleting your account immediately."
-        );
-      } else {
-        setError(err.message || (lang === "bn" ? "অ্যাকাউন্ট ডিলিট করতে সমস্যা হয়েছে।" : "Failed to purge account data."));
-      }
+      setError(err.message || (lang === "bn" ? "অ্যাকাউন্ট ডিলিট করতে সমস্যা হয়েছে।" : "Failed to purge account data."));
     } finally {
       setLoading(false);
     }
@@ -130,11 +168,11 @@ export default function DataDeletionPage({
                 <CheckCircle className="w-12 h-12" />
               </div>
               <h2 className="text-xl font-bold text-slate-900">
-                {lang === "bn" ? "আপনার ডাটা স্থায়ীভাবে মুছে ফেলা হয়েছে!" : "Data Purged Successfully!"}
+                {lang === "bn" ? "আপনার ডাটা স্থায়ীভাবে মুছে ফেলা হয়েছে!" : "Data Purged Successfully!"}
               </h2>
               <p className="text-sm text-slate-500 max-w-sm mx-auto">
                 {lang === "bn" 
-                  ? "গাড়ি বাজার থেকে আপনার অ্যাকাউন্ট, বিজ্ঞাপনসমূহ এবং সমস্ত ব্যক্তিগত তথ্য স্থায়ীভাবে ডাটাবেস থেকে মুছে ফেলা হয়েছে।" 
+                  ? "গাড়ি বাজার থেকে আপনার অ্যাকাউন্ট, বিজ্ঞাপনসমূহ এবং সমস্ত ব্যক্তিগত তথ্য স্থায়ীভাবে ডাটাবেস থেকে মুছে ফেলা হয়েছে।" 
                   : "All of your listings, profile records, and credential tokens have been permanently cleared from Gari Bazar servers."}
               </p>
               <button 
@@ -154,7 +192,7 @@ export default function DataDeletionPage({
                   </span>
                   <p className="text-xs text-red-750 leading-relaxed font-semibold">
                     {lang === "bn" 
-                      ? "অ্যাকাউন্ট ডিলিট করলে আপনার আপলোড করা সমস্ত বিজ্ঞাপনের বিজ্ঞাপনকারী তথ্য ও পেমেন্ট হিস্ট্রি অবিলম্ব স্থায়ীভাবে মুছে যাবে। এটি আর ফিরিয়ে আনা সম্ভব নয়।" 
+                      ? "অ্যাকাউন্ট ডিলিট করলে আপনার আপলোড করা সমস্ত বিজ্ঞাপনের বিজ্ঞাপনকারী তথ্য ও পেমেন্ট হিস্ট্রি অবিলম্ব স্থায়ীভাবে মুছে যাবে। এটি আর ফিরিয়ে আনা সম্ভব নয়।" 
                       : "Purging account data deletes all premium parts listings, historical wallets, and profiles. This process is absolutely permanent and cannot be undone."}
                   </p>
                 </div>
@@ -171,7 +209,11 @@ export default function DataDeletionPage({
                 </ul>
               </div>
 
-              {!currentUser ? (
+              {checkingAuth ? (
+                <div className="flex items-center justify-center py-6">
+                  <Loader2 className="w-5 h-5 animate-spin text-slate-400" />
+                </div>
+              ) : !isLoggedIn ? (
                 <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5 text-center space-y-4">
                   <p className="text-xs text-slate-600 font-bold">
                     {lang === "bn" 
