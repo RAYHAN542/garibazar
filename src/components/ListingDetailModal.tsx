@@ -380,9 +380,9 @@ export function ListingDetailModal({ listing, language, currentUser, onClose, on
   // (listings/{id}.reportCount/reportedBy)। migration-এর পর নতুন listing
   // Firestore-এ থাকেই না, তাই docSnap.exists() সবসময় false হতো আর বাটনটা
   // চাপলে কিছুই হতো না (কোনো error ছাড়াই, চুপচাপ ব্যর্থ)। এখন
-  // /api/report-listing দিয়ে যায় -- report_count/reported_by কলাম RLS
-  // trigger-এ admin-only protected, তাই সরাসরি ক্লায়েন্ট থেকে লেখাও যেত না;
-  // সার্ভার service role দিয়ে এটা করে।
+  // /api/account-actions (action: report_listing) দিয়ে যায় -- report_count/
+  // reported_by কলাম RLS trigger-এ admin-only protected, তাই সরাসরি
+  // ক্লায়েন্ট থেকে লেখাও যেত না; সার্ভার service role দিয়ে এটা করে।
   const handleReportListing = async () => {
     if (!currentUser) {
       onLoginPrompt?.();
@@ -395,13 +395,13 @@ export function ListingDetailModal({ listing, language, currentUser, onClose, on
       const idToken = await getAuthToken();
       if (!idToken) throw new Error("লগইন সেশন পাওয়া যায়নি");
 
-      const resp = await fetch(apiUrl("/api/report-listing"), {
+      const resp = await fetch(apiUrl("/api/account-actions"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${idToken}`,
         },
-        body: JSON.stringify({ listingId: listing.id }),
+        body: JSON.stringify({ action: "report_listing", listingId: listing.id }),
       });
       const data = await resp.json();
       if (!resp.ok) throw new Error(data?.error || "রিপোর্ট সাবমিট করা যায়নি।");
