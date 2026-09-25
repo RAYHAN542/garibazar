@@ -122,6 +122,30 @@ const detectLocationFromText = (text: string): string => {
   return "";
 };
 
+// 🔧 (2026-09-26) আগে "vehicle" টাইপের প্রতিটা পোস্টই hardcode করে
+// sub_category="other_heavy_equipment" পেত -- আসলে গাড়ি/বাইক/ট্রাক যা-ই হোক
+// না কেন। ফলে হোমপেজের "Car"/"Bike"/"Truck" quick-filter icon-গুলো এই
+// পোস্টগুলো subCategory ফিল্ডে কখনো খুঁজে পেত না (শুধু বিবরণে keyword থাকলে
+// text-fallback দিয়ে ধরা পড়ত), আর "Heavy Equip." ফিল্টারে ক্লিক করলে
+// আসলে-heavy-machinery-না এমন সব গাড়ি/বাইকও দেখাত (matchesSubCategoryFilter-এ
+// subCategory মিলে গেলে সরাসরি true হয়ে যায়, বিবরণ না দেখেই)। এই ফাংশনটা
+// listingFilters.ts-এর matchesSubCategoryFilter-এ যে একই কীওয়ার্ড ব্যবহার হয়
+// সেগুলো দিয়েই বিবরণ থেকে সঠিক sub-category অনুমান করে, যাতে পোস্ট করার
+// সময়েই ঠিকভাবে ট্যাগ হয়ে যায়।
+const detectVehicleSubCategory = (text: string): string => {
+  const t = (text || "").toLowerCase();
+  if (/excavator|এক্সক্যাভেটর|এক্সকাভেটর/.test(t)) return "excavator";
+  if (/crane|ক্রেন/.test(t)) return "crane";
+  if (/bulldozer|বুলডোজার|dozer/.test(t)) return "bulldozer";
+  if (/forklift|ফর্কলিফ্ট|forkclip/.test(t)) return "forklift";
+  if (/microbus|মাইক্রোবাস|hiace|হাইয়েস/.test(t)) return "microbus";
+  if (/(^|[^a-z])bus([^a-z]|$)|বাস/.test(t)) return "bus";
+  if (/truck|ট্রাক|lorry|লরি|covered van|কাভার্ড ভ্যান/.test(t)) return "truck";
+  if (/bike|বাইক|motorcycle|মোটরসাইকেল|scooter|স্কুটার|yamaha|bajaj/.test(t)) return "bike";
+  if (/car|কার|toyota|jeep|pickup|noah|hilux/.test(t)) return "car";
+  return "other_heavy_equipment";
+};
+
 // বিবরণের প্রথম অংশ থেকে একটা সংক্ষিপ্ত শিরোনাম বানায় (কার্ডে দেখানোর জন্য)।
 const deriveTitleFromDescription = (text: string): string => {
   const firstLine = text.split("\n")[0].trim();
@@ -248,7 +272,10 @@ export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPromp
       const cleanPhone = sanitizeText(cleanPhoneDigits);
 
       const parentCategory = selectedType === "vehicle" ? "vehicles" : "general";
-      const normalizedSubCategory = selectedType === "vehicle" ? "other_heavy_equipment" : "general";
+      // 🔧 আগে এখানে সবসময় "other_heavy_equipment" hardcode করা হতো -- এখন
+      // বিবরণ থেকে আসল ধরন (car/bike/truck/bus/excavator ইত্যাদি) অনুমান করা
+      // হয়, যাতে হোমপেজের quick-filter icon-গুলো সঠিকভাবে কাজ করে।
+      const normalizedSubCategory = selectedType === "vehicle" ? detectVehicleSubCategory(description) : "general";
 
       // Written to Supabase now (App.tsx reads listings from Supabase -
       // USE_SUPABASE_LISTINGS = true). The 30s cooldown is enforced by a
