@@ -1515,17 +1515,18 @@ export default function App() {
     try {
       // 🔧 সরাসরি Firestore write-এর বদলে rate-limited API ব্যবহার করা হচ্ছে
       // (guest হলে IP-ভিত্তিক, লগইন থাকলে uid-ভিত্তিক সীমা) -- দেখুন
-      // api/submit-support-ticket.ts, আর firestore.rules-এ support_tickets
-      // এখন client-এর জন্য সম্পূর্ণ বন্ধ।
+      // api/account-actions.ts (action: submit_support_ticket), আর
+      // firestore.rules-এ support_tickets এখন client-এর জন্য সম্পূর্ণ বন্ধ।
       const { data: { session } } = await supabase.auth.getSession();
       const idToken = user?.uid ? (session?.access_token || null) : null;
-      const resp = await fetch(apiUrl("/api/submit-support-ticket"), {
+      const resp = await fetch(apiUrl("/api/account-actions"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}),
         },
         body: JSON.stringify({
+          action: "submit_support_ticket",
           name: supportName || (user?.displayName || "Anonymous"),
           email: supportEmail || (user?.email || "anonymous@garibazar.com"),
           message: supportMessage,
