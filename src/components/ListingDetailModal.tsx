@@ -100,6 +100,7 @@ export function ListingDetailModal({ listing, language, currentUser, onClose, on
   const [selectedReason, setSelectedReason] = useState("spam");
   const [reportLoading, setReportLoading] = useState(false);
   const [reportSuccess, setReportSuccess] = useState(false);
+  const [reportError, setReportError] = useState<string | null>(null);
 
   const [isAddingToDashboard, setIsAddingToDashboard] = useState(false);
   const [addToDashboardSuccess, setAddToDashboardSuccess] = useState(false);
@@ -366,6 +367,13 @@ export function ListingDetailModal({ listing, language, currentUser, onClose, on
     }
   };
 
+  // 🔧 (2026-09-25) আগে এখানে সরাসরি Firestore-এ getDoc/updateDoc হতো
+  // (listings/{id}.reportCount/reportedBy)। migration-এর পর নতুন listing
+  // Firestore-এ থাকেই না, তাই docSnap.exists() সবসময় false হতো আর বাটনটা
+  // চাপলে কিছুই হতো না (কোনো error ছাড়াই, চুপচাপ ব্যর্থ)। এখন
+  // /api/report-listing দিয়ে যায় -- report_count/reported_by কলাম RLS
+  // trigger-এ admin-only protected, তাই সরাসরি ক্লায়েন্ট থেকে লেখাও যেত না;
+  // সার্ভার service role দিয়ে এটা করে।
   const handleReportListing = async () => {
     if (!currentUser) {
       onLoginPrompt?.();
@@ -373,39 +381,41 @@ export function ListingDetailModal({ listing, language, currentUser, onClose, on
     }
     if (hasReported) return;
     setReportLoading(true);
+    setReportError(null);
     try {
-      const docRef = doc(db, "listings", listing.id);
-      const docSnap = await getDoc(docRef);
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        const currentReportedBy = data.reportedBy || [];
-        
-        if (!currentReportedBy.includes(currentUser.uid)) {
-          const nextReportedBy = [...currentReportedBy, currentUser.uid];
-          const nextReportCount = (data.reportCount || 0) + 1;
-          
-          await updateDoc(docRef, {
-            reportCount: nextReportCount,
-            reportedBy: nextReportedBy
-          });
-          
-          setHasReported(true);
-          setReportSuccess(true);
-          
-          // Instantly hide the flagged document locally
-          const hiddenStr = localStorage.getItem("gari_bazar_hidden_listings") || "[]";
-          try {
-            const hidden = JSON.parse(hiddenStr);
-            if (Array.isArray(hidden) && !hidden.includes(listing.id)) {
-              localStorage.setItem("gari_bazar_hidden_listings", JSON.stringify([...hidden, listing.id]));
-            }
-          } catch {}
-          
-          window.dispatchEvent(new Event("storage"));
+      const idToken = await getAuthToken();
+      if (!idToken) throw new Error("লগইন সেশন পাওয়া যায়নি");
+
+      const resp = await fetch(apiUrl("/api/report-listing"), {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({ listingId: listing.id }),
+      });
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data?.error || "রিপোর্ট সাবমিট করা যায়নি।");
+
+      setHasReported(true);
+      setReportSuccess(true);
+
+      // Instantly hide the flagged document locally
+      const hiddenStr = localStorage.getItem("gari_bazar_hidden_listings") || "[]";
+      try {
+        const hidden = JSON.parse(hiddenStr);
+        if (Array.isArray(hidden) && !hidden.includes(listing.id)) {
+          localStorage.setItem("gari_bazar_hidden_listings", JSON.stringify([...hidden, listing.id]));
         }
-      }
-    } catch (err) {
+      } catch {}
+
+      window.dispatchEvent(new Event("storage"));
+    } catch (err: any) {
       console.error("Report listing incident failure: ", err);
+      setReportError(
+        err?.message ||
+          (language === "bn" ? "রিপোর্ট সাবমিট করা যায়নি। আবার চেষ্টা করুন।" : "Couldn't submit report. Please try again.")
+      );
     } finally {
       setReportLoading(false);
     }
@@ -872,6 +882,9 @@ export function ListingDetailModal({ listing, language, currentUser, onClose, on
                     📞 {language === "bn" ? "মোবাইল বন্ধ / সংযোগহীন" : "Seller unreachable"}
                   </button>
                 </div>
+                {reportError && (
+                  <p className="text-[11px] font-bold text-red-500">{reportError}</p>
+                )}
                 <div className="flex justify-end pt-1">
                   <button
                     type="button"
