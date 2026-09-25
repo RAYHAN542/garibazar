@@ -37,6 +37,17 @@ import { createClient } from "@supabase/supabase-js";
 // Supabase RPC from the client, see ListingDetailModal.tsx). Now this
 // tries the current Supabase token first, and only falls back to the old
 // Firebase check for any still-cached legacy sessions.
+//
+// 🔧 THIRD FIX (2026-09-25) "Show number takes ~5 seconds": every single
+// request -- even for a brand-new listing -- was doing THREE sequential
+// network round-trips: (1) a Firestore lookup that could never succeed for
+// a post-migration listing, (2) a Supabase `listings` existence check, (3)
+// a separate Supabase `listing_contacts` lookup. New listings always get a
+// real UUID as their id (see AddPartForm.tsx's Supabase insert) and were
+// NEVER a Firestore document, so for a UUID id we now skip straight to a
+// single `listing_contacts` query. The slower legacy path (Firestore, then
+// a `legacy_firestore_id` lookup) still runs, but only for old
+// non-UUID ids -- a shrinking minority of listings.
 // ------------------------------------------------------------------------
 
 if (!getApps().length) {
@@ -55,6 +66,8 @@ const RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000; // 1 hour
 const RATE_LIMIT_MAX = 50; // reveals per user per hour -- generous for a
 // genuine buyer browsing many listings, but stops a scripted account from
 // harvesting the whole marketplace's phone numbers in one sweep.
+
+const UUID_RE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
 
 export default async function handler(req: any, res: any) {
   if (applyCors(req, res)) return;
@@ -98,6 +111,34 @@ export default async function handler(req: any, res: any) {
       });
     }
 
+    const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!supabaseUrl || !supabaseServiceKey) {
+      console.error("[get-seller-contact] Missing Supabase env vars -- url:", !!supabaseUrl, "serviceKey:", !!supabaseServiceKey);
+    }
+
+    // Fast path: brand-new listings (the vast majority now) always have a
+    // real UUID id and were never a Firestore document -- one direct query,
+    // no Firestore round-trip, no extra "does this listing exist" check.
+    if (UUID_RE.test(listingId) && supabaseUrl && supabaseServiceKey) {
+      const supabase = createClient(supabaseUrl, supabaseServiceKey);
+      const { data: contactRow, error: contactErr } = await supabase
+        .from("listing_contacts")
+        .select("phone")
+        .eq("listing_id", listingId)
+        .maybeSingle();
+
+      if (contactErr) {
+        console.error("[get-seller-contact] Supabase fast-path error:", contactErr.message);
+        return res.status(500).json({ error: "সার্ভারে সমস্যা হয়েছে।" });
+      }
+      if (contactRow?.phone) {
+        return res.status(200).json({ contactNumber: contactRow.phone });
+      }
+      return res.status(404).json({ error: "নম্বর পাওয়া যায়নি।" });
+    }
+
+    // Legacy path: a non-UUID id can only be an old Firestore document ID.
     if (getApps().length) {
       const db = getFirestore();
       const contactSnap = await db
@@ -112,31 +153,14 @@ export default async function handler(req: any, res: any) {
       }
     }
 
-    // Not in Firestore - this listing was created after the Supabase
-    // migration, so its number only lives there now. Uses the service role
-    // key (server-side only, never exposed to the client) with a direct
-    // query rather than the get_listing_contact_number RPC - that RPC's
-    // own "must be signed in" check reads the caller's Supabase session
-    // JWT, which doesn't exist when called with a plain service-role
-    // client. This endpoint already did its own auth + rate limit above,
-    // so re-checking via RLS here would be redundant.
-    const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
-    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    if (!supabaseUrl || !supabaseServiceKey) {
-      // 🔧 আগে এই দুটো env var এর একটা মিসিং থাকলে silently পুরো Supabase
-      // fallback অংশটা skip হয়ে যেত -- ফলে শুধু Firestore-এ থাকা পুরনো
-      // listing-এর নম্বর দেখাত, নতুন (শুধু Supabase-এ থাকা) listing-এর
-      // জন্য সবসময় "পাওয়া যায়নি" দেখাত, কোনো log ছাড়াই। এখন স্পষ্ট করে
-      // লগ হবে যাতে ভবিষ্যতে দ্রুত ধরা পড়ে।
-      console.error("[get-seller-contact] Missing Supabase env vars -- url:", !!supabaseUrl, "serviceKey:", !!supabaseServiceKey);
-    }
+    // Not in Firestore either -- check whether it was migrated into
+    // Supabase under a new UUID with this as its legacy_firestore_id.
     if (supabaseUrl && supabaseServiceKey) {
       const supabase = createClient(supabaseUrl, supabaseServiceKey);
-      const isUuid = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(listingId);
       const { data: listingRow, error: listingErr } = await supabase
         .from("listings")
         .select("id")
-        .or(isUuid ? `legacy_firestore_id.eq.${listingId},id.eq.${listingId}` : `legacy_firestore_id.eq.${listingId}`)
+        .eq("legacy_firestore_id", listingId)
         .maybeSingle();
 
       if (!listingErr && listingRow) {
@@ -149,7 +173,7 @@ export default async function handler(req: any, res: any) {
           return res.status(200).json({ contactNumber: contactRow.phone });
         }
       } else if (listingErr) {
-        console.error("[get-seller-contact] Supabase fallback error:", listingErr.message);
+        console.error("[get-seller-contact] Supabase legacy-fallback error:", listingErr.message);
       }
     }
 
