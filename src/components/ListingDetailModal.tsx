@@ -191,12 +191,21 @@ export function ListingDetailModal({ listing, language, currentUser, onClose, on
       console.error("Local storage purchase save fail:", e);
     }
 
-    // 2. Submit to Firestore - the real source of truth. Firestore is the
-    // thing that actually matters here; if it fails, roll back the
-    // optimistic local entry and tell the user honestly instead of
+    // 2. Submit to Supabase - the real source of truth. If it fails, roll
+    // back the optimistic local entry and tell the user honestly instead of
     // showing a fake success.
+    // 🔧 (2026-09-25) Migrated from a Firestore addDoc() to Supabase's
+    // `purchases` table (buyer_id + jsonb data column), matching the read
+    // side in App.tsx -- both were previously reading/writing Firestore
+    // consistently with each other, this just brings the whole feature onto
+    // the same database as the rest of the migrated app.
     try {
-      const addPromise = addDoc(collection(db, "purchases"), newPurchaseDoc);
+      const addPromise = supabase
+        .from("purchases")
+        .insert({ buyer_id: currentUser.uid, data: newPurchaseDoc })
+        .then(({ error }) => {
+          if (error) throw error;
+        });
       const timeoutPromise = new Promise((_, reject) =>
         setTimeout(() => reject(new Error("Timeout")), 8000)
       );
@@ -211,7 +220,7 @@ export function ListingDetailModal({ listing, language, currentUser, onClose, on
         setAddToDashboardSuccess(false);
       }, 3500);
     } catch (err) {
-      console.error("Failed to save purchase to Firestore:", err);
+      console.error("Failed to save purchase:", err);
       // Roll back the optimistic local entry - it never actually saved.
       try {
         const stored = localStorage.getItem("gari_bazar_local_purchases") || "[]";
