@@ -1,19 +1,20 @@
-import { Search, SlidersHorizontal, Bell, Check, Plus, X, ShoppingBag, Loader2 } from "lucide-react";
+import { Search, SlidersHorizontal, Bell, Plus, X, ShoppingBag, Loader2, LayoutGrid, Car, Wrench, Bike, Truck, Construction } from "lucide-react";
 import { ListingCard } from "./ListingCard";
 import { PromotedSlider } from "./PromotedSlider";
 import { CITIES } from "../translations";
 import { PartListing, SupportedLanguage, TranslationSet } from "../types";
 import type { ActiveTab } from "./HeaderNav";
 import { logAnalyticsEvent } from "../firebase";
-import vehicleCardImg from "../assets/images/vehicle-card-new.webp";
-import partsCardImg from "../assets/images/parts-card-new.webp";
 
 const VEHICLE_SUBCATEGORIES = [
   { id: "all", bnName: "সব গাড়ি", enName: "All Vehicles" },
+  { id: "car", bnName: "কার", enName: "Car" },
+  { id: "bike", bnName: "বাইক", enName: "Bike" },
+  { id: "truck", bnName: "ট্রাক", enName: "Truck" },
+  { id: "microbus", bnName: "মাইক্রোবাস", enName: "Microbus" },
+  { id: "bus", bnName: "বাস", enName: "Bus" },
   { id: "excavator", bnName: "এক্সক্যাভেটর", enName: "Excavator" },
   { id: "crane", bnName: "ক্রেন", enName: "Crane" },
-  { id: "car", bnName: "কার", enName: "Car" },
-  { id: "bus", bnName: "বাস", enName: "Bus" },
   { id: "bulldozer", bnName: "বুলডোজার", enName: "Bulldozer" },
   { id: "forklift", bnName: "ফর্কলিফ্ট", enName: "Forklift" },
   { id: "other_heavy_equipment", bnName: "অন্যান্য ভারী যন্ত্রপাতি", enName: "Other Heavy Equipment" }
@@ -317,63 +318,91 @@ export default function MarketplaceTab({
                   )}
                 </div>
 
-                {/* 🚗 vs ⚙️ Side-by-Side Main Category Buy/Sell Buttons */}
+                {/* 🔧 (2026-09-25) Replaced the two big "Vehicle Buy & Sell" /
+                    "Vehicle Parts" cards with a single always-visible row of
+                    quick-filter icons (All, Car, Part, Bike, Truck, Heavy
+                    Equipment) -- one tap goes straight to that filter instead
+                    of needing to open the Filters panel first and then pick a
+                    sub-category from a text list. "Part" now lives in this
+                    same row instead of a separate big button. Bike and Truck
+                    are new sub-categories -- see listingFilters.ts -- since
+                    neither existed as a filterable category before this. */}
+                <div className="flex overflow-x-auto whitespace-nowrap no-scrollbar gap-2.5 mb-3 pb-0.5 animate-[slide-down_0.2s_ease-out]">
+                  {([
+                    {
+                      id: "quick_all",
+                      icon: LayoutGrid,
+                      bn: "সব",
+                      en: "All",
+                      active: selectedCategory === "all" && selectedSubCategory === "all",
+                      onClick: () => { setSelectedCategory("all"); setSelectedSubCategory("all"); },
+                    },
+                    {
+                      id: "quick_car",
+                      icon: Car,
+                      bn: "কার",
+                      en: "Car",
+                      active: selectedCategory === "vehicles" && selectedSubCategory === "car",
+                      onClick: () => { setSelectedCategory("vehicles"); setSelectedSubCategory("car"); },
+                    },
+                    {
+                      id: "quick_parts",
+                      icon: Wrench,
+                      bn: "পার্টস",
+                      en: "Part",
+                      active: selectedCategory === "spare_parts",
+                      onClick: () => { setSelectedCategory("spare_parts"); setSelectedSubCategory("all"); },
+                    },
+                    {
+                      id: "quick_bike",
+                      icon: Bike,
+                      bn: "বাইক",
+                      en: "Bike",
+                      active: selectedCategory === "vehicles" && selectedSubCategory === "bike",
+                      onClick: () => { setSelectedCategory("vehicles"); setSelectedSubCategory("bike"); },
+                    },
+                    {
+                      id: "quick_truck",
+                      icon: Truck,
+                      bn: "ট্রাক",
+                      en: "Truck",
+                      active: selectedCategory === "vehicles" && selectedSubCategory === "truck",
+                      onClick: () => { setSelectedCategory("vehicles"); setSelectedSubCategory("truck"); },
+                    },
+                    {
+                      id: "quick_heavy",
+                      icon: Construction,
+                      bn: "হেভি ইকুইপ.",
+                      en: "Heavy Equip.",
+                      active: selectedCategory === "vehicles" && selectedSubCategory === "other_heavy_equipment",
+                      onClick: () => { setSelectedCategory("vehicles"); setSelectedSubCategory("other_heavy_equipment"); },
+                    },
+                  ] as const).map((item) => {
+                    const ItemIcon = item.icon;
+                    return (
+                      <button
+                        key={item.id}
+                        onClick={() => {
+                          item.onClick();
+                          try {
+                            logAnalyticsEvent("select_category", { category: item.id });
+                          } catch (_) {}
+                        }}
+                        className={`shrink-0 flex flex-col items-center justify-center gap-1 w-16 py-2 rounded-2xl border transition-all duration-150 cursor-pointer ${
+                          item.active
+                            ? "bg-amber-500 border-amber-500 text-slate-950 shadow-md scale-[0.98]"
+                            : "bg-white dark:bg-slate-900 border-slate-150 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:border-amber-400/50"
+                        }`}
+                      >
+                        <ItemIcon className="w-5 h-5" />
+                        <span className="text-[10px] font-extrabold leading-none whitespace-nowrap">
+                          {language === "bn" ? item.bn : item.en}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
 
-          <div className="grid grid-cols-2 gap-2.5 mb-2.5 animate-[slide-down_0.2s_ease-out]">
-            <button
-              onClick={() => {
-                const nextCat = selectedCategory === "vehicles" ? "all" : "vehicles";
-                setSelectedCategory(nextCat);
-                setSelectedSubCategory("all");
-              }}
-              className={`relative overflow-hidden rounded-xl p-2 flex items-center gap-2 text-left cursor-pointer bg-white dark:bg-gradient-to-br dark:from-slate-900 dark:to-slate-800 shadow-sm transition-all duration-150 ${
-                selectedCategory === "vehicles"
-                  ? "ring-2 ring-amber-500 scale-[0.98]"
-                  : "ring-1 ring-amber-200/60 dark:ring-slate-700"
-              }`}
-            >
-              <img
-                src={vehicleCardImg}
-                alt={language === "bn" ? "গাড়ি,এক্সাভেটর" : "Vehicle Buy & Sell"}
-                className="w-14 h-14 object-contain shrink-0"
-              />
-              <span className="font-black text-sm text-amber-800 dark:text-amber-300 leading-tight truncate">
-                {language === "bn" ? "গাড়ি,এক্সাভেটর" : "Vehicle Buy & Sell"}
-              </span>
-              {selectedCategory === "vehicles" && (
-                <span className="absolute top-1.5 right-1.5 w-5 h-5 rounded-full bg-amber-500 text-white flex items-center justify-center shadow-md z-10">
-                  <Check className="w-3 h-3" />
-                </span>
-              )}
-            </button>
-
-            <button
-              onClick={() => {
-                const nextCat = selectedCategory === "spare_parts" ? "all" : "spare_parts";
-                setSelectedCategory(nextCat);
-                setSelectedSubCategory("all");
-              }}
-              className={`relative overflow-hidden rounded-xl p-2 flex items-center gap-2 text-left cursor-pointer bg-white dark:bg-gradient-to-br dark:from-slate-900 dark:to-slate-800 shadow-sm transition-all duration-150 ${
-                selectedCategory === "spare_parts"
-                  ? "ring-2 ring-sky-500 scale-[0.98]"
-                  : "ring-1 ring-sky-200/60 dark:ring-slate-700"
-              }`}
-            >
-              <img
-                src={partsCardImg}
-                alt={language === "bn" ? "গাড়ির পাট" : "Vehicle Parts"}
-                className="w-14 h-14 object-contain shrink-0"
-              />
-              <span className="font-black text-sm text-sky-800 dark:text-sky-300 leading-tight truncate">
-                {language === "bn" ? "গাড়ির পাট" : "Vehicle Parts"}
-              </span>
-              {selectedCategory === "spare_parts" && (
-                <span className="absolute top-1.5 right-1.5 w-5 h-5 rounded-full bg-sky-600 text-white flex items-center justify-center shadow-md z-10">
-                  <Check className="w-3 h-3" />
-                </span>
-              )}
-            </button>
-          </div>
 
                 {/* 🛠️ Modern Filters & Dynamic Sorting Panel (Revealed dynamically!) */}
                 {showFilters && (

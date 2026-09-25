@@ -30,7 +30,10 @@ export const isItemVehicle = (item: PartListing): boolean => {
 
   // Fallback check on subcategory
   if (item.subCategory) {
-    const isVehicleSub = ["excavator", "crane", "car", "bus", "bulldozer", "forklift", "other_heavy_equipment"].includes(item.subCategory);
+    // 🔧 Added "truck", "bike", "microbus" -- these listings had no
+    // subcategory that matched here at all before, so they fell through to
+    // the keyword guess below and could get misclassified.
+    const isVehicleSub = ["excavator", "crane", "car", "bus", "truck", "bike", "microbus", "bulldozer", "forklift", "other_heavy_equipment"].includes(item.subCategory);
     if (isVehicleSub) return true;
     const isPartsSub = ["engine_part", "light", "pump", "controller", "drive_motor", "other_part"].includes(item.subCategory);
     if (isPartsSub) return false;
@@ -38,7 +41,7 @@ export const isItemVehicle = (item: PartListing): boolean => {
 
   // Default fallback check based on keywords in title
   const titleLower = (item.title || "").toLowerCase();
-  const vehicleKeywords = ["excavator", "crane", "bulldozer", "forklift", "loader", "car", "bus", "truck", "pickup", "hilux", "toyota", "komatsu", "crawler", "মেশিন", "গাড়ি", "এক্সকাভেটর", "এক্সক্যাভেটর", "ক্রেন", "বুলডোজার", "বাস"];
+  const vehicleKeywords = ["excavator", "crane", "bulldozer", "forklift", "loader", "car", "bus", "truck", "pickup", "hilux", "toyota", "komatsu", "crawler", "bike", "motorcycle", "microbus", "hiace", "noah", "মেশিন", "গাড়ি", "এক্সকাভেটর", "এক্সক্যাভেটর", "ক্রেন", "বুলডোজার", "বাস", "ট্রাক", "বাইক", "মোটরসাইকেল", "মাইক্রোবাস"];
   if (vehicleKeywords.some(keyword => titleLower.includes(keyword))) {
     // Make sure it's not a spare part of a vehicle
     const partKeywords = ["part", "pump", "chain", "pulley", "hook", "motor", "engine", "piston", "filter", "পার্ট", "পাম্প", "চেইন", "ইঞ্জিন", "মোটর"];
@@ -73,12 +76,31 @@ export const matchesSubCategoryFilter = (item: PartListing, subCategory: string)
     matchesText = textToSearch.includes("car") || textToSearch.includes("কার") || textToSearch.includes("toyota") || textToSearch.includes("jeep") || textToSearch.includes("pickup") || textToSearch.includes("noah") || textToSearch.includes("hilux");
   } else if (subCategory === "bus") {
     matchesText = textToSearch.includes("bus") || textToSearch.includes("বাস");
+  } else if (subCategory === "truck") {
+    // 🔧 New -- "ট্রাক" quick-filter icon (see MarketplaceTab.tsx). No
+    // listing anywhere set subCategory:"truck" before this, since the icon
+    // (and this branch) didn't exist yet.
+    matchesText = textToSearch.includes("truck") || textToSearch.includes("ট্রাক") || textToSearch.includes("lorry") || textToSearch.includes("লরি") || textToSearch.includes("কাভার্ড ভ্যান") || textToSearch.includes("covered van");
+  } else if (subCategory === "bike") {
+    // 🔧 New -- "বাইক" quick-filter icon.
+    matchesText = textToSearch.includes("bike") || textToSearch.includes("বাইক") || textToSearch.includes("motorcycle") || textToSearch.includes("মোটরসাইকেল") || textToSearch.includes("scooter") || textToSearch.includes("স্কুটার") || textToSearch.includes("yamaha") || textToSearch.includes("bajaj") || textToSearch.includes("cc ");
+  } else if (subCategory === "microbus") {
+    matchesText = textToSearch.includes("microbus") || textToSearch.includes("মাইক্রোবাস") || textToSearch.includes("hiace") || textToSearch.includes("হাইয়েস");
   } else if (subCategory === "bulldozer") {
     matchesText = textToSearch.includes("bulldozer") || textToSearch.includes("বুলডোজার") || textToSearch.includes("dozer");
   } else if (subCategory === "forklift") {
     matchesText = textToSearch.includes("forklift") || textToSearch.includes("ফর্কলিফ্ট") || textToSearch.includes("forkclip");
   } else if (subCategory === "other_heavy_equipment") {
-    matchesText = textToSearch.includes("heavy") || textToSearch.includes("loader") || textToSearch.includes("পল্লক") || textToSearch.includes("pulle");
+    // 🔧 Broadened -- this is now also the target of the top-level "হেভি
+    // ইকুইপমেন্ট" quick-filter icon, which is meant to surface every kind
+    // of heavy machinery at once (excavator/crane/bulldozer/forklift
+    // included), not just whatever didn't fit those specific sub-filters.
+    matchesText = textToSearch.includes("heavy") || textToSearch.includes("loader") || textToSearch.includes("পল্লক") || textToSearch.includes("pulle")
+      || textToSearch.includes("excavator") || textToSearch.includes("এক্সক্যাভেটর") || textToSearch.includes("এক্সকাভেটর")
+      || textToSearch.includes("crane") || textToSearch.includes("ক্রেন")
+      || textToSearch.includes("bulldozer") || textToSearch.includes("বুলডোজার") || textToSearch.includes("dozer")
+      || textToSearch.includes("forklift") || textToSearch.includes("ফর্কলিফ্ট")
+      || textToSearch.includes("ভারী যন্ত্রপাতি") || textToSearch.includes("রোলার") || textToSearch.includes("compactor");
   } else if (subCategory === "engine_part") {
     matchesText = textToSearch.includes("engine") || textToSearch.includes("ইঞ্জিন") || textToSearch.includes("cylinder") || textToSearch.includes("sleeve") || textToSearch.includes("gear") || textToSearch.includes("transmission") || textToSearch.includes("গিয়ার") || textToSearch.includes("chain") || textToSearch.includes("চেইন");
   } else if (subCategory === "light") {
