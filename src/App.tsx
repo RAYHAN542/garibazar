@@ -1252,43 +1252,44 @@ export default function App() {
     }
   };
 
-  // 3. Real-time Purchases Sync (capped to 20 documents)
+  // 3. Purchases Sync — Supabase (`purchases` table: buyer_id + jsonb `data`
+  // column), matching ListingDetailModal.tsx's write-side migration
+  // (2026-09-25). Was a Firestore onSnapshot listener; now a one-time fetch
+  // plus a realtime subscription so new purchases still show up live.
   useEffect(() => {
-    if (!user) {
+    if (!user?.uid) {
       setFirebasePurchases([]);
       setMorePurchases([]);
-      setLastPurchasesDoc(null);
       setHasMorePurchases(false);
       return;
     }
-
-    const q = query(collection(db, "purchases"), where("buyerId", "==", user.uid), orderBy("createdAt", "desc"), limit(20));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      if (snapshot.empty) {
-        setFirebasePurchases([]);
-        setLastPurchasesDoc(null);
-        setHasMorePurchases(false);
-      } else {
-        const firestoreList: any[] = [];
-        snapshot.forEach((doc) => {
-          const data = doc.data();
-          if (data.buyerId === user.uid || data.sellerContact === userMetadata?.phoneNumber) {
-            firestoreList.push({ id: doc.id, ...data });
-          }
-        });
-
-        setFirebasePurchases(firestoreList);
-        setLastPurchasesDoc(snapshot.docs[snapshot.docs.length - 1]);
-        setHasMorePurchases(snapshot.docs.length === 20);
+    let active = true;
+    const fetchPurchases = async () => {
+      const { data, error } = await supabase
+        .from("purchases")
+        .select("id,data,created_at")
+        .eq("buyer_id", user.uid)
+        .order("created_at", { ascending: false })
+        .limit(20);
+      if (!active) return;
+      if (error) {
+        console.warn("Failed to fetch purchases:", error);
+        return;
       }
-    }, (err) => {
-      console.warn("Using offline purchases:", err);
-    });
-
-    return () => {
-      unsubscribe();
+      const list = (data || []).map((row: any) => ({ id: row.id, ...row.data }));
+      setFirebasePurchases(list);
+      setHasMorePurchases((data || []).length === 20);
     };
-  }, [user, userMetadata?.phoneNumber]);
+    fetchPurchases();
+    const channel = supabase
+      .channel(`purchases-${user.uid}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "purchases", filter: `buyer_id=eq.${user.uid}` }, fetchPurchases)
+      .subscribe();
+    return () => {
+      active = false;
+      supabase.removeChannel(channel);
+    };
+  }, [user?.uid]);
 
   // 3b. Merge real-time, loaded-more, and local purchases
   useEffect(() => {
@@ -1337,43 +1338,33 @@ export default function App() {
     };
   }, [firebasePurchases, morePurchases]);
 
-  // 3c. Purchases Pagination Loader helper
+  // 3c. Purchases Pagination Loader helper — Supabase offset-based (no
+  // Firestore document cursor anymore, so this just fetches the next window
+  // past what's already loaded).
   const handleLoadMorePurchases = async () => {
-    if (!user || !lastPurchasesDoc || loadingMorePurchases) return;
+    if (!user?.uid || loadingMorePurchases) return;
     setLoadingMorePurchases(true);
     try {
-      const q = query(
-        collection(db, "purchases"),
-        where("buyerId", "==", user.uid),
-        orderBy("createdAt", "desc"),
-        startAfter(lastPurchasesDoc),
-        limit(20)
-      );
-      const snapshot = await withTimeout(getDocs(q), 12000, "loadMorePurchases");
-      if (snapshot.empty) {
-        setHasMorePurchases(false);
-      } else {
-        const nextList: any[] = [];
-        snapshot.forEach((doc) => {
-          const data = doc.data();
-          if (data.buyerId === user.uid || data.sellerContact === userMetadata?.phoneNumber) {
-            nextList.push({ id: doc.id, ...data });
+      const currentCount = firebasePurchases.length + morePurchases.length;
+      const { data, error } = await supabase
+        .from("purchases")
+        .select("id,data,created_at")
+        .eq("buyer_id", user.uid)
+        .order("created_at", { ascending: false })
+        .range(currentCount, currentCount + 19);
+      if (error) throw error;
+      const nextList = (data || []).map((row: any) => ({ id: row.id, ...row.data }));
+
+      setMorePurchases(prev => {
+        const combined = [...prev];
+        nextList.forEach(item => {
+          if (!combined.some(existing => existing.id === item.id)) {
+            combined.push(item);
           }
         });
-
-        setMorePurchases(prev => {
-          const combined = [...prev];
-          nextList.forEach(item => {
-            if (!combined.some(existing => existing.id === item.id)) {
-              combined.push(item);
-            }
-          });
-          return combined;
-        });
-
-        setLastPurchasesDoc(snapshot.docs[snapshot.docs.length - 1]);
-        setHasMorePurchases(snapshot.docs.length === 20);
-      }
+        return combined;
+      });
+      setHasMorePurchases(nextList.length === 20);
     } catch (err) {
       console.warn("Failed to load more purchases:", err);
     } finally {
