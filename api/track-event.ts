@@ -1,6 +1,3 @@
-import { initializeApp, getApps, cert } from "firebase-admin/app";
-import { getFirestore, FieldValue } from "firebase-admin/firestore";
-import { getAuth } from "firebase-admin/auth";
 import { createClient } from "@supabase/supabase-js";
 import { applyCors } from "./_lib/cors.js";
 import { checkAndBumpRateLimit } from "./_lib/rateLimit.js";
@@ -41,26 +38,18 @@ function isRateLimited(ip: string): boolean {
   return false;
 }
 
-if (!getApps().length) {
-  const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
-  if (serviceAccountJson) {
-    try {
-      const serviceAccount = JSON.parse(serviceAccountJson);
-      initializeApp({ credential: cert(serviceAccount) });
-    } catch (e) {
-      console.error("Failed to parse FIREBASE_SERVICE_ACCOUNT_KEY:", e);
-    }
-  }
-}
-
-// 🔧 Firebase -> Supabase migration: site-wide visit/login/signup/install
-// analytics (this file's main path) now writes to Supabase's `site_visits`
-// table instead of Firestore. `analytics_daily` (the rollup Admin Panel reads)
-// updates itself automatically via a DB trigger (`trg_bump_analytics_daily`)
-// on every site_visits insert -- no extra write needed here for that path.
-// Per-listing view/click/save/unsave (handleListingInteraction below) is
-// UNCHANGED and still uses Firestore -- that part isn't broken and is out of
-// scope for this fix.
+// 🔧 (2026-09-26) Migrated off Firestore entirely -- this was the last piece
+// of firebase-admin left in this file (per-listing view/click/save/unsave).
+// Site-wide visit/login/signup/install analytics moved to Supabase last
+// week; those per-listing counters were explicitly left as "out of scope"
+// at the time and kept writing to Firestore, which meant every view/click/
+// save on a listing created after the Supabase migration silently did
+// nothing (the listing document those Firestore calls targeted never
+// existed). Now both paths use the same Supabase admin client, and the
+// atomic counter/save-toggle logic lives in two Postgres functions
+// (bump_listing_counter, toggle_listing_save -- see the SQL migration)
+// instead of a Firestore transaction, for the same "no double-count under
+// concurrent calls" guarantee.
 const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const supabaseAdmin =
@@ -70,30 +59,41 @@ const supabaseAdmin =
       })
     : null;
 
-// ---------------------------------------------------------------------------
-// 🔧 Was: src/utils/counters.ts called POST /api/track-listing-interaction
-// for every listing view/click/save -- but that file never actually existed
-// (Vercel's Hobby-plan 12-function cap was already maxed out, so a genuinely
-// new file was never added here). firestore.rules was ALSO already updated
-// to block the old direct-client-write fallback for views/clicks/dailyStats/
-// savedCount. Net effect: every view, every "contact seller" click, and
-// every save has been silently failing in production since that refactor --
-// the 404 (or permission-denied) gets swallowed by counters.ts's own
-// try/catch, so nothing ever surfaced as a visible error, but listing view
-// counts, click counts, and the analytics graph have all been stuck at
-// whatever they were before this shipped.
-//
-// Fix: this same endpoint (already one of the 12) now handles BOTH the
-// existing site-wide visit/login/signup/install logging above AND
-// per-listing view/click/save/unsave, distinguished by whether the request
-// body includes a listingId. Kept in one file specifically to stay within
-// the function-count limit -- see the phone.ts merge comment for the same
-// constraint hitting auth earlier.
-// ---------------------------------------------------------------------------
 const LISTING_INTERACTION_TYPES = new Set(["view", "click", "save", "unsave"]);
+const UUID_RE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
 
-async function handleListingInteraction(req: any, res: any, listingId: string, type: string) {
-  const db = getFirestore();
+async function resolveListingId(listingId: string): Promise<string | null> {
+  if (!supabaseAdmin) return null;
+  if (UUID_RE.test(listingId)) return listingId;
+  // Old Firestore-era share links / cached clients may still send a
+  // non-UUID id -- resolve it via the legacy_firestore_id column the
+  // migration preserved (same pattern as get-seller-contact.ts / draw.ts).
+  const { data, error } = await supabaseAdmin
+    .from("listings")
+    .select("id")
+    .eq("legacy_firestore_id", listingId)
+    .maybeSingle();
+  if (error) {
+    console.error("resolveListingId error:", error.message);
+    return null;
+  }
+  return data?.id || null;
+}
+
+async function handleListingInteraction(req: any, res: any, rawListingId: string, type: string) {
+  if (!supabaseAdmin) {
+    res.status(200).json({ ok: false });
+    return;
+  }
+
+  const listingId = await resolveListingId(rawListingId);
+  if (!listingId) {
+    // Unknown listing (deleted, bad id, or never migrated) -- not an error
+    // worth surfacing to the visitor, just don't count anything.
+    res.status(200).json({ ok: true, counted: false });
+    return;
+  }
+
   const ip = getClientIp(req);
   const todayKey = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
 
@@ -104,33 +104,17 @@ async function handleListingInteraction(req: any, res: any, listingId: string, t
     const allowed = await checkAndBumpRateLimit(`view_${listingId}_${ip}`, 10 * 60 * 1000, 1);
     if (!allowed) return res.status(200).json({ ok: true, counted: false });
 
-    await db.doc(`listings/${listingId}`).set(
-      { views: FieldValue.increment(1), [`dailyStats.${todayKey}.views`]: FieldValue.increment(1) },
-      { merge: true }
-    );
-    return res.status(200).json({ ok: true, counted: true });
+    const { error } = await supabaseAdmin.rpc("bump_listing_counter", { p_listing_id: listingId, p_counter: "views" });
+    if (error) console.error("bump_listing_counter(views) error:", error.message);
+    return res.status(200).json({ ok: true, counted: !error });
   }
 
-  // click/save/unsave all require a real signed-in user. Try the current
-  // login system (Supabase) first, then fall back to a legacy Firebase ID
-  // token -- same dual-auth pattern as get-seller-contact.ts and api/draw.ts.
-  // 🔧 Before, this ONLY checked Firebase, which always throws on a Supabase
-  // access token (wrong signer) -- so "Show Number" clicks and Save/Unsave
-  // silently failed with a 401 for every Supabase-authenticated user (i.e.
-  // everyone who has logged in since the Supabase migration), even though
-  // the button appeared to do nothing rather than show a visible error.
+  // click/save/unsave all require a real signed-in user, via Supabase auth.
   const authHeader = req.headers.authorization || "";
   const idToken = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
   if (!idToken) return res.status(401).json({ error: "লগইন করা প্রয়োজন।" });
-  let uid: string | null = await verifySupabaseToken(idToken);
-  if (!uid) {
-    try {
-      const decoded = await getAuth().verifyIdToken(idToken);
-      uid = decoded.uid;
-    } catch {
-      return res.status(401).json({ error: "সেশন মেয়াদোত্তীর্ণ, আবার লগইন করুন।" });
-    }
-  }
+  const uid = await verifySupabaseToken(idToken);
+  if (!uid) return res.status(401).json({ error: "সেশন মেয়াদোত্তীর্ণ, আবার লগইন করুন।" });
 
   if (type === "click") {
     // Once per user per listing per day -- repeatedly tapping "Show Number"
@@ -138,36 +122,25 @@ async function handleListingInteraction(req: any, res: any, listingId: string, t
     const allowed = await checkAndBumpRateLimit(`click_${listingId}_${uid}_${todayKey}`, 24 * 60 * 60 * 1000, 1);
     if (!allowed) return res.status(200).json({ ok: true, counted: false });
 
-    await db.doc(`listings/${listingId}`).set(
-      { clicks: FieldValue.increment(1), [`dailyStats.${todayKey}.clicks`]: FieldValue.increment(1) },
-      { merge: true }
-    );
-    return res.status(200).json({ ok: true, counted: true });
+    const { error } = await supabaseAdmin.rpc("bump_listing_counter", { p_listing_id: listingId, p_counter: "clicks" });
+    if (error) console.error("bump_listing_counter(clicks) error:", error.message);
+    return res.status(200).json({ ok: true, counted: !error });
   }
 
-  // save / unsave: the savedBy/{uid} marker doc is the only source of truth
-  // for whether THIS user has this listing saved -- a transaction keeps the
-  // marker and the savedCount tally consistent even under concurrent calls,
-  // and makes repeated save-save or unsave-unsave calls safe no-ops instead
-  // of double-counting.
-  const listingRef = db.doc(`listings/${listingId}`);
-  const markerRef = db.doc(`listings/${listingId}/savedBy/${uid}`);
-  const counted = await db.runTransaction(async (tx) => {
-    const markerSnap = await tx.get(markerRef);
-    if (type === "save") {
-      if (markerSnap.exists) return false; // already saved, no-op
-      tx.set(markerRef, { savedAt: FieldValue.serverTimestamp() });
-      tx.set(listingRef, { savedCount: FieldValue.increment(1) }, { merge: true });
-      return true;
-    } else {
-      // unsave
-      if (!markerSnap.exists) return false; // wasn't saved, no-op
-      tx.delete(markerRef);
-      tx.set(listingRef, { savedCount: FieldValue.increment(-1) }, { merge: true });
-      return true;
-    }
+  // save / unsave: toggle_listing_save is idempotent (a Postgres unique
+  // constraint on listing_saves(listing_id, uid) backs it), so a repeated
+  // save-save or unsave-unsave call is a safe no-op instead of
+  // double-counting -- same guarantee the old Firestore transaction gave.
+  const { data: changed, error } = await supabaseAdmin.rpc("toggle_listing_save", {
+    p_listing_id: listingId,
+    p_uid: uid,
+    p_save: type === "save",
   });
-  return res.status(200).json({ ok: true, counted });
+  if (error) {
+    console.error("toggle_listing_save error:", error.message);
+    return res.status(200).json({ ok: true, counted: false });
+  }
+  return res.status(200).json({ ok: true, counted: !!changed });
 }
 
 const ALLOWED_TYPES = new Set(["visit", "login", "signup", "install"]);
@@ -243,18 +216,12 @@ export default async function handler(req: any, res: any) {
   try {
     const body = typeof req.body === "string" ? JSON.parse(req.body || "{}") : (req.body || {});
 
-    // New: per-listing view/click/save/unsave, routed to its own handler.
-    // This path still needs Firestore (unchanged), so only here do we
-    // require the Firebase Admin SDK to have initialized successfully.
+    // Per-listing view/click/save/unsave, routed to its own handler.
     if (typeof body?.listingId === "string" && LISTING_INTERACTION_TYPES.has(body?.type)) {
-      if (!getApps().length) {
-        res.status(200).json({ ok: false });
-        return;
-      }
       return await handleListingInteraction(req, res, body.listingId, body.type);
     }
 
-    // Site-wide visit/login/signup/install analytics — Supabase-only from here on.
+    // Site-wide visit/login/signup/install analytics.
     if (!supabaseAdmin) {
       // Analytics is best-effort; never break the app over a missing config.
       res.status(200).json({ ok: false });
