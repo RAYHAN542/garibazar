@@ -1,14 +1,21 @@
 import { useEffect, useState } from "react";
 import { Capacitor } from "@capacitor/core";
-import { doc, getDoc } from "firebase/firestore";
-import { db } from "../firebase";
+import { supabase } from "../supabase";
 import { Download, X } from "lucide-react";
 import { SupportedLanguage } from "../types";
 
 // Local-bundle মোডে (capacitor.config.ts-এ server.url নেই) অ্যাপের HTML/JS
 // আর ওয়েবসাইটের নতুন ডিপ্লয়ের সাথে সাথে অটো আপডেট হয় না -- নতুন ফিচার/ফিক্স
-// পেতে ইউজারকে নতুন APK ইনস্টল করতে হয়। এই ব্যানারটা Firestore-এর
-// app_config/version ডকুমেন্ট চেক করে জানায় নতুন ভার্সন থাকলে।
+// পেতে ইউজারকে নতুন APK ইনস্টল করতে হয়। এই ব্যানারটা app_config টেবিলের
+// "version" row চেক করে জানায় নতুন ভার্সন থাকলে।
+//
+// 🔧 (2026-09-26) Migrated off Firestore -- app_config already existed as a
+// Supabase table (key/value, key="version"), but its stored value shape
+// ({latest, forceUpdate}) didn't match what this component actually reads
+// (latestVersionCode/apkUrl) and nothing else in the codebase referenced
+// those two fields either -- it was a stale, disconnected placeholder.
+// Restructured the row's value to what this banner needs (see the
+// accompanying SQL) and switched the read here from Firestore to Supabase.
 //
 // ⚠️ Play Store পলিসি (audit A3): সরাসরি APK ডাউনলোড লিংক দেখানো
 // "Device and Network Abuse" পলিসি ভাঙে -- Play নিজে থেকে সব ইউজারকে আপডেট
@@ -19,11 +26,11 @@ import { SupportedLanguage } from "../types";
 // যাবে -- কোড পাল্টানোর দরকার নেই।
 const IS_PLAY_STORE_BUILD = import.meta.env.VITE_PLAY_STORE_BUILD === "true";
 //
-// ম্যানুয়াল সেটআপ (একবারই করতে হবে): Firestore Console-এ গিয়ে
-//   app_config/version  ডকুমেন্ট তৈরি করো, ফিল্ড:
+// ম্যানুয়াল সেটআপ (একবারই করতে হবে): Supabase-এ app_config টেবিলে
+//   key = "version"  এর value জেসনে থাকতে হবে:
 //     latestVersionCode  (number)  -- android/app/build.gradle-এর versionCode-এর সাথে মিলিয়ে
 //     apkUrl             (string)  -- নতুন APK-এর ডাউনলোড লিংক
-//   নতুন APK রিলিজ দিলেই এই ডকুমেন্টের latestVersionCode আপডেট করে দিও।
+//   নতুন APK রিলিজ দিলেই এই row-এর latestVersionCode আপডেট করে দিও।
 interface UpdateBannerProps {
   language: SupportedLanguage;
 }
@@ -45,14 +52,14 @@ export default function UpdateBanner({ language }: UpdateBannerProps) {
     // fire-and-forget -- ব্যর্থ হলেও চুপচাপ কিছু না দেখিয়ে থেমে যায়।
     (async () => {
       try {
-        const [{ App: CapacitorApp }, versionSnap] = await Promise.all([
+        const [{ App: CapacitorApp }, configResult] = await Promise.all([
           import("@capacitor/app"),
-          getDoc(doc(db, "app_config", "version")),
+          supabase.from("app_config").select("value").eq("key", "version").maybeSingle(),
         ]);
 
-        if (!versionSnap.exists()) return;
-        const data = versionSnap.data() as { latestVersionCode?: number; apkUrl?: string };
-        if (!data.latestVersionCode || !data.apkUrl) return;
+        if (configResult.error || !configResult.data) return;
+        const data = configResult.data.value as { latestVersionCode?: number; apkUrl?: string };
+        if (!data?.latestVersionCode || !data?.apkUrl) return;
 
         const info = await CapacitorApp.getInfo();
         const installedBuild = parseInt(info.build, 10);
