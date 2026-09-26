@@ -1,45 +1,50 @@
-import { getFirestore, FieldValue } from "firebase-admin/firestore";
+import { createClient } from "@supabase/supabase-js";
 
 // ---------------------------------------------------------------------------
-// Shared rate limiter, backed by a Firestore transaction instead of an
-// in-memory Map.
-//
-// Why: a `new Map()` at module scope only persists for the lifetime of ONE
-// warm serverless instance. Vercel can and does spin up several concurrent
-// instances for the same function under load (every cold start gets its own
-// empty Map) -- so an in-memory "10 requests/minute per IP" limit is really
-// "10 requests/minute PER INSTANCE", and a script sending requests fast
-// enough to trigger concurrent cold starts sails past it entirely. This was
-// the case for phone-signup.ts and phone-login.ts (account-creation /
-// brute-force surfaces -- exactly where a bypassable limit matters most)
-// before this fix; get-seller-contact.ts and submit-support-ticket.ts
-// already used this Firestore-transaction pattern inline, so this just
-// factors that same durable pattern out into one shared place both old and
-// new callers use, instead of four separate copies of the same logic.
+// 🔧 (2026-09-25) Migrated off Firestore -- this was the last thing still
+// pulling firebase-admin into several API routes (get-seller-contact, draw,
+// submit-support-ticket/account-actions, track-event) purely for this one
+// shared helper, well after their actual auth/data logic had already moved
+// to Supabase. Now backed by Supabase's `rate_limits` table via the
+// check_and_bump_rate_limit() Postgres function, which does the same
+// atomic "read window, reset-or-increment, write back" as a single
+// SECURITY DEFINER upsert -- no client-side read-then-write race, same
+// guarantee the old Firestore transaction gave.
 // ---------------------------------------------------------------------------
+const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+let supabaseAdmin: ReturnType<typeof createClient> | null = null;
+function getSupabaseAdmin() {
+  if (!supabaseAdmin) {
+    if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+      throw new Error("Supabase server credentials are not configured");
+    }
+    supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+  }
+  return supabaseAdmin;
+}
+
 export async function checkAndBumpRateLimit(
   key: string,
   windowMs: number,
   max: number
 ): Promise<boolean> {
-  const db = getFirestore();
-  const ref = db.collection("rate_limits").doc(key);
-  return db.runTransaction(async (tx) => {
-    const snap = await tx.get(ref);
-    const now = Date.now();
-    if (!snap.exists) {
-      tx.set(ref, { count: 1, windowStart: now });
-      return true;
-    }
-    const data = snap.data() as { count: number; windowStart: number };
-    if (now - data.windowStart > windowMs) {
-      tx.set(ref, { count: 1, windowStart: now });
-      return true;
-    }
-    if (data.count >= max) return false;
-    tx.update(ref, { count: FieldValue.increment(1) });
-    return true;
+  const { data, error } = await getSupabaseAdmin().rpc("check_and_bump_rate_limit", {
+    p_key: key,
+    p_window_ms: windowMs,
+    p_max_count: max,
   });
+  if (error) {
+    // Fail open rather than block real users if the rate limiter itself is
+    // down -- same posture the old Firestore version had (an unhandled
+    // exception there would have surfaced as a 500, not a silent block).
+    console.error("checkAndBumpRateLimit error:", error);
+    return true;
+  }
+  return !!data;
 }
 
 export function getClientIp(req: any): string {
