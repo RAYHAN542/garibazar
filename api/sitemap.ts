@@ -1,17 +1,4 @@
-import { initializeApp, getApps, cert } from "firebase-admin/app";
-import { getFirestore } from "firebase-admin/firestore";
-
-if (!getApps().length) {
-  const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
-  if (serviceAccountJson) {
-    try {
-      const serviceAccount = JSON.parse(serviceAccountJson);
-      initializeApp({ credential: cert(serviceAccount) });
-    } catch (e) {
-      console.error("Failed to parse FIREBASE_SERVICE_ACCOUNT_KEY:", e);
-    }
-  }
-}
+import { createClient } from "@supabase/supabase-js";
 
 const SITE_URL = "https://garibazar.shop";
 
@@ -23,6 +10,15 @@ function escapeXml(str: string) {
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&apos;");
 }
+
+// 🔧 (2026-09-26) Migrated off Firestore -- listings have lived in Supabase's
+// `listings` table since the migration (see src/utils/listingsApi.ts), so
+// the old db.collection("listings") query here always came back empty for
+// anything posted after that point: every new listing has been silently
+// missing from sitemap.xml since then, so Google was never seeing them.
+// Now reads the same table the rest of the app already reads from.
+const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 // Builds a fresh sitemap.xml on every request (cached at the edge for an hour)
 // so newly posted listings show up for Google without a manual redeploy.
@@ -38,34 +34,40 @@ export default async function handler(req: any, res: any) {
   let listingUrls: { loc: string; changefreq: string; priority: string; lastmod?: string }[] = [];
 
   try {
-    if (getApps().length) {
-      const db = getFirestore();
-      const snap = await db
-        .collection("listings")
-        .orderBy("createdAt", "desc")
-        .limit(5000)
-        .get();
+    if (SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY) {
+      const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+        auth: { autoRefreshToken: false, persistSession: false },
+      });
 
-      listingUrls = snap.docs
-        .filter((doc) => {
-          const d = doc.data() as any;
-          return d.status !== "deleted" && d.status !== "sold" && d.status !== "removed";
-        })
-        .map((doc) => {
-          const d = doc.data() as any;
-          let lastmod: string | undefined;
-          try {
-            if (d.createdAt?.toDate) lastmod = d.createdAt.toDate().toISOString().slice(0, 10);
-          } catch {
-            // ignore
-          }
-          return {
-            loc: `${SITE_URL}/l/${doc.id}`,
-            changefreq: "weekly",
-            priority: "0.8",
-            lastmod,
-          };
-        });
+      // is_sold can be null on older rows (never explicitly set) as well as
+      // false -- .eq("is_sold", false) alone would silently exclude every
+      // null row too (SQL: NULL = false is NULL, not true), so match both.
+      const { data, error } = await supabase
+        .from("listings")
+        .select("id, created_at")
+        .eq("is_deleted", false)
+        .or("is_sold.is.null,is_sold.eq.false")
+        .order("created_at", { ascending: false })
+        .limit(5000);
+
+      if (error) throw error;
+
+      listingUrls = (data || []).map((row: any) => {
+        let lastmod: string | undefined;
+        try {
+          if (row.created_at) lastmod = new Date(row.created_at).toISOString().slice(0, 10);
+        } catch {
+          // ignore
+        }
+        return {
+          loc: `${SITE_URL}/l/${row.id}`,
+          changefreq: "weekly",
+          priority: "0.8",
+          lastmod,
+        };
+      });
+    } else {
+      console.error("[sitemap] Missing Supabase env vars -- serving static URLs only.");
     }
   } catch (e) {
     console.error("sitemap generation error:", e);
