@@ -36,9 +36,23 @@ export function AdsterraBanner({ adKey, width, height }: AdsterraBannerProps) {
     };
   }, [adKey, width, height]);
 
+  // 🔧 (2026-09-26) আগে এই wrapper-এর background ছিল bg-slate-950, ঠিক
+  // modal-এর উপরের ডার্ক হেডারের মতোই -- Adsterra যখন এই স্লটে অ্যাড fill
+  // করেনি (নতুন ইউনিট, fill শুরু হতে সময় লাগে), তখন খালি জায়গাটা
+  // ব্যাকগ্রাউন্ডের সাথে মিশে গিয়ে সম্পূর্ণ অদৃশ্য হয়ে যাচ্ছিল -- মালিক
+  // ভাবছিলেন কোডই কাজ করছে না। এখন হালকা dashed বর্ডার + "বিজ্ঞাপন" লেবেল
+  // যুক্ত করা হলো, যাতে খালি অবস্থায়ও স্লটটা আলাদা করে দেখা যায়, আর অ্যাড
+  // fill হলে লেবেলটা ছোট আর অপ্রতুল থাকে (অ্যাড নিজেই মূল ফোকাস)।
   return (
-    <div className="w-full flex justify-center bg-slate-950 py-1.5">
-      <div ref={containerRef} style={{ width, height }} />
+    <div className="w-full flex flex-col items-center bg-slate-900 py-1.5 gap-1">
+      <span className="text-[9px] uppercase tracking-widest text-slate-500 font-bold">
+        বিজ্ঞাপন
+      </span>
+      <div
+        ref={containerRef}
+        style={{ width, height }}
+        className="border border-dashed border-slate-700 flex items-center justify-center"
+      />
     </div>
   );
 }
