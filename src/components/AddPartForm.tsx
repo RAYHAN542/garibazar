@@ -132,6 +132,13 @@ const detectLocationFromText = (text: string): string => {
 // listingFilters.ts-এর matchesSubCategoryFilter-এ যে একই কীওয়ার্ড ব্যবহার হয়
 // সেগুলো দিয়েই বিবরণ থেকে সঠিক sub-category অনুমান করে, যাতে পোস্ট করার
 // সময়েই ঠিকভাবে ট্যাগ হয়ে যায়।
+//
+// 🔧 (2026-09-26, second fix) ডিফল্ট fallback আগে ছিল "other_heavy_equipment"
+// -- কিন্তু অনেক গাড়ির পোস্টে শুধু মডেলের নাম থাকে ("COROLLA 110", "Premio",
+// "Axio"), "car"/"toyota" শব্দ literally থাকে না, তাই ভুলভাবে heavy equipment
+// হিসেবে ট্যাগ হয়ে যেত। Heavy equipment পোস্টে প্রায় সবসময়ই স্পষ্ট শব্দ
+// (excavator/crane/bulldozer) থাকে, কিন্তু সাধারণ গাড়িতে না-ও থাকতে পারে --
+// তাই ডিফল্ট এখন "car" (সংখ্যায় সবচেয়ে বেশি এবং misclassify হলে কম ক্ষতিকর)।
 const detectVehicleSubCategory = (text: string): string => {
   const t = (text || "").toLowerCase();
   if (/excavator|এক্সক্যাভেটর|এক্সকাভেটর/.test(t)) return "excavator";
@@ -142,8 +149,7 @@ const detectVehicleSubCategory = (text: string): string => {
   if (/(^|[^a-z])bus([^a-z]|$)|বাস/.test(t)) return "bus";
   if (/truck|ট্রাক|lorry|লরি|covered van|কাভার্ড ভ্যান/.test(t)) return "truck";
   if (/bike|বাইক|motorcycle|মোটরসাইকেল|scooter|স্কুটার|yamaha|bajaj/.test(t)) return "bike";
-  if (/car|কার|toyota|jeep|pickup|noah|hilux/.test(t)) return "car";
-  return "other_heavy_equipment";
+  return "car";
 };
 
 // বিবরণের প্রথম অংশ থেকে একটা সংক্ষিপ্ত শিরোনাম বানায় (কার্ডে দেখানোর জন্য)।
@@ -225,16 +231,6 @@ export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPromp
       onLoginPrompt();
       return;
     }
-
-    // 🔧 (2026-09-24) আগে এখানে auth.currentUser (Firebase) চেক করে জোর করে
-    // token রিফ্রেশ করা হতো, আর সেটা না পেলে "session expired" দেখিয়ে আটকে
-    // দেওয়া হতো। কিন্তু লগইন এখন সম্পূর্ণ Supabase দিয়ে হয় -- Firebase Auth-এ
-    // কখনো সাইন-ইনই করা হয় না, তাই auth.currentUser সবসময় null ছিল। ফলে
-    // Supabase দিয়ে সত্যিকারের ভ্যালিড সেশনসহ লগইন করা প্রতিটা ইউজারও পোস্ট
-    // করতে গেলেই "session expired" পেত (নিচের submitListing পুরোপুরি Supabase
-    // দিয়েই লেখে, Firebase কখনো ব্যবহারই হয় না)। এই dead চেকটা সরিয়ে ফেলা
-    // হলো -- currentUser (app-এর নিজস্ব Supabase-backed session state) থাকলেই
-    // যথেষ্ট; সত্যিই সেশন invalid হলে insert নিজেই RLS-এ ব্যর্থ হয়ে ধরা পড়বে।
 
     if (!description.trim()) {
       setError(language === "bn" ? "অনুগ্রহ করে বিবরণ লিখুন" : "Please write a description");
