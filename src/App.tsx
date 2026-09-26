@@ -1037,12 +1037,26 @@ export default function App() {
   // only ~40 visitors/day (see the ad-listener fan-out fix from earlier in
   // this migration) -- a real fix for that problem, not just a workaround.
   const INITIAL_FETCH_LIMIT = 20; // restored: 8 caused annoying repeated "Load More" clicks
+  // 🔧 (2026-09-26) Now passes the active category/sub-category as a
+  // server-side filter (see listingsApi.ts's CategoryFilters). Previously
+  // this always pulled the newest 20 of ANY type and everything downstream
+  // (Load More's matching loop, the "no matches yet, keep fetching" effect)
+  // tried to compensate client-side -- which failed badly for a
+  // minority/older sub-category (e.g. "excavator": 72 listings that
+  // happened to be older than the last ~150 posts) since the app had to
+  // scan hundreds of newer, irrelevant listings before finding even one
+  // match. Filtering at the query itself means the very first page is
+  // already full of real matches, however old or rare that category is.
   const fetchInitialListings = async () => {
     setLoading(true);
     setListingsError(null);
     const isProduction = checkIsProduction();
     try {
-      const page = await withTimeout(fetchInitialListingsFromSupabase(INITIAL_FETCH_LIMIT), 12000, "fetchInitialListings");
+      const page = await withTimeout(
+        fetchInitialListingsFromSupabase(INITIAL_FETCH_LIMIT, { category: selectedCategory, subCategory: selectedSubCategory }),
+        12000,
+        "fetchInitialListings"
+      );
 
       if (page.listings.length === 0) {
         if (isProduction) {
@@ -1093,9 +1107,18 @@ export default function App() {
     }
   };
 
+  // 🔧 (2026-09-26) Re-fetch from scratch whenever the category/sub-category
+  // filter changes, resetting pagination -- the query itself is filtered
+  // server-side now, so switching filters needs a fresh first page rather
+  // than continuing to scroll through whatever was already loaded under the
+  // previous filter.
   useEffect(() => {
+    setMoreListings([]);
     fetchInitialListings();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedCategory, selectedSubCategory]);
 
+  useEffect(() => {
     const handleRefresh = () => {
       fetchInitialListings();
     };
@@ -1103,6 +1126,7 @@ export default function App() {
     return () => {
       window.removeEventListener("gari_bazar_refreshed_data", handleRefresh);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // 2b. Merge real-time, loaded-more, and local listings
@@ -1174,77 +1198,32 @@ export default function App() {
     };
   }, [firebaseListings, moreListings, userMetadata?.blockedUids]);
 
-  // 2c. Listings Pagination Loader helper
-  // NOTE: Firestore pagination fetches the next 20 listings of ANY category
-  // (vehicles + parts mixed), but the visible list is filtered client-side by
-  // whichever tab (selectedCategory) the person is on. That mismatch is why
-  // "Load More" used to feel broken -- e.g. on the Parts tab, if only 1 of
-  // the next 20 raw docs happened to be a part, the person would see just 1
-  // new item and have to tap Load More again and again. Fixed by looping:
-  // keep pulling batches until enough *matching* items have been collected
-  // (or there's nothing left to fetch), so one tap reliably surfaces a
-  // meaningful number of new items for whatever filter is active.
+  // 2c. Listings Pagination Loader helper.
+  // 🔧 (2026-09-26) Simplified: since fetchMoreListingsFromSupabase now
+  // filters by category/sub-category server-side, one page already contains
+  // real matches (or genuinely doesn't exist) -- no more need to loop
+  // through up to 6 unfiltered batches hunting for a handful of matches.
   const handleLoadMoreListings = async () => {
     if (!lastListingDoc || loadingMoreListings) return;
     setLoadingMoreListings(true);
-
-    const TARGET_NEW_MATCHES = 6;
-    const MAX_BATCHES = 6; // safety cap: at most 6*20 = 120 extra reads per tap
-
-    const matchesCurrentFilter = (item: PartListing): boolean => {
-      const isVehicle = isItemVehicle(item);
-      let matchesCategory = true;
-      if (selectedCategory === "vehicles") matchesCategory = isVehicle;
-      else if (selectedCategory === "spare_parts") matchesCategory = !isVehicle;
-
-      // Also require the selected sub-category (e.g. Excavator) to match, not
-      // just the parent category - otherwise the loop below would stop after
-      // finding a handful of *any* vehicle, even if none were excavators.
-      const matchesSub = matchesSubCategoryFilter(item, selectedSubCategory);
-
-      return matchesCategory && matchesSub;
-    };
-
     try {
-      let cursor = lastListingDoc;
-      let combinedNew: PartListing[] = [];
-      let matchedCount = 0;
-      let exhausted = false;
-
-      for (let i = 0; i < MAX_BATCHES; i++) {
-        const page = await withTimeout(fetchMoreListingsFromSupabase(cursor as string, 20), 12000, "loadMoreListings");
-
-        if (page.listings.length === 0) {
-          exhausted = true;
-          break;
-        }
-
-        const nextList = page.listings;
-
-        combinedNew = combinedNew.concat(nextList);
-        matchedCount += nextList.filter(matchesCurrentFilter).length;
-        cursor = page.nextCursor;
-
-        if (nextList.length < 20) {
-          exhausted = true;
-          break;
-        }
-        if (matchedCount >= TARGET_NEW_MATCHES) {
-          break;
-        }
-      }
+      const page = await withTimeout(
+        fetchMoreListingsFromSupabase(lastListingDoc, 20, { category: selectedCategory, subCategory: selectedSubCategory }),
+        12000,
+        "loadMoreListings"
+      );
 
       setMoreListings(prev => {
         const combined = [...prev];
-        combinedNew.forEach(item => {
+        page.listings.forEach(item => {
           if (!combined.some(existing => existing.id === item.id)) {
             combined.push(item);
           }
         });
         return combined;
       });
-      setLastListingDoc(cursor);
-      setHasMoreListings(!exhausted);
+      setLastListingDoc(page.nextCursor);
+      setHasMoreListings(page.hasMore);
     } catch (err) {
       console.warn("Failed to load more listings:", err);
     } finally {
@@ -1723,7 +1702,12 @@ export default function App() {
       baseListings = matchedItems;
     }
     
-    // Filter matching categories and geographic cities
+    // Filter matching categories and geographic cities. This is now a
+    // safety net (the fetch itself is already filtered server-side, see
+    // fetchInitialListings/handleLoadMoreListings) that mainly matters for
+    // the boosted ads merged in via listingsWithAds -- those are fetched
+    // separately/unfiltered, so a boosted ad from another category still
+    // gets excluded from the main grid here.
     const finalFiltered = baseListings.filter((item) => {
       // 1. Parent category filter
       let matchesCategory = true;
@@ -1763,18 +1747,11 @@ export default function App() {
   }, [enrichedListings, fuseInstance, debouncedSearchQuery, selectedCategory, selectedSubCategory, selectedCity, sortBy]);
 
   // 7b. Auto-fetch more when a filter/sub-category matches nothing on the
-  // current page but more listings might still exist further back.
-  // Without this, a visitor picking e.g. "Excavator" would see "No matches"
-  // on the very first page and just leave - they have no way of knowing that
-  // clicking "Load More" would actually find some. handleLoadMoreListings()
-  // already loops internally until it finds real matches (or genuinely runs
-  // out, which flips hasMoreListings to false and stops this effect), so
-  // triggering it automatically here just removes the need for a manual tap.
+  // current page but more listings might still exist further back. Mostly a
+  // safety net now that the fetch itself is filtered server-side (see
+  // fetchInitialListings) -- still useful for the boosted-ads-merge edge
+  // case and for text search combined with a filter.
   useEffect(() => {
-    // Scoped to category/sub-category filtering only (not text search) -
-    // handleLoadMoreListings' matching only checks category/sub-category, so
-    // for a text search it could end up fetching the entire collection just
-    // to conclude nothing matches. Manual "Load More" still works for search.
     if (
       !loading &&
       debouncedSearchQuery.trim().length === 0 &&
