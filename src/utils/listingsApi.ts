@@ -63,13 +63,49 @@ export interface ListingsPage {
   hasMore: boolean;
 }
 
-export async function fetchInitialListings(limit = INITIAL_FETCH_LIMIT): Promise<ListingsPage> {
-  const { data, error } = await supabase
+export interface CategoryFilters {
+  /** "vehicles" | "spare_parts" | "all" (or undefined/omitted = no filter) */
+  category?: string;
+  /** e.g. "car" | "bike" | "truck" | "excavator" | "other_heavy_equipment" | "all" */
+  subCategory?: string;
+}
+
+// 🔧 (2026-09-26) Applies the category/sub-category filter AT THE DATABASE,
+// not after fetching. Before this, the homepage always pulled the newest 20
+// listings of ANY type and filtered client-side -- for a minority
+// sub-category like "excavator" (72 out of hundreds of listings, but every
+// single one older than the last ~150 posts), that meant "Load More" had to
+// scan hundreds of irrelevant newer car listings before finding even one
+// match, so a filter like "Heavy Equip." looked almost empty even though
+// plenty of matching listings genuinely existed. Now the query itself only
+// asks Postgres for rows that already match, so the very first page is full
+// of real results regardless of how old or rare that category is.
+function applyCategoryFilters(query: any, filters?: CategoryFilters) {
+  if (!filters) return query;
+  if (filters.category === "vehicles") {
+    query = query.eq("category", "vehicles");
+  } else if (filters.category === "spare_parts") {
+    query = query.neq("category", "vehicles");
+  }
+  if (filters.subCategory && filters.subCategory !== "all") {
+    if (filters.subCategory === "other_heavy_equipment") {
+      // "Heavy Equip." is meant to surface every kind of heavy machinery at
+      // once, not just whatever didn't fit a more specific sub-category.
+      query = query.in("sub_category", ["other_heavy_equipment", "excavator", "crane", "bulldozer", "forklift"]);
+    } else {
+      query = query.eq("sub_category", filters.subCategory);
+    }
+  }
+  return query;
+}
+
+export async function fetchInitialListings(limit = INITIAL_FETCH_LIMIT, filters?: CategoryFilters): Promise<ListingsPage> {
+  let query = supabase
     .from("listings")
     .select("*")
-    .eq("is_deleted", false)
-    .order("created_at", { ascending: false })
-    .limit(limit);
+    .eq("is_deleted", false);
+  query = applyCategoryFilters(query, filters);
+  const { data, error } = await query.order("created_at", { ascending: false }).limit(limit);
 
   if (error) throw error;
   const rows = data || [];
@@ -81,14 +117,14 @@ export async function fetchInitialListings(limit = INITIAL_FETCH_LIMIT): Promise
   };
 }
 
-export async function fetchMoreListings(beforeCreatedAt: string, limit = 20): Promise<ListingsPage> {
-  const { data, error } = await supabase
+export async function fetchMoreListings(beforeCreatedAt: string, limit = 20, filters?: CategoryFilters): Promise<ListingsPage> {
+  let query = supabase
     .from("listings")
     .select("*")
     .eq("is_deleted", false)
-    .lt("created_at", beforeCreatedAt)
-    .order("created_at", { ascending: false })
-    .limit(limit);
+    .lt("created_at", beforeCreatedAt);
+  query = applyCategoryFilters(query, filters);
+  const { data, error } = await query.order("created_at", { ascending: false }).limit(limit);
 
   if (error) throw error;
   const rows = data || [];
