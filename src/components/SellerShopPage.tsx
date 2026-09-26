@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { PartListing, SupportedLanguage } from "../types";
 import { X, MapPin, Phone, MessageSquare, ShoppingBag, Search, Sparkles, Loader2 } from "lucide-react";
-import { collection, query, where, getDocs, doc, getDoc, limit } from "firebase/firestore";
-import { db } from "../firebase";
 import { supabase } from "../supabase";
+import { fetchMyListings } from "../utils/listingsApi";
 import { ListingCard } from "./ListingCard";
 
 interface SellerShopPageProps {
@@ -43,7 +42,7 @@ export function SellerShopPage({
   // Search inside shop
   const [searchQuery, setSearchQuery] = useState("");
 
-  // Fetch Seller Profile from users collection
+  // Fetch Seller Profile from Supabase's public_profiles view
   useEffect(() => {
     let active = true;
     const fetchSellerData = async () => {
@@ -63,12 +62,14 @@ export function SellerShopPage({
         return;
       }
       try {
-        // Migrated to Supabase's public_profiles view (uid, name,
-        // profile_picture, city only -- deliberately no phone/email, see
-        // that view's own comment. Contact numbers stay behind the
-        // separate gated reveal flow, same as before -- sellerContact
-        // below already falls back to fallbackContact, which the caller
-        // supplies from that flow, so nothing changes there).
+        // 🔧 (2026-09-26) Removed the Firestore fallback that used to sit
+        // here -- public_profiles is a live VIEW on top of the `users`
+        // table (verified: same row count, always in sync, never lags
+        // behind), so every current and future user already has a
+        // matching row here. Deliberately no phone/email in this view --
+        // contact numbers stay behind the separate gated reveal flow
+        // (sellerContact below already falls back to fallbackContact,
+        // which the caller supplies from that flow).
         const { data: row, error } = await supabase
           .from("public_profiles")
           .select("name, profile_picture, city")
@@ -77,15 +78,8 @@ export function SellerShopPage({
 
         if (active && row) {
           setSellerProfile({ displayName: row.name, profilePicture: row.profile_picture, city: row.city });
-        } else if (active) {
-          // Not migrated yet -- fall back to Firestore (matches the same
-          // dual-source pattern used for listings/contacts during this
-          // transitional period).
-          const userRef = doc(db, "users", sellerId);
-          const userSnap = await getDoc(userRef);
-          if (active && userSnap.exists()) {
-            setSellerProfile(userSnap.data());
-          }
+        } else if (error) {
+          console.warn("Failed to fetch seller profile:", error.message);
         }
       } catch (err) {
         console.warn("Failed to fetch seller profile:", err);
@@ -100,7 +94,7 @@ export function SellerShopPage({
     };
   }, [sellerId, language]);
 
-  // Fetch Seller Listings from listings collection
+  // Fetch Seller Listings
   useEffect(() => {
     let active = true;
     const fetchSellerListings = async () => {
@@ -129,7 +123,7 @@ export function SellerShopPage({
           },
           {
             id: "local-demo-2",
-            title: language === "bn" ? "ব্রেম্বো হাই পারফরম্যান্স ব্রেক প্যাড (জোড়া)" : "Brembo High Performance Brake Pads (Pair)",
+            title: language === "bn" ? "ব্রেম্বো হাই পারফরম্যান্স ব্রেক প্যাড (জোড়া)" : "Brembo High Performance Brake Pads (Pair)",
             category: "Brakes & Suspension",
             subCategory: "Brake Pads",
             price: 4800,
@@ -173,19 +167,16 @@ export function SellerShopPage({
         return;
       }
       try {
-        const q = query(
-          collection(db, "listings"),
-          where("sellerId", "==", sellerId),
-          limit(30)
-        );
-        const snapshot = await getDocs(q);
+        // 🔧 (2026-09-26) Was a Firestore query (collection(db, "listings"),
+        // where("sellerId", "==", sellerId)) -- listings have lived in
+        // Supabase since the migration, so this always came back empty for
+        // any seller who posted since then (their shop page showed zero
+        // listings even though their posts were live on the homepage,
+        // which already reads Supabase). Reuses fetchMyListings(), the same
+        // function App.tsx's Dashboard/My Shop already use for this exact
+        // purpose.
+        const list = await fetchMyListings(sellerId, 30);
         if (active) {
-          const list: PartListing[] = [];
-          snapshot.forEach((docSnap) => {
-            list.push({ id: docSnap.id, ...docSnap.data() } as PartListing);
-          });
-          // Sort newest first
-          list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
           setSellerListings(list);
         }
       } catch (err) {
@@ -290,7 +281,7 @@ export function SellerShopPage({
               </div>
               <div className="text-center sm:text-right">
                 <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block">
-                  {language === "bn" ? "সক্রিয় স্টক" : "Active Stock"}
+                  {language === "bn" ? "সক্রিয় স্টক" : "Active Stock"}
                 </span>
                 <span className="text-2xl font-black text-amber-500">
                   {activeListings.length}
@@ -352,7 +343,7 @@ export function SellerShopPage({
               <div className="text-center py-12 bg-slate-50 dark:bg-slate-955 rounded-2xl border border-slate-150 dark:border-slate-850 text-slate-500">
                 <p className="text-sm font-semibold">
                   {language === "bn" 
-                    ? "কোন সক্রিয় পার্টস বা বিজ্ঞাপন পাওয়া যায়নি!" 
+                    ? "কোন সক্রিয় পার্টস বা বিজ্ঞাপন পাওয়া যায়নি!" 
                     : "No active listing found in this shop matching your search."}
                 </p>
               </div>
