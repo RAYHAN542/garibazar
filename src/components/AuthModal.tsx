@@ -510,12 +510,21 @@ export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModa
         setUploadingPhoto(false);
       }
 
+      // 🔧 (2026-09-27) আগে এখানে created_at: new Date().toISOString() পাঠানো
+      // হতো এই upsert-এর সাথে। কিন্তু এই uid-এর রো ততক্ষণে ইতিমধ্যেই তৈরি
+      // হয়ে গেছে (handle_new_auth_user() ট্রিগার সাইনআপের সাথে সাথেই নিজের
+      // created_at দিয়ে insert করে দেয়) -- তাই এই upsert একটা UPDATE হিসেবে
+      // চলে, এবং created_at-এর নতুন মান পুরনো মানের থেকে ভিন্ন হওয়ায়
+      // trg_protect_user_columns ট্রিগার সেটাকে protected ফিল্ড পরিবর্তন
+      // ধরে পুরো আপডেটটাই ব্লক করে দিচ্ছিল ("Not allowed to change
+      // protected user fields directly") -- ফলে অ্যাকাউন্ট তৈরি হয়ে গেলেও
+      // নাম/ছবি কখনো সেভ হচ্ছিল না। created_at বাদ দেওয়া হলো -- ট্রিগার
+      // insert-এর সময়ই এটা সঠিকভাবে সেট করে রাখে।
       const { error: profileError } = await supabase.from("users").upsert({
         uid: data.uid,
         name: cleanName,
         phone: data.phone,
         profile_picture: profilePicture,
-        created_at: new Date().toISOString(),
       }, { onConflict: "uid" });
 
       if (profileError) {
