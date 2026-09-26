@@ -7,6 +7,7 @@ import { supabase } from "../supabase";
 import { trackListingClick } from "../utils/counters";
 import { getOptimizedImageUrl } from "../utils/cloudinary";
 import { apiUrl } from "../utils/apiBase";
+import { AdsterraBanner } from "./AdsterraBanner";
 
 // Masks all but the last 4 digits so the full number isn't visible in plain
 // text to anonymous visitors or scrapers. The underlying tel: link still
@@ -476,6 +477,9 @@ export function ListingDetailModal({ listing, language, currentUser, onClose, on
               : "Promoted Special Spotlight Listing"}
           </div>
         )}
+
+        {/* Adsterra ad slot - shown above the listing image gallery */}
+        <AdsterraBanner adKey="b857b962a0d90b99389aec7b0ee74db7" width={320} height={50} />
 
         <button
           id="detail-close-btn"
