@@ -1787,6 +1787,24 @@ export default function App() {
     }
   }, [filteredListings.length, hasMoreListings, loadingMoreListings, loading, listings.length, selectedCategory, selectedSubCategory, selectedCity, debouncedSearchQuery]);
 
+  // 7c. Filtered boosted/sponsored ads for the "Premium Sponsored Spotlights"
+  // slider -- previously the slider always showed EVERY boosted ad
+  // regardless of the active category/sub-category filter (Car/Bike/Truck/
+  // Heavy Equip.), so selecting e.g. "Bike" still showed boosted cars in the
+  // spotlight section, which looked broken even though the main grid below
+  // was filtering correctly. Now the spotlight respects the same
+  // category/sub-category selection as the rest of the page.
+  const filteredAdListings = useMemo(() => {
+    return adListings.filter((item) => {
+      let matchesCategory = true;
+      const isVehicle = isItemVehicle(item);
+      if (selectedCategory === "vehicles") matchesCategory = isVehicle;
+      else if (selectedCategory === "spare_parts") matchesCategory = !isVehicle;
+      const matchesSub = matchesSubCategoryFilter(item, selectedSubCategory);
+      return matchesCategory && matchesSub;
+    });
+  }, [adListings, selectedCategory, selectedSubCategory]);
+
   // 8. Stats counting
   const statsSummary = useMemo(() => {
     const activeCount = listings.length;
@@ -1956,7 +1974,7 @@ export default function App() {
                   showFilters={showFilters}
                   setShowFilters={setShowFilters}
                   listings={listings}
-                  adListings={adListings}
+                  adListings={filteredAdListings}
                   filteredListings={filteredListings}
                   hasMoreListings={hasMoreListings}
                   loadingMoreListings={loadingMoreListings}
