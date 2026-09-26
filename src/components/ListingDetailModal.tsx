@@ -149,24 +149,33 @@ export function ListingDetailModal({ listing, language, currentUser, onClose, on
       return;
     }
 
-    if (!fetchedContactNumber) {
-      setAddToDashboardError(
-        language === "bn"
-          ? "বিক্রেতার নম্বর এখনো লোড হয়নি, একটু পর আবার চেষ্টা করুন।"
-          : "Seller's number hasn't loaded yet - please try again in a moment."
-      );
-      return;
-    }
-
     setAddToDashboardError(null);
     setIsAddingToDashboard(true);
+
+    // 🔧 (2026-09-26) আগে "Show number" আলাদাভাবে না চাপলে এখানেই থেমে
+    // "নম্বর লোড হয়নি" error দেখাত -- অনেক visitor শুধু listing-টা সেভ
+    // করতে চায়, নম্বর না দেখেই। এখন নম্বর fetch করা না থাকলে এখানেই
+    // চুপচাপ fetch করে নেওয়া হচ্ছে (ব্যর্থ হলেও সেভ আটকাবে না, শুধু
+    // sellerContact ফাঁকা থাকবে)।
+    let contactNumberForSave = fetchedContactNumber;
+    if (!contactNumberForSave) {
+      try {
+        const fetched = await fetchContactNumberViaApi();
+        if (fetched) {
+          contactNumberForSave = fetched;
+          setFetchedContactNumber(fetched);
+        }
+      } catch (err) {
+        console.error("Could not fetch contact number before saving:", err);
+      }
+    }
 
     const newPurchaseDoc = {
       title: listing.title,
       image: (listing.images && listing.images[0]) || "https://images.unsplash.com/photo-1506015391300-4802dc74de2e?w=500&auto=format&fit=crop&q=80",
       price: Number(listing.price),
       sellerName: listing.sellerName || "Seller",
-      sellerContact: fetchedContactNumber,
+      sellerContact: contactNumberForSave || "",
       buyerId: currentUser.uid,
       status: language === "bn" ? "অর্ডার পেন্ডিং" : "Pending Delivery",
       createdAt: new Date().toISOString(),
@@ -199,18 +208,18 @@ export function ListingDetailModal({ listing, language, currentUser, onClose, on
     // side in App.tsx -- both were previously reading/writing Firestore
     // consistently with each other, this just brings the whole feature onto
     // the same database as the rest of the migrated app.
+    // 🔧 (2026-09-26) Removed the artificial 8-second Promise.race timeout
+    // that used to sit here. On slower mobile connections (this app has
+    // repeatedly seen 3-4s+ round trips), that race often fired BEFORE the
+    // real Supabase request finished, showing a false "couldn't save"
+    // error even though the row was actually about to be written
+    // successfully a moment later. Now this just awaits the real request
+    // and only reports failure if it genuinely rejects.
     try {
-      const addPromise = supabase
+      const { error } = await supabase
         .from("purchases")
-        .insert({ buyer_id: currentUser.uid, data: newPurchaseDoc })
-        .then(({ error }) => {
-          if (error) throw error;
-        });
-      const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error("Timeout")), 8000)
-      );
-
-      await Promise.race([addPromise, timeoutPromise]);
+        .insert({ buyer_id: currentUser.uid, data: newPurchaseDoc });
+      if (error) throw error;
 
       setAddToDashboardSuccess(true);
       if (onPurchaseAdded) {
