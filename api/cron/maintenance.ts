@@ -1,132 +1,64 @@
-import { initializeApp, getApps, cert } from "firebase-admin/app";
-import { getFirestore, FieldValue } from "firebase-admin/firestore";
+import { createClient } from "@supabase/supabase-js";
 
-if (!getApps().length) {
-  const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
-  if (serviceAccountJson) {
-    try {
-      const serviceAccount = JSON.parse(serviceAccountJson);
-      initializeApp({ credential: cert(serviceAccount) });
-    } catch (e) {
-      console.error("[maintenance] Failed to parse FIREBASE_SERVICE_ACCOUNT_KEY:", e);
-    }
-  }
-}
-
-async function aggregateCounters(db: FirebaseFirestore.Firestore): Promise<{ listingsDrained: number; shardsDrained: number }> {
-  // Was: 1 query for all listings, then a SEPARATE counterShards query per
-  // listing (N+1) -- at 10k listings that's 10k+ extra queries/reads every
-  // single day, enough on its own to exhaust the Spark plan's daily quota.
-  // Now: one collectionGroup query pulls every shard across every listing
-  // in a single round trip, grouped back by parent listing in memory below.
-  const shardsSnap = await db.collectionGroup("counterShards").get();
-
-  const byListing = new Map<string, FirebaseFirestore.QueryDocumentSnapshot[]>();
-  shardsSnap.forEach((shardDoc) => {
-    const listingRef = shardDoc.ref.parent.parent;
-    if (!listingRef) return;
-    const key = listingRef.path;
-    if (!byListing.has(key)) byListing.set(key, []);
-    byListing.get(key)!.push(shardDoc);
-  });
-
-  let listingsDrained = 0;
-  let shardsDrained = 0;
-
-  for (const [listingPath, shardDocs] of byListing.entries()) {
-    let totalViews = 0;
-    let totalSaved = 0;
-    const dirtyShards: { ref: FirebaseFirestore.DocumentReference; views: number; saved: number }[] = [];
-
-    for (const shardDoc of shardDocs) {
-      const data = shardDoc.data();
-      const shardViews = typeof data.views === "number" ? data.views : 0;
-      const shardSaved = typeof data.saved === "number" ? data.saved : 0;
-      if (shardViews !== 0 || shardSaved !== 0) {
-        totalViews += shardViews;
-        totalSaved += shardSaved;
-        dirtyShards.push({ ref: shardDoc.ref, views: shardViews, saved: shardSaved });
-      }
-    }
-
-    if (dirtyShards.length === 0) continue;
-
-    const listingRef = db.doc(listingPath);
-    const batch = db.batch();
-    const listingUpdate: Record<string, FirebaseFirestore.FieldValue> = {};
-    if (totalViews !== 0) listingUpdate.views = FieldValue.increment(totalViews);
-    if (totalSaved !== 0) listingUpdate.savedCount = FieldValue.increment(totalSaved);
-    batch.update(listingRef, listingUpdate);
-
-    for (const shard of dirtyShards) {
-      const shardUpdate: Record<string, FirebaseFirestore.FieldValue> = {};
-      if (shard.views !== 0) shardUpdate.views = FieldValue.increment(-shard.views);
-      if (shard.saved !== 0) shardUpdate.saved = FieldValue.increment(-shard.saved);
-      batch.update(shard.ref, shardUpdate);
-      shardsDrained++;
-    }
-
-    await batch.commit();
-    listingsDrained++;
-  }
-
-  return { listingsDrained, shardsDrained };
-}
-
+// 🔧 (2026-09-26) Full migration off Firestore. This cron used to:
+//   1. Drain Firestore's sharded view/save counters (counterShards) into
+//      the parent listing doc -- that sharding pattern existed purely to
+//      work around Firestore's ~1 write/sec/document ceiling under high
+//      concurrent traffic. Postgres has no such ceiling (an UPDATE ...
+//      SET x = x + 1 handles concurrent callers fine via row locking), and
+//      api/track-event.ts's bump_listing_counter() already increments
+//      Supabase's listings.views/clicks directly -- there's no sharded
+//      counter to drain anymore, so that whole step is gone.
+//   2. Purge old soft-deleted listings and old chat messages from
+//      Firestore -- but listings and chat_messages have lived in Supabase
+//      since the migration, so this was cleaning up a shrinking, stale
+//      dataset while the real data it should have been purging (Supabase)
+//      was never touched. Both purges now target Supabase directly.
 const RETENTION_DAYS_LISTINGS = 30;
 const RETENTION_DAYS_MESSAGES = 180;
-const BATCH_LIMIT = 400;
 
-async function purgeOldSoftDeletedListings(db: FirebaseFirestore.Firestore): Promise<number> {
-  const cutoff = new Date(Date.now() - RETENTION_DAYS_LISTINGS * 24 * 60 * 60 * 1000);
-  const snap = await db
-    .collection("listings")
-    .where("isDeleted", "==", true)
-    .where("deletedAt", "<", cutoff)
-    .limit(BATCH_LIMIT)
-    .get();
+const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-  if (snap.empty) return 0;
+async function purgeOldSoftDeletedListings(supabase: ReturnType<typeof createClient>): Promise<number> {
+  const cutoff = new Date(Date.now() - RETENTION_DAYS_LISTINGS * 24 * 60 * 60 * 1000).toISOString();
 
-  for (const listingDoc of snap.docs) {
-    const shardsSnap = await listingDoc.ref.collection("counterShards").get();
-    if (!shardsSnap.empty) {
-      const shardBatch = db.batch();
-      shardsSnap.forEach((s) => shardBatch.delete(s.ref));
-      await shardBatch.commit();
-    }
-  }
+  // Find the candidates first so we can also clean up listing_contacts rows
+  // for them -- that table isn't guaranteed to have an ON DELETE CASCADE
+  // back to listings, so an explicit cleanup avoids leaving orphaned phone
+  // numbers behind. listing_saves DOES cascade (see the migration), so
+  // nothing extra is needed for that one.
+  const { data: candidates, error: findErr } = await supabase
+    .from("listings")
+    .select("id")
+    .eq("is_deleted", true)
+    .lt("deleted_at", cutoff);
+  if (findErr) throw findErr;
+  const ids = (candidates || []).map((r: any) => r.id);
+  if (ids.length === 0) return 0;
 
-  const batch = db.batch();
-  snap.docs.forEach((d) => batch.delete(d.ref));
-  await batch.commit();
+  const { error: contactsErr } = await supabase.from("listing_contacts").delete().in("listing_id", ids);
+  if (contactsErr) console.error("[maintenance] listing_contacts cleanup error:", contactsErr.message);
 
-  return snap.size;
+  const { error: deleteErr } = await supabase.from("listings").delete().in("id", ids);
+  if (deleteErr) throw deleteErr;
+
+  return ids.length;
 }
 
-async function purgeOldChatMessages(db: FirebaseFirestore.Firestore): Promise<number> {
-  const cutoff = new Date(Date.now() - RETENTION_DAYS_MESSAGES * 24 * 60 * 60 * 1000);
-  const snap = await db
-    .collectionGroup("messages")
-    .where("createdAt", "<", cutoff)
-    .limit(BATCH_LIMIT)
-    .get();
-
-  if (snap.empty) return 0;
-
-  const batch = db.batch();
-  snap.docs.forEach((d) => batch.delete(d.ref));
-  await batch.commit();
-
-  return snap.size;
+async function purgeOldChatMessages(supabase: ReturnType<typeof createClient>): Promise<number> {
+  const cutoff = new Date(Date.now() - RETENTION_DAYS_MESSAGES * 24 * 60 * 60 * 1000).toISOString();
+  const { data, error } = await supabase.from("chat_messages").delete().lt("created_at", cutoff).select("id");
+  if (error) throw error;
+  return (data || []).length;
 }
 
 export default async function handler(req: any, res: any) {
   // Was: `if (process.env.CRON_SECRET && authHeader !== ...)` -- if the env
   // var simply wasn't set in Vercel, that condition was false and this
   // whole check was skipped entirely, leaving the endpoint wide open for
-  // anyone to hit repeatedly and burn through the Firestore read quota.
-  // Now: a missing CRON_SECRET is itself a hard failure, not an open door.
+  // anyone to hit repeatedly and burn through the database. Now: a missing
+  // CRON_SECRET is itself a hard failure, not an open door.
   if (!process.env.CRON_SECRET) {
     console.error("[maintenance] CRON_SECRET is not set -- refusing to run.");
     res.status(500).json({ error: "Server misconfigured: CRON_SECRET not set." });
@@ -138,17 +70,22 @@ export default async function handler(req: any, res: any) {
     return;
   }
 
-  try {
-    const db = getFirestore();
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+    console.error("[maintenance] Missing Supabase env vars.");
+    res.status(500).json({ error: "Server misconfigured: Supabase env vars missing." });
+    return;
+  }
 
-    const { listingsDrained, shardsDrained } = await aggregateCounters(db);
-    const listingsPurged = await purgeOldSoftDeletedListings(db);
-    const messagesPurged = await purgeOldChatMessages(db);
+  try {
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+
+    const listingsPurged = await purgeOldSoftDeletedListings(supabase);
+    const messagesPurged = await purgeOldChatMessages(supabase);
 
     res.status(200).json({
       success: true,
-      listingsDrained,
-      shardsDrained,
       listingsPurged,
       messagesPurged,
     });
