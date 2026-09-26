@@ -23,11 +23,6 @@ const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 async function purgeOldSoftDeletedListings(supabase: ReturnType<typeof createClient>): Promise<number> {
   const cutoff = new Date(Date.now() - RETENTION_DAYS_LISTINGS * 24 * 60 * 60 * 1000).toISOString();
 
-  // Find the candidates first so we can also clean up listing_contacts rows
-  // for them -- that table isn't guaranteed to have an ON DELETE CASCADE
-  // back to listings, so an explicit cleanup avoids leaving orphaned phone
-  // numbers behind. listing_saves DOES cascade (see the migration), so
-  // nothing extra is needed for that one.
   const { data: candidates, error: findErr } = await supabase
     .from("listings")
     .select("id")
@@ -37,8 +32,16 @@ async function purgeOldSoftDeletedListings(supabase: ReturnType<typeof createCli
   const ids = (candidates || []).map((r: any) => r.id);
   if (ids.length === 0) return 0;
 
-  const { error: contactsErr } = await supabase.from("listing_contacts").delete().in("listing_id", ids);
-  if (contactsErr) console.error("[maintenance] listing_contacts cleanup error:", contactsErr.message);
+  // listing_contacts and saved_listings both have ON DELETE CASCADE back to
+  // listings, so deleting the listing row cleans those up automatically.
+  // chats.listing_id does NOT cascade (it's NO ACTION -- verified against
+  // the live schema) since a chat's history should survive its listing
+  // being purged. Without nulling it out first, deleting a listing that
+  // still has a chat thread pointing at it would throw a foreign-key
+  // violation and abort the ENTIRE batch delete below -- silently
+  // cancelling the whole day's purge, not just that one listing.
+  const { error: chatsErr } = await supabase.from("chats").update({ listing_id: null }).in("listing_id", ids);
+  if (chatsErr) console.error("[maintenance] chats.listing_id cleanup error:", chatsErr.message);
 
   const { error: deleteErr } = await supabase.from("listings").delete().in("id", ids);
   if (deleteErr) throw deleteErr;
