@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { PartListing, SupportedLanguage } from "../types";
 import { X, MapPin, Sparkles, Play, SquarePlay, Flag, ShieldAlert, CheckCircle2, ChevronLeft, ChevronRight, Loader2, ShoppingBag, MessageSquare, Share2 } from "lucide-react";
-import { doc, getDoc, updateDoc, collection, addDoc, query, increment } from "firebase/firestore";
-import { db, auth, logAnalyticsEvent } from "../firebase";
+import { auth, logAnalyticsEvent } from "../firebase";
 import { supabase } from "../supabase";
 import { trackListingClick } from "../utils/counters";
 import { getOptimizedImageUrl } from "../utils/cloudinary";
@@ -91,6 +90,7 @@ export function ListingDetailModal({ listing, language, currentUser, onClose, on
   // Toggle states
   const [isSold, setIsSold] = useState(listing.isSold || false);
   const [soldLoading, setSoldLoading] = useState(false);
+  const [soldError, setSoldError] = useState<string | null>(null);
 
   // Content Flag/Report states
   const [hasReported, setHasReported] = useState<boolean>(() => {
@@ -265,6 +265,12 @@ export function ListingDetailModal({ listing, language, currentUser, onClose, on
   // দেখলেও নম্বর "—" দেখাত, যদিও ডাটাবেজে নম্বর ঠিকই ছিল। সার্ভার API নিজে
   // token verify করে (verifyJwt.ts দিয়ে, Supabase অথবা লিগ্যাসি Firebase
   // দুটোই), তাই client-side session state-এর উপর নির্ভর করে না।
+  //
+  // এই একই কারণে "Mark as Sold" আর report-listing-ও সরাসরি Supabase client
+  // write না করে সার্ভার API (/api/account-actions) দিয়ে যায় -- Google/
+  // Facebook দিয়ে লগইন করা ইউজারদের এখনো কোনো Supabase session নেই (Auth
+  // migration এখনো বাকি), তাই client-side supabase.from(...).update() তাদের
+  // জন্য RLS-এ আটকে যেত।
   const getAuthToken = async (): Promise<string | null> => {
     const { data: sessionData } = await supabase.auth.getSession();
     const supaToken = sessionData?.session?.access_token;
@@ -355,17 +361,36 @@ export function ListingDetailModal({ listing, language, currentUser, onClose, on
     }
   };
 
+  // 🔧 (2026-09-26) Was a direct client-side Firestore updateDoc() --
+  // listings have lived in Supabase since the migration, so this silently
+  // did nothing for any listing created since then (the Firestore doc it
+  // targeted never existed; caught below, never surfaced). Now goes
+  // through /api/account-actions (action: toggle_sold), which also
+  // verifies ownership server-side and works for Google/Facebook-logged-in
+  // sellers who don't have a Supabase session (see the getAuthToken comment
+  // above for why a direct client write can't be used here).
   const handleToggleSold = async () => {
     if (!isOwner) return;
     setSoldLoading(true);
+    setSoldError(null);
+    const newSoldStatus = !isSold;
     try {
-      const newSoldStatus = !isSold;
-      const docRef = doc(db, "listings", listing.id);
-      await updateDoc(docRef, {
-        isSold: newSoldStatus
+      const idToken = await getAuthToken();
+      if (!idToken) throw new Error("লগইন সেশন পাওয়া যায়নি");
+
+      const resp = await fetch(apiUrl("/api/account-actions"), {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({ action: "toggle_sold", listingId: listing.id, isSold: newSoldStatus }),
       });
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data?.error || "স্ট্যাটাস পরিবর্তন করা যায়নি।");
+
       setIsSold(newSoldStatus);
-      
+
       // Sync offline listings cache
       const localListingsStr = localStorage.getItem("gari_bazar_local_listings") || "[]";
       try {
@@ -379,8 +404,12 @@ export function ListingDetailModal({ listing, language, currentUser, onClose, on
       } catch {}
       
       window.dispatchEvent(new Event("storage"));
-    } catch (err) {
+    } catch (err: any) {
       console.error("Could not update sold status:", err);
+      setSoldError(
+        err?.message ||
+          (language === "bn" ? "স্ট্যাটাস পরিবর্তন করা যায়নি। আবার চেষ্টা করুন।" : "Couldn't update status. Please try again.")
+      );
     } finally {
       setSoldLoading(false);
     }
@@ -454,9 +483,9 @@ export function ListingDetailModal({ listing, language, currentUser, onClose, on
     // now rejected by firestore.rules (those fields are admin/server-only,
     // see api/track-event.ts's comment) -- this was silently failing every
     // time (caught below, never surfaced), so click counts and the seller's
-    // analytics graph have been stuck. trackListingClick() goes through the
-    // server, which is the only path that's actually allowed to write these
-    // fields now.
+    // analytics graph have been stuck. trackListingClick() goes through
+    // Supabase directly now, which is the only path that's actually allowed
+    // to write these fields.
     try {
       await trackListingClick(listing.id);
     } catch (err) {
@@ -759,6 +788,36 @@ export function ListingDetailModal({ listing, language, currentUser, onClose, on
                 )}
               </div>
             </div>
+
+            {/* Owner-only: Mark as Sold toggle */}
+            {isOwner && (
+              <div className="flex items-center justify-between gap-3 p-3.5 bg-slate-50 dark:bg-slate-950 border border-slate-150 dark:border-slate-850 rounded-xl">
+                <div>
+                  <p className="text-xs font-extrabold text-slate-800 dark:text-slate-100">
+                    {language === "bn" ? "এই প্রোডাক্টটি কি বিক্রি হয়ে গেছে?" : "Mark this listing as sold?"}
+                  </p>
+                  {soldError && <p className="text-[11px] font-bold text-red-500 mt-0.5">{soldError}</p>}
+                </div>
+                <button
+                  type="button"
+                  onClick={handleToggleSold}
+                  disabled={soldLoading}
+                  className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 shrink-0 ${
+                    isSold
+                      ? "bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400"
+                      : "bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400"
+                  }`}
+                >
+                  {soldLoading ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : isSold ? (
+                    language === "bn" ? "অবিক্রিত করুন" : "Mark as Available"
+                  ) : (
+                    language === "bn" ? "বিক্রিত হিসেবে চিহ্নিত করুন" : "Mark as Sold"
+                  )}
+                </button>
+              </div>
+            )}
 
             {/* Quick Actions (Add to Dashboard, Report) */}
             <div className="pt-2 border-t border-slate-150 dark:border-slate-800/80 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
