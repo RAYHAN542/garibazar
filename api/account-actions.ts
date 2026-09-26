@@ -1,6 +1,5 @@
 import { initializeApp, getApps, cert } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
-import { getFirestore } from "firebase-admin/firestore";
 import { createClient } from "@supabase/supabase-js";
 import { applyCors } from "./_lib/cors.js";
 import { checkAndBumpRateLimit, getClientIp } from "./_lib/rateLimit.js";
@@ -12,10 +11,10 @@ import { verifySupabaseToken } from "./_lib/verifyJwt.js";
 // 🔧 (2026-09-26) Vercel's Hobby plan caps a deployment at 12 Serverless
 // Functions. This project had grown to 13 (api/delete-account.ts,
 // api/report-listing.ts, api/submit-support-ticket.ts among them) --
-// EVERY production deployment for the last ~24h had been failing at the
-// build step with `exceeded_serverless_functions_per_deployment`, meaning
-// none of that day's fixes (including today's lottery fix) had actually
-// gone live, despite each individual commit's code being correct.
+// EVERY production deployment for a while had been failing at the build
+// step with `exceeded_serverless_functions_per_deployment`, meaning none
+// of that period's fixes had actually gone live, despite each individual
+// commit's code being correct.
 //
 // These three were the safest candidates to merge into one function:
 // all three are POST-only, called exclusively from this app's own client
@@ -24,8 +23,13 @@ import { verifySupabaseToken } from "./_lib/verifyJwt.js";
 // in the same broad category. Dispatched here by a `action` field in the
 // request body -- same pattern already used by api/auth/phone.ts
 // ("login"/"signup") and api/track-event.ts (several event types).
-//
-// Nothing about each action's own logic changed, only where it lives.
+// toggle_sold was added later for the same reason ListingDetailModal's
+// other privileged writes (report_listing) already live here: a listing's
+// is_sold flag needs to work for BOTH auth types this app currently has
+// (Supabase-session phone/OTP users AND still-Firebase-only Google/
+// Facebook users) -- a direct client-side supabase.from(...).update() only
+// works for the former, since RLS's ownership check needs a real Supabase
+// JWT, which Google/Facebook-logged-in users don't have yet.
 // ============================================================================
 
 if (!getApps().length) {
@@ -50,7 +54,10 @@ const supabaseAdmin =
 
 // Resolves either a Supabase session token or, as a fallback, a legacy
 // Firebase ID token -- same dual-auth pattern used across the app's other
-// endpoints during this migration.
+// endpoints during this migration. NOTE: this Firebase fallback stays in
+// place until AuthModal.tsx's Google/Facebook login itself moves to
+// Supabase Auth -- removing it now would break every Google/Facebook user,
+// since that's still their only session type.
 async function resolveUid(req: any): Promise<string | null> {
   const authHeader = req.headers.authorization || "";
   const idToken = authHeader.replace("Bearer ", "").trim();
@@ -171,6 +178,57 @@ async function handleReportListing(req: any, res: any) {
 }
 
 // ---------------------------------------------------------------------------
+// toggle_sold
+// ---------------------------------------------------------------------------
+// 🔧 (2026-09-26) Was a direct client-side Firestore updateDoc() in
+// ListingDetailModal.tsx -- listings have lived in Supabase since the
+// migration, so that call silently did nothing for any listing created
+// since then (the Firestore doc it targeted never existed). Routed through
+// the server (like report_listing above) rather than a direct Supabase
+// client write, specifically so it also works for Google/Facebook-logged-in
+// sellers who don't have a Supabase session yet.
+async function handleToggleSold(req: any, res: any) {
+  const uid = await resolveUid(req);
+  if (!uid) {
+    return res.status(401).json({ error: "লগইন করা প্রয়োজন।" });
+  }
+
+  const { listingId, isSold } = req.body || {};
+  if (!listingId || typeof listingId !== "string" || typeof isSold !== "boolean") {
+    return res.status(400).json({ error: "অবৈধ অনুরোধ।" });
+  }
+
+  if (!supabaseAdmin) {
+    return res.status(500).json({ error: "সার্ভার কনফিগারেশনে সমস্যা।" });
+  }
+
+  const { data: listing, error: fetchErr } = await supabaseAdmin
+    .from("listings")
+    .select("seller_id")
+    .eq("id", listingId)
+    .maybeSingle();
+
+  if (fetchErr) {
+    console.error("[account-actions/toggle_sold] fetch error:", fetchErr.message);
+    return res.status(500).json({ error: "সার্ভারে সমস্যা হয়েছে।" });
+  }
+  if (!listing) {
+    return res.status(404).json({ error: "লিস্টিং খুঁজে পাওয়া যায়নি।" });
+  }
+  if (listing.seller_id !== uid) {
+    return res.status(403).json({ error: "শুধু বিক্রেতা নিজেই এটি পরিবর্তন করতে পারবেন।" });
+  }
+
+  const { error: updateErr } = await supabaseAdmin.from("listings").update({ is_sold: isSold }).eq("id", listingId);
+  if (updateErr) {
+    console.error("[account-actions/toggle_sold] update error:", updateErr.message);
+    return res.status(500).json({ error: "স্ট্যাটাস পরিবর্তন করা যায়নি।" });
+  }
+
+  return res.status(200).json({ success: true, isSold });
+}
+
+// ---------------------------------------------------------------------------
 // submit_support_ticket
 // ---------------------------------------------------------------------------
 const GUEST_WINDOW_MS = 60 * 60 * 1000;
@@ -179,10 +237,6 @@ const USER_WINDOW_MS = 60 * 60 * 1000;
 const USER_MAX = 10; // per signed-in uid
 
 async function handleSubmitSupportTicket(req: any, res: any) {
-  if (!getApps().length) {
-    return res.status(500).json({ error: "সার্ভার কনফিগারেশনে সমস্যা।" });
-  }
-
   const { name, email, message } = req.body || {};
   if (!message || typeof message !== "string" || !message.trim()) {
     return res.status(400).json({ error: "বার্তা লিখুন।" });
@@ -203,15 +257,26 @@ async function handleSubmitSupportTicket(req: any, res: any) {
     });
   }
 
-  const db = getFirestore();
-  await db.collection("support_tickets").add({
+  if (!supabaseAdmin) {
+    return res.status(500).json({ error: "সার্ভার কনফিগারেশনে সমস্যা।" });
+  }
+
+  // 🔧 (2026-09-26) Migrated off Firestore's support_tickets collection --
+  // this was the last firebase-admin write left in this file (Auth
+  // verification via getAuth() still needs firebase-admin, but Firestore
+  // itself is no longer touched anywhere in this file).
+  const { error: insertErr } = await supabaseAdmin.from("support_tickets").insert({
     name: (name || "").toString().slice(0, 200) || (uid ? "User" : "Anonymous"),
     email: (email || "").toString().slice(0, 200) || "anonymous@garibazar.com",
     message: message.trim().slice(0, 2000),
-    createdAt: new Date().toISOString(),
-    userId: uid || "guest",
+    user_id: uid || "guest",
     status: "open",
   });
+
+  if (insertErr) {
+    console.error("[account-actions/submit_support_ticket] insert error:", insertErr.message);
+    return res.status(500).json({ error: "টিকেট জমা দেওয়া যায়নি।" });
+  }
 
   return res.status(200).json({ success: true });
 }
@@ -233,6 +298,8 @@ export default async function handler(req: any, res: any) {
         return await handleDeleteAccount(req, res);
       case "report_listing":
         return await handleReportListing(req, res);
+      case "toggle_sold":
+        return await handleToggleSold(req, res);
       case "submit_support_ticket":
         return await handleSubmitSupportTicket(req, res);
       default:
