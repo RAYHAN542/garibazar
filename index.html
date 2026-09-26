@@ -57,6 +57,23 @@
           }, 3000);
         });
       </script>
+      <!-- Adsterra Social Bar: same deferred-load / native-skip pattern as
+           the AdSense script above -- loaded after window 'load' so it
+           never competes with first paint, and skipped inside the packaged
+           Capacitor app since a sticky ad bar isn't appropriate there. -->
+      <script>
+        window.addEventListener('load', function () {
+          setTimeout(function () {
+            if (window.Capacitor && typeof window.Capacitor.isNativePlatform === 'function' && window.Capacitor.isNativePlatform()) {
+              return;
+            }
+            var s = document.createElement('script');
+            s.async = true;
+            s.src = "https://pl31521943.profitableratecpmnetwork.com/d2/47/2f/d2472fc1d9f7f1c9aba2e0c3492d1a87.js";
+            document.body.appendChild(s);
+          }, 3000);
+        });
+      </script>
     <style>
       /* Static splash shown instantly before JS loads/parses/runs.
          React replaces this the moment it mounts. */
@@ -115,4 +132,3 @@
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
-
