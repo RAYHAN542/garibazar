@@ -18,6 +18,7 @@ import { PartListing } from "../types";
 // ---------------------------------------------------------------------------
 
 const INITIAL_FETCH_LIMIT = 20;
+const UUID_RE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
 
 function mapRowToListing(row: any): PartListing {
   const images: string[] = Array.isArray(row.images) ? row.images : [];
@@ -186,4 +187,23 @@ export async function fetchAdminListings(limit = 300): Promise<PartListing[]> {
 
   if (error) throw error;
   return (data || []).map(mapRowToListing);
+}
+
+// 🔧 (2026-09-27) Added for App.tsx's shared-link direct-open path
+// (?listing=<id>), which was still doing a Firestore getDoc() -- listings
+// live in Supabase now, so that always found nothing for a listing created
+// since the migration. Same dual id/legacy_firestore_id lookup pattern
+// used server-side (api/share-listing.ts, api/get-seller-contact.ts,
+// api/draw.ts), since an older shared link may carry a pre-migration id.
+export async function fetchListingById(id: string): Promise<PartListing | null> {
+  const isUuid = UUID_RE.test(id);
+  const { data, error } = await supabase
+    .from("listings")
+    .select("*")
+    .or(isUuid ? `legacy_firestore_id.eq.${id},id.eq.${id}` : `legacy_firestore_id.eq.${id}`)
+    .maybeSingle();
+
+  if (error) throw error;
+  if (!data) return null;
+  return mapRowToListing(data);
 }
