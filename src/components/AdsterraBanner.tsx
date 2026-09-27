@@ -12,6 +12,16 @@ interface AdsterraBannerProps {
 // freshly (re-)injected into an isolated container each time using real DOM
 // nodes (document.createElement + appendChild) -- injected <script> tags
 // only execute when appended this way, not via dangerouslySetInnerHTML.
+//
+// 🔧 (2026-09-27) Adsterra's own "Get Code" snippet for this ad unit
+// (320x50_1) actually ships TWO script tags, not one -- the atOptions +
+// invoke.js pair below, PLUS a second script hosted on
+// profitableratecpmnetwork.com that does the actual ad-serving/creative
+// delivery. Only the first pair was ever wired in here, so the slot went
+// from fully empty (before the CSP fix let invoke.js itself load) to a
+// broken-image icon (invoke.js ran and built the ad container, but the
+// second script that fills it with a real creative was simply never
+// injected). Both scripts need vercel.json's CSP to allow their domains too.
 export function AdsterraBanner({ adKey, width, height }: AdsterraBannerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -28,8 +38,16 @@ export function AdsterraBanner({ adKey, width, height }: AdsterraBannerProps) {
     invokeScript.src = `https://www.highrevenueformat.com/${adKey}/invoke.js`;
     invokeScript.async = true;
 
+    // Second script from Adsterra's "Get Code" panel for this exact ad unit
+    // -- without this, invoke.js has nothing to actually fill the slot with.
+    const creativeScript = document.createElement("script");
+    creativeScript.type = "text/javascript";
+    creativeScript.src = "https://pl31521943.profitableratecpmnetwork.com/d2/47/2f/d2472fc1d9f7f1c9aba2e0c3492d1a87.js";
+    creativeScript.async = true;
+
     container.appendChild(configScript);
     container.appendChild(invokeScript);
+    container.appendChild(creativeScript);
 
     return () => {
       container.innerHTML = "";
