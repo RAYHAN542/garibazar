@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { db, auth } from "../firebase";
-import { onAuthStateChanged } from "firebase/auth";
-import {collection, onSnapshot, query, orderBy, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, limit, getAggregateFromServer, sum, count, startAfter} from "firebase/firestore";
 import { supabase } from "../supabase";
+import { fetchAdminListings } from "../utils/listingsApi";
 import { ShieldAlert, CheckCircle2, XCircle, Coins, Loader2, Save, Check, Smartphone, User, Clock, Mail, Trash2, Search, TrendingUp, Grid, Inbox, Flag, Activity, Globe, Users, MapPin, Eye, RefreshCw } from "lucide-react";
 import { SupportedLanguage } from "../types";
 
@@ -53,6 +51,17 @@ const mapRefillRow = (row: any) => ({
   createdAt: row.created_at,
 });
 
+// support_tickets is also snake_case in Supabase -- same camelCase mapping approach.
+const mapTicketRow = (row: any) => ({
+  id: row.id,
+  name: row.name,
+  email: row.email,
+  message: row.message,
+  status: row.status,
+  createdAt: row.created_at,
+  resolvedAt: row.resolved_at,
+});
+
 export function AdminPanel({ language, currentUser, listings: listingsProp, isUserAdmin }: AdminPanelProps) {
   // Local mirror of the listings prop so we can optimistically remove
   // deleted items instantly without waiting for a full page reload.
@@ -63,42 +72,46 @@ export function AdminPanel({ language, currentUser, listings: listingsProp, isUs
 
   // Admin needs the REAL, complete count/list of every listing in the database —
   // not just whatever the Market page happens to have paginated in via "Load More".
-  // This is a dedicated, independent real-time listener so it's always accurate.
+  // This is a dedicated, independent fetch so it's always accurate.
   const [adminListings, setAdminListings] = useState<any[]>([]);
-  // Accurate site-wide totals (listing count + summed views) computed server-side
-  // via a Firestore aggregate query — no documents are downloaded for this, so it
-  // stays cheap and correct even after the list below is capped.
+  // Accurate site-wide listing count, via a cheap head-only count query (no
+  // rows downloaded). Total views is summed from the up-to-300 most recent
+  // listings loaded below -- an approximation over very old, rarely-viewed
+  // listings, same tolerance the old Firestore aggregate's error-fallback
+  // path already accepted.
   const [aggListingCount, setAggListingCount] = useState<number>(0);
-  const [aggTotalViews, setAggTotalViews] = useState<number>(0);
 
+  // 🔧 (2026-09-26) Migrated off Firestore -- listings have lived in
+  // Supabase since the migration, so the old collection(db,"listings")
+  // query here always came back empty, meaning the entire "Manage
+  // Listings" tab (and the reported-only filter, and the listing counts
+  // in the stat cards) has been showing nothing for any listing posted
+  // since then. fetchAdminListings() reuses the same Supabase read/mapping
+  // logic as the rest of the app (listingsApi.ts).
   useEffect(() => {
-    // Managing/searching listings only needs the most recent N, not literally every
-    // listing ever created — capped to keep this fast and inexpensive as the
-    // marketplace grows.
-    const fetchListings = async () => {
+    const loadListings = async () => {
       try {
-        const q = query(collection(db, "listings"), orderBy("createdAt", "desc"), limit(300));
-        const snapshot = await getDocs(q);
-        const all: any[] = [];
-        snapshot.forEach((docSnap) => {
-          all.push({ id: docSnap.id, ...docSnap.data() });
-        });
+        const all = await fetchAdminListings(300);
         setAdminListings(all);
       } catch (err) {
         console.error("Could not fetch listings for admin:", err);
       }
     };
-    fetchListings();
+    loadListings();
 
-    getAggregateFromServer(collection(db, "listings"), {
-      totalCount: count(),
-      totalViews: sum("views"),
-    }).then((snap) => {
-      setAggListingCount(snap.data().totalCount);
-      setAggTotalViews(snap.data().totalViews || 0);
-    }).catch((err) => {
-      console.error("Could not fetch listings aggregate for admin:", err);
-    });
+    const loadCount = async () => {
+      try {
+        const { count, error } = await supabase
+          .from("listings")
+          .select("*", { count: "exact", head: true })
+          .eq("is_deleted", false);
+        if (error) throw error;
+        setAggListingCount(count || 0);
+      } catch (err) {
+        console.error("Could not fetch listings count for admin:", err);
+      }
+    };
+    loadCount();
   }, []);
 
   // Enforce secure lock immediately
@@ -139,14 +152,6 @@ export function AdminPanel({ language, currentUser, listings: listingsProp, isUs
   const [loadingVisits, setLoadingVisits] = useState(true);
   const [analyticsStats, setAnalyticsStats] = useState<{ totalVisits?: number; totalLogins?: number; totalSignups?: number; totalInstalls?: number }>({});
 
-  const [authReady, setAuthReady] = useState(!!auth.currentUser);
-  useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (u) => {
-      setAuthReady(!!u);
-    });
-    return () => unsub();
-  }, []);
-
   // Support tickets states
   const [ticketsList, setTicketsList] = useState<any[]>([]);
   const [loadingTickets, setLoadingTickets] = useState(true);
@@ -158,6 +163,9 @@ export function AdminPanel({ language, currentUser, listings: listingsProp, isUs
   const [deleteLoadingId, setDeleteLoadingId] = useState<string | null>(null);
   const [seeding, setSeeding] = useState(false);
 
+  // 🔧 (2026-09-26) Migrated to insert into Supabase's listings table
+  // (same shape AddPartForm.tsx writes), matching where the marketplace
+  // actually reads listings from now.
   const handleSeedMockListings = async () => {
     const confirmSeed = window.confirm(
       language === "bn"
@@ -170,9 +178,23 @@ export function AdminPanel({ language, currentUser, listings: listingsProp, isUs
     setActionSuccessMsg("");
     try {
       const { SAMPLE_LISTINGS } = await import("../translations");
-      for (const item of SAMPLE_LISTINGS) {
-        await setDoc(doc(db, "listings", item.id), item);
-      }
+      const rows = SAMPLE_LISTINGS.map((item: any) => ({
+        title: item.title,
+        model: item.model,
+        category: item.category,
+        sub_category: item.subCategory || "general",
+        brand: item.brand || "",
+        price: Number(item.price) || 0,
+        description: item.description || "",
+        location: item.location || "Bangladesh",
+        images: item.images || (item.image ? [item.image] : []),
+        seller_id: item.sellerId || "demo-seller",
+        seller_name: item.sellerName || "Demo Seller",
+        type: item.category === "vehicles" ? "vehicle" : "part",
+      }));
+      const { error } = await supabase.from("listings").insert(rows);
+      if (error) throw error;
+
       setActionSuccessMsg(
         language === "bn"
           ? "সফলভাবে ডাটাবেসে মক লিস্টিং যোগ করা হয়েছে! মার্কেটপ্লেস রিফ্রেশ করুন।"
@@ -187,16 +209,18 @@ export function AdminPanel({ language, currentUser, listings: listingsProp, isUs
     }
   };
 
-  // Load configured payment info from Firestore
+  // 🔧 (2026-09-26) payment_info moved into the same Supabase app_config
+  // table UpdateBanner.tsx's "version" row already lives in (key/value
+  // jsonb) -- was a Firestore settings/payment_info doc.
   useEffect(() => {
     const fetchPaymentInfo = async () => {
       try {
-        const docSnap = await getDoc(doc(db, "settings", "payment_info"));
-        if (docSnap.exists()) {
-          const data = docSnap.data();
-          setBkash(data.bkash || "01783457173 (Personal)");
-          setNagad(data.nagad || "01783457173 (Personal)");
-          setRocket(data.rocket || "01783457173 (Personal)");
+        const { data, error } = await supabase.from("app_config").select("value").eq("key", "payment_info").maybeSingle();
+        if (error) throw error;
+        if (data?.value) {
+          setBkash(data.value.bkash || "01783457173 (Personal)");
+          setNagad(data.value.nagad || "01783457173 (Personal)");
+          setRocket(data.value.rocket || "01783457173 (Personal)");
         }
       } catch (err) {
         console.error("Could not fetch payment_info:", err);
@@ -250,40 +274,43 @@ export function AdminPanel({ language, currentUser, listings: listingsProp, isUs
     };
   }, []);
 
-  // Listen to all customer support tickets across Gari Bazar platform
-  useEffect(() => {
-    const q = query(
-      collection(db, "support_tickets"),
-      orderBy("createdAt", "desc"),
-      limit(50)
-    );
-
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const list: any[] = [];
-      snapshot.forEach((doc) => {
-        list.push({ id: doc.id, ...doc.data() });
-      });
-      setTicketsList(list);
-      setLoadingTickets(false);
-    }, (err) => {
+  // 🔧 (2026-09-26) Migrated off Firestore's support_tickets collection --
+  // api/account-actions.ts now writes tickets into a Supabase table of the
+  // same name. This was the last Firestore onSnapshot listener left in the
+  // app; replaced with a one-time fetch + a Realtime subscription (same
+  // pattern as refill_requests just above).
+  const fetchTickets = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("support_tickets")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(50);
+      if (error) throw error;
+      setTicketsList((data || []).map(mapTicketRow));
+    } catch (err) {
       console.error("Could not fetch support tickets:", err);
+    } finally {
       setLoadingTickets(false);
-    });
+    }
+  };
 
-    return () => unsubscribe();
+  useEffect(() => {
+    fetchTickets();
+    const channel = supabase
+      .channel("admin_support_tickets")
+      .on("postgres_changes", { event: "*", schema: "public", table: "support_tickets" }, () => {
+        fetchTickets();
+      })
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   // Live summary counters -- total visits / logins / signups. Backed by
   // Supabase (`analytics_daily` rollup + `site_visits` log), written by
-  // /api/track-event -- NOT Firestore anymore (see below for why).
-  //
-  // 🔧 আগে এটা Firestore-এর analytics_stats/summary/shards থেকে পড়ত, যেটার
-  // security rule চায় একটা Firebase Auth session (`request.auth`)। যেসব
-  // admin phone দিয়ে লগইন করেন (Supabase Auth-only, Firebase session তৈরিই
-  // হয় না), তাদের জন্য ওই read সবসময় permission-denied হয়ে চুপচাপ fail করত
-  // -- তাই Total Visits/Logins/Signups/Installs সবসময় 0 দেখাত। Supabase-এ
-  // সরিয়ে আনায় এখন phone/email/google -- সব ধরনের admin login-এই ঠিকভাবে
-  // কাজ করবে।
+  // /api/track-event.
   //
   // আগে এই দুটো effect প্রতি 30 সেকেন্ডে নিজে থেকে re-fetch করত (setInterval) --
   // এখন শুধু ট্যাব খোলার সময় একবার fetch হয়, আর নিচের রিফ্রেশ বাটনে চাপলে আবার
@@ -382,10 +409,12 @@ export function AdminPanel({ language, currentUser, listings: listingsProp, isUs
   const handleResolveTicket = async (ticketId: string) => {
     setTicketActionLoadingId(ticketId);
     try {
-      await updateDoc(doc(db, "support_tickets", ticketId), {
-        status: "resolved",
-        resolvedAt: new Date().toISOString()
-      });
+      const { error } = await supabase
+        .from("support_tickets")
+        .update({ status: "resolved", resolved_at: new Date().toISOString() })
+        .eq("id", ticketId);
+      if (error) throw error;
+      await fetchTickets();
     } catch (err) {
       console.error("Could not resolve ticket:", err);
     } finally {
@@ -396,9 +425,9 @@ export function AdminPanel({ language, currentUser, listings: listingsProp, isUs
   const handleReopenTicket = async (ticketId: string) => {
     setTicketActionLoadingId(ticketId);
     try {
-      await updateDoc(doc(db, "support_tickets", ticketId), {
-        status: "open"
-      });
+      const { error } = await supabase.from("support_tickets").update({ status: "open" }).eq("id", ticketId);
+      if (error) throw error;
+      await fetchTickets();
     } catch (err) {
       console.error("Could not reopen ticket:", err);
     } finally {
@@ -412,13 +441,17 @@ export function AdminPanel({ language, currentUser, listings: listingsProp, isUs
     setSaveSuccess(false);
 
     try {
-      await setDoc(doc(db, "settings", "payment_info"), {
-        bkash: bkash.trim(),
-        nagad: nagad.trim(),
-        rocket: rocket.trim(),
-        updatedAt: new Date().toISOString(),
-        updatedBy: currentUser?.phoneNumber || currentUser?.email || "Admin"
-      }, { merge: true });
+      const { error } = await supabase.from("app_config").upsert({
+        key: "payment_info",
+        value: {
+          bkash: bkash.trim(),
+          nagad: nagad.trim(),
+          rocket: rocket.trim(),
+          updatedAt: new Date().toISOString(),
+          updatedBy: currentUser?.phoneNumber || currentUser?.email || "Admin",
+        },
+      });
+      if (error) throw error;
 
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 3000);
@@ -517,6 +550,12 @@ export function AdminPanel({ language, currentUser, listings: listingsProp, isUs
     }
   };
 
+  // 🔧 (2026-09-26) Migrated off Firestore's deleteDoc() -- listings live
+  // in Supabase. chats.listing_id has NO ACTION on delete (not CASCADE,
+  // verified against the live schema -- see api/cron/maintenance.ts's
+  // comment for the same finding), so a listing with an active chat thread
+  // is nulled out there first, or the delete would throw a foreign-key
+  // violation.
   const handleDeleteListing = async (listingId: string) => {
     const confirmDelete = window.confirm(
       language === "bn" 
@@ -529,10 +568,16 @@ export function AdminPanel({ language, currentUser, listings: listingsProp, isUs
     setActionSuccessMsg("");
 
     try {
-      await deleteDoc(doc(db, "listings", listingId));
+      const { error: chatsErr } = await supabase.from("chats").update({ listing_id: null }).eq("listing_id", listingId);
+      if (chatsErr) console.error("chats.listing_id cleanup error:", chatsErr.message);
+
+      const { error } = await supabase.from("listings").delete().eq("id", listingId);
+      if (error) throw error;
+
       // Remove instantly from the local list so the admin sees the
       // updated count/grid without needing to reload the page.
       setListings((prev) => prev.filter((l) => l.id !== listingId));
+      setAdminListings((prev) => prev.filter((l) => l.id !== listingId));
       setActionSuccessMsg(
         language === "bn"
           ? "লিস্টিংটি সফলভাবে গেটওয়ে ও ডাটাবেস থেকে মুছে ফেলা হয়েছে!"
@@ -556,7 +601,7 @@ export function AdminPanel({ language, currentUser, listings: listingsProp, isUs
     .reduce((sum, req) => sum + (Number(req.amount) || 0), 0);
   const totalListings = aggListingCount || adminListings?.length || 0;
   const pendingRequestsCount = requests.filter(r => r.status === 'pending').length;
-  const totalViews = aggTotalViews || (adminListings || []).reduce((sum, l: any) => sum + (Number(l.views) || 0), 0);
+  const totalViews = (adminListings || []).reduce((sum, l: any) => sum + (Number(l.views) || 0), 0);
 
   return (
     <div className="space-y-6">
