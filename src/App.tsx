@@ -4,11 +4,10 @@
  */
 
 import { useState, useEffect, useMemo, useRef, lazy, Suspense } from "react";
-import { db, logAnalyticsEvent } from "./firebase";
+import { logAnalyticsEvent } from "./firebase";
 import { supabase } from "./supabase";
 import { logger } from "./utils/logger";
 import { trackEvent } from "./utils/trackEvent";
-import { collection, onSnapshot, query, orderBy, getDocs, doc, getDoc, updateDoc, where, addDoc, serverTimestamp, limit, startAfter, DocumentSnapshot } from "firebase/firestore";
 import { withTimeout, TimeoutError } from "./utils/withTimeout";
 import { apiUrl } from "./utils/apiBase";
 import { incrementListingView } from "./utils/counters";
@@ -17,6 +16,7 @@ import {
   fetchMoreListings as fetchMoreListingsFromSupabase,
   fetchAdListings as fetchAdListingsFromSupabase,
   fetchMyListings as fetchMyListingsFromSupabase,
+  fetchListingById,
 } from "./utils/listingsApi";
 import { useAdPromotion } from "./hooks/useAdPromotion";
 import { Car, Search, User, LogOut, Globe, Loader2, ShoppingBag, Phone, ChevronRight, ShieldCheck, Send, Check, Download, Smartphone } from "lucide-react";
@@ -289,7 +289,6 @@ export default function App() {
   // Purchases Pagination States
   const [firebasePurchases, setFirebasePurchases] = useState<any[]>([]);
   const [morePurchases, setMorePurchases] = useState<any[]>([]);
-  const [lastPurchasesDoc, setLastPurchasesDoc] = useState<DocumentSnapshot | null>(null);
   const [hasMorePurchases, setHasMorePurchases] = useState(false);
   const [loadingMorePurchases, setLoadingMorePurchases] = useState(false);
   
@@ -347,7 +346,7 @@ export default function App() {
   // we try two much faster paths first:
   //   1. A locally cached copy stashed right before we navigated here (instant,
   //      zero network wait).
-  //   2. A direct single-document fetch by ID (one small request, instead of
+  //   2. A direct single-listing fetch by ID (one small request, instead of
   //      syncing the whole marketplace).
   // The full `listings` collection still loads in the background as normal.
   const [hasOpenedSharedListing, setHasOpenedSharedListing] = useState(false);
@@ -384,12 +383,17 @@ export default function App() {
       return;
     }
 
-    // Last resort: fetch just this one document directly.
+    // Last resort: fetch just this one listing directly from Supabase.
+    // 🔧 (2026-09-27) Was a Firestore getDoc() -- listings have lived in
+    // Supabase since the migration, so this silently found nothing for any
+    // listing created since then, meaning a shared link for a newer post
+    // never opened the listing directly (it would only appear once the
+    // full paginated collection happened to sync down, if ever).
     (async () => {
       try {
-        const snap = await getDoc(doc(db, "listings", sharedListingId));
-        if (snap.exists()) {
-          setSelectedListing({ id: snap.id, ...snap.data() } as PartListing);
+        const found = await fetchListingById(sharedListingId);
+        if (found) {
+          setSelectedListing(found);
         }
       } catch (err) {
         console.warn("Could not fetch shared listing directly:", err);
@@ -917,27 +921,65 @@ export default function App() {
   }, [authReady, user?.uid]);
 
   // Sync profile metadata real-time (e.g. simulated credits recharge instantly)
+  // 🔧 (2026-09-27) Migrated off Firestore's users/{uid} onSnapshot listener
+  // -- profile data (name/phone/city/profile_picture/simulated_credits/
+  // referral_code/blocked_uids) has lived in Supabase's `users` table since
+  // the phone-auth migration (see AuthModal.tsx / api/auth/phone.ts), so
+  // this listener was watching a Firestore doc that nothing writes to
+  // anymore -- credits recharges, referral codes, and blocked-user updates
+  // never reached userMetadata live. isAdmin is untouched by this change:
+  // it was never a field synced by this listener either way -- AuthModal.tsx
+  // resolves it fresh at login time from Supabase's separate `admins` table.
   useEffect(() => {
     if (!authReady || !user?.uid) return;
+    let active = true;
 
-    const userRef = doc(db, "users", user.uid);
-    const unsubscribe = onSnapshot(userRef, (docSnap) => {
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        setUserMetadata((prev: any) => ({ ...prev, ...data }));
-        
-        // Sync back to local storage
-        const stored = localStorage.getItem("gari_bazar_session_user");
-        if (stored) {
-          try {
-            const parsed = JSON.parse(stored);
-            localStorage.setItem("gari_bazar_session_user", JSON.stringify({ ...parsed, ...data }));
-          } catch (e) {}
-        }
+    const applyUserRow = (row: any) => {
+      if (!row) return;
+      const mapped = {
+        displayName: row.name,
+        email: row.email,
+        phoneNumber: row.phone,
+        city: row.city,
+        profilePicture: row.profile_picture,
+        simulatedCredits: row.simulated_credits,
+        referralCode: row.referral_code,
+        blockedUids: row.blocked_uids,
+      };
+      setUserMetadata((prev: any) => ({ ...prev, ...mapped }));
+
+      // Sync back to local storage
+      const stored = localStorage.getItem("gari_bazar_session_user");
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored);
+          localStorage.setItem("gari_bazar_session_user", JSON.stringify({ ...parsed, ...mapped }));
+        } catch (e) {}
       }
-    });
+    };
 
-    return () => unsubscribe();
+    const fetchUserRow = async () => {
+      const { data, error } = await supabase.from("users").select("*").eq("uid", user.uid).maybeSingle();
+      if (!active) return;
+      if (error) {
+        console.warn("Failed to fetch user profile row:", error);
+        return;
+      }
+      applyUserRow(data);
+    };
+
+    fetchUserRow();
+    const channel = supabase
+      .channel(`user-profile-${user.uid}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "users", filter: `uid=eq.${user.uid}` }, (payload) => {
+        applyUserRow(payload.new);
+      })
+      .subscribe();
+
+    return () => {
+      active = false;
+      supabase.removeChannel(channel);
+    };
   }, [authReady, user?.uid]);
 
   // Unread Chats Listener — migrated to Supabase (chats table), matching
@@ -1494,8 +1536,8 @@ export default function App() {
     try {
       // 🔧 সরাসরি Firestore write-এর বদলে rate-limited API ব্যবহার করা হচ্ছে
       // (guest হলে IP-ভিত্তিক, লগইন থাকলে uid-ভিত্তিক সীমা) -- দেখুন
-      // api/account-actions.ts (action: submit_support_ticket), আর
-      // firestore.rules-এ support_tickets এখন client-এর জন্য সম্পূর্ণ বন্ধ।
+      // api/account-actions.ts (action: submit_support_ticket), যেটা
+      // Supabase-এর support_tickets টেবিলে লেখে।
       const { data: { session } } = await supabase.auth.getSession();
       const idToken = user?.uid ? (session?.access_token || null) : null;
       const resp = await fetch(apiUrl("/api/account-actions"), {
@@ -2480,8 +2522,8 @@ export default function App() {
                           </div>
                           <p className="leading-relaxed font-semibold">
                             {language === "bn"
-                              ? "আপনার অ্যাকাউন্ট এবং পার্সোনাল ডাটা সম্পূর্ণ নিরাপদ। আমরা আপনার তথ্যের গোপনীয়তা রক্ষায় জেনুইন সিকিউরিটি ও ফায়ারবেস ব্যাকএন্ড ব্যবহার করি।"
-                              : "Our data storage protocols match modern standards. We respect user rights and protect trade listings from scraping with Firestore security filters."}
+                              ? "আপনার অ্যাকাউন্ট এবং পার্সোনাল ডাটা সম্পূর্ণ নিরাপদ। আমরা আপনার তথ্যের গোপনীয়তা রক্ষায় জেনুইন সিকিউরিটি ও Supabase ব্যাকএন্ড ব্যবহার করি।"
+                              : "Our data storage protocols match modern standards. We respect user rights and protect trade listings from scraping with database-level security policies."}
                           </p>
                           <button
                             type="button"
