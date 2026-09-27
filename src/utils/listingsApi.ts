@@ -169,3 +169,21 @@ export async function fetchMyListings(sellerId: string, limit = 100): Promise<Pa
   if (error) throw error;
   return (data || []).map(mapRowToListing);
 }
+
+// 🔧 (2026-09-26) Added for AdminPanel.tsx's "Manage Listings" tab, which
+// was still querying Firestore (collection(db,"listings")) and so always
+// came back empty for anything posted since the Supabase migration. Same
+// mapping as everything else in this file, just without a seller filter and
+// with a larger default limit (the admin panel manages the whole
+// marketplace, not one seller's posts).
+export async function fetchAdminListings(limit = 300): Promise<PartListing[]> {
+  const { data, error } = await supabase
+    .from("listings")
+    .select("*")
+    .eq("is_deleted", false)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+
+  if (error) throw error;
+  return (data || []).map(mapRowToListing);
+}
