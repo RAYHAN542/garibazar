@@ -1,43 +1,48 @@
 import type { PartListing } from "../types";
 
 // Fair rotation for boosted/sponsored ads.
-// - The homepage never shows more than 6 boosted ads at once (spotlight
-//   slider and feed both use the same 6-ad window).
+// - The top spotlight slider shows at most 6 boosted ads at once.
+// - The feed below shows just ONE boosted post (after the first 2 normal
+//   posts) -- not a row of them.
 // - However many ads exist, EVERY ad gets its turn: each visitor's browser
-//   remembers where it left off and moves the window forward by 6 on every
-//   page load, cycling through all ads in a fixed order. New visitors start
-//   at a random point so all ads get equal exposure across visitors too.
+//   remembers where it left off and moves forward on every page load,
+//   cycling through all ads in a fixed order. New visitors start at a random
+//   point so all ads get equal exposure across visitors too.
 // - The logged-in seller's OWN live boosted posts are always pinned into
-//   their own window, so whoever paid for a boost can always see it on the
-//   homepage (other visitors still see it only when its turn comes).
-// - Boosted ads outside the current window are NOT hidden -- they just
-//   appear as normal listings in their usual position.
+//   their own view, so whoever paid for a boost can always see it on the
+//   homepage (other visitors see it only when its turn comes).
+// - Boosted ads that aren't picked are NOT hidden -- they just appear as
+//   normal listings in their usual position.
 export const MAX_SPOTLIGHT_ADS = 6;
-export const MAX_INLINE_ADS = 6;
+export const MAX_INLINE_ADS = 1;
 export const ADS_INTERLEAVE_GAP = 5;
 const FIRST_AD_POSITION = 2;
 
-const OFFSET_STORAGE_KEY = "gari_bazar_ad_rotation_offset";
 const SESSION_STORAGE_KEY = "gari_bazar_session_user";
+const SLIDER_OFFSET_KEY = "gari_bazar_ad_rotation_offset";
+const FEED_OFFSET_KEY = "gari_bazar_ad_feed_rotation_offset";
 
-// Read this visitor's position in the rotation once per page load, then
+// Read this visitor's position in a rotation once per page load, then
 // advance it for the next load.
-function readAndAdvanceOffset(): number {
+function readAndAdvance(storageKey: string, step: number): number {
   let offset = Math.floor(Math.random() * 1_000_000);
   try {
-    const saved = localStorage.getItem(OFFSET_STORAGE_KEY);
+    const saved = localStorage.getItem(storageKey);
     if (saved !== null) {
       const parsed = parseInt(saved, 10);
       if (!Number.isNaN(parsed)) offset = parsed;
     }
-    localStorage.setItem(OFFSET_STORAGE_KEY, String(offset + MAX_INLINE_ADS));
+    localStorage.setItem(storageKey, String(offset + step));
   } catch {
     // storage unavailable: fall back to a random start for this load
   }
   return offset;
 }
 
-const PAGE_OFFSET = readAndAdvanceOffset();
+// Slider moves forward by a whole window (6) per load; the single feed ad
+// moves forward by 1 per load so it also visits every ad.
+const SLIDER_OFFSET = readAndAdvance(SLIDER_OFFSET_KEY, MAX_SPOTLIGHT_ADS);
+const FEED_OFFSET = readAndAdvance(FEED_OFFSET_KEY, MAX_INLINE_ADS);
 
 function currentUserId(): string | null {
   try {
@@ -77,7 +82,8 @@ export function pickRotatedAds(ads: PartListing[], max: number): PartListing[] {
 
   const pinnedIds = new Set(pinned.map((item) => item.id));
   const rest = live.filter((item) => !pinnedIds.has(item.id));
-  const start = PAGE_OFFSET % rest.length;
+  const offset = max === MAX_INLINE_ADS ? FEED_OFFSET : SLIDER_OFFSET;
+  const start = offset % rest.length;
   const window = Array.from({ length: Math.min(remaining, rest.length) }, (_, i) => rest[(start + i) % rest.length]);
   return [...pinned, ...window];
 }
@@ -100,7 +106,7 @@ export function interleaveAds(items: PartListing[]): PartListing[] {
       (n > FIRST_AD_POSITION && (n - FIRST_AD_POSITION) % ADS_INTERLEAVE_GAP === 0);
     if (isSlot && next < picked.length) out.push(picked[next++]);
   });
-  // Very short feed: still show one boosted ad.
+  // Very short feed: still show the boosted ad.
   if (next === 0) out.push(picked[next++]);
   return out;
 }
