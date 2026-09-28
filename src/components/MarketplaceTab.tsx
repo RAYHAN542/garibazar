@@ -8,36 +8,6 @@ import type { ActiveTab } from "./HeaderNav";
 import { logAnalyticsEvent } from "../firebase";
 import { pickRotatedAds, interleaveAds, MAX_SPOTLIGHT_ADS } from "../utils/adRotation";
 
-const VEHICLE_SUBCATEGORIES = [
-  { id: "all", bnName: "সব গাড়ি", enName: "All Vehicles" },
-  { id: "car", bnName: "কার", enName: "Car" },
-  { id: "bike", bnName: "বাইক", enName: "Bike" },
-  { id: "truck", bnName: "ট্রাক", enName: "Truck" },
-  { id: "microbus", bnName: "মাইক্রোবাস", enName: "Microbus" },
-  { id: "bus", bnName: "বাস", enName: "Bus" },
-  { id: "excavator", bnName: "এক্সক্যাভেটর", enName: "Excavator" },
-  { id: "crane", bnName: "ক্রেন", enName: "Crane" },
-  { id: "bulldozer", bnName: "বুলডোজার", enName: "Bulldozer" },
-  { id: "forklift", bnName: "ফর্কলিফ্ট", enName: "Forklift" },
-  { id: "other_heavy_equipment", bnName: "অন্যান্য ভারী যন্ত্রপাতি", enName: "Other Heavy Equipment" }
-];
-
-const SPARE_PARTS_SUBCATEGORIES = [
-  { id: "all", bnName: "সব পার্টস", enName: "All Parts" },
-  { id: "engine_part", bnName: "ইঞ্জিন পার্ট", enName: "Engine Part" },
-  { id: "light", bnName: "লাইট", enName: "Light" },
-  { id: "pump", bnName: "পাম্প", enName: "Pump" },
-  { id: "controller", bnName: "কন্ট্রোলার", enName: "Controller" },
-  { id: "drive_motor", bnName: "ড্রাইভ মোটর", enName: "Drive Motor" },
-  { id: "other_part", bnName: "অন্যান্য পার্টস", enName: "Other Part" }
-];
-
-const ALL_SUBCATEGORIES = [
-  { id: "all", bnName: "সব ক্যাটাগরি", enName: "All Categories" },
-  ...VEHICLE_SUBCATEGORIES.slice(1),
-  ...SPARE_PARTS_SUBCATEGORIES.slice(1)
-];
-
 interface MarketplaceTabProps {
   language: SupportedLanguage;
   activeTranslations: TranslationSet;
@@ -411,7 +381,12 @@ export default function MarketplaceTab({
                 </div>
 
 
-                {/* 🛠️ Modern Filters & Dynamic Sorting Panel (Revealed dynamically!) */}
+                {/* 🛠️ Modern Filters & Dynamic Sorting Panel (Revealed dynamically!)
+                    🔧 (2026-09-26) The "Sub-Categories" pill row that used to sit at
+                    the top of this panel was removed -- the quick-filter icon row
+                    above (All/Car/Part/Bike/Truck/Heavy Equip.) already does the
+                    same job with one tap and now filters correctly server-side,
+                    so the duplicate list was just extra clutter. */}
                 {showFilters && (
                   <div className="bg-slate-50 dark:bg-slate-900 border border-slate-150 dark:border-slate-800 rounded-2xl p-3.5 mb-4 space-y-3.5 shadow-xs animate-fade-in text-slate-850 dark:text-slate-200">
                     {/* Dynamic resetting helper option if filtered */}
@@ -419,49 +394,6 @@ export default function MarketplaceTab({
                       <span className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider block">
                         {language === "bn" ? "ফিল্টার এবং সাজান:" : "Filter & Sort:"}
                       </span>
-                    </div>
-
-                    {/* Subcategories Selector List - Relocated beautifully here */}
-                    <div>
-                      <span className="text-[10px] text-slate-400 dark:text-slate-550 font-extrabold uppercase tracking-wider block mb-2">
-                        {language === "bn" ? "উপ-ক্যাটাগরি সমূহ:" : "Sub-Categories:"}
-                      </span>
-                      <div className="flex overflow-x-auto whitespace-nowrap no-scrollbar gap-2 pb-1.5 -mx-1 px-1">
-                        {(selectedCategory === "vehicles" 
-                          ? VEHICLE_SUBCATEGORIES 
-                          : selectedCategory === "spare_parts" 
-                            ? SPARE_PARTS_SUBCATEGORIES 
-                            : ALL_SUBCATEGORIES)
-                          .map((cat) => (
-                          <button
-                            key={cat.id}
-                            onClick={() => {
-                              setSelectedSubCategory(cat.id);
-                              if (selectedCategory === "all" && cat.id !== "all") {
-                                const isVehicleSub = VEHICLE_SUBCATEGORIES.some(v => v.id === cat.id);
-                                const isPartsSub = SPARE_PARTS_SUBCATEGORIES.some(p => p.id === cat.id);
-                                if (isVehicleSub) {
-                                  setSelectedCategory("vehicles");
-                                } else if (isPartsSub) {
-                                  setSelectedCategory("spare_parts");
-                                }
-                              } else if (cat.id === "all") {
-                                setSelectedSubCategory("all");
-                              }
-                              try {
-                                logAnalyticsEvent("select_category", { category: cat.id });
-                              } catch (_) {}
-                            }}
-                            className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-extrabold transition-all duration-200 cursor-pointer ${
-                              selectedSubCategory === cat.id
-                                ? "bg-amber-500 text-slate-950 shadow-xs scale-[0.98]"
-                                : "bg-white dark:bg-slate-800 border border-slate-150 dark:border-slate-750 text-slate-650 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700"
-                            }`}
-                          >
-                            {language === "bn" ? cat.bnName : cat.enName}
-                          </button>
-                        ))}
-                      </div>
                     </div>
 
                   {/* 📍 Geographic District City Selector styled as beautiful Pills */}
