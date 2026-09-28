@@ -18,6 +18,7 @@ import {
   fetchMyListings as fetchMyListingsFromSupabase,
   fetchListingById,
 } from "./utils/listingsApi";
+import { shuffleArray, interleaveAds, MAX_SPOTLIGHT_ADS, MAX_INLINE_ADS, ADS_INTERLEAVE_GAP } from "./utils/adRotation.js";
 import { useAdPromotion } from "./hooks/useAdPromotion";
 import { Car, Search, User, LogOut, Globe, Loader2, ShoppingBag, Phone, ChevronRight, ShieldCheck, Send, Check, Download, Smartphone } from "lucide-react";
 
@@ -1596,6 +1597,16 @@ export default function App() {
     return merged;
   }, [listings, adListings]);
 
+  // 🎲 Fair rotation: বুস্ট করা অ্যাডগুলোর অর্ডার প্রতিবার পেজ লোডে র‍্যান্ডম হয় (adListings
+  // বদলালেই শুধু নতুন করে shuffle হয়, ফিল্টার/সার্চ বদলালে না -- তাই স্ক্রল করতে করতে অর্ডার লাফায় না)।
+  // যে অ্যাড আগে আসে সে স্পটলাইট আর মেইন ফিড দুই জায়গাতেই আগে সুযোগ পায়।
+  const shuffledAds = useMemo(() => shuffleArray(adListings), [adListings]);
+  const adRank = useMemo(() => {
+    const m = new Map<string, number>();
+    shuffledAds.forEach((a, i) => m.set(a.id, i));
+    return m;
+  }, [shuffledAds]);
+
   const enrichedListings = useMemo(() => {
     return listingsWithAds.map((item) => {
       const cat = CATEGORIES.find(c => c.id === item.category);
@@ -1767,12 +1778,11 @@ export default function App() {
       return matchesCategory && matchesSub && matchesCity;
     });
 
-    // Custom sorting algorithms
-    return [...finalFiltered].sort((a, b) => {
-      // Prioritize boosted promoted spotlight ad listings
-      if (a.isAd && !b.isAd) return -1;
-      if (!a.isAd && b.isAd) return 1;
-
+    // 🎲 Fair-rotation + interleave (আগে: সব বুস্ট করা অ্যাড একসাথে সবার উপরে জমা হতো)।
+    // এখন: বুস্ট করা অ্যাডগুলো র‍্যান্ডম অর্ডারে (shuffledAds) সাজিয়ে সর্বোচ্চ MAX_INLINE_ADS-টা
+    // মেইন ফিডের ভেতরে ছড়িয়ে দেওয়া হয় (প্রতি ADS_INTERLEAVE_GAP-টা সাধারণ পোস্টের পর ১টা)।
+    // সীমার বাইরে পড়ে যাওয়া অ্যাডগুলো হারিয়ে যায় না -- সাধারণ পোস্ট হিসেবে ফিডে থাকে।
+    const sortOrganic = (a: PartListing, b: PartListing) => {
       if (sortBy === "priceAsc") {
         return a.price - b.price;
       } else if (sortBy === "priceDesc") {
@@ -1781,12 +1791,20 @@ export default function App() {
         const popA = (a.views || 0) + (a.clicks || 0) * 3;
         const popB = (b.views || 0) + (b.clicks || 0) * 3;
         return popB - popA;
-      } else {
-        // "latest"
-        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
       }
-    });
-  }, [enrichedListings, fuseInstance, debouncedSearchQuery, selectedCategory, selectedSubCategory, selectedCity, sortBy]);
+      // "latest"
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    };
+
+    const allAds = finalFiltered
+      .filter((item) => item.isAd)
+      .sort((a, b) => (adRank.get(a.id) ?? 9999) - (adRank.get(b.id) ?? 9999));
+    const inlineAds = allAds.slice(0, MAX_INLINE_ADS);
+    const overflowAds = allAds.slice(MAX_INLINE_ADS);
+    const organic = [...finalFiltered.filter((item) => !item.isAd), ...overflowAds].sort(sortOrganic);
+
+    return interleaveAds(organic, inlineAds, ADS_INTERLEAVE_GAP);
+  }, [enrichedListings, fuseInstance, debouncedSearchQuery, selectedCategory, selectedSubCategory, selectedCity, sortBy, adRank]);
 
   // 7b. Auto-fetch more when a filter/sub-category matches nothing on the
   // current page but more listings might still exist further back. Mostly a
@@ -1807,22 +1825,21 @@ export default function App() {
   }, [filteredListings.length, hasMoreListings, loadingMoreListings, loading, listings.length, selectedCategory, selectedSubCategory, selectedCity, debouncedSearchQuery]);
 
   // 7c. Filtered boosted/sponsored ads for the "Premium Sponsored Spotlights"
-  // slider -- previously the slider always showed EVERY boosted ad
-  // regardless of the active category/sub-category filter (Car/Bike/Truck/
-  // Heavy Equip.), so selecting e.g. "Bike" still showed boosted cars in the
-  // spotlight section, which looked broken even though the main grid below
-  // was filtering correctly. Now the spotlight respects the same
-  // category/sub-category selection as the rest of the page.
+  // slider -- respects the same category/sub-category selection as the rest
+  // of the page. 🎲 Now taken from the randomly-rotated list and capped at
+  // MAX_SPOTLIGHT_ADS so every boosted ad gets a fair turn at the top.
   const filteredAdListings = useMemo(() => {
-    return adListings.filter((item) => {
-      let matchesCategory = true;
-      const isVehicle = isItemVehicle(item);
-      if (selectedCategory === "vehicles") matchesCategory = isVehicle;
-      else if (selectedCategory === "spare_parts") matchesCategory = !isVehicle;
-      const matchesSub = matchesSubCategoryFilter(item, selectedSubCategory);
-      return matchesCategory && matchesSub;
-    });
-  }, [adListings, selectedCategory, selectedSubCategory]);
+    return shuffledAds
+      .filter((item) => {
+        let matchesCategory = true;
+        const isVehicle = isItemVehicle(item);
+        if (selectedCategory === "vehicles") matchesCategory = isVehicle;
+        else if (selectedCategory === "spare_parts") matchesCategory = !isVehicle;
+        const matchesSub = matchesSubCategoryFilter(item, selectedSubCategory);
+        return matchesCategory && matchesSub;
+      })
+      .slice(0, MAX_SPOTLIGHT_ADS);
+  }, [shuffledAds, selectedCategory, selectedSubCategory]);
 
   // 8. Stats counting
   const statsSummary = useMemo(() => {
