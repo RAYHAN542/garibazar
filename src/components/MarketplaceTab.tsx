@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { Search, SlidersHorizontal, Bell, Plus, X, ShoppingBag, Loader2, LayoutGrid, Car, Wrench, Bike, Truck, Construction } from "lucide-react";
 import { ListingCard } from "./ListingCard";
 import { PromotedSlider } from "./PromotedSlider";
@@ -5,6 +6,7 @@ import { CITIES } from "../translations";
 import { PartListing, SupportedLanguage, TranslationSet } from "../types";
 import type { ActiveTab } from "./HeaderNav";
 import { logAnalyticsEvent } from "../firebase";
+import { pickRotatedAds, interleaveAds, MAX_SPOTLIGHT_ADS } from "../utils/adRotation";
 
 const VEHICLE_SUBCATEGORIES = [
   { id: "all", bnName: "সব গাড়ি", enName: "All Vehicles" },
@@ -123,6 +125,11 @@ export default function MarketplaceTab({
   handleRequestNotificationPermission,
   setIsLotteryOpen,
 }: MarketplaceTabProps) {
+  // Fair rotation of boosted ads: capped + randomly rotated per page load,
+  // spotlight slider and main feed (interleaved instead of grouped at top).
+  const spotlightAds = useMemo(() => pickRotatedAds(adListings, MAX_SPOTLIGHT_ADS), [adListings]);
+  const displayListings = useMemo(() => interleaveAds(filteredListings), [filteredListings]);
+
   return (
               <div>
 
@@ -548,10 +555,10 @@ export default function MarketplaceTab({
                 </div>
               )}
 
-                {/* 🚀 Boost Ads slide-show — সব বুস্ট করা অ্যাড দেখাবে, category/search filter ছাড়াই,
-                    যাতে যিনি পার্ট বুস্ট করেছেন তিনিও Vehicle ট্যাবে নিজের অ্যাড দেখতে পান */}
+                {/* 🚀 Boost Ads slide-show — capped + randomly rotated boosted ads (fair rotation),
+                    category/search filter ছাড়াই যাতে যিনি পার্ট বুস্ট করেছেন তিনিও Vehicle ট্যাবে নিজের অ্যাড দেখতে পান */}
                 <PromotedSlider 
-                  listings={adListings} 
+                  listings={spotlightAds} 
                   language={language}
                   onViewListing={handleViewListingDetails}
                   onOpenLottery={() => setIsLotteryOpen(true)}
@@ -605,7 +612,7 @@ export default function MarketplaceTab({
                 )}
 
                 {/* Sponsored / Ads Spotlight Header if any */}
-                {filteredListings.some((item) => item.isAd) && (
+                {displayListings.some((item) => item.isAd) && (
                   <div className="mb-2.5 flex items-center gap-2">
                     <span className="w-2.5 h-2.5 bg-amber-500 rounded-full animate-ping"></span>
                     <h3 className="text-sm font-extrabold font-sans text-amber-600 dark:text-amber-400 uppercase tracking-widest">
@@ -664,7 +671,7 @@ export default function MarketplaceTab({
                   </div>
                 ) : (
                   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2 sm:gap-4">
-  {filteredListings.map((listing, index) => (
+  {displayListings.map((listing, index) => (
     <ListingCard
       key={listing.id}
       listing={listing}
