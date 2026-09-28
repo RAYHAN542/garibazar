@@ -2,15 +2,15 @@ import type { PartListing } from "../types";
 
 // Fair rotation for boosted/sponsored ads.
 // - The top spotlight slider shows at most 6 boosted ads at once.
-// - The feed below shows just ONE boosted post (after the first 2 normal
-//   posts) -- not a row of them.
+// - The feed below shows just ONE other-seller boosted post (after the first
+//   2 normal posts) -- not a row of them.
 // - However many ads exist, EVERY ad gets its turn: each visitor's browser
 //   remembers where it left off and moves forward on every page load,
 //   cycling through all ads in a fixed order. New visitors start at a random
 //   point so all ads get equal exposure across visitors too.
-// - The logged-in seller's OWN live boosted posts are always pinned into
-//   their own view, so whoever paid for a boost can always see it on the
-//   homepage (other visitors see it only when its turn comes).
+// - The logged-in seller's OWN live boosted posts are always shown to them
+//   first: pinned into their slider window, and placed at the very top of
+//   their feed. Other visitors still see them only when their turn comes.
 // - Boosted ads that aren't picked are NOT hidden -- they just appear as
 //   normal listings in their usual position.
 export const MAX_SPOTLIGHT_ADS = 6;
@@ -89,14 +89,20 @@ export function pickRotatedAds(ads: PartListing[], max: number): PartListing[] {
 }
 
 export function interleaveAds(items: PartListing[]): PartListing[] {
-  const picked = pickRotatedAds(items, MAX_INLINE_ADS);
-  if (picked.length === 0) return items;
+  // The viewer's own live boosted posts go to the very top of THEIR feed.
+  const uid = currentUserId();
+  const mine = uid ? items.filter((item) => isLiveAd(item) && item.sellerId === uid) : [];
+  const mineIds = new Set(mine.map((item) => item.id));
+  const others = mineIds.size > 0 ? items.filter((item) => !mineIds.has(item.id)) : items;
+
+  const picked = pickRotatedAds(others, MAX_INLINE_ADS);
+  if (picked.length === 0) return [...mine, ...others];
 
   const pickedIds = new Set(picked.map((p) => p.id));
-  const organic = items.filter((item) => !pickedIds.has(item.id));
-  if (organic.length === 0) return picked;
+  const organic = others.filter((item) => !pickedIds.has(item.id));
+  if (organic.length === 0) return [...mine, ...picked];
 
-  const out: PartListing[] = [];
+  const out: PartListing[] = [...mine];
   let next = 0;
   organic.forEach((item, idx) => {
     out.push(item);
