@@ -137,13 +137,21 @@ export async function fetchMoreListings(beforeCreatedAt: string, limit = 20, fil
   };
 }
 
+// 🔧 (2026-09-28) The caller used to pass 20, which silently capped the
+// boosted-ad pool at 20 -- with fair rotation (src/utils/adRotation.ts)
+// every boosted ad must be able to take its turn, so the pool has to hold
+// ALL of them. Callers can still ask for fewer, but never less than this
+// floor.
+const AD_POOL_MIN_LIMIT = 300;
+
 export async function fetchAdListings(limit = 20): Promise<PartListing[]> {
   const { data, error } = await supabase
     .from("listings")
     .select("*")
     .eq("is_deleted", false)
     .eq("is_ad", true)
-    .limit(limit);
+    .order("created_at", { ascending: false })
+    .limit(Math.max(limit, AD_POOL_MIN_LIMIT));
 
   if (error) throw error;
   return (data || []).map(mapRowToListing);
