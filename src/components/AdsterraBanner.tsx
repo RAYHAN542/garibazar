@@ -13,15 +13,13 @@ interface AdsterraBannerProps {
 // nodes (document.createElement + appendChild) -- injected <script> tags
 // only execute when appended this way, not via dangerouslySetInnerHTML.
 //
-// 🔧 (2026-09-27) Adsterra's own "Get Code" snippet for this ad unit
-// (320x50_1) actually ships TWO script tags, not one -- the atOptions +
-// invoke.js pair below, PLUS a second script hosted on
-// profitableratecpmnetwork.com that does the actual ad-serving/creative
-// delivery. Only the first pair was ever wired in here, so the slot went
-// from fully empty (before the CSP fix let invoke.js itself load) to a
-// broken-image icon (invoke.js ran and built the ad container, but the
-// second script that fills it with a real creative was simply never
-// injected). Both scripts need vercel.json's CSP to allow their domains too.
+// 🔧 (2026-09-29) Removed a third <script> that used to be injected here
+// (pl31521943.profitableratecpmnetwork.com/...js). That is the Adsterra
+// *Social Bar* script, which index.html already loads globally -- loading
+// it again on every listing open was a duplicate, not part of the 320x50
+// banner unit. The real cause of the empty/broken banner was vercel.json's
+// CSP blocking Adsterra's rotating ad + tracking domains (fixed by allowing
+// https: for script/connect/frame).
 export function AdsterraBanner({ adKey, width, height }: AdsterraBannerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -38,29 +36,18 @@ export function AdsterraBanner({ adKey, width, height }: AdsterraBannerProps) {
     invokeScript.src = `https://www.highrevenueformat.com/${adKey}/invoke.js`;
     invokeScript.async = true;
 
-    // Second script from Adsterra's "Get Code" panel for this exact ad unit
-    // -- without this, invoke.js has nothing to actually fill the slot with.
-    const creativeScript = document.createElement("script");
-    creativeScript.type = "text/javascript";
-    creativeScript.src = "https://pl31521943.profitableratecpmnetwork.com/d2/47/2f/d2472fc1d9f7f1c9aba2e0c3492d1a87.js";
-    creativeScript.async = true;
-
     container.appendChild(configScript);
     container.appendChild(invokeScript);
-    container.appendChild(creativeScript);
 
     return () => {
       container.innerHTML = "";
     };
   }, [adKey, width, height]);
 
-  // 🔧 (2026-09-26) আগে এই wrapper-এর background ছিল bg-slate-950, ঠিক
-  // modal-এর উপরের ডার্ক হেডারের মতোই -- Adsterra যখন এই স্লটে অ্যাড fill
-  // করেনি (নতুন ইউনিট, fill শুরু হতে সময় লাগে), তখন খালি জায়গাটা
-  // ব্যাকগ্রাউন্ডের সাথে মিশে গিয়ে সম্পূর্ণ অদৃশ্য হয়ে যাচ্ছিল -- মালিক
-  // ভাবছিলেন কোডই কাজ করছে না। এখন হালকা dashed বর্ডার + "বিজ্ঞাপন" লেবেল
-  // যুক্ত করা হলো, যাতে খালি অবস্থায়ও স্লটটা আলাদা করে দেখা যায়, আর অ্যাড
-  // fill হলে লেবেলটা ছোট আর অপ্রতুল থাকে (অ্যাড নিজেই মূল ফোকাস)।
+  // 🔧 (2026-09-26) আগে এই wrapper-এর background ছিল bg-slate-950, ঠিক modal-এর উপরের ডার্ক হেডারের
+  // মতোই -- Adsterra যখন এই স্লটে অ্যাড fill করেনি, খালি জায়গাটা ব্যাকগ্রাউন্ডের
+  // সাথে মিশে অদৃশ্য হয়ে যাচ্ছিল। এখন হালকা dashed বর্ডার + "বিজ্ঞাপন" লেবেল
+  // যুক্ত করা হলো, যাতে খালি অবস্থায়ও স্লটটা আলাদা করে দেখা যায়।
   return (
     <div className="w-full flex flex-col items-center bg-slate-900 py-1.5 gap-1">
       <span className="text-[9px] uppercase tracking-widest text-slate-500 font-bold">

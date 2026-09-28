@@ -24,37 +24,6 @@
 <meta name="twitter:title" content="📲 গাড়ি বাজার অ্যাপ ইনস্টল করুন | Gari Bazar" />
 <meta name="twitter:description" content="গাড়ি বাজার অ্যাপ ইনস্টল করুন এবং গাড়ি ও গাড়ির পার্টস সহজে কেনাবেচা করুন।" />
 <meta name="twitter:image" content="https://garibazar.shop/og-banner.jpg" />
-    <!-- 🔍 TEMP DEBUG (remove after fixing ads): open garibazar.shop/?csp=1
-         and a green box at the bottom lists every URL the CSP blocked. -->
-    <script>
-      (function () {
-        if (location.search.indexOf('csp=1') === -1) return;
-        var lines = [];
-        function show() {
-          if (!document.body) return;
-          var box = document.getElementById('csp-debug');
-          if (!box) {
-            box = document.createElement('div');
-            box.id = 'csp-debug';
-            box.style.cssText = 'position:fixed;left:0;right:0;bottom:0;max-height:45vh;overflow:auto;z-index:2147483647;background:#111;color:#0f0;font:11px monospace;padding:8px;white-space:pre-wrap;word-break:break-all';
-            document.body.appendChild(box);
-          }
-          box.textContent = 'CSP DEBUG (' + lines.length + ')\n' + lines.join('\n');
-        }
-        document.addEventListener('securitypolicyviolation', function (e) {
-          lines.push('BLOCKED [' + e.violatedDirective + '] ' + e.blockedURI);
-          show();
-        });
-        window.addEventListener('error', function (e) {
-          var t = e.target;
-          if (t && t.tagName === 'SCRIPT') { lines.push('SCRIPT FAILED ' + t.src); show(); }
-        }, true);
-        window.addEventListener('load', function () {
-          setTimeout(show, 500);
-          setTimeout(function () { lines.push('-- 8s after load --'); show(); }, 8000);
-        });
-      })();
-    </script>
     <!-- Preload Noto Sans Bengali (non-render-blocking) -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
