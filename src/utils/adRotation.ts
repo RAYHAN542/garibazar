@@ -7,6 +7,9 @@ import type { PartListing } from "../types";
 //   remembers where it left off and moves the window forward by 6 on every
 //   page load, cycling through all ads in a fixed order. New visitors start
 //   at a random point so all ads get equal exposure across visitors too.
+// - The logged-in seller's OWN live boosted posts are always pinned into
+//   their own window, so whoever paid for a boost can always see it on the
+//   homepage (other visitors still see it only when its turn comes).
 // - Boosted ads outside the current window are NOT hidden -- they just
 //   appear as normal listings in their usual position.
 export const MAX_SPOTLIGHT_ADS = 6;
@@ -15,6 +18,7 @@ export const ADS_INTERLEAVE_GAP = 5;
 const FIRST_AD_POSITION = 2;
 
 const OFFSET_STORAGE_KEY = "gari_bazar_ad_rotation_offset";
+const SESSION_STORAGE_KEY = "gari_bazar_session_user";
 
 // Read this visitor's position in the rotation once per page load, then
 // advance it for the next load.
@@ -35,6 +39,17 @@ function readAndAdvanceOffset(): number {
 
 const PAGE_OFFSET = readAndAdvanceOffset();
 
+function currentUserId(): string | null {
+  try {
+    const raw = localStorage.getItem(SESSION_STORAGE_KEY);
+    if (!raw) return null;
+    const uid = JSON.parse(raw)?.uid;
+    return typeof uid === "string" && uid ? uid : null;
+  } catch {
+    return null;
+  }
+}
+
 function isLiveAd(item: PartListing): boolean {
   if (!item.isAd) return false;
   if (!item.adExpiresAt) return true;
@@ -54,8 +69,17 @@ export function pickRotatedAds(ads: PartListing[], max: number): PartListing[] {
 
   if (live.length <= max) return live;
 
-  const start = PAGE_OFFSET % live.length;
-  return Array.from({ length: max }, (_, i) => live[(start + i) % live.length]);
+  // The viewer's own boosted posts are always shown to them first.
+  const uid = currentUserId();
+  const pinned = uid ? live.filter((item) => item.sellerId === uid).slice(0, max) : [];
+  const remaining = max - pinned.length;
+  if (remaining <= 0) return pinned;
+
+  const pinnedIds = new Set(pinned.map((item) => item.id));
+  const rest = live.filter((item) => !pinnedIds.has(item.id));
+  const start = PAGE_OFFSET % rest.length;
+  const window = Array.from({ length: Math.min(remaining, rest.length) }, (_, i) => rest[(start + i) % rest.length]);
+  return [...pinned, ...window];
 }
 
 export function interleaveAds(items: PartListing[]): PartListing[] {
