@@ -1,32 +1,39 @@
 import type { PartListing } from "../types";
 
 // Fair rotation for boosted/sponsored ads.
-// - Spotlight slider shows at most MAX_SPOTLIGHT_ADS boosted ads.
-// - Main feed shows at most MAX_INLINE_ADS boosted ads, interleaved between
-//   normal listings (not grouped at the top).
-// - Which ads get picked is random but stable within one page load (seeded),
-//   and changes on the next load, so every boosted ad gets its turn.
-// - Boosted ads that lose the draw are NOT hidden -- they just appear as
-//   normal listings in their usual position.
-export const MAX_SPOTLIGHT_ADS = 8;
+// - The homepage never shows more than 6 boosted ads at once (spotlight
+//   slider and feed both use the same 6-ad window).
+// - However many ads exist, EVERY ad gets its turn: each visitor's browser
+//   remembers where it left off and moves the window forward by 6 on every
+//   page load, cycling through all ads in a fixed order. New visitors start
+//   at a random point so all ads get equal exposure across visitors too.
+// - Boosted ads outside the current window are NOT hidden -- they just
+//   appear as normal listings in their usual position.
+export const MAX_SPOTLIGHT_ADS = 6;
 export const MAX_INLINE_ADS = 6;
 export const ADS_INTERLEAVE_GAP = 5;
 const FIRST_AD_POSITION = 2;
 
-const SESSION_SEED = Math.floor(Math.random() * 4294967296);
+const OFFSET_STORAGE_KEY = "gari_bazar_ad_rotation_offset";
 
-function rankFor(id: string): number {
-  // FNV-1a hash of the id, mixed with the per-load seed, then one mulberry32 step.
-  let h = 2166136261 ^ SESSION_SEED;
-  for (let i = 0; i < id.length; i++) {
-    h ^= id.charCodeAt(i);
-    h = Math.imul(h, 16777619);
+// Read this visitor's position in the rotation once per page load, then
+// advance it for the next load.
+function readAndAdvanceOffset(): number {
+  let offset = Math.floor(Math.random() * 1_000_000);
+  try {
+    const saved = localStorage.getItem(OFFSET_STORAGE_KEY);
+    if (saved !== null) {
+      const parsed = parseInt(saved, 10);
+      if (!Number.isNaN(parsed)) offset = parsed;
+    }
+    localStorage.setItem(OFFSET_STORAGE_KEY, String(offset + MAX_INLINE_ADS));
+  } catch {
+    // storage unavailable: fall back to a random start for this load
   }
-  let t = (h + 0x6d2b79f5) | 0;
-  t = Math.imul(t ^ (t >>> 15), t | 1);
-  t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-  return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  return offset;
 }
+
+const PAGE_OFFSET = readAndAdvanceOffset();
 
 function isLiveAd(item: PartListing): boolean {
   if (!item.isAd) return false;
@@ -36,12 +43,19 @@ function isLiveAd(item: PartListing): boolean {
 
 export function pickRotatedAds(ads: PartListing[], max: number): PartListing[] {
   const seen = new Set<string>();
-  const live = ads.filter((item) => {
-    if (!isLiveAd(item) || seen.has(item.id)) return false;
-    seen.add(item.id);
-    return true;
-  });
-  return live.sort((a, b) => rankFor(a.id) - rankFor(b.id)).slice(0, max);
+  const live = ads
+    .filter((item) => {
+      if (!isLiveAd(item) || seen.has(item.id)) return false;
+      seen.add(item.id);
+      return true;
+    })
+    // fixed order so the rotating window walks through every ad
+    .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+
+  if (live.length <= max) return live;
+
+  const start = PAGE_OFFSET % live.length;
+  return Array.from({ length: max }, (_, i) => live[(start + i) % live.length]);
 }
 
 export function interleaveAds(items: PartListing[]): PartListing[] {
