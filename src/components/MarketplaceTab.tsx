@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { Search, SlidersHorizontal, Bell, Plus, X, ShoppingBag, Loader2, LayoutGrid, Car, Wrench, Bike, Truck, Construction } from "lucide-react";
+import { Search, SlidersHorizontal, Bell, Plus, X, ShoppingBag, Loader2, LayoutGrid, Car, Wrench, Bike, Truck, Construction, MapPin } from "lucide-react";
 import { ListingCard } from "./ListingCard";
 import { PromotedSlider } from "./PromotedSlider";
 import { CITIES } from "../translations";
@@ -48,6 +48,13 @@ interface MarketplaceTabProps {
   handleRequestNotificationPermission: () => Promise<void>;
   setIsLotteryOpen: (v: boolean) => void;
 }
+
+// শহরের নাম "Dhaka (ঢাকা)" ফরম্যাটে থাকে -- search bar-এর ভেতরের ছোট্ট
+// pill-এ পুরোটা আঁটবে না, তাই শুধু প্রথম অংশ (bracket-এর আগে পর্যন্ত) দেখানো হয়।
+const getShortCityLabel = (selectedCity: string, language: SupportedLanguage): string => {
+  if (selectedCity === "all") return language === "bn" ? "সব" : "All";
+  return selectedCity.split(" (")[0];
+};
 
 /**
  * "Market" tab: search bar, category/city/sort filters, promoted-ads slider,
@@ -132,16 +139,35 @@ export default function MarketplaceTab({
                         }
                       }}
                       placeholder={activeTranslations.searchPlaceholder}
-                      className="w-full pl-8 pr-6 py-2 bg-white dark:bg-slate-900 border border-slate-150 dark:border-slate-800 rounded-xl text-[11px] focus:outline-none focus:ring-2 focus:ring-amber-500/15 text-slate-900 dark:text-white shadow-xs font-semibold transition hover:border-amber-550/30"
+                      className="w-full pl-8 pr-[68px] py-2 bg-white dark:bg-slate-900 border border-slate-150 dark:border-slate-800 rounded-xl text-[11px] focus:outline-none focus:ring-2 focus:ring-amber-500/15 text-slate-900 dark:text-white shadow-xs font-semibold transition hover:border-amber-550/30"
                     />
-                    {searchQuery.trim().length > 0 && (
+                    {/* 🔧 (2026-09-30) শহর-নির্বাচক এখন search bar-এর ভেতরেই ডান পাশে
+                        দেখানো হয় (📍 আইকন + শহরের নাম, PakWheels-এর "Search | 📍
+                        City" প্যাটার্নের মতো) -- আগে এটা শুধু Filters প্যানেল খুললে
+                        তবেই দেখা যেত, তাই অনেকে বুঝতেই পারতেন না যে শহর অনুযায়ী
+                        ফিল্টার করার সুযোগ আছে। ট্যাপ করলে সরাসরি Filters প্যানেল
+                        খুলে যায়, যেখানে শহর পরিবর্তন করা যায়। */}
+                    <div className="absolute inset-y-0 right-0 flex items-center gap-1 pr-1.5">
+                      {searchQuery.trim().length > 0 && (
+                        <button
+                          onClick={() => setSearchQuery("")}
+                          className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-250 cursor-pointer p-0.5 shrink-0"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      )}
                       <button
-                        onClick={() => setSearchQuery("")}
-                        className="absolute inset-y-0 right-0 pr-2 flex items-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-250 cursor-pointer"
+                        type="button"
+                        onClick={() => setShowFilters(true)}
+                        className="flex items-center gap-0.5 pl-1.5 border-l border-slate-200 dark:border-slate-700 text-amber-600 dark:text-amber-450 cursor-pointer max-w-[58px] shrink-0"
+                        title={language === "bn" ? "শহর পরিবর্তন করুন" : "Change city"}
                       >
-                        <X className="w-3.5 h-3.5" />
+                        <MapPin className="w-3 h-3 shrink-0" />
+                        <span className="text-[9px] font-extrabold truncate">
+                          {getShortCityLabel(selectedCity, language)}
+                        </span>
                       </button>
-                    )}
+                    </div>
                   </div>
 
                   {/* Filter Tune Toggle Key */}
@@ -220,16 +246,30 @@ export default function MarketplaceTab({
                           }
                         }}
                         placeholder={activeTranslations.searchPlaceholder}
-                        className="w-full pl-11 pr-10 py-3 bg-white dark:bg-slate-900 border border-slate-150 dark:border-slate-800 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/15 text-slate-900 dark:text-white shadow-xs font-semibold transition hover:border-amber-550/30"
+                        className="w-full pl-11 pr-24 py-3 bg-white dark:bg-slate-900 border border-slate-150 dark:border-slate-800 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/15 text-slate-900 dark:text-white shadow-xs font-semibold transition hover:border-amber-550/30"
                       />
-                      {searchQuery.trim().length > 0 && (
-                        <button 
-                          onClick={() => setSearchQuery("")}
-                          className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-250 cursor-pointer"
+                      {/* একই "search-এর ভেতরে ডান পাশে শহর" প্যাটার্ন, ডেস্কটপ সাইজে */}
+                      <div className="absolute inset-y-0 right-0 flex items-center gap-1.5 pr-2.5">
+                        {searchQuery.trim().length > 0 && (
+                          <button
+                            onClick={() => setSearchQuery("")}
+                            className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-250 cursor-pointer p-0.5 shrink-0"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => setShowFilters(true)}
+                          className="flex items-center gap-1 pl-2 border-l border-slate-200 dark:border-slate-700 text-amber-600 dark:text-amber-450 cursor-pointer max-w-[84px] shrink-0"
+                          title={language === "bn" ? "শহর পরিবর্তন করুন" : "Change city"}
                         >
-                          <X className="w-4 h-4" />
+                          <MapPin className="w-3.5 h-3.5 shrink-0" />
+                          <span className="text-xs font-extrabold truncate">
+                            {getShortCityLabel(selectedCity, language)}
+                          </span>
                         </button>
-                      )}
+                      </div>
                     </div>
 
                     {/* Reset/All Categories Button next to the 3-line filter button */}
