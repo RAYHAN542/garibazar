@@ -51,8 +51,11 @@ interface MarketplaceTabProps {
 
 // শহরের নাম "Dhaka (ঢাকা)" ফরম্যাটে থাকে -- search bar-এর ভেতরের ছোট্ট
 // pill-এ পুরোটা আঁটবে না, তাই শুধু প্রথম অংশ (bracket-এর আগে পর্যন্ত) দেখানো হয়।
+// 🔧 (2026-09-30) mobile header থেকে logo/"Gari Bazar" লেখা সরিয়ে সার্চ বার
+// বড় করা হয়েছে, তাই "all" অবস্থায় এখন শুধু "All"/"সব" না, পুরো
+// "All City"/"সব শহর" দেখানো হয় -- জায়গা এখন যথেষ্ট আছে।
 const getShortCityLabel = (selectedCity: string, language: SupportedLanguage): string => {
-  if (selectedCity === "all") return language === "bn" ? "সব" : "All";
+  if (selectedCity === "all") return language === "bn" ? "সব শহর" : "All City";
   return selectedCity.split(" (")[0];
 };
 
@@ -110,20 +113,16 @@ export default function MarketplaceTab({
   return (
               <div>
 
-                {/* Mobile-only compact single-row header: logo + name (left), a
-                    narrower search bar, filter icon, and notification bell (right)
-                    — everything that used to take two stacked rows now shares one,
-                    freeing up vertical space for listings. */}
+                {/* Mobile-only compact single-row header: a full-width search bar
+                    plus the filter icon and notification bell (right).
+                    🔧 (2026-09-30) Dropped the small logo image + "Gari Bazar"
+                    text that used to sit to the left of the search bar -- it
+                    only ate into the search input's width and added no real
+                    value on a screen this narrow (the splash screen / browser
+                    tab already carries the brand). The search bar now gets
+                    that freed-up space, and the city pill inside it shows the
+                    full "All City" label instead of a truncated "All". */}
                 <div className="md:hidden flex items-center gap-1.5 mb-2 animate-[slide-down_0.2s_ease-out]">
-                  <img
-                    src="/icon-512.png"
-                    alt="Gari Bazar"
-                    className="w-7 h-7 rounded-full object-cover shrink-0 shadow-sm"
-                  />
-                  <h1 className="text-[13px] font-black text-slate-850 dark:text-white leading-none tracking-tight shrink-0">
-                    {language === "bn" ? "গাড়ি বাজার" : "Gari Bazar"}
-                  </h1>
-
                   <div className="relative flex-1 min-w-0">
                     <span className="absolute inset-y-0 left-0 pl-2.5 flex items-center text-slate-400 pointer-events-none">
                       <Search className="w-4 h-4 text-amber-500" />
@@ -139,7 +138,7 @@ export default function MarketplaceTab({
                         }
                       }}
                       placeholder={activeTranslations.searchPlaceholder}
-                      className="w-full pl-8 pr-[68px] py-2 bg-white dark:bg-slate-900 border border-slate-150 dark:border-slate-800 rounded-xl text-[11px] focus:outline-none focus:ring-2 focus:ring-amber-500/15 text-slate-900 dark:text-white shadow-xs font-semibold transition hover:border-amber-550/30"
+                      className="w-full pl-8 pr-[78px] py-2 bg-white dark:bg-slate-900 border border-slate-150 dark:border-slate-800 rounded-xl text-[11px] focus:outline-none focus:ring-2 focus:ring-amber-500/15 text-slate-900 dark:text-white shadow-xs font-semibold transition hover:border-amber-550/30"
                     />
                     {/* 🔧 (2026-09-30) শহর-নির্বাচক এখন search bar-এর ভেতরেই ডান পাশে
                         দেখানো হয় (📍 আইকন + শহরের নাম, PakWheels-এর "Search | 📍
@@ -159,7 +158,7 @@ export default function MarketplaceTab({
                       <button
                         type="button"
                         onClick={() => setShowFilters(true)}
-                        className="flex items-center gap-0.5 pl-1.5 border-l border-slate-200 dark:border-slate-700 text-amber-600 dark:text-amber-450 cursor-pointer max-w-[58px] shrink-0"
+                        className="flex items-center gap-0.5 pl-1.5 border-l border-slate-200 dark:border-slate-700 text-amber-600 dark:text-amber-450 cursor-pointer max-w-[68px] shrink-0"
                         title={language === "bn" ? "শহর পরিবর্তন করুন" : "Change city"}
                       >
                         <MapPin className="w-3 h-3 shrink-0" />
