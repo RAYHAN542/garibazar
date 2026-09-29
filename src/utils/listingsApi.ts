@@ -50,6 +50,7 @@ function mapRowToListing(row: any): PartListing {
     reportedBy: Array.isArray(row.reported_by) ? row.reported_by : undefined,
     adExpiresAt: row.ad_expires_at ?? undefined,
     expiresAt: row.expires_at ?? undefined,
+    adImpressions: row.ad_impressions ?? 0,
     sellerRating: row.seller_rating != null ? Number(row.seller_rating) : undefined,
     sellerReviewCount: row.seller_review_count ?? undefined,
     dailyStats: row.daily_stats ?? undefined,
