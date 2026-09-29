@@ -74,6 +74,41 @@
           }, 3000);
         });
       </script>
+      <!-- 🚫 Google Play Payments policy: the packaged Android app must not
+           lead users to a payment method other than Google Play Billing.
+           Ad-promotion payments (UddoktaPay/bKash) therefore stay
+           website-only. Inside the native Capacitor app this marks <html>
+           with .is-native-app, and the CSS below hides every entry point
+           to the paid ad-promotion flow (Dashboard "Ads" tab + campaign
+           panel, admin "Promote" button, and the "Buy Ads" item in the
+           home slider's Free Ads menu). The free Lottery stays visible.
+           Nothing changes on the website (garibazar.shop).
+           No mention of the website is shown inside the app on purpose --
+           that would itself count as steering users to another payment
+           method. -->
+      <script>
+        (function () {
+          function markNative() {
+            try {
+              if (window.Capacitor && typeof window.Capacitor.isNativePlatform === 'function' && window.Capacitor.isNativePlatform()) {
+                document.documentElement.classList.add('is-native-app');
+              }
+            } catch (e) {}
+          }
+          markNative();
+          document.addEventListener('DOMContentLoaded', markNative);
+          window.addEventListener('load', markNative);
+        })();
+      </script>
+      <style>
+        html.is-native-app #dash-subtab-ads,
+        html.is-native-app #ads-campaign-suite,
+        html.is-native-app [id^="dash-boost-btn-"],
+        html.is-native-app button[title="Buy an ad"],
+        html.is-native-app button[title="বিজ্ঞাপন কিনুন"] {
+          display: none !important;
+        }
+      </style>
     <style>
       /* Static splash shown instantly before JS loads/parses/runs.
          React replaces this the moment it mounts. */
