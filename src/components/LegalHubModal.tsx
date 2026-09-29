@@ -103,38 +103,44 @@ export default function LegalHubModal({ isOpen = true, onClose, language, standa
               </h4>
               <p>
                 {language === "bn"
-                  ? "গাড়ি বাজার (Gari Bazar) প্ল্যাটফর্ম ব্যবহারকারীদের তথ্যের সুরক্ষা বজায় রাখার জন্য সম্পূর্ণ প্রতিশ্রুতিবদ্ধ। ডেভেলপার MD RAYHAN কর্তৃক পরিচালিত এই অ্যাপে গুগল প্লে স্টোর পলিসি ও আইনগত সংগতি নিশ্চিত করতে আমাদের ডেটা সংগ্রহ পদ্ধতির বিশদ রূপরেখা নিচে প্রকাশ করছি:"
-                  : "Gari Bazar is committed to maintaining the highest standards of data security and transparency. To ensure full compliance with regulatory requirements and Google Play Store Developer policies, our information practices managed by developer MD RAYHAN are detailed below:"}
+                  ? "গাড়ি বাজার (Gari Bazar) প্ল্যাটফর্ম ব্যবহারকারীদের তথ্যের সুরক্ষা বজায় রাখার জন্য সম্পূর্ণ প্রতিশ্রুতিবদ্ধ। ডেভেলপার MD RAYHAN কর্তৃক পরিচালিত এই অ্যাপে আমরা কোন তথ্য সংগ্রহ করি তার সংক্ষিপ্ত রূপরেখা নিচে দেওয়া হলো। সম্পূর্ণ প্রাইভেসি পলিসি পাওয়া যাবে garibazar.shop/privacy-policy পেজে:"
+                  : "Gari Bazar is committed to maintaining the highest standards of data security and transparency. A summary of the information practices of this app, managed by developer MD RAYHAN, is below. The full Privacy Policy is available at garibazar.shop/privacy-policy:"}
               </p>
               
               <div className="bg-slate-50 border border-slate-150 p-3.5 rounded-2xl space-y-2 mt-2">
                 <span className="font-extrabold text-slate-900 block">
-                  {language === "bn" ? "কী কী ব্যক্তিগত ডেটা সংগ্রহ করা হয় ও কেন:" : "What personally identifiable data we collect and why:"}
+                  {language === "bn" ? "কী কী ব্যক্তিগত ডেটা সংগ্রহ করা হয় ও কেন:" : "What personally identifiable data we collect and why:"}
                 </span>
                 <ul className="list-disc list-inside space-y-2 bg-white p-3 rounded-xl border border-slate-100">
                   <li>
-                    <strong>{language === "bn" ? "মোবাইল ফোন নম্বর:" : "Mobile Phone Numbers:"}</strong>{" "}
+                    <strong>{language === "bn" ? "নাম ও মোবাইল ফোন নম্বর:" : "Name & Mobile Phone Number:"}</strong>{" "}
                     {language === "bn" 
-                      ? "বিক্রেতার আসল অস্তিত্ব নিশ্চিত করতে, জাল বিজ্ঞাপন ও স্প্যাম প্রতিরোধ করতে এবং ক্রেতাদের যোগাযোগের মাধ্যম হিসেবে ফোন নাম্বার সংগ্রহ করা হয়।" 
-                      : "Collected strictly to establish verified seller identities, combat spam listings, and facilitate direct communication between buyers and sellers."}
+                      ? "মোবাইল নম্বর ও পাসওয়ার্ড দিয়ে অ্যাকাউন্ট খোলা ও লগইন করা হয়। এটি বিক্রেতার আসল অস্তিত্ব নিশ্চিত করতে, জাল বিজ্ঞাপন ও স্প্যাম প্রতিরোধ করতে এবং ক্রেতাদের যোগাযোগের মাধ্যম হিসেবে ব্যবহৃত হয়।" 
+                      : "You create an account and sign in with your phone number and a password. This is used to establish verified seller identities, combat spam listings, and let buyers contact sellers directly."}
                   </li>
                   <li>
                     <strong>{language === "bn" ? "অবস্থান ডেটা (শহর/লোকেশন):" : "Geographic Location Data (City/Region):"}</strong>{" "}
                     {language === "bn" 
-                      ? "ভারী গাড়ি পার্টস কেনাবেচায় অপ্রয়োজনীয় শিপিং খরচ ও দূরত্ব কমাতে এবং আপনার নিকটবর্তী শহর অনুযায়ী ফিল্টার সাজানোর সুবিধা দেওয়ার জন্য এটি ব্যবহৃত হয়।" 
-                      : "Used to route search queries to nearby parts listings, minimizing expensive physical delivery and shipping logistics across Bangladesh."}
+                      ? "আপনার নিজের উল্লেখ করা শহর বা এলাকা, যাতে নিকটবর্তী ক্রেতা-বিক্রেতা খুঁজে পাওয়া যায়। অ্যাপ ফোনের GPS বা সঠিক লোকেশন সংগ্রহ করে না।" 
+                      : "The city or area you state yourself, used to route search queries to nearby listings. The app does not collect your phone's GPS or precise location."}
                   </li>
                   <li>
-                    <strong>{language === "bn" ? "ছবি ও মিডিয়া ফাইলস:" : "Product Photos & Profile Images:"}</strong>{" "}
+                    <strong>{language === "bn" ? "ছবি ও মিডিয়া ফাইলস:" : "Product Photos & Profile Images:"}</strong>{" "}
                     {language === "bn" 
-                      ? "বিক্রেতাদের জেনুইন পার্টসের বাস্তব ছবি প্রদর্শনের স্বার্থে পণ্যের ছবি এবং অ্যাকাউন্ট কাস্টমাইজেশনে প্রফাইল ছবি আপলোড করতে হয় যা ফায়ারবেস স্টোরেজে হোস্ট থাকে।" 
-                      : "Required for hosting verified car parts advertisements and profile personalization. All images are securely stored on Google Firebase Cloud Storage."}
+                      ? "পণ্যের ছবি এবং প্রোফাইল ছবি আপলোড করা হয় যা Cloudinary-তে হোস্ট থাকে। লিস্টিংয়ের ছবি অন্য ব্যবহারকারীদের দেখানো হয়।" 
+                      : "Product photos and profile images are uploaded and hosted on Cloudinary. Listing photos are shown to other users."}
                   </li>
                   <li>
-                    <strong>{language === "bn" ? "ফায়ারবেস অথেন্টিকেশন ডেটা:" : "Firebase Authentication Profile:"}</strong>{" "}
+                    <strong>{language === "bn" ? "অ্যাকাউন্ট ও লগইন ডেটা:" : "Account & Sign-in Data:"}</strong>{" "}
                     {language === "bn" 
-                      ? "ডিভাইসে লগইন সেশন ধরে রাখতে ফায়ারবেস অথেন্টিকেশন পরিচালিত হয়, যেখানে আপনার লগইন মেথড (যেমন ওটিপি ফোন নম্বর বা ইমেইল) এবং ইউনিক ইউজার আইডি (UID) নথিভুক্ত থাকে।" 
-                      : "Provides secure token-based user logins, managing authenticated sessions through Google Firebase Auth while saving unique Firebase User UIDs."}
+                      ? "লগইন সেশন ধরে রাখতে Supabase Authentication ব্যবহৃত হয়, যেখানে আপনার ইউনিক ইউজার আইডি নথিভুক্ত থাকে এবং পাসওয়ার্ড নিরাপদভাবে হ্যাশ করে রাখা হয়।" 
+                      : "Supabase Authentication manages your login session and stores your unique user ID; your password is securely hashed."}
+                  </li>
+                  <li>
+                    <strong>{language === "bn" ? "চ্যাট মেসেজ ও ব্যবহারের তথ্য:" : "Chat Messages & Usage Data:"}</strong>{" "}
+                    {language === "bn" 
+                      ? "ক্রেতা-বিক্রেতার চ্যাট মেসেজ, রিপোর্ট/ব্লকের তথ্য এবং স্প্যাম ঠেকাতে ও ব্যবহারের পরিসংখ্যান বুঝতে একটি ডিভাইস বা ইনস্টলেশন আইডি সংগ্রহ করা হয়।" 
+                      : "Chat messages between buyers and sellers, report/block information, and a device or installation ID used to prevent spam and understand usage statistics."}
                   </li>
                 </ul>
               </div>
@@ -143,17 +149,17 @@ export default function LegalHubModal({ isOpen = true, onClose, language, standa
                 <span className="font-bold text-slate-900 block">{language === "bn" ? "২. ডেটা ডিলিট বা প্রত্যাহারের অনুরোধ" : "2. Data Deletion and Account Removal"}</span>
                 <p>
                   {language === "bn"
-                    ? "গাবার প্লে স্টোর নির্দেশিকা মেনে আমরা ব্যবহারকারীদের অধিকারকে সর্বোচ্চ প্রাধান্য দেই। যেকোনো সময় লগইনকৃত ড্যাশবোর্ড থেকে অ্যাকাউন্ট ডিলিট করতে পারেন অথবা সরাসরি rjrayhan9191@gmail.com বা sadakalo7373@gmail.com ইমেইলে আবেদনের মাধ্যমে স্থায়ীভাবে ডাটা মুছে ফেলার অনুরোধ পাঠাতে পারেন।"
-                    : "Consistent with Google Play Store standards, users retain total control over their data. You can delete your account instantly from your active Dashboard profile settings, or write to our support desk to purge all associated files and listings within 24-48 hours."}
+                    ? "গুগল প্লে স্টোর নির্দেশিকা মেনে আমরা ব্যবহারকারীদের অধিকারকে সর্বোচ্চ প্রাধান্য দেই। যেকোনো সময় লগইনকৃত ড্যাশবোর্ড থেকে অ্যাকাউন্ট ডিলিট করতে পারেন, garibazar.shop/delete-account পেজে অনুরোধ করতে পারেন, অথবা rjrayhan9191@gmail.com বা sadakalo7373@gmail.com ইমেইলে আবেদন পাঠাতে পারেন। ২৪-৪৮ ঘণ্টার মধ্যে ডাটা স্থায়ীভাবে মুছে ফেলা হয়।"
+                    : "Consistent with Google Play Store standards, users retain total control over their data. You can delete your account instantly from your Dashboard profile settings, request deletion at garibazar.shop/delete-account, or write to our support desk. All associated data is permanently purged within 24-48 hours."}
                 </p>
               </div>
 
               <div className="space-y-1.5">
-                <span className="font-bold text-slate-900 block">{language === "bn" ? "৩. ডেটা শেয়ারিং এবং থার্ড-পার্টি ডিসক্লোজার" : "3. Third-Party Sharing Policies"}</span>
+                <span className="font-bold text-slate-900 block">{language === "bn" ? "৩. ডেটা শেয়ারিং এবং থার্ড-পার্টি ডিসক্লোজার" : "3. Third-Party Sharing Policies"}</span>
                 <p>
                   {language === "bn"
-                    ? "আমরা কোনো ব্যক্তিগত তথ্য বা ট্র্যাকিং ডাটা বাহ্যিক বিজ্ঞাপনী সংস্থা বা থার্ড পার্টি প্রতিষ্ঠানের কাছে বিক্রি করি না। আপনার মোবাইল নম্বর কেবল গাড়ি পার্টস বিক্রয়ের যোগাযোগের উদ্দেশ্যে ক্রেতাদের নিকট প্রদর্শিত হয়ে থাকে।"
-                    : "We enforce a strict zero-sharing policy. Personally identifiable variables are never shared, leased, or distributed with third-party tracking nets or marketing providers."}
+                    ? "আমরা আপনার ব্যক্তিগত তথ্য বিক্রি করি না। আপনার মোবাইল নম্বর গাড়ি পার্টস বিক্রয়ের যোগাযোগের উদ্দেশ্যে আগ্রহী ক্রেতাদের দেখানো হয়। আমাদের হয়ে তথ্য প্রক্রিয়াকরণকারী সেবাদাতা: Supabase, Google Firebase, Cloudinary, Vercel এবং পেমেন্টের জন্য UddoktaPay/bKash। ওয়েবসাইটে Google AdSense ও Adsterra-র তৃতীয় পক্ষের বিজ্ঞাপন দেখানো হতে পারে; অ্যান্ড্রয়েড অ্যাপে বর্তমানে কোনো তৃতীয় পক্ষের বিজ্ঞাপন নেই।"
+                    : "We do not sell your personal information. Your phone number is shown to interested buyers so they can contact sellers. Service providers that process data on our behalf: Supabase, Google Firebase, Cloudinary, Vercel, and UddoktaPay/bKash for payments. The website may show third-party ads from Google AdSense and Adsterra; the Android app currently shows no third-party ads."}
                 </p>
               </div>
             </div>
@@ -166,7 +172,7 @@ export default function LegalHubModal({ isOpen = true, onClose, language, standa
               </h4>
               <p>
                 {language === "bn"
-                  ? "গাড়ি বাজার মোবাইল অ্যাপটি ইন্সটল অথবা ব্যবহার করার মাধ্যমে আপনি নিম্নলিখিত শর্তাবলী মেনে নিতে সম্মত হচ্ছেন:"
+                  ? "গাড়ি বাজার মোবাইল অ্যাপটি ইন্সটল অথবা ব্যবহার করার মাধ্যমে আপনি নিম্নলিখিত শর্তাবলী মেনে নিতে সম্মত হচ্ছেন:"
                   : "By installing, accessing, or utilizing the Gari Bazar application, you acknowledge agreement with these binding terms:"}
               </p>
 
@@ -174,25 +180,25 @@ export default function LegalHubModal({ isOpen = true, onClose, language, standa
                 <span className="font-extrabold text-slate-900 block">{language === "bn" ? "১. বিক্রেতার সুনীতি ও বাধ্যবাধকতা" : "1. Seller Guidelines & Responsibilities"}</span>
                 <p>
                   {language === "bn"
-                    ? "বিক্রেতাদের কেবল বৈধ গাড়ি পার্টস এবং স্পেয়ার্স আইটেম পোস্ট করতে হবে। কোনো চোরাই মালামাল, ত্রুটিযুক্ত ফেক বা অবৈধ পণ্য পোস্ট করা হলে অ্যাকাউন্ট চিরতরে স্থগিত করা হবে। সকল পণ্যের মূল্য ও বিবরণ স্পষ্ট এবং সঠিক হওয়া আবশ্যক।"
+                    ? "বিক্রেতাদের কেবল বৈধ গাড়ি পার্টস এবং স্পেয়ার্স আইটেম পোস্ট করতে হবে। কোনো চোরাই মালামাল, ত্রুটিযুক্ত ফেক বা অবৈধ পণ্য পোস্ট করা হলে অ্যাকাউন্ট চিরতরে স্থগিত করা হবে। সকল পণ্যের মূল্য ও বিবরণ স্পষ্ট এবং সঠিক হওয়া আবশ্যক।"
                     : "Sellers must list only genuine automative parts and spares actually in stock. Any presentation of counterfeit goods, fraudulent pricing details, or stolen items will result in immediate termination of trading access."}
                 </p>
               </div>
 
               <div className="space-y-2 bg-slate-50 border border-slate-150 p-4 rounded-2xl">
-                <span className="font-extrabold text-slate-900 block">{language === "bn" ? "২. ভার্চুয়াল ওয়ালেট এবং বিলিং ক্রেডিট" : "2. Virtual Wallets & Marketing Credits"}</span>
+                <span className="font-extrabold text-slate-900 block">{language === "bn" ? "২. ভার্চুয়াল ক্রেডিট" : "2. Virtual Credits"}</span>
                 <p>
                   {language === "bn"
-                    ? "অ্যাপে দৃশ্যমান ব্যালেন্স (simulatedCredits) বিজ্ঞাপন বুস্ট করার এবং মার্কেটিং ফিচারের ডেমো পরীক্ষার জন্য ব্যবহৃত চিপস। এগুলো কোনো আসল ক্রিপ্টোকারেন্সি বা রিয়েল মানি অলটারনেটিভ নয়।"
-                    : "Platform credits (simulatedCredits) are virtual units provided solely for sandbox testing and ad boosting visualization. Credits do not possess physical real-money exchange value."}
+                    ? "অ্যাপে দৃশ্যমান ক্রেডিট হলো গাড়ি বাজারের ভেতরে বিজ্ঞাপন বুস্ট ও প্রমোশনাল ফিচার ব্যবহারের ভার্চুয়াল ইউনিট। এগুলো নগদ টাকা বা ক্রিপ্টোকারেন্সি নয় এবং তুলে নেওয়া যায় না।"
+                    : "Platform credits are virtual units used only inside Gari Bazar to boost ads and use promotional features. They are not cash or cryptocurrency and cannot be withdrawn."}
                 </p>
               </div>
 
               <div className="space-y-1.5">
-                <span className="font-bold text-slate-900 block">{language === "bn" ? "৩. দায়বদ্ধতা সীমাবদ্ধকরণ" : "3. Limitation of Liability"}</span>
+                <span className="font-bold text-slate-900 block">{language === "bn" ? "৩. দায়বদ্ধতা সীমাবদ্ধকরণ" : "3. Limitation of Liability"}</span>
                 <p>
                   {language === "bn"
-                    ? "গাড়ি বাজার একটি উন্মুক্ত বিজ্ঞাপনী বাজার। ক্রেতা ও বিক্রেতার মধ্যস্থ টাকা-পয়সা লেনদেনের কোনো ত্রুটি বা পণ্য বিতরণের কোনো ক্ষয়-ক্ষতিতে গাড়ি বাজার কোনো আইনি দায়ভার বহন করবে না। সরাসরি দেখা করে পণ্য যাচাই করে ক্রয়ের জন্য ক্রেতাদের অনুরোধ করা যাচ্ছে।"
+                    ? "গাড়ি বাজার একটি উন্মুক্ত বিজ্ঞাপনী বাজার। ক্রেতা ও বিক্রেতার মধ্যস্থ টাকা-পয়সা লেনদেনের কোনো ত্রুটি বা পণ্য বিতরণের কোনো ক্ষয়-ক্ষতিতে গাড়ি বাজার কোনো আইনি দায়ভার বহন করবে না। সরাসরি দেখা করে পণ্য যাচাই করে ক্রয়ের জন্য ক্রেতাদের অনুরোধ করা যাচ্ছে।"
                     : "Gari Bazar operates as an peer-to-peer advertising index. We disclaim all civil and financial liability for transaction failures, delivery disputes, or description mismatch between independent buyers and sellers."}
                 </p>
               </div>
@@ -206,33 +212,42 @@ export default function LegalHubModal({ isOpen = true, onClose, language, standa
               </h4>
               <p>
                 {language === "bn"
-                  ? "যেহেতু গাড়ি বাজার অ্যাপে বুস্টিং এবং রিচার্জ ওয়ালেটের জন্য ডেমো স্যান্ডবক্স পেমেন্ট পদ্ধতি ব্যবহার করা হচ্ছে, আমরা আমাদের আইনি পরিচ্ছন্নতা বজায় রাখার জন্য একটি সুনির্দিষ্ট নীতি প্রদান করছি:"
-                  : "To establish a transparent compliance relationship with our users, we maintain a clear refund and transaction resolution protocol:"}
+                  ? "গাড়ি বাজারে বিজ্ঞাপন প্রচার সংক্রান্ত পেমেন্ট আমাদের পেমেন্ট পার্টনার UddoktaPay ও bKash-এর মাধ্যমে প্রক্রিয়াজাত হয়। পেমেন্ট ও রিফান্ড নিয়ে আমাদের নীতি নিচে দেওয়া হলো:"
+                  : "Payments for ad promotion on Gari Bazar are processed by our payment partners UddoktaPay and bKash. Our payment and refund approach is below:"}
               </p>
 
               <div className="space-y-2 bg-indigo-50/50 border border-indigo-150 p-4 rounded-2xl text-indigo-950">
-                <span className="font-extrabold text-indigo-900 block">{language === "bn" ? "১. ডিজিটাল গেটওয়ে স্যান্ডবক্স ডিসক্লোজার" : "1. Digital Gateway Sandbox Protocols"}</span>
+                <span className="font-extrabold text-indigo-900 block">{language === "bn" ? "১. পেমেন্ট প্রক্রিয়া" : "1. How Payments Work"}</span>
                 <p>
                   {language === "bn"
-                    ? "আমাদের পেমেন্ট পোর্টালটি গুগল প্লে স্টোরের ডেমো পরীক্ষার সুবিধার্থে এবং অ্যাপের কার্যক্ষমতা মূল্যায়নের জন্য কেবল একটি সিমুলেশন চালনা করে। কোনো আসল টাকা কর্তন না হওয়ায় এর কোনো আসল রিফান্ড আবেদন প্রযোজ্য নয়।"
-                    : "In line with pre-production sandboxing regulations, transactions processed within the mock gateway are simulated for review purposes. Because no real currency changes hands, standard monetary refunds are not issued."}
+                    ? "পেমেন্ট সফলভাবে যাচাই হলে প্রমোশন বা ক্রেডিট স্বয়ংক্রিয়ভাবে যুক্ত হয়। আপনার bKash পিন বা কার্ডের তথ্য আমরা দেখি না এবং রাখিও না।"
+                    : "Once a payment is successfully verified, the promotion or credit is added automatically. We never see or store your bKash PIN or card details."}
                 </p>
               </div>
 
               <div className="space-y-2 bg-slate-50 border border-slate-150 p-4 rounded-2xl">
-                <span className="font-extrabold text-slate-900 block">{language === "bn" ? "২. প্রমোশন এবং বিজ্ঞাপন বুস্ট রিফান্ড নীতি" : "2. Paid Package and Ad Promotion Upgrades"}</span>
+                <span className="font-extrabold text-slate-900 block">{language === "bn" ? "২. পেমেন্ট সংক্রান্ত সমস্যা" : "2. Payment Problems"}</span>
                 <p>
                   {language === "bn"
-                    ? "যদি কোনো ব্যবহারকারী ভুলক্রমে ডেমো প্রক্সি ব্যবহার করে বিজ্ঞাপন আপগ্রেড করে থাকেন এবং বিজ্ঞাপনটি দৃশ্যমান করতে ব্যর্থ হন, তাহলে অ্যাডমিন প্যানেল থেকে পুনরায় বিনামূল্যে রিফিল ব্যালেন্স প্রদান করা হবে।"
-                    : "For testing of promotional packages, if a test upgrade token encounters activation issues, users can instantly request free manual refill credits from the Admin Panel widget."}
+                    ? "টাকা কেটে গেলেও প্রমোশন বা ক্রেডিট যুক্ত না হলে লেনদেনের আইডিসহ সাপোর্টে ইমেইল করুন। আমরা বিষয়টি যাচাই করে সমাধান করব।"
+                    : "If money was deducted but your promotion or credit was not added, email support with your transaction ID. We will review the case and resolve it."}
+                </p>
+              </div>
+
+              <div className="space-y-2 bg-slate-50 border border-slate-150 p-4 rounded-2xl">
+                <span className="font-extrabold text-slate-900 block">{language === "bn" ? "৩. ক্রেতা-বিক্রেতার লেনদেন" : "3. Buyer-Seller Transactions"}</span>
+                <p>
+                  {language === "bn"
+                    ? "পণ্য কেনাবেচার টাকা ক্রেতা ও বিক্রেতার মধ্যে সরাসরি লেনদেন হয়। গাড়ি বাজার সেই লেনদেনে অংশ নেয় না, তাই এর রিফান্ড আমাদের মাধ্যমে হয় না।"
+                    : "Money for goods is exchanged directly between buyer and seller. Gari Bazar does not take part in that exchange, so refunds for it are not handled by us."}
                 </p>
               </div>
 
               <div className="space-y-1.5">
-                <span className="font-bold text-slate-900 block">{language === "bn" ? "৩. কাস্টমার সাপোর্ট ও হেল্প ডেস্ক" : "3. Dispute Resolution Contacts"}</span>
+                <span className="font-bold text-slate-900 block">{language === "bn" ? "৪. কাস্টমার সাপোর্ট ও হেল্প ডেস্ক" : "4. Dispute Resolution Contacts"}</span>
                 <p>
                   {language === "bn"
-                    ? "যেকোনো অসঙ্গতি দূর করতে অথবা কোনো ফেক বিজ্ঞাপনের বিরুদ্ধে অভিযোগ জানাতে sadakalo7373@gmail.com ঠিকানায় ইমেইল পাঠান। ২৪ ঘণ্টার মধ্যে ব্যবস্থা গ্রহণ করা হবে।"
+                    ? "যেকোনো অসঙ্গতি দূর করতে অথবা কোনো ফেক বিজ্ঞাপনের বিরুদ্ধে অভিযোগ জানাতে sadakalo7373@gmail.com ঠিকানায় ইমেইল পাঠান। ২৪ ঘণ্টার মধ্যে ব্যবস্থা গ্রহণ করা হবে।"
                     : "For any compliance issues, developer concerns, or to report a fraudulent listing, please immediately reach out to our helpdesk at sadakalo7373@gmail.com. We respond within 24 hours."}
                 </p>
               </div>
