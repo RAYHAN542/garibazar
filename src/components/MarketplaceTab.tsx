@@ -52,7 +52,7 @@ interface MarketplaceTabProps {
 // শহরের নাম "Dhaka (ঢাকা)" ফরম্যাটে থাকে -- search bar-এর ভেতরের ছোট্ট
 // pill-এ পুরোটা আঁটবে না, তাই শুধু প্রথম অংশ (bracket-এর আগে পর্যন্ত) দেখানো হয়।
 // 🔧 (2026-09-30) mobile header থেকে logo/"Gari Bazar" লেখা সরিয়ে সার্চ বার
-// বড় করা হয়েছে, তাই "all" অবস্থায় এখন শুধু "All"/"সব" না, পুরো
+// বড় করা হয়েছে, তাই "all" অবস্থায় এখন শুধু "All"/"সব" না, পুরো
 // "All City"/"সব শহর" দেখানো হয় -- জায়গা এখন যথেষ্ট আছে।
 const getShortCityLabel = (selectedCity: string, language: SupportedLanguage): string => {
   if (selectedCity === "all") return language === "bn" ? "সব শহর" : "All City";
@@ -189,7 +189,7 @@ export default function MarketplaceTab({
                     type="button"
                     onClick={() => {
                       if (notificationPermission === "granted") {
-                        alert(language === "bn" ? "নোটিফিকেশন ইতিমধ্যে চালু আছে ✅" : "Notifications are already enabled ✅");
+                        alert(language === "bn" ? "নোটিফিকেশন ইতমধ্যে চালু আছে ✅" : "Notifications are already enabled ✅");
                       } else if (notificationPermission === "denied") {
                         alert(language === "bn" ? "নোটিফিকেশন বন্ধ করা আছে। ব্রাউজার/সাইট সেটিংস থেকে চালু করুন।" : "Notifications are blocked. Please allow them from your browser/site settings.");
                       } else {
@@ -247,7 +247,7 @@ export default function MarketplaceTab({
                         placeholder={activeTranslations.searchPlaceholder}
                         className="w-full pl-11 pr-24 py-3 bg-white dark:bg-slate-900 border border-slate-150 dark:border-slate-800 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/15 text-slate-900 dark:text-white shadow-xs font-semibold transition hover:border-amber-550/30"
                       />
-                      {/* একই "search-এর ভেতরে ডান পাশে শহর" প্যাটার্ন, ডেস্কটপ সাইজে */}
+                      {/* একই "search-এর ভেতরে ডান পাশে শহর" প্যাটার্ন, ডেসকটপ সাইজে */}
                       <div className="absolute inset-y-0 right-0 flex items-center gap-1.5 pr-2.5">
                         {searchQuery.trim().length > 0 && (
                           <button
@@ -425,7 +425,12 @@ export default function MarketplaceTab({
                     the top of this panel was removed -- the quick-filter icon row
                     above (All/Car/Part/Bike/Truck/Heavy Equip.) already does the
                     same job with one tap and now filters correctly server-side,
-                    so the duplicate list was just extra clutter. */}
+                    so the duplicate list was just extra clutter.
+                    🔧 (2026-09-30) The "Filter by City:" section heading (with its 📍
+                    label) was removed -- city selection is now reachable directly
+                    from the search bar's city pill (which opens this same panel),
+                    so a second "filter by city" label right above the city pills
+                    was redundant. The city pills themselves are unchanged. */}
                 {showFilters && (
                   <div className="bg-slate-50 dark:bg-slate-900 border border-slate-150 dark:border-slate-800 rounded-2xl p-3.5 mb-4 space-y-3.5 shadow-xs animate-fade-in text-slate-850 dark:text-slate-200">
                     {/* Dynamic resetting helper option if filtered */}
@@ -437,9 +442,6 @@ export default function MarketplaceTab({
 
                   {/* 📍 Geographic District City Selector styled as beautiful Pills */}
                   <div>
-                    <span className="text-[10px] text-slate-400 dark:text-slate-550 font-extrabold uppercase tracking-wider block mb-2">
-                      📍 {language === "bn" ? "স্থান অনুযায়ী ফিল্টার:" : "Filter by City:"}
-                    </span>
                     <div className="flex overflow-x-auto whitespace-nowrap no-scrollbar gap-1.5 -mx-1 px-1 items-center">
                       <button
                         onClick={() => {
@@ -527,7 +529,7 @@ export default function MarketplaceTab({
               )}
 
                 {/* 🚀 Boost Ads slide-show — capped + randomly rotated boosted ads (fair rotation),
-                    category/search filter ছাড়াই যাতে যিনি পার্ট বুস্ট করেছেন তিনিও Vehicle ট্যাবে নিজের অ্যাড দেখতে পান */}
+                    category/search filter ছাড়াই যাতে যিনি পার্ট বুস্ট করেছেন তিনিও Vehicle ট্যাবে নিজের অ্যাড দেখতে পারেন */}
                 <PromotedSlider 
                   listings={spotlightAds} 
                   language={language}
@@ -558,7 +560,7 @@ export default function MarketplaceTab({
                         </h3>
                         <p className="text-[10px] sm:text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-xl leading-relaxed">
                           {language === "bn" 
-                            ? "নতুন কোনো গাড়ির পার্টস লিস্টিং হলে বা গ্রাহক হোয়াটসঅ্যাপ/কল করতে চাইলে সাথে সাথে পুশ নোটিফিকেশন এ অ্যালার্ট বা মেসেজ পান।" 
+                            ? "নতুন কোনো গাড়ির পার্টস লিস্টিং হলে বা গ্রাহক হোয়াটসঅ্যাপ/কল করতে চাইলে সাথে সাথে পুশ নোটিফিকেশন এ অ্যালার্ট বা মেসেজ পান।" 
                             : "Enable push alerts to get immediate updates whenever auto parts match your compatibility or are listed."}
                         </p>
                       </div>
@@ -603,7 +605,7 @@ export default function MarketplaceTab({
                     </h4>
                     <p className="text-slate-500 dark:text-slate-400 text-sm mt-2 max-w-md mx-auto leading-relaxed font-semibold">
                       {language === "bn" 
-                        ? "দুঃখিত, এই মুহূর্তে কোনো সক্রিয় পার্টস বা গাড়ি পোস্ট করা হয়নি। নতুন পণ্য পোস্ট করা হলে তা সরাসরি এখানে দেখতে পাবেন।" 
+                        ? "দুঃখিত, এই মুহূর্তে কোনো সক্রিয় পার্টস বা গাড়ি পোস্ট করা হয়নি। নতুন পণ্য পোস্ট করা হলে তা সরাসরি এখানে দেখতে পাবেন।" 
                         : "Sorry, there are no active parts or vehicles listed at the moment. Once items are posted, they will appear here."}
                     </p>
                     <button
