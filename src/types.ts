@@ -27,6 +27,7 @@ export interface PartListing {
   reportedBy?: string[]; // Array of reporter uid's
   adExpiresAt?: string; // Optional field for tracking campaign expiration
   expiresAt?: string; // Expiry date of the listing
+  adImpressions?: number; // How many times this boosted post has been shown on the homepage rotation (see adRotation.ts)
   sellerRating?: number; // Average 1-5 rating of seller
   sellerReviewCount?: number; // Total number of reviews
   dailyStats?: Record<string, { views?: number; clicks?: number }>; // Real per-day view/click counts, keyed by YYYY-MM-DD
