@@ -4,7 +4,7 @@ export const translations: Record<'en' | 'bn', TranslationSet> = {
   en: {
     appName: "DitchIt Gari & Heavy Equipment",
     appSub: "Bangladesh's Premier Heavy Machinery, Vehicles & Spare Parts Market",
-    searchPlaceholder: "Search excavator, dozer, crane, car, or spare parts...",
+    searchPlaceholder: "Search cars and parts...",
     categoryAll: "All Categories",
     sellBtn: "Sell Gear & Parts",
     buyTitle: "Live Machine & Parts Catalog",
@@ -44,7 +44,7 @@ export const translations: Record<'en' | 'bn', TranslationSet> = {
   bn: {
     appName: "ডিচইট গাড়ি ও হেভি ইকুইপমেন্ট",
     appSub: "বাংলাদেশ ও ঢাকার সর্ববৃহৎ হেভি মেশিনারি, গাড়ি ও খুচরা যন্ত্রাংশের বিশ্বস্ত মার্কেটপ্লেস",
-    searchPlaceholder: "এক্সেভেটর, ডোজার, ক্রেন, গাড়ি বা খুচরা পার্টস লিখে খুঁজুন...",
+    searchPlaceholder: "গাড়ি ও পার্টস খুঁজুন...",
     categoryAll: "সব ক্যাটাগরি",
     sellBtn: "মেশিন ও পার্টস বিক্রি করুন",
     buyTitle: "বিক্রির জন্য সকল গাড়ি, ভারী যন্ত্রপাতি ও খুচরা পার্টস",
