@@ -8,10 +8,24 @@ interface PrivacyPolicyPageProps {
   standalone?: boolean;
 }
 
-export default function PrivacyPolicyPage({ 
-  language: initialLanguage = "bn", 
-  onBack, 
-  standalone = false 
+const SectionTitle = ({ children }: { children: React.ReactNode }) => (
+  <h2 className="text-base font-black text-slate-900 border-b border-slate-100 pb-1.5 flex items-center gap-2">
+    <span className="w-2.5 h-2.5 rounded-full bg-indigo-600"></span>
+    {children}
+  </h2>
+);
+
+const InfoCard = ({ title, children }: { title: string; children: React.ReactNode }) => (
+  <div className="border border-slate-150 p-4 rounded-2xl bg-white space-y-1.5 shadow-sm">
+    <span className="font-extrabold text-xs text-indigo-600 uppercase tracking-wider block">{title}</span>
+    <p className="text-xs">{children}</p>
+  </div>
+);
+
+export default function PrivacyPolicyPage({
+  language: initialLanguage = "bn",
+  onBack,
+  standalone = false
 }: PrivacyPolicyPageProps) {
   const [lang, setLang] = useState<SupportedLanguage>(initialLanguage);
 
@@ -22,20 +36,20 @@ export default function PrivacyPolicyPage({
   return (
     <div className={`min-h-screen bg-slate-50 text-slate-800 ${standalone ? "py-8 px-4 sm:px-6 lg:px-8" : "p-0"}`}>
       <div className="max-w-4xl mx-auto bg-white rounded-3xl border border-slate-200 shadow-xl overflow-hidden">
-        
+
         {/* Header Block */}
         <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white px-6 sm:px-10 py-8 shrink-0 relative">
           <div className="absolute right-4 top-4 flex items-center gap-2 bg-slate-850/40 backdrop-blur-md px-3 py-1.5 rounded-full border border-slate-700/50">
             <Globe className="w-4 h-4 text-amber-400" />
-            <button 
-              onClick={() => setLang("bn")} 
+            <button
+              onClick={() => setLang("bn")}
               className={`text-xs font-bold transition-all px-2 py-0.5 rounded ${lang === "bn" ? "bg-amber-500 text-slate-950" : "text-slate-300 hover:text-white"}`}
             >
               বাংলা
             </button>
             <span className="text-slate-600">|</span>
-            <button 
-              onClick={() => setLang("en")} 
+            <button
+              onClick={() => setLang("en")}
               className={`text-xs font-bold transition-all px-2 py-0.5 rounded ${lang === "en" ? "bg-amber-500 text-slate-950" : "text-slate-300 hover:text-white"}`}
             >
               English
@@ -44,7 +58,7 @@ export default function PrivacyPolicyPage({
 
           <div className="space-y-3 mt-4 sm:mt-1">
             {onBack && (
-              <button 
+              <button
                 onClick={onBack}
                 className="inline-flex items-center gap-1.5 text-xs text-indigo-300 hover:text-white transition-colors cursor-pointer bg-slate-800/50 px-3 py-1 rounded-full border border-slate-700/30"
               >
@@ -70,13 +84,13 @@ export default function PrivacyPolicyPage({
             <div className="flex flex-wrap items-center gap-x-4 gap-y-2 pt-2 border-t border-slate-800 text-[11px] text-slate-400 font-medium">
               <span className="inline-flex items-center gap-1">
                 <Calendar className="w-3 h-3 text-indigo-400" />
-                {lang === "bn" ? "সর্বশেষ আপডেট: ২০ জুন, ২০২৬" : "Last Updated: June 20, 2026"}
+                {lang === "bn" ? "সর্বশেষ আপডেট: ৩০ সেপ্টেম্বর, ২০২৬" : "Last Updated: September 30, 2026"}
               </span>
               <span className="inline-flex items-center gap-1">
                 <Mail className="w-3 h-3 text-indigo-400" />
                 rjrayhan9191@gmail.com
               </span>
-              <button 
+              <button
                 onClick={handlePrint}
                 className="ml-auto inline-flex items-center gap-1 bg-indigo-600/20 hover:bg-indigo-600/40 text-indigo-300 hover:text-white px-2.5 py-1 rounded-lg border border-indigo-500/20 transition text-[10px] font-bold cursor-pointer"
               >
@@ -88,149 +102,111 @@ export default function PrivacyPolicyPage({
         </div>
 
         {/* Content Body */}
-        <div className="p-6 sm:p-10 space-y-8 font-sans leading-relaxed text-sm text-slate-650">
-          
+        <div className="p-6 sm:p-10 space-y-8 font-sans leading-relaxed text-sm text-slate-600">
+
           {lang === "bn" ? (
             /* BENGALI PRIVACY POLICY */
             <>
               <section className="bg-slate-50 border border-slate-150 p-5 rounded-2xl space-y-3">
-                <h2 className="text-base font-black text-slate-900 border-b border-slate-200 pb-1.5 flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 rounded-full bg-indigo-600"></span>
-                  গোপনীয়তা চুক্তি ও ভূমিকা
-                </h2>
+                <SectionTitle>গোপনীয়তা চুক্তি ও ভূমিকা</SectionTitle>
                 <p>
-                  <strong>গাড়ি বাজার (Gari Bazar)</strong> একটি অনলাইন গাড়ি এবং বাইকের পার্টস কেনাবেচার মার্কেটপ্লেস অ্যাপ হিসেবে পরিচালিত হয়। 
-                  নিরাপদ ও বিশ্বস্ত মাধ্যম বজায় রাখার লক্ষ্যে ডেভেলপার <strong>MD RAYHAN</strong> আমাদের ব্যবহারকারীদের তথ্য সুরক্ষার ব্যাপারে সর্বোচ্চ প্রতিশ্রুতিবদ্ধ। 
-                  প্লে স্টোর পলিসি ও নিয়ম অনুযায়ী, ব্যবহারকারী যখন আমাদের অ্যাপ বা প্ল্যাটফর্মটি ব্যবহার করেন, তখন কী ধরনের তথ্য কীভাবে সংগৃহীত, সংরক্ষিত এবং প্রক্রিয়াজাত করা হয় তার বিশদ বিবরণ এ প্রাইভেসি পলিসিতে দেওয়া হয়েছে।
+                  <strong>গাড়ি বাজার (Gari Bazar)</strong> গাড়ি, বাইক, ভারী যন্ত্রপাতি ও তাদের পার্টস কেনাবেচার একটি অনলাইন মার্কেটপ্লেস।
+                  এটি ওয়েবসাইট (garibazar.shop) এবং অ্যান্ড্রয়েড অ্যাপ, এই দুই মাধ্যমেই পাওয়া যায়। ডেভেলপার <strong>MD RAYHAN</strong> আপনার তথ্যের সুরক্ষায় প্রতিশ্রুতিবদ্ধ।
+                  এই নীতিতে বলা হয়েছে আমরা কোন তথ্য সংগ্রহ করি, কেন করি, কাদের সাথে শেয়ার করি এবং আপনি কীভাবে তা মুছে ফেলতে পারেন।
                 </p>
               </section>
 
               <section className="space-y-4">
-                <h2 className="text-base font-black text-slate-900 border-b border-slate-100 pb-1.5 flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 rounded-full bg-indigo-600"></span>
-                  ১. আমরা কী কী ব্যক্তিগত তথ্য সংগ্রহ করি এবং কেন?
-                </h2>
+                <SectionTitle>১. আমরা কী কী তথ্য সংগ্রহ করি এবং কেন?</SectionTitle>
                 <p>
-                  আমাদের অ্যাপ্লিকেশনের নির্বিঘ্ন সেবা এবং জেনুইন ক্রেতা-বিক্রেতার মধ্যকার আস্থা নিশ্চিত করতে আমরা প্রধানত নিচের তথ্যগুলো সংগ্রহ করে থাকি:
+                  সেবা চালু রাখতে এবং ক্রেতা-বিক্রেতার মধ্যে আস্থা নিশ্চিত করতে আমরা প্রধানত নিচের তথ্যগুলো সংগ্রহ করি:
                 </p>
 
                 <div className="space-y-4 pt-2">
-                  {/* Phone Number */}
-                  <div className="border border-slate-150 p-4 rounded-2xl bg-white space-y-1.5 shadow-sm">
-                    <span className="font-extrabold text-slate-900 text-xs text-indigo-600 uppercase tracking-wider block">
-                      ক) মোবাইল ফোন নম্বর (User Phone Numbers)
-                    </span>
-                    <p className="text-xs">
-                      <strong>উদ্দেশ্য:</strong> পার্টস কিনতে বা বিক্রি করতে ইচ্ছুক ব্যবহারকারীদের সঠিক পরিচয় যাচাই নিশ্চিত করতে ফোন নম্বর দিয়ে সাইন-ইন/ভেরিফিকেশন সম্পন্ন করা হয়। 
-                      তাছাড়া কোনো পার্ট পছন্দ হলে ক্রেতা সরাসরি বিক্রেতার দেওয়ার ফোন নম্বরে যোগাযোগ করার সুবিধার্থেই এটি সংগ্রহ ও প্রদর্শন করা হয়।
-                    </p>
-                  </div>
+                  <InfoCard title="ক) নাম ও মোবাইল নম্বর">
+                    <strong>উদ্দেশ্য:</strong> আপনি মোবাইল নম্বর ও পাসওয়ার্ড দিয়ে অ্যাকাউন্ট খোলেন ও লগইন করেন, সাথে আপনার নাম দেন।
+                    এটি অ্যাকাউন্ট পরিচালনা, ভুয়া বা একাধিক অ্যাকাউন্ট ঠেকানো এবং ক্রেতা-বিক্রেতার সরাসরি যোগাযোগের জন্য ব্যবহৃত হয়।
+                    বিক্রেতার ফোন নম্বর আগ্রহী ক্রেতাদের দেখানো হয়। পাসওয়ার্ড আমরা সরাসরি দেখি না, এটি Supabase Authentication-এর মাধ্যমে নিরাপদভাবে হ্যাশ করে রাখা হয়।
+                  </InfoCard>
 
-                  {/* Location Data */}
-                  <div className="border border-slate-150 p-4 rounded-2xl bg-white space-y-1.5 shadow-sm">
-                    <span className="font-extrabold text-slate-900 text-xs text-indigo-600 uppercase tracking-wider block">
-                      খ) অবস্থান সংক্রান্ত ডেটা (Geographic Location / City)
-                    </span>
-                    <p className="text-xs">
-                      <strong>উদ্দেশ্য:</strong> সম্পূর্ণ বাংলাদেশে গাড়ির পার্টস কেনাবেচা সহজ করতে আমরা ব্যবহারকারীর শহর (Location/City) নির্বাচন সংক্রান্ত ডেটা সংগ্রহ করি। 
-                      এর মাধ্যমে ব্যবহারকারী তার নিজ এলকার বা নিকটবর্তী শহরের খুচরা বিক্রেতা বা শোরুম থেকে সহজে পার্টস খুঁজে বের করতে সক্ষম হন এবং পণ্য ডেলিভারি প্রক্রিয়া লাভদায়ক হয়।
-                    </p>
-                  </div>
+                  <InfoCard title="খ) ইমেইল ঠিকানা (ঐচ্ছিক)">
+                    <strong>উদ্দেশ্য:</strong> ইমেইল দিলে তা শুধু অ্যাকাউন্ট ব্যবস্থাপনা ও প্রয়োজনে যোগাযোগের জন্য ব্যবহৃত হয়।
+                  </InfoCard>
 
-                  {/* Photos and Images */}
-                  <div className="border border-slate-150 p-4 rounded-2xl bg-white space-y-1.5 shadow-sm">
-                    <span className="font-extrabold text-slate-900 text-xs text-indigo-600 uppercase tracking-wider block">
-                      গ) ছবি ও ফাইল আপলোড (Photos and Listing Images)
-                    </span>
-                    <p className="text-xs">
-                      <strong>উদ্দেশ্য:</strong> বিক্রেতা যখন কোনো গাড়ির পার্টসের বিজ্ঞাপন (Listing) যুক্ত করেন, তখন ক্রেতাদের দেখানোর জন্য পণ্যের আসল ছবি আপলোড করতে হয়। 
-                      এছাড়াও প্রফাইল কাস্টমাইজেশনে ছবির প্রয়োজন হতে পারে। এই ছবিগুলো আমাদের ক্লাউড স্টোরেজে সুরক্ষিতভাবে হোস্ট করা থাকে এবং লিস্টিং আকারে অন্যান্য পাবলিক ব্যবহারকারীদের প্রদর্শন করা হয়।
-                    </p>
-                  </div>
+                  <InfoCard title="গ) অবস্থান (শহর/জেলা)">
+                    <strong>উদ্দেশ্য:</strong> আপনি নিজে যে শহর বা এলাকা উল্লেখ করেন (বা লিস্টিংয়ের বর্ণনা থেকে শনাক্ত হয়) তা সংরক্ষণ করা হয়, যাতে কাছাকাছি ক্রেতা ও বিক্রেতা খুঁজে পাওয়া যায়।
+                    অ্যাপ আপনার ফোনের GPS বা সঠিক (precise) লোকেশন সংগ্রহ করে না।
+                  </InfoCard>
 
-                  {/* Firebase Auth Data */}
-                  <div className="border border-slate-150 p-4 rounded-2xl bg-white space-y-1.5 shadow-sm">
-                    <span className="font-extrabold text-slate-900 text-xs text-indigo-600 uppercase tracking-wider block">
-                      ঘ) ফায়ারবেস অথেন্টিকেশন তথ্য (Firebase Authentication Profile)
-                    </span>
-                    <p className="text-xs">
-                      <strong>উদ্দেশ্য:</strong> ব্যবহারকারীদের ডিভাইসে নিরাপদ লগইন এবং সেশন ধরে রাখতে আমরা গুগল ফায়ারবেস অথেন্টিকেশন (Firebase Authentication) ব্যবহার করি। 
-                      এর আওতায় আপনার লগইন মেথড (যেমন ফোন ওটিপি বা ইমেইল) এবং ইউনিক ইউজার আইডি (UID) সংগ্রহ করা হয় যা ডেটাবেসে আপনার বিজ্ঞাপনের মালিকানা পরিচালনা করার জন্য ব্যবহৃত হয়।
-                    </p>
-                  </div>
+                  <InfoCard title="ঘ) ছবি">
+                    <strong>উদ্দেশ্য:</strong> লিস্টিংয়ের জন্য পণ্যের ছবি এবং প্রোফাইল ছবি (যদি দেন) আপলোড করা হয়। ছবিগুলো Cloudinary-তে হোস্ট করা হয়।
+                    লিস্টিংয়ের ছবি অন্যান্য ব্যবহারকারীদের দেখানো হয়।
+                  </InfoCard>
 
-                  {/* Device ID & Email Disclosures */}
-                  <div className="border border-slate-150 p-4 rounded-2xl bg-white space-y-1.5 shadow-sm">
-                    <span className="font-extrabold text-slate-900 text-xs text-indigo-600 uppercase tracking-wider block">
-                      ঙ) ইমেল, ডিভাইস আইডি ও ডাটা সিকিউরিটি পার্টনার
-                    </span>
-                    <p className="text-xs">
-                      <strong>সংগৃহীত ডাটা:</strong> ইমেল ঠিকানা, ডিভাইস আইডি (অ্যান্ড্রয়েড আইডি / ইনস্টলেশন আইডি), এবং আপলোডকৃত পার্টস এর ফটো।<br />
-                      <strong>উদ্দেশ্য:</strong> ডিভাইস আইডি স্প্যাম প্রতিরোধ ও অ্যাপ পারফরমেন্স ট্র্যাক করতে ব্যবহৃত হয়। আপনার তথ্য কেবল অ্যাকাউন্ট পরিচালনা, বিজ্ঞাপন (Listings) এবং ক্রেতা-বিক্রেতার ডিরেক্ট যোগাযোগের কাজেই ব্যবহৃত হয়।<br />
-                      <strong>ডাটা ধারণ সীমা (Retention):</strong> আপনার ব্যবহারের সমস্ত তথ্য অ্যাকাউন্ট ডিলিট করা পর্যন্ত সংরক্ষিত থাকবে। অ্যাকাউন্ট ডিলিট করলে তা চিরতরে মুছে ফেলা হবে।<br />
-                      <strong>থার্ড-পার্টি সার্ভিস পার্টনার:</strong> ডাটা সংরক্ষণে গুগল ফায়ারবেস (Firebase) এবং স্মার্ট বিবরণী জেনারেটরে গুগল জেমিনি (Gemini API) ব্যবহার করা হয়।
-                    </p>
-                  </div>
+                  <InfoCard title="ঙ) লিস্টিং, চ্যাট মেসেজ ও রিপোর্ট">
+                    <strong>উদ্দেশ্য:</strong> আপনার পোস্ট করা লিস্টিং (দাম, বর্ণনা), ক্রেতা-বিক্রেতার মধ্যে চ্যাট মেসেজ এবং রিপোর্ট বা ব্লকের তথ্য সংরক্ষণ করা হয়।
+                    এগুলো চ্যাট সেবা দেওয়া, প্ল্যাটফর্মের নিরাপত্তা ও অপব্যবহার ঠেকানোর জন্য ব্যবহৃত হয়।
+                  </InfoCard>
+
+                  <InfoCard title="চ) ডিভাইস আইডি ও ব্যবহারের তথ্য">
+                    <strong>উদ্দেশ্য:</strong> স্প্যাম ও বট ঠেকাতে এবং সাইট বা অ্যাপ কীভাবে ব্যবহৃত হচ্ছে (ভিজিট, লগইন, সাইন-আপ, ইনস্টল, লিস্টিং দেখা বা সেভ করা) তা বুঝতে
+                    একটি ডিভাইস বা ইনস্টলেশন আইডি এবং ব্যবহারের ঘটনা সংগ্রহ করা হয়।
+                  </InfoCard>
+
+                  <InfoCard title="ছ) লেনদেনের তথ্য (শুধু ওয়েবসাইটে)">
+                    <strong>উদ্দেশ্য:</strong> ওয়েবসাইটে বিজ্ঞাপন প্রচারের পেমেন্ট UddoktaPay ও bKash-এর মাধ্যমে হয়।
+                    আমরা কেবল পরিমাণ, পেমেন্টের অবস্থা ও লেনদেন রেফারেন্স রাখি। আপনার bKash পিন বা কার্ডের তথ্য আমরা পাই না এবং রাখিও না।
+                  </InfoCard>
                 </div>
               </section>
 
               <section className="space-y-3">
-                <h2 className="text-base font-black text-slate-900 border-b border-slate-100 pb-1.5 flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 rounded-full bg-indigo-600"></span>
-                  ২. তথ্যের ব্যবহার পদ্ধতি ও বণ্টন
-                </h2>
-                <p>
-                  সংগৃহীত তথ্যসমূহ নিম্নলিখিত উপায়ে ব্যবহৃত হয়:
-                </p>
+                <SectionTitle>২. তথ্যের ব্যবহার ও শেয়ারিং</SectionTitle>
                 <ul className="list-disc pl-5 space-y-1.5 text-xs">
-                  <li>ব্যবহারকারীর অ্যাকাউন্ট তৈরি ও প্লে স্টোর মার্কেটপ্লেস সেবা পরিচালনা ও টেকনিক্যাল সাপোর্ট দেওয়া।</li>
-                  <li>স্পেয়ার পার্টসের বিজ্ঞাপন তৈরি ও কাছাকাছি অঞ্চলের ক্রেতাদের সুবিধার্থে লিস্টিং সাজানো।</li>
-                  <li>জাল লিস্টিং, স্প্যাম অ্যাকাউন্ট ও সিকিউরিটি ব্রিজ ঠেকাতে এবং প্রকৃত বিক্রেতাদের ফোন নম্বর দিয়ে কমিউনিটি রক্ষা।</li>
-                  <li>ব্যবহারকারীর সম্মতি এবং অনুরোধ ব্যতীত কখনোই বিজ্ঞাপন বা অন্য কোনো থার্ড-পার্টি ট্র্যাকিং নেটওয়ার্কের সাথে কোনো ব্যক্তিগত ডাটা বিনিময় বা বিক্রি করা হয় না।</li>
+                  <li>অ্যাকাউন্ট, লিস্টিং, চ্যাট ও সাপোর্ট সেবা দিতে আপনার তথ্য ব্যবহার করা হয়।</li>
+                  <li>জাল লিস্টিং, স্প্যাম অ্যাকাউন্ট ও অপব্যবহার ঠেকাতে তথ্য ব্যবহার করা হয়।</li>
+                  <li><strong>আমরা আপনার ব্যক্তিগত তথ্য বিক্রি করি না।</strong></li>
+                  <li>
+                    আমাদের হয়ে তথ্য প্রক্রিয়াকরণকারী সেবাদাতা: Supabase (অ্যাকাউন্ট, চ্যাট, ব্যবহারের পরিসংখ্যান), Google Firebase/Firestore (লিস্টিং সংক্রান্ত ডেটা),
+                    Cloudinary (ছবি), Vercel (হোস্টিং ও সার্ভার), UddoktaPay ও bKash (ওয়েবসাইটের পেমেন্ট)।
+                  </li>
+                  <li>
+                    ওয়েবসাইটে Google AdSense ও Adsterra-র মতো তৃতীয় পক্ষের বিজ্ঞাপন দেখানো হতে পারে। তারা নিজেদের নীতি অনুযায়ী কুকি বা ডিভাইস শনাক্তকারী ব্যবহার করতে পারে।
+                    অ্যান্ড্রয়েড অ্যাপে বর্তমানে কোনো তৃতীয় পক্ষের বিজ্ঞাপন নেই। ভবিষ্যতে অ্যাপে বিজ্ঞাপন যুক্ত করলে আগে এই নীতি হালনাগাদ করা হবে।
+                  </li>
                 </ul>
               </section>
 
               <section className="space-y-3">
-                <h2 className="text-base font-black text-slate-900 border-b border-slate-100 pb-1.5 flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 rounded-full bg-indigo-600"></span>
-                  ৩. ডেটা স্টোরেজ ও নিরাপত্তা (Storage & Security)
-                </h2>
+                <SectionTitle>৩. ডেটা স্টোরেজ ও নিরাপত্তা</SectionTitle>
                 <p>
-                  আমরা আপনার সমস্ত লিস্টিং, অবস্থান এবং প্রফাইল তথ্য <strong>গুগল ফায়ারবেস ফায়ারস্টোর (Google Firebase Firestore)</strong> ক্লাউড প্রযুক্তির মাধ্যমে সুরক্ষিত অবস্থায় সংরক্ষণ করি। 
-                  অননুমোদিত প্রবেশ ঠেকাতে আমরা কঠোর সিকিউরিটি রুলস (Firestore Security Rules) এবং এসএসএল ট্রান্সমিশন এনক্রিপশন ব্যবহার করি।
+                  আপনার অ্যাকাউন্ট, চ্যাট ও ব্যবহারের পরিসংখ্যান <strong>Supabase</strong>-এ, লিস্টিং সংক্রান্ত ডেটা <strong>Google Firebase Firestore</strong>-এ এবং ছবি <strong>Cloudinary</strong>-তে সংরক্ষিত হয়।
+                  সব যোগাযোগ HTTPS/SSL এনক্রিপশনের মাধ্যমে হয় এবং অননুমোদিত প্রবেশ ঠেকাতে ডেটাবেসে অ্যাক্সেস নিয়ন্ত্রণ (security rules) প্রয়োগ করা আছে।
                 </p>
               </section>
 
               <section className="space-y-3">
-                <h2 className="text-base font-black text-slate-900 border-b border-slate-100 pb-1.5 flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 rounded-full bg-indigo-600"></span>
-                  ৪. ব্যবহারকারীর অ্যাকাউন্টের সম্পূর্ণ তথ্য মুছে দেওয়ার অধিকার
-                </h2>
+                <SectionTitle>৪. তথ্য সংরক্ষণকাল ও অ্যাকাউন্ট মুছে ফেলার অধিকার</SectionTitle>
                 <p>
-                  গুগল প্লে স্টোর ডেটা ডিলিট পলিসি মেনে ব্যবহারকারীর অধিকারকে সর্বোচ্চ সম্মান জানানো হয়। যেকোনো ব্যবহারকারী চাইলে অ্যাপের ড্যাশবোর্ড থেকে তাৎক্ষণিকভাবে অ্যাকাউন্ট ডিলিট করতে পারেন। 
-                  তা ছাড়া আপনার সমস্ত বিজ্ঞাপন ও ব্যক্তিগত ডাটা সম্পূর্ণ মুছে ফেলার অনুরোধ করতে আমাদের ডেভেলপার ইমেইলে সরাসরি মেসেজ পাঠাতে পারেন। অনুরোধ পাওয়ার ২৪-৪৮ ঘণ্টার মধ্যে ডেটাবেস থেকে সংশ্লিষ্ট সমস্ত রেকর্ড স্থায়ীভাবে ডিলিট করা হবে।
+                  আপনার তথ্য অ্যাকাউন্ট ডিলিট না করা পর্যন্ত সংরক্ষিত থাকে। আপনি যেকোনো সময় অ্যাপের ড্যাশবোর্ড থেকে অ্যাকাউন্ট ডিলিট করতে পারেন, অথবা
+                  {" "}<a href="https://garibazar.shop/delete-account" className="text-indigo-600 hover:underline">https://garibazar.shop/delete-account</a>{" "}
+                  পেজে গিয়ে অ্যাকাউন্ট ও সংশ্লিষ্ট ডেটা মুছে ফেলার অনুরোধ করতে পারেন।
+                  ইমেইলেও অনুরোধ পাঠানো যায়। অনুরোধ পাওয়ার ২৪-৪৮ ঘণ্টার মধ্যে আপনার অ্যাকাউন্ট ও সংশ্লিষ্ট রেকর্ড স্থায়ীভাবে মুছে ফেলা হয়।
                 </p>
               </section>
 
               <section className="space-y-3">
-                <h2 className="text-base font-black text-slate-900 border-b border-slate-100 pb-1.5 flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 rounded-full bg-indigo-600"></span>
-                  ৫. শিশুদের গোপনীয়তা রক্ষা (Children’s Privacy)
-                </h2>
+                <SectionTitle>৫. শিশুদের গোপনীয়তা</SectionTitle>
                 <p>
-                  আমাদের এই কার্যক্রম ১৮ বছরের কম বয়সী শিশুদের লক্ষ্য করে পরিচালিত নয় এবং জেনুইন কার পার্টস ডিল করার জন্য কেবল সাবালক নাগরিকরাই এটি ব্যবহার করবেন। 
-                  আমরা জেনেশুনে কখনো অপ্রাপ্তবয়স্ক ব্যবহারকারীদের কোনো ব্যক্তিগত তথ্য সংগ্রহ করি না।
+                  এই সেবা ১৮ বছরের কম বয়সীদের জন্য নয়। আমরা জেনেশুনে অপ্রাপ্তবয়স্কদের কোনো ব্যক্তিগত তথ্য সংগ্রহ করি না।
                 </p>
               </section>
 
               <section className="space-y-3">
-                <h2 className="text-base font-black text-slate-900 border-b border-slate-100 pb-1.5 flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 rounded-full bg-indigo-600"></span>
-                  ৬. কন্টাক্ট এবং আমাদের সাথে যোগাযোগের ঠিকানা
-                </h2>
+                <SectionTitle>৬. নীতির পরিবর্তন ও যোগাযোগ</SectionTitle>
                 <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-2">
                   <p className="text-xs">
-                    প্রাইভেসি পলিসি সংক্রান্ত কোনো উদ্বেগ অথবা অভিযোগ থাকলে আমাদের নিচের ঠিকানায় ইমেইল পাঠান:
+                    এই নীতিতে কোনো পরিবর্তন হলে এই পেজে সর্বশেষ আপডেটের তারিখসহ প্রকাশ করা হবে। প্রাইভেসি সংক্রান্ত কোনো প্রশ্ন বা অভিযোগ থাকলে নিচের ঠিকানায় ইমেইল করুন:
                   </p>
                   <ul className="text-xs space-y-1 font-bold text-slate-800">
                     <li>ডেভেলপার নাম: MD RAYHAN</li>
@@ -244,141 +220,106 @@ export default function PrivacyPolicyPage({
             /* ENGLISH PRIVACY POLICY */
             <>
               <section className="bg-slate-50 border border-slate-150 p-5 rounded-2xl space-y-3">
-                <h2 className="text-base font-black text-slate-900 border-b border-slate-200 pb-1.5 flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 rounded-full bg-indigo-600"></span>
-                  Agreement & Scope
-                </h2>
+                <SectionTitle>Agreement & Scope</SectionTitle>
                 <p>
-                  This Privacy Policy document discloses the information practices of <strong>Gari Bazar</strong>, 
-                  a peer-to-peer automotive parts marketplace application built by developer <strong>MD RAYHAN</strong>. 
-                  We are deeply committed to protecting the integrity and confidentiality of your personal information. 
-                  By downloading, registering, or facilitating trades within Gari Bazar, you agree to the collection, hosting, 
-                  and usage practices specified in this Google Play Developer policy-compliant charter.
+                  <strong>Gari Bazar</strong> is an online marketplace for buying and selling cars, bikes, heavy equipment and their parts.
+                  It is available on the website (garibazar.shop) and as an Android app. The developer, <strong>MD RAYHAN</strong>, is committed to protecting your information.
+                  This policy explains what we collect, why we collect it, who we share it with, and how you can delete it.
                 </p>
               </section>
 
               <section className="space-y-4">
-                <h2 className="text-base font-black text-slate-900 border-b border-slate-100 pb-1.5 flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 rounded-full bg-indigo-600"></span>
-                  1. Information We Collect and Its Logical Necessity
-                </h2>
+                <SectionTitle>1. Information We Collect and Why</SectionTitle>
                 <p>
-                  To secure user authorizations, combat fraudulent trade advertisements, and enable direct negotiations 
-                  between authentic parts buyers and sellers, we capture the following details:
+                  To run the service and build trust between buyers and sellers, we mainly collect the following:
                 </p>
 
                 <div className="space-y-4 pt-2">
-                  {/* Phone Number */}
-                  <div className="border border-slate-150 p-4 rounded-2xl bg-white space-y-1.5 shadow-sm">
-                    <span className="font-extrabold text-slate-900 text-xs text-indigo-600 uppercase tracking-wider block">
-                      A) User Phone Numbers
-                    </span>
-                    <p className="text-xs">
-                      <strong>Purpose & Necessity:</strong> Phone numbers are collected to authenticate users and prevent fraudulent multi-account generation. 
-                      Because Gari Bazar functions as a direct classified catalog for automobile parts, the phone number also serves as the primary contact gateway 
-                      for potential buyers to negotiate and organize logistics directly with you.
-                    </p>
-                  </div>
+                  <InfoCard title="A) Name and Phone Number">
+                    <strong>Purpose:</strong> You create an account and sign in with your phone number and a password, and you provide your name.
+                    This is used to manage your account, prevent fake or duplicate accounts, and let buyers and sellers contact each other directly.
+                    A seller's phone number is shown to interested buyers. We never see your password in plain text; it is securely hashed by Supabase Authentication.
+                  </InfoCard>
 
-                  {/* Location Data */}
-                  <div className="border border-slate-150 p-4 rounded-2xl bg-white space-y-1.5 shadow-sm">
-                    <span className="font-extrabold text-slate-900 text-xs text-indigo-600 uppercase tracking-wider block">
-                      B) Geographic Location Data (City / Division)
-                    </span>
-                    <p className="text-xs">
-                      <strong>Purpose & Necessity:</strong> Auto parts are heavy physical assets. To filter and display spare listings within local proximity 
-                      and prevent expensive long-range shipping errors across Bangladesh, the application logs the user’s self-declared city or active region.
-                    </p>
-                  </div>
+                  <InfoCard title="B) Email Address (optional)">
+                    <strong>Purpose:</strong> If you provide an email, it is used only for account management and, when needed, to contact you.
+                  </InfoCard>
 
-                  {/* Photos and Images */}
-                  <div className="border border-slate-150 p-4 rounded-2xl bg-white space-y-1.5 shadow-sm">
-                    <span className="font-extrabold text-slate-900 text-xs text-indigo-600 uppercase tracking-wider block">
-                      C) Uploaded Listing Images & Photos
-                    </span>
-                    <p className="text-xs">
-                      <strong>Purpose & Necessity:</strong> Sellers must upload photo assets of actual engine components, transmission packages, or bumpers 
-                      to confirm listing authenticity. These images are transmitted securely to Google Firebase Cloud Storage and visible to public listing queries.
-                    </p>
-                  </div>
+                  <InfoCard title="C) Location (city / district)">
+                    <strong>Purpose:</strong> We store the city or area you state yourself (or that is identified from your listing description) so nearby buyers and sellers can find each other.
+                    The app does not collect your phone's GPS or precise location.
+                  </InfoCard>
 
-                  {/* Firebase Auth Data */}
-                  <div className="border border-slate-150 p-4 rounded-2xl bg-white space-y-1.5 shadow-sm">
-                    <span className="font-extrabold text-slate-900 text-xs text-indigo-600 uppercase tracking-wider block">
-                      D) Firebase Authentication Data
-                    </span>
-                    <p className="text-xs">
-                      <strong>Purpose & Necessity:</strong> We use Google Firebase Authentication for session management and login validation. 
-                      This stores the authentication metadata, profile attributes, and unique Firestore User ID (UID) necessary to securely associate listings 
-                      and wallet credits to your authenticated terminal.
-                    </p>
-                  </div>
+                  <InfoCard title="D) Photos">
+                    <strong>Purpose:</strong> Product photos for listings and a profile photo (if you add one) are uploaded and hosted on Cloudinary.
+                    Listing photos are shown to other users.
+                  </InfoCard>
 
-                  {/* Device ID & Email Disclosures */}
-                  <div className="border border-slate-150 p-4 rounded-2xl bg-white space-y-1.5 shadow-sm">
-                    <span className="font-extrabold text-slate-900 text-xs text-indigo-600 uppercase tracking-wider block">
-                      E) Email, Device ID, and Storage Lifespans
-                    </span>
-                    <p className="text-xs">
-                      <strong>Data Collected:</strong> Email address, Device ID (Android ID or Installation ID), and uploaded parts photos.<br />
-                      <strong>Purposes:</strong> Device IDs prevent multiple bot registrations and secure performance auditing. All collected data is strictly used for account management, listing setups, and customer-seller direct contact.<br />
-                      <strong>Retention Policy:</strong> All PII remains hosted strictly until account deletion. Immediate complete purge occurs upon trigger.<br />
-                      <strong>Third-Party Partners:</strong> Storage and user accounts are processed via Google Firebase. Intelligent automated text assistance is facilitated through Google Gemini APIs. No marketing agencies or aggregate trackers are ever utilized.
-                    </p>
-                  </div>
+                  <InfoCard title="E) Listings, Chat Messages and Reports">
+                    <strong>Purpose:</strong> We store the listings you post (price, description), chat messages between buyers and sellers, and report or block information.
+                    This is used to provide chat, keep the platform safe and prevent abuse.
+                  </InfoCard>
+
+                  <InfoCard title="F) Device ID and Usage Data">
+                    <strong>Purpose:</strong> To prevent spam and bots and to understand how the site or app is used (visits, logins, sign-ups, installs, listing views and saves),
+                    we collect a device or installation ID and usage events.
+                  </InfoCard>
+
+                  <InfoCard title="G) Transaction Data (website only)">
+                    <strong>Purpose:</strong> Payments for ad promotion on the website are processed by UddoktaPay and bKash.
+                    We keep only the amount, payment status and transaction reference. We do not receive or store your bKash PIN or card details.
+                  </InfoCard>
                 </div>
               </section>
 
               <section className="space-y-3">
-                <h2 className="text-base font-black text-slate-900 border-b border-slate-100 pb-1.5 flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 rounded-full bg-indigo-600"></span>
-                  2. Use and Protection of Information
-                </h2>
-                <p>
-                  Your information is processed to improve the Gari Bazar app services. We enforce these data guidelines:
-                </p>
+                <SectionTitle>2. Use and Sharing of Information</SectionTitle>
                 <ul className="list-disc pl-5 space-y-1.5 text-xs">
-                  <li>To establish account authentication, manage user profiles, and resolve dispute requests.</li>
-                  <li>To display parts listings with correct geographic filters for surrounding consumers.</li>
-                  <li>To block bot accounts, malicious advertising scripts, and counterfeit listings.</li>
-                  <li><strong>Zero Distribution Policy:</strong> Gari Bazar does not share, trade, rent, or distribute any user data with external advertising aggregators or third-party marketing services.</li>
+                  <li>We use your information to provide accounts, listings, chat and support.</li>
+                  <li>We use it to prevent counterfeit listings, spam accounts and abuse.</li>
+                  <li><strong>We do not sell your personal information.</strong></li>
+                  <li>
+                    Service providers that process data on our behalf: Supabase (accounts, chat, usage statistics), Google Firebase/Firestore (listing data),
+                    Cloudinary (images), Vercel (hosting and servers), and UddoktaPay and bKash (website payments).
+                  </li>
+                  <li>
+                    The website may show third-party ads such as Google AdSense and Adsterra, which may use cookies or device identifiers under their own policies.
+                    The Android app currently shows no third-party ads. If ads are added to the app in the future, this policy will be updated first.
+                  </li>
                 </ul>
               </section>
 
               <section className="space-y-3">
-                <h2 className="text-base font-black text-slate-900 border-b border-slate-100 pb-1.5 flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 rounded-full bg-indigo-600"></span>
-                  3. Cloud Services & Data Architecture
-                </h2>
+                <SectionTitle>3. Data Storage and Security</SectionTitle>
                 <p>
-                  All database and user records are stored securely in <strong>Google Firebase/Firestore</strong> servers. 
-                  We deploy automated Firebase Auth protection layers, encryption-in-transit (HTTPS/SSL), and explicit security rules to prevent information leaks.
+                  Your account, chat and usage statistics are stored in <strong>Supabase</strong>, listing-related data in <strong>Google Firebase Firestore</strong>, and images on <strong>Cloudinary</strong>.
+                  All communication uses HTTPS/SSL encryption, and access rules (security rules) are applied to the databases to prevent unauthorized access.
                 </p>
               </section>
 
               <section className="space-y-3">
-                <h2 className="text-base font-black text-slate-900 border-b border-slate-100 pb-1.5 flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 rounded-full bg-indigo-600"></span>
-                  4. Explicit Account Deletion and Data Purge Rights
-                </h2>
+                <SectionTitle>4. Retention and Your Right to Delete</SectionTitle>
                 <p>
-                  In compliance with Google Play Developer Console requirement paradigms, users retain complete autonomy over their data. 
-                  You can purge your profile, inventory, and registered records instantly via the Account Dashboard tools in Gari Bazar. 
-                  Alternatively, write to our official helpdesk at <a href="mailto:rjrayhan9191@gmail.com" className="text-indigo-600 hover:underline">rjrayhan9191@gmail.com</a>, 
-                  and your data will be permanently cleared from active storage within 24-48 hours.
+                  Your data is kept until you delete your account. You can delete your account at any time from the dashboard in the app, or request deletion of your account and related data at{" "}
+                  <a href="https://garibazar.shop/delete-account" className="text-indigo-600 hover:underline">https://garibazar.shop/delete-account</a>.
+                  You can also email us. Your account and related records are permanently deleted within 24-48 hours of the request.
                 </p>
               </section>
 
               <section className="space-y-3">
-                <h2 className="text-base font-black text-slate-900 border-b border-slate-100 pb-1.5 flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 rounded-full bg-indigo-600"></span>
-                  5. Compliance Inquiries & Developer Contacts
-                </h2>
+                <SectionTitle>5. Children's Privacy</SectionTitle>
+                <p>
+                  This service is not intended for people under 18. We do not knowingly collect personal information from minors.
+                </p>
+              </section>
+
+              <section className="space-y-3">
+                <SectionTitle>6. Changes to This Policy and Contact</SectionTitle>
                 <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-2">
                   <p className="text-xs">
-                    Please submit any privacy audit questions, legal notices, or feedback regarding data policies to:
+                    If this policy changes, the updated version will be published on this page with a new "Last Updated" date. For any privacy questions or complaints, write to:
                   </p>
-                  <ul className="text-xs space-y-1 font-bold text-slate-805">
+                  <ul className="text-xs space-y-1 font-bold text-slate-800">
                     <li>Developer: MD RAYHAN</li>
                     <li>Jurisdiction: Bangladesh</li>
                     <li>Official Email: <a href="mailto:rjrayhan9191@gmail.com" className="text-indigo-600 hover:underline">rjrayhan9191@gmail.com</a></li>
