@@ -64,6 +64,20 @@ const HOME_CATEGORIES = [
 
 import { checkIsProduction, isItemVehicle, matchesSubCategoryFilter } from "./utils/listingFilters";
 
+// 🔧 (2026-09-30) Packaged Capacitor APK এর WebView-তে browser-এর
+// Notification API নেই বা কাজ করে না -- আগে সেখানে "Push notifications are
+// not supported in this browser environment" নামের একটা কাঁচা technical
+// error দেখাত। এখন এই হেল্পার দিয়ে native app ধরা হয়, যাতে সেখানে বন্ধু-সুলভ
+// বাংলা/ইংরেজি বার্তা দেখানো যায় (real push notifications native app-এ FCM/
+// APNs-এর মাধ্যমে আলাদাভাবে কাজ করে, browser Notification API দিয়ে না)।
+const isNativeApp = (): boolean => {
+  try {
+    return !!(window as any).Capacitor && typeof (window as any).Capacitor.isNativePlatform === "function" && (window as any).Capacitor.isNativePlatform();
+  } catch (e) {
+    return false;
+  }
+};
+
 export default function App() {
   const [language, setLanguage] = useState<SupportedLanguage>(() => {
     try {
@@ -405,11 +419,16 @@ export default function App() {
   }, [listings, hasOpenedSharedListing]);
 
   // Push Notifications (FCM) and Analytics integration states
+  // 🔧 (2026-09-30) Inside the packaged Capacitor app the browser Notification
+  // API is absent/non-functional, so we never treat "default" as promptable
+  // there -- avoids showing the banner for a feature that would only show a
+  // technical error when tapped. Native push needs a separate FCM/APNs
+  // integration, not the web Notification API.
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>(
     typeof window !== "undefined" && "Notification" in window ? Notification.permission : "default"
   );
   const [showNotificationPrompt, setShowNotificationPrompt] = useState(
-    typeof window !== "undefined" && "Notification" in window && Notification.permission === "default"
+    typeof window !== "undefined" && "Notification" in window && Notification.permission === "default" && !isNativeApp()
   );
 
   const prevListingsIdRef = useRef<Set<string>>(new Set());
@@ -540,9 +559,26 @@ export default function App() {
   };
 
   // Request Notification permission
+  // 🔧 (2026-09-30) Native app (Capacitor)-এ browser Notification API কাজ
+  // করে না -- আগে সরাসরি "Push notifications are not supported in this
+  // browser environment" এই কাঁচা ইংরেজি technical error দেখাত। এখন সেখানে
+  // একটা বন্ধু-সুলভ দ্বিভাষিক বার্তা দেখায় ("এই ফিচারটি শীঘ্রই আসছে")।
   const handleRequestNotificationPermission = async () => {
+    if (isNativeApp()) {
+      setShowNotificationPrompt(false);
+      alert(
+        language === "bn"
+          ? "অ্যাপে পুশ নোটিফিকেশন ফিচারটি শীঘ্রই আসছে। এখনো এটি প্রস্তুত নয়।"
+          : "Push notifications in the app are coming soon. This feature isn't ready yet."
+      );
+      return;
+    }
     if (typeof window === "undefined" || !("Notification" in window)) {
-      alert("Push notifications are not supported in this browser environment.");
+      alert(
+        language === "bn"
+          ? "এই ব্রাউজারে পুশ নোটিফিকেশন সমর্থিত নয়।"
+          : "Push notifications are not supported in this browser environment."
+      );
       return;
     }
     try {
