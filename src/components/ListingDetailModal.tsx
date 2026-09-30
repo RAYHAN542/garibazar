@@ -6,7 +6,7 @@ import { supabase } from "../supabase";
 import { trackListingClick } from "../utils/counters";
 import { getOptimizedImageUrl } from "../utils/cloudinary";
 import { apiUrl } from "../utils/apiBase";
-import { AdsterraBanner } from "./AdsterraBanner";
+import { NativeBannerAd } from "./NativeBannerAd";
 import { Capacitor } from "@capacitor/core";
 
 // Masks all but the last 4 digits so the full number isn't visible in plain
@@ -508,10 +508,11 @@ export function ListingDetailModal({ listing, language, currentUser, onClose, on
           </div>
         )}
 
-        {/* Adsterra ad slot - shown above the listing image gallery */}
-        {!Capacitor.isNativePlatform() && (
-          <AdsterraBanner adKey="b857b962a0d90b99389aec7b0ee74db7" width={320} height={50} />
-        )}
+        {/* 🔧 (2026-09-30) Swapped the plain 320x50 AdsterraBanner for the
+            Native Banner format -- a larger, in-feed-styled ad (matches the
+            Bikroy-style ad the user pointed to), shown right above the
+            image gallery same as before. */}
+        {!Capacitor.isNativePlatform() && <NativeBannerAd />}
 
         <button
           id="detail-close-btn"
