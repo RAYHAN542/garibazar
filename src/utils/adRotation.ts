@@ -1,25 +1,19 @@
 import type { PartListing } from "../types";
 import { apiUrl } from "./apiBase";
 
-// Fair rotation for boosted/sponsored ads -- impression-count based.
-// - The top spotlight slider shows at most 6 boosted ads at once.
-// - The feed below also shows up to 6 boosted posts, placed at fixed serial
-//   positions in the grid (2nd, then every 5th item after that) -- someone
-//   paying to boost a post wants it actually seen, so the feed carries the
-//   same 6-ad allowance as the slider instead of just one.
-// - However many ads exist (100 or 100,000), EVERY ad gets its turn: the
-//   database tracks how many times each ad has actually been shown
-//   (ad_impressions, bumped via /api/ad-impression -> bump_ad_impressions()
-//   RPC), and every homepage load picks whichever LIVE ads have been shown
-//   the LEAST so far. This is true fairness -- no reload-guessing, no
-//   per-visitor local rotation state, and it works the same for every
-//   visitor since the counts live on the server, not in one browser's
-//   localStorage.
-// - The logged-in seller's OWN live boosted posts are always shown to them
-//   first: pinned into their slider/feed window. Other visitors still see
-//   them only when their turn comes (by impression count).
-// - Boosted ads that aren't picked are NOT hidden -- they just appear as
-//   normal listings in their usual position.
+// Fair rotation for boosted/sponsored ads.
+// - The top spotlight slider shows at most MAX_SPOTLIGHT_ADS boosted ads.
+// - The feed below shows up to MAX_INLINE_ADS boosted posts, placed at fixed
+//   serial positions in the grid (2nd item, then every ADS_INTERLEAVE_GAP
+//   items after that) -- someone paying to boost a post wants it actually
+//   seen, so the feed carries the same allowance as the slider.
+// - Server-side impression counting: every time interleaveAds/pickRotatedAds
+//   actually places an ad in front of a visitor, it fires a best-effort,
+//   non-blocking call to /api/ad-impression, which bumps that listing's
+//   ad_impressions column via the bump_ad_impressions() RPC. This lets a
+//   caller that DOES select ads by least-shown-first (pickRotatedAds) give
+//   true fairness across however many ads are boosted at once (100 or
+//   100,000), without relying on client-side reload-guessing.
 export const MAX_SPOTLIGHT_ADS = 6;
 export const MAX_INLINE_ADS = 6;
 export const ADS_INTERLEAVE_GAP = 5;
@@ -75,6 +69,11 @@ function leastShownFirst(items: PartListing[]): PartListing[] {
     .map(({ item }) => item);
 }
 
+// Picks up to `max` LIVE boosted ads out of `ads`, preferring whichever have
+// been shown the least (server-tracked ad_impressions), and reports the
+// impression for whatever it picks. The logged-in viewer's own boosted posts
+// are always included first (pinned) so a seller can always see their own
+// live ad regardless of the fairness queue.
 export function pickRotatedAds(ads: PartListing[], max: number): PartListing[] {
   const seen = new Set<string>();
   const live = ads.filter((item) => {
@@ -88,9 +87,6 @@ export function pickRotatedAds(ads: PartListing[], max: number): PartListing[] {
     return live;
   }
 
-  // The viewer's own boosted posts are always shown to them first (and
-  // don't count toward -- or need -- the fairness queue, since the viewer
-  // chose to look at their own ad).
   const uid = currentUserId();
   const pinned = uid ? live.filter((item) => item.sellerId === uid).slice(0, max) : [];
   const remaining = max - pinned.length;
@@ -103,34 +99,31 @@ export function pickRotatedAds(ads: PartListing[], max: number): PartListing[] {
   return [...pinned, ...picked];
 }
 
-export function interleaveAds(items: PartListing[]): PartListing[] {
-  // The viewer's own live boosted posts go to the very top of THEIR feed.
-  const uid = currentUserId();
-  const mine = uid ? items.filter((item) => isLiveAd(item) && item.sellerId === uid) : [];
-  const mineIds = new Set(mine.map((item) => item.id));
-  const others = mineIds.size > 0 ? items.filter((item) => !mineIds.has(item.id)) : items;
+// Interleaves a pre-selected list of ad items into a list of organic items,
+// at fixed serial positions: the FIRST_AD_POSITION-th organic item, then
+// every `gap` organic items after that. Any ad items left over once the
+// organic list runs out are appended at the end (so nothing is silently
+// dropped). Reports impressions for whichever ads actually get placed.
+export function interleaveAds(
+  organicItems: PartListing[],
+  adItems: PartListing[],
+  gap: number = ADS_INTERLEAVE_GAP
+): PartListing[] {
+  if (adItems.length === 0) return organicItems;
+  reportImpressions(adItems.filter(isLiveAd).map((item) => item.id));
 
-  const picked = pickRotatedAds(others, MAX_INLINE_ADS);
-  if (picked.length === 0) return [...mine, ...others];
-
-  const pickedIds = new Set(picked.map((p) => p.id));
-  const organic = others.filter((item) => !pickedIds.has(item.id));
-  if (organic.length === 0) return [...mine, ...picked];
-
-  const out: PartListing[] = [...mine];
+  const out: PartListing[] = [];
   let next = 0;
-  organic.forEach((item, idx) => {
+  organicItems.forEach((item, idx) => {
     out.push(item);
     const n = idx + 1;
-    const isSlot =
-      n === FIRST_AD_POSITION ||
-      (n > FIRST_AD_POSITION && (n - FIRST_AD_POSITION) % ADS_INTERLEAVE_GAP === 0);
-    if (isSlot && next < picked.length) out.push(picked[next++]);
+    const isSlot = n === FIRST_AD_POSITION || (n > FIRST_AD_POSITION && (n - FIRST_AD_POSITION) % gap === 0);
+    if (isSlot && next < adItems.length) out.push(adItems[next++]);
   });
-  // Very short feed: still show whatever boosted ads we picked, at the end.
-  while (next < picked.length) {
-    out.push(picked[next++]);
+  while (next < adItems.length) {
+    out.push(adItems[next++]);
   }
   return out;
 }
+
 export { shuffleArray } from "./shuffle";
