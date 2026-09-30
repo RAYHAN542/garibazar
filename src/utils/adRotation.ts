@@ -3,8 +3,10 @@ import { apiUrl } from "./apiBase";
 
 // Fair rotation for boosted/sponsored ads -- impression-count based.
 // - The top spotlight slider shows at most 6 boosted ads at once.
-// - The feed below shows just ONE other-seller boosted post (after the first
-//   2 normal posts) -- not a row of them.
+// - The feed below also shows up to 6 boosted posts, placed at fixed serial
+//   positions in the grid (2nd, then every 5th item after that) -- someone
+//   paying to boost a post wants it actually seen, so the feed carries the
+//   same 6-ad allowance as the slider instead of just one.
 // - However many ads exist (100 or 100,000), EVERY ad gets its turn: the
 //   database tracks how many times each ad has actually been shown
 //   (ad_impressions, bumped via /api/ad-impression -> bump_ad_impressions()
@@ -14,13 +16,12 @@ import { apiUrl } from "./apiBase";
 //   visitor since the counts live on the server, not in one browser's
 //   localStorage.
 // - The logged-in seller's OWN live boosted posts are always shown to them
-//   first: pinned into their slider window, and placed at the very top of
-//   their feed. Other visitors still see them only when their turn comes
-//   (by impression count).
+//   first: pinned into their slider/feed window. Other visitors still see
+//   them only when their turn comes (by impression count).
 // - Boosted ads that aren't picked are NOT hidden -- they just appear as
 //   normal listings in their usual position.
 export const MAX_SPOTLIGHT_ADS = 6;
-export const MAX_INLINE_ADS = 1;
+export const MAX_INLINE_ADS = 6;
 export const ADS_INTERLEAVE_GAP = 5;
 const FIRST_AD_POSITION = 2;
 
@@ -126,8 +127,10 @@ export function interleaveAds(items: PartListing[]): PartListing[] {
       (n > FIRST_AD_POSITION && (n - FIRST_AD_POSITION) % ADS_INTERLEAVE_GAP === 0);
     if (isSlot && next < picked.length) out.push(picked[next++]);
   });
-  // Very short feed: still show the boosted ad.
-  if (next === 0) out.push(picked[next++]);
+  // Very short feed: still show whatever boosted ads we picked, at the end.
+  while (next < picked.length) {
+    out.push(picked[next++]);
+  }
   return out;
 }
 export { shuffleArray } from "./shuffle";
