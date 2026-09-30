@@ -57,23 +57,21 @@
           }, 3000);
         });
       </script>
-      <!-- Adsterra Social Bar: same deferred-load / native-skip pattern as
-           the AdSense script above -- loaded after window 'load' so it
-           never competes with first paint, and skipped inside the packaged
-           Capacitor app since a sticky ad bar isn't appropriate there. -->
-      <script>
-        window.addEventListener('load', function () {
-          setTimeout(function () {
-            if (window.Capacitor && typeof window.Capacitor.isNativePlatform === 'function' && window.Capacitor.isNativePlatform()) {
-              return;
-            }
-            var s = document.createElement('script');
-            s.async = true;
-            s.src = "https://pl31521943.profitableratecpmnetwork.com/d2/47/2f/d2472fc1d9f7f1c9aba2e0c3492d1a87.js";
-            document.body.appendChild(s);
-          }, 3000);
-        });
-      </script>
+      <!-- 🔧 (2026-09-30) Adsterra "Social Bar" script removed from here.
+           That format injects its own floating overlay content directly
+           into the page, completely outside any container's width/height
+           -- in practice this meant full-screen, low-quality, often
+           inappropriate ad creatives (gambling/casino, movie-piracy
+           "watch online" spam) stacking up over the whole listing page,
+           regardless of any sizing set elsewhere. Two problems: it looked
+           nothing like the compact banner the site was designed around
+           (compare to Bikroy-style small banner ads), and gambling-content
+           ads are a real risk to Google Play policy compliance for the
+           packaged app. AdsterraBanner.tsx's properly size-bound
+           320x50/300x250 iframe banner (rendered inside the listing detail
+           page) is the only Adsterra ad surface left -- it can't render
+           oversized content like this since Adsterra's script is confined
+           to the exact pixel box that component sets. -->
       <!-- 🚫 Google Play Payments policy: the packaged Android app must not
            lead users to a payment method other than Google Play Billing.
            Ad-promotion payments (UddoktaPay/bKash) therefore stay
