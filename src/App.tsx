@@ -20,6 +20,7 @@ import {
 } from "./utils/listingsApi";
 import { shuffleArray, interleaveAds, MAX_SPOTLIGHT_ADS, MAX_INLINE_ADS, ADS_INTERLEAVE_GAP } from "./utils/adRotation.js";
 import { useAdPromotion } from "./hooks/useAdPromotion";
+import { usePushNotifications } from "./hooks/usePushNotifications";
 import { Car, Search, User, LogOut, Globe, Loader2, ShoppingBag, Phone, ChevronRight, ShieldCheck, Send, Check, Download, Smartphone } from "lucide-react";
 
 import { PartListing, SupportedLanguage } from "./types";
@@ -211,6 +212,11 @@ export default function App() {
   }, [user]);
 
   const isUserAdmin = isAdminVerified;
+
+  // 🔔 (2026-09-30) Registers this device for real native push notifications
+  // (Firebase Cloud Messaging via Capacitor) once the user is signed in.
+  // No-ops entirely on web -- see src/hooks/usePushNotifications.ts.
+  usePushNotifications(user?.uid);
   
   // Helper to retrieve all currently blocked user IDs
   const getBlockedUids = (): string[] => {
