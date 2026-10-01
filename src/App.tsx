@@ -1820,10 +1820,6 @@ export default function App() {
       return matchesCategory && matchesSub && matchesCity;
     });
 
-    // 🎲 Fair-rotation + interleave (আগে: সব বুস্ট করা অ্যাড একসাথে সবার উপরে জমা হতো)।
-    // এখন: বুস্ট করা অ্যাডগুলো র‍্যান্ডম অর্ডারে (shuffledAds) সাজিয়ে সর্বোচ্চ MAX_INLINE_ADS-টা
-    // মেইন ফিডের ভেতরে ছড়িয়ে দেওয়া হয় (প্রতি ADS_INTERLEAVE_GAP-টা সাধারণ পোস্টের পর ১টা)।
-    // সীমার বাইরে পড়ে যাওয়া অ্যাডগুলো হারিয়ে যায় না -- সাধারণ পোস্ট হিসেবে ফিডে থাকে।
     const sortOrganic = (a: PartListing, b: PartListing) => {
       if (sortBy === "priceAsc") {
         return a.price - b.price;
@@ -1838,14 +1834,13 @@ export default function App() {
       return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
     };
 
-    const allAds = finalFiltered
-      .filter((item) => item.isAd)
-      .sort((a, b) => (adRank.get(a.id) ?? 9999) - (adRank.get(b.id) ?? 9999));
-    const inlineAds = allAds.slice(0, MAX_INLINE_ADS);
-    const overflowAds = allAds.slice(MAX_INLINE_ADS);
-    const organic = [...finalFiltered.filter((item) => !item.isAd), ...overflowAds].sort(sortOrganic);
-
-    return interleaveAds(organic, inlineAds, ADS_INTERLEAVE_GAP);
+    // 🔧 ইউজারের স্পষ্ট নির্দেশ অনুযায়ী: বুস্ট করা পোস্ট শুধু উপরের "Sponsored
+    // Spotlights" গ্রিডেই (একটা আলাদা গ্রুপ হিসেবে) দেখাবে -- নিচের মূল ফিডে
+    // প্রতি ২টা/৫টা পোস্ট পরপর আলাদা করে আবার বসানো (interleave) হবে না।
+    // তাই এখানে বুস্ট পোস্টও বাকি সব পোস্টের মতোই স্বাভাবিক সাজানো অনুযায়ী
+    // (sortOrganic) নিজের জায়গায় থাকে -- জোর করে কোনো নির্দিষ্ট স্লটে বসানো
+    // হয় না, এবং দুইবার দেখানোও হয় না।
+    return [...finalFiltered].sort(sortOrganic);
   }, [enrichedListings, fuseInstance, debouncedSearchQuery, selectedCategory, selectedSubCategory, selectedCity, sortBy, adRank]);
 
   // 7b. Auto-fetch more when a filter/sub-category matches nothing on the
