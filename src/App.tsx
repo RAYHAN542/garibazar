@@ -65,12 +65,6 @@ const HOME_CATEGORIES = [
 
 import { checkIsProduction, isItemVehicle, matchesSubCategoryFilter } from "./utils/listingFilters";
 
-// 🔧 (2026-09-30) Packaged Capacitor APK এর WebView-তে browser-এর
-// Notification API নেই বা কাজ করে না -- আগে সেখানে "Push notifications are
-// not supported in this browser environment" নামের একটা কাঁচা technical
-// error দেখাত। এখন এই হেল্পার দিয়ে native app ধরা হয়, যাতে সেখানে বন্ধু-সুলভ
-// বাংলা/ইংরেজি বার্তা দেখানো যায় (real push notifications native app-এ FCM/
-// APNs-এর মাধ্যমে আলাদাভাবে কাজ করে, browser Notification API দিয়ে না)।
 const isNativeApp = (): boolean => {
   try {
     return !!(window as any).Capacitor && typeof (window as any).Capacitor.isNativePlatform === "function" && (window as any).Capacitor.isNativePlatform();
@@ -424,12 +418,10 @@ export default function App() {
     })();
   }, [listings, hasOpenedSharedListing]);
 
-  // Push Notifications (FCM) and Analytics integration states
-  // 🔧 (2026-09-30) Inside the packaged Capacitor app the browser Notification
-  // API is absent/non-functional, so we never treat "default" as promptable
-  // there -- avoids showing the banner for a feature that would only show a
-  // technical error when tapped. Native push needs a separate FCM/APNs
-  // integration, not the web Notification API.
+  // Push Notifications states. 🔔 (2026-09-30) On the packaged native app,
+  // the device auto-registers with FCM on login (see usePushNotifications
+  // above) -- no banner needed there, so it only shows on web where the
+  // person has to opt in via the browser's own Notification API.
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>(
     typeof window !== "undefined" && "Notification" in window ? Notification.permission : "default"
   );
@@ -565,18 +557,43 @@ export default function App() {
   };
 
   // Request Notification permission
-  // 🔧 (2026-09-30) Native app (Capacitor)-এ browser Notification API কাজ
-  // করে না -- আগে সরাসরি "Push notifications are not supported in this
-  // browser environment" এই কাঁচা ইংরেজি technical error দেখাত। এখন সেখানে
-  // একটা বন্ধু-সুলভ দ্বিভাষিক বার্তা দেখায় ("এই ফিচারটি শীঘ্রই আসছে")।
+  // 🔔 (2026-09-30) Native app now has the @capacitor/push-notifications
+  // plugin installed (usePushNotifications.ts handles auto-registration on
+  // login). Tapping the bell here on native now triggers a real permission
+  // request + registration through that same plugin, instead of the old
+  // "coming soon" placeholder message.
   const handleRequestNotificationPermission = async () => {
     if (isNativeApp()) {
-      setShowNotificationPrompt(false);
-      alert(
-        language === "bn"
-          ? "অ্যাপে পুশ নোটিফিকেশন ফিচারটি শীঘ্রই আসছে। এখনো এটি প্রস্তুত নয়।"
-          : "Push notifications in the app are coming soon. This feature isn't ready yet."
-      );
+      try {
+        const { PushNotifications } = await import(/* @vite-ignore */ "@capacitor/push-notifications");
+        let permStatus = await PushNotifications.checkPermissions();
+        if (permStatus.receive === "prompt") {
+          permStatus = await PushNotifications.requestPermissions();
+        }
+        setShowNotificationPrompt(false);
+        if (permStatus.receive === "granted") {
+          await PushNotifications.register();
+          alert(
+            language === "bn"
+              ? "পুশ নোটিফিকেশন সফলভাবে চালু হয়েছে! আপনাকে স্বাগতম!"
+              : "Push notifications successfully enabled! Welcome aboard!"
+          );
+        } else {
+          alert(
+            language === "bn"
+              ? "নোটিফিকেশন অনুমতি দেওয়া হয়নি। ফোনের সেটিংস থেকে পরে চালু করতে পারেন।"
+              : "Notification permission wasn't granted. You can enable it later from your phone's app settings."
+          );
+        }
+      } catch (e) {
+        console.warn("Native push registration failed:", e);
+        setShowNotificationPrompt(false);
+        alert(
+          language === "bn"
+            ? "পুশ নোটিফিকেশন চালু করা যায়নি। একটু পর আবার চেষ্টা করুন।"
+            : "Couldn't enable push notifications. Please try again shortly."
+        );
+      }
       return;
     }
     if (typeof window === "undefined" || !("Notification" in window)) {
