@@ -6,7 +6,7 @@ import { CITIES } from "../translations";
 import { PartListing, SupportedLanguage, TranslationSet } from "../types";
 import type { ActiveTab } from "./HeaderNav";
 import { logAnalyticsEvent } from "../firebase";
-import { pickRotatedAds, interleaveAds, MAX_SPOTLIGHT_ADS } from "../utils/adRotation";
+import { pickRotatedAds, MAX_SPOTLIGHT_ADS } from "../utils/adRotation";
 
 interface MarketplaceTabProps {
   language: SupportedLanguage;
@@ -105,7 +105,8 @@ export default function MarketplaceTab({
   setIsLotteryOpen,
 }: MarketplaceTabProps) {
   const spotlightAds = useMemo(() => pickRotatedAds(adListings, MAX_SPOTLIGHT_ADS), [adListings]);
-  const displayListings = useMemo(() => interleaveAds(filteredListings), [filteredListings]);
+  // filteredListings already has ads interleaved by App.tsx -- do not interleave twice.
+  const displayListings = filteredListings;
 
   const [isCityPickerOpen, setIsCityPickerOpen] = useState(false);
   const [citySearchQuery, setCitySearchQuery] = useState("");

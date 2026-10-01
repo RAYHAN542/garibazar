@@ -111,10 +111,11 @@ export function pickRotatedAds(ads: PartListing[], max: number): PartListing[] {
 // dropped). Reports impressions for whichever ads actually get placed.
 export function interleaveAds(
   organicItems: PartListing[],
-  adItems: PartListing[],
+  adItems: PartListing[] = [],
   gap: number = ADS_INTERLEAVE_GAP
 ): PartListing[] {
-  if (adItems.length === 0) return organicItems;
+  if (!Array.isArray(organicItems)) organicItems = [];
+  if (!Array.isArray(adItems) || adItems.length === 0) return organicItems;
   reportImpressions(adItems.filter(isLiveAd).map((item) => item.id));
 
   const out: PartListing[] = [];
