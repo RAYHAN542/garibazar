@@ -1,9 +1,9 @@
-import React, { ErrorInfo, ReactNode } from "react";
+import React, { ReactNode } from "react";
 import { AlertTriangle, Loader2, Home } from "lucide-react";
 import { logAnalyticsEvent } from "../firebase";
 
 interface Props {
-  children?: ReactNode;
+  children: ReactNode;
   language?: "bn" | "en";
 }
 
@@ -22,65 +22,145 @@ export class ErrorBoundary extends React.Component<Props, State> {
     return { hasError: true, error };
   }
 
-  public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error("Uncaught exception caught by React ErrorBoundary:", error, errorInfo);
+  private isChunkLoadError = (error: Error | null) => {
+    const message = String(error?.message || "").toLowerCase();
+    const name = String(error?.name || "").toLowerCase();
+
+    return (
+      name.includes("chunk") ||
+      message.includes("loading chunk") ||
+      message.includes("chunkloaderror") ||
+      message.includes("failed to fetch dynamically imported module") ||
+      message.includes("dynamically imported module") ||
+      message.includes("importing a module script failed") ||
+      message.includes("failed to load module script")
+    );
+  };
+
+  private recoverFromStaleChunk = async () => {
+    try {
+      const recoveryKey = "gari_bazar_chunk_recovery_v1";
+
+      // Prevent an infinite reload loop.
+      if (sessionStorage.getItem(recoveryKey) === "1") {
+        return;
+      }
+
+      sessionStorage.setItem(recoveryKey, "1");
+
+      // Remove old service workers.
+      if ("serviceWorker" in navigator) {
+        const registrations =
+          await navigator.serviceWorker.getRegistrations();
+
+        await Promise.all(
+          registrations.map((registration) =>
+            registration.unregister()
+          )
+        );
+      }
+
+      // Remove stale cached bundles.
+      if ("caches" in window) {
+        const cacheKeys = await caches.keys();
+
+        await Promise.all(
+          cacheKeys.map((key) => caches.delete(key))
+        );
+      }
+    } catch (e) {
+      // Recovery is best-effort.
+    } finally {
+      window.location.reload();
+    }
+  };
+
+  public componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    console.error(
+      "Uncaught error caught by React ErrorBoundary:",
+      error,
+      errorInfo
+    );
+
     try {
       logAnalyticsEvent("app_crash_detected", {
         message: error?.message || "Unknown error",
         stack: error?.stack || "",
-        componentStack: errorInfo?.componentStack || ""
+        componentStack: errorInfo?.componentStack || "",
       });
     } catch (e) {}
+
+    // Automatically recover from stale Vercel/PWA chunks.
+    if (this.isChunkLoadError(error)) {
+      void this.recoverFromStaleChunk();
+    }
   }
 
   private handleReset = () => {
-    this.setState({ hasError: false, error: null });
+    this.setState({
+      hasError: false,
+      error: null,
+    });
+
     window.location.reload();
   };
 
   public render() {
     if (this.state.hasError) {
       const isBangla = this.props.language !== "en";
+
       return (
-        <div className="min-h-screen bg-slate-900 flex flex-col justify-center items-center p-6 text-slate-100">
+        <div className="min-h-screen bg-slate-900 flex flex-col justify-center items-center p-6">
           <div className="max-w-md w-full text-center space-y-6 bg-slate-800/50 p-8 rounded-3xl border border-slate-700">
-            <div className="inline-flex p-4 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-500">
-              <AlertTriangle className="w-12 h-12" />
+
+            <div className="inline-flex p-4 rounded-full bg-amber-500/10 border border-amber-500/20">
+              <AlertTriangle className="w-12 h-12 text-amber-500" />
             </div>
 
             <div className="space-y-2">
               <h1 className="text-xl md:text-2xl font-black tracking-tight text-white">
-                {isBangla ? "দুঃখিত, কোনো একটি সমস্যা হয়েছে!" : "Something went wrong!"}
+                {isBangla
+                  ? "দুঃখিত, কোনো একটি সমস্যা হয়েছে!"
+                  : "Something went wrong!"}
               </h1>
+
               <p className="text-sm text-slate-400 leading-relaxed font-semibold">
                 {isBangla
-                  ? "অ্যাপের কোনো ফাইল লোড হতে সমস্যা হচ্ছে। দয়া করে রিলোড করে আবার চেষ্টা করুন।"
+                  ? "অ্যাপের কোনো ফাইল লোড হতে সমস্যা হচ্ছে। দয়া করে রিলোড করে আবার চেষ্টা করুন।"
                   : "An unexpected client crash occurred. Please reload the app to resume your session."}
               </p>
             </div>
 
-            {(this.state.error && import.meta.env.DEV && (
-              <div className="text-left bg-slate-950/80 p-4 rounded-xl border border-slate-800 font-mono text-[11px] text-slate-400">
-                <span className="font-bold text-red-500">Error (dev only):</span> {this.state.error.message}
-              </div>
-            ))}
+            {this.state.error &&
+              import.meta.env.DEV && (
+                <div className="p-4 rounded-xl border border-slate-800 bg-slate-900 font-mono text-[11px] text-slate-400">
+                  <span className="font-bold text-red-500">
+                    Error (dev only):
+                  </span>{" "}
+                  {this.state.error.message}
+                </div>
+              )}
 
             <div className="flex flex-col sm:flex-row gap-3 pt-2">
               <button
                 onClick={this.handleReset}
-                className="flex-1 inline-flex items-center justify-center gap-2 bg-amber-500 hover:bg-amber-600 text-slate-900 font-black py-3 px-6 rounded-2xl"
+                className="flex-1 inline-flex items-center justify-center gap-2 bg-amber-500 hover:bg-amber-600 text-slate-900 font-bold py-3 px-6 rounded-2xl"
               >
                 <Loader2 className="w-4 h-4" />
                 {isBangla ? "রিলোড করুন" : "Reload App"}
               </button>
+
               <button
-                onClick={() => { window.location.href = "/"; }}
-                className="flex-1 inline-flex items-center justify-center gap-2 bg-slate-700 hover:bg-slate-600 text-white font-black py-3 px-6 rounded-2xl"
+                onClick={() => {
+                  window.location.href = "/";
+                }}
+                className="flex-1 inline-flex items-center justify-center gap-2 bg-slate-700 hover:bg-slate-600 text-white font-bold py-3 px-6 rounded-2xl"
               >
                 <Home className="w-4 h-4" />
                 {isBangla ? "হোমে যান" : "Go Home"}
               </button>
             </div>
+
           </div>
         </div>
       );
@@ -88,4 +168,4 @@ export class ErrorBoundary extends React.Component<Props, State> {
 
     return this.props.children;
   }
-                }
+}
