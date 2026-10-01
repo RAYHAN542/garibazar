@@ -173,6 +173,20 @@ export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPromp
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  // 🔧 (2026-10-01) ফর্মটা বড়, আর submit বাটন একদম নিচে। আগে error শুধু
+  // ফর্মের সবার উপরে দেখানো হতো -- ইউজার নিচে scroll করে থেকে submit চাপলে
+  // validation fail হলেও error message দেখতে পেত না (স্ক্রিনের বাইরে)।
+  // এখন submit চাপার পর error এলে স্বয়ংক্রিয়ভাবে সেই জায়গায় scroll হয়ে
+  // যায়, আর submit বাটনের ঠিক উপরেও একই বার্তা দেখানো হয় (duplicate), যাতে
+  // scroll কোনো কারণে কাজ না করলেও ইউজার কারণটা দেখতে পায়।
+  const errorBannerRef = useRef<HTMLDivElement>(null);
+
+  const showError = (msg: string) => {
+    setError(msg);
+    requestAnimationFrame(() => {
+      errorBannerRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+  };
 
   const uploadImageToCloudinary = async (file: File, targetIndex: number) => {
     try {
@@ -191,7 +205,7 @@ export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPromp
     const files = Array.from(e.target.files);
 
     if (images.length + files.length > 5) {
-      setError(language === "bn" ? "সর্বোচ্চ ৫টি ছবি আপলোড করা যাবে" : "Maximum 5 images allowed");
+      showError(language === "bn" ? "সর্বোচ্চ ৫টি ছবি আপলোড করা যাবে" : "Maximum 5 images allowed");
       return;
     }
 
@@ -231,19 +245,19 @@ export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPromp
     }
 
     if (!description.trim()) {
-      setError(language === "bn" ? "অনুগ্রহ করে বিবরণ লিখুন" : "Please write a description");
+      showError(language === "bn" ? "অনুগ্রহ করে বিবরণ লিখুন" : "Please write a description");
       return;
     }
 
     const cleanPhoneDigits = toEnglishDigits(phone).replace(/\D/g, "");
     if (!validateBanglaPhone(cleanPhoneDigits)) {
-      setError(language === "bn" ? "সঠিক ১১ ডিজিটের মোবাইল নম্বর দিন" : "Enter a valid 11-digit phone number");
+      showError(language === "bn" ? "সঠিক ১১ ডিজিটের মোবাইল নম্বর দিন" : "Enter a valid 11-digit phone number");
       return;
     }
 
     const uploadedUrls = images.filter(img => img.status === "success" && img.url).map(img => img.url as string);
     if (uploadedUrls.length === 0) {
-      setError(language === "bn" ? "কমপক্ষে একটি ছবি সফলভাবে আপলোড হতে হবে" : "At least one image must be successfully uploaded");
+      showError(language === "bn" ? "কমপক্ষে একটি ছবি সফলভাবে আপলোড হতে হবে" : "At least one image must be successfully uploaded");
       return;
     }
 
@@ -337,20 +351,20 @@ export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPromp
       console.error("Listing submit failed:", err?.code, err?.message, err);
       // The cooldown trigger raises errcode P0001 with this message.
       if (err?.code === "P0001" || err?.message?.includes("listing_cooldown_active")) {
-        setError(
+        showError(
           language === "bn"
             ? "আপনি একটু আগেই একটা বিজ্ঞাপন পোস্ট করেছেন। অনুগ্রহ করে কিছুক্ষণ অপেক্ষা করে আবার চেষ্টা করুন।"
             : "You just posted a listing. Please wait a bit and try again."
         );
       } else if (err?.code === "42501" || err?.status === 403) {
         // Postgres/PostgREST permission-denied (RLS rejection).
-        setError(
+        showError(
           language === "bn"
             ? "পোস্ট করা যায়নি (permission denied)। অনুগ্রহ করে লগআউট করে আবার লগইন করে চেষ্টা করুন। সমস্যা থাকলে সাপোর্টে যোগাযোগ করুন।"
             : "Couldn't post your listing (permission denied). Please log out and log back in, then try again. Contact support if this continues."
         );
       } else {
-        setError(err.message || "Submission failed");
+        showError(err.message || "Submission failed");
       }
     } finally {
       setIsSubmitting(false);
@@ -360,7 +374,7 @@ export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPromp
   return (
     <div className="max-w-2xl mx-auto bg-white p-4 rounded-xl shadow-sm">
       {error && (
-        <div className="mb-4 bg-red-50 text-red-600 p-3 rounded-lg flex items-center gap-2 text-sm">
+        <div ref={errorBannerRef} className="mb-4 bg-red-50 text-red-600 p-3 rounded-lg flex items-center gap-2 text-sm">
           <AlertTriangle className="w-4 h-4 flex-shrink-0" />
           <span>{error}</span>
         </div>
@@ -433,6 +447,16 @@ export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPromp
             required
           />
         </div>
+
+        {/* 🔧 (2026-10-01) Submit বাটনের ঠিক উপরে একই error দ্বিতীয়বার --
+            ইউজার যেখানে থেকে Submit চাপে, ঠিক সেখানেই কারণটা দেখতে পায়,
+            scrollIntoView কোনো কারণে ব্যর্থ হলেও। */}
+        {error && (
+          <div className="bg-red-50 text-red-600 p-3 rounded-lg flex items-center gap-2 text-sm">
+            <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+            <span>{error}</span>
+          </div>
+        )}
 
         <button type="submit" disabled={isSubmitting || images.some(img => img.status === "uploading")} className="w-full py-3 bg-orange-500 text-white font-semibold rounded-xl text-sm shadow-sm hover:bg-orange-600 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2">
           {isSubmitting ? (
