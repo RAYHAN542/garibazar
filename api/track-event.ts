@@ -50,6 +50,15 @@ function isRateLimited(ip: string): boolean {
 // (bump_listing_counter, toggle_listing_save -- see the SQL migration)
 // instead of a Firestore transaction, for the same "no double-count under
 // concurrent calls" guarantee.
+//
+// 🔧 (2026-09-30) Merged api/ad-impression.ts into this file -- the Vercel
+// Hobby plan caps a deployment at 12 Serverless Functions and the project
+// had crept back up to 13 (this + api/send-push.ts both being new since
+// the last time this limit was hit), which silently failed every single
+// production deployment again, including unrelated fixes. ad-impression
+// reporting is conceptually just another kind of event tracking, so it's
+// dispatched here the same way listing view/click/save/unsave already are
+// -- by request body shape (an `ids` array with no listingId/type).
 const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const supabaseAdmin =
@@ -61,6 +70,7 @@ const supabaseAdmin =
 
 const LISTING_INTERACTION_TYPES = new Set(["view", "click", "save", "unsave"]);
 const UUID_RE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+const MAX_AD_IMPRESSION_IDS_PER_CALL = 10;
 
 async function resolveListingId(listingId: string): Promise<string | null> {
   if (!supabaseAdmin) return null;
@@ -143,6 +153,48 @@ async function handleListingInteraction(req: any, res: any, rawListingId: string
   return res.status(200).json({ ok: true, counted: !!changed });
 }
 
+// Records that boosted listings were actually shown to a visitor, so the
+// fair-rotation logic (src/utils/adRotation.ts) can always pick whichever
+// live ads have been shown the LEAST -- true fairness no matter how many
+// ads are boosted at once (100 or 100,000), no client-side reload-guessing
+// needed. Public/anonymous (no login required, same as a page view), but
+// rate-limited per IP and capped per request so it can't be abused to
+// inflate/deflate specific listings' counts.
+async function handleAdImpression(req: any, res: any, rawIds: any[]) {
+  if (!supabaseAdmin) {
+    // Best-effort feature -- never break the homepage over missing config.
+    res.status(200).json({ ok: false });
+    return;
+  }
+
+  const ids = Array.from(new Set(rawIds.filter((id: any) => typeof id === "string" && UUID_RE.test(id)))).slice(
+    0,
+    MAX_AD_IMPRESSION_IDS_PER_CALL
+  );
+  if (ids.length === 0) {
+    res.status(200).json({ ok: true, counted: 0 });
+    return;
+  }
+
+  const ip = getClientIp(req);
+  // One impression-report call per IP per few seconds is plenty (one per
+  // homepage load) -- this only guards against a broken client looping,
+  // not normal browsing.
+  const allowed = await checkAndBumpRateLimit(`ad_impression_${ip}`, 5_000, 3);
+  if (!allowed) {
+    res.status(200).json({ ok: true, counted: 0, skipped: true });
+    return;
+  }
+
+  const { error } = await supabaseAdmin.rpc("bump_ad_impressions", { p_ids: ids });
+  if (error) {
+    console.error("bump_ad_impressions error:", error.message);
+    res.status(200).json({ ok: false });
+    return;
+  }
+  res.status(200).json({ ok: true, counted: ids.length });
+}
+
 const ALLOWED_TYPES = new Set(["visit", "login", "signup", "install"]);
 
 // The site owner's own IP(s) - visits/logins from here are excluded from the
@@ -219,6 +271,13 @@ export default async function handler(req: any, res: any) {
     // Per-listing view/click/save/unsave, routed to its own handler.
     if (typeof body?.listingId === "string" && LISTING_INTERACTION_TYPES.has(body?.type)) {
       return await handleListingInteraction(req, res, body.listingId, body.type);
+    }
+
+    // Ad impression reporting (fair rotation), routed to its own handler --
+    // identified by an `ids` array with no listingId/known type, same shape
+    // adRotation.ts already sends.
+    if (Array.isArray(body?.ids)) {
+      return await handleAdImpression(req, res, body.ids);
     }
 
     // Site-wide visit/login/signup/install analytics.
