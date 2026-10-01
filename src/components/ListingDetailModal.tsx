@@ -6,8 +6,6 @@ import { supabase } from "../supabase";
 import { trackListingClick } from "../utils/counters";
 import { getOptimizedImageUrl } from "../utils/cloudinary";
 import { apiUrl } from "../utils/apiBase";
-import { NativeBannerAd } from "./NativeBannerAd";
-import { Capacitor } from "@capacitor/core";
 
 // Masks all but the last 4 digits so the full number isn't visible in plain
 // text to anonymous visitors or scrapers. The underlying tel: link still
@@ -512,7 +510,6 @@ export function ListingDetailModal({ listing, language, currentUser, onClose, on
             Native Banner format -- a larger, in-feed-styled ad (matches the
             Bikroy-style ad the user pointed to), shown right above the
             image gallery same as before. */}
-        {!Capacitor.isNativePlatform() && <NativeBannerAd />}
 
         <button
           id="detail-close-btn"
