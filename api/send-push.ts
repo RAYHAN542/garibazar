@@ -26,8 +26,16 @@ if (!getApps().length) {
   }
 }
 
+// 🔧 (2026-09-30) `supabase: any` here (was `ReturnType<typeof createClient>`)
+// -- a newer @supabase/supabase-js got pulled in by an unrelated npm install
+// and now infers `never` row/arg types for any client created without an
+// explicit generated Database type (which this project doesn't have). That
+// broke the build here and in rateLimit.ts/cron/maintenance.ts. `any` is the
+// pragmatic fix until this project generates and wires up real Database
+// types; functionally identical to before, just without the stricter
+// (currently unusable) compile-time checking.
 export async function sendPushToUid(
-  supabase: ReturnType<typeof createClient>,
+  supabase: any,
   uid: string,
   title: string,
   body: string,
@@ -63,7 +71,7 @@ export default async function handler(req: any, res: any) {
     if (!supabaseUrl || !supabaseServiceKey) {
       return res.status(500).json({ error: "সার্ভার কনফিগারেশনে সমস্যা।" });
     }
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    const supabase: any = createClient(supabaseUrl, supabaseServiceKey);
 
     const authHeader = req.headers.authorization || "";
     const idToken = authHeader.replace("Bearer ", "");

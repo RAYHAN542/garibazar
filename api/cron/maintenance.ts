@@ -14,13 +14,21 @@ import { createClient } from "@supabase/supabase-js";
 //      since the migration, so this was cleaning up a shrinking, stale
 //      dataset while the real data it should have been purging (Supabase)
 //      was never touched. Both purges now target Supabase directly.
+//
+// 🔧 (2026-09-30) Client params typed as `any` (were `ReturnType<typeof
+// createClient>`) -- a newer @supabase/supabase-js pulled in by an
+// unrelated npm install now infers `never` argument types for any client
+// created without an explicit generated Database type (which this project
+// doesn't have), which broke the build here and in send-push.ts/
+// rateLimit.ts. Functionally identical, just without compile-time row/arg
+// checking until this project wires up real Database types.
 const RETENTION_DAYS_LISTINGS = 30;
 const RETENTION_DAYS_MESSAGES = 180;
 
 const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-async function purgeOldSoftDeletedListings(supabase: ReturnType<typeof createClient>): Promise<number> {
+async function purgeOldSoftDeletedListings(supabase: any): Promise<number> {
   const cutoff = new Date(Date.now() - RETENTION_DAYS_LISTINGS * 24 * 60 * 60 * 1000).toISOString();
 
   const { data: candidates, error: findErr } = await supabase
@@ -40,7 +48,7 @@ async function purgeOldSoftDeletedListings(supabase: ReturnType<typeof createCli
   // still has a chat thread pointing at it would throw a foreign-key
   // violation and abort the ENTIRE batch delete below -- silently
   // cancelling the whole day's purge, not just that one listing.
-  const { error: chatsErr } = await supabase.from("chats").update({ listing_id: null }).in("listing_id", ids);
+  const { error: chatsErr } = await supabase.from("chats").update({ listing_id: null as any }).in("listing_id", ids);
   if (chatsErr) console.error("[maintenance] chats.listing_id cleanup error:", chatsErr.message);
 
   const { error: deleteErr } = await supabase.from("listings").delete().in("id", ids);
@@ -49,7 +57,7 @@ async function purgeOldSoftDeletedListings(supabase: ReturnType<typeof createCli
   return ids.length;
 }
 
-async function purgeOldChatMessages(supabase: ReturnType<typeof createClient>): Promise<number> {
+async function purgeOldChatMessages(supabase: any): Promise<number> {
   const cutoff = new Date(Date.now() - RETENTION_DAYS_MESSAGES * 24 * 60 * 60 * 1000).toISOString();
   const { data, error } = await supabase.from("chat_messages").delete().lt("created_at", cutoff).select("id");
   if (error) throw error;
@@ -80,7 +88,7 @@ export default async function handler(req: any, res: any) {
   }
 
   try {
-    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+    const supabase: any = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
       auth: { autoRefreshToken: false, persistSession: false },
     });
 
