@@ -9,11 +9,12 @@ import { apiUrl } from "./apiBase";
 //   seen, so the feed carries the same allowance as the slider.
 // - Server-side impression counting: every time interleaveAds/pickRotatedAds
 //   actually places an ad in front of a visitor, it fires a best-effort,
-//   non-blocking call to /api/ad-impression, which bumps that listing's
-//   ad_impressions column via the bump_ad_impressions() RPC. This lets a
-//   caller that DOES select ads by least-shown-first (pickRotatedAds) give
-//   true fairness across however many ads are boosted at once (100 or
-//   100,000), without relying on client-side reload-guessing.
+//   non-blocking call to /api/track-event (an `ids` array, dispatched there
+//   to ad-impression handling), which bumps that listing's ad_impressions
+//   column via the bump_ad_impressions() RPC. This lets a caller that DOES
+//   select ads by least-shown-first (pickRotatedAds) give true fairness
+//   across however many ads are boosted at once (100 or 100,000), without
+//   relying on client-side reload-guessing.
 export const MAX_SPOTLIGHT_ADS = 6;
 export const MAX_INLINE_ADS = 6;
 export const ADS_INTERLEAVE_GAP = 5;
@@ -42,10 +43,14 @@ function isLiveAd(item: PartListing): boolean {
 // impression count goes up and they move to the back of the "least shown"
 // queue for the next visitor. Never blocks rendering and never throws --
 // this is a best-effort fairness signal, not something the UI depends on.
+//
+// 🔧 (2026-09-30) Was /api/ad-impression (its own Serverless Function) --
+// merged into /api/track-event.ts to stay under Vercel's 12-function Hobby
+// plan limit. Same request shape ({ ids }), just a different endpoint path.
 function reportImpressions(ids: string[]) {
   if (ids.length === 0) return;
   try {
-    fetch(apiUrl("/api/ad-impression"), {
+    fetch(apiUrl("/api/track-event"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ ids }),
