@@ -2308,11 +2308,9 @@ export default function App() {
                         </div>
                         <div>
                           <p className="text-sm sm:text-base font-extrabold text-slate-800 dark:text-slate-100">
-                            {language === "bn" ? "ব্যক্তিগত তথ্য (Personal info)" : "Personal info"}
+                            {language === "bn" ? "ব্যক্তিগত তথ্য" : "Personal info"}
                           </p>
-                          <p className="text-xs text-slate-400 dark:text-slate-500 font-bold mt-0.5">
-                            {user ? (user.displayName || "Seller") : (language === "bn" ? "লগইন করতে এখানে চাপুন" : "Sign in to see info")}
-                          </p>
+                          
                         </div>
                       </div>
                       <div className="flex items-center gap-1 text-slate-400 dark:text-slate-500">
@@ -2416,11 +2414,9 @@ export default function App() {
                         </div>
                         <div>
                           <p className="text-sm sm:text-base font-extrabold text-slate-800 dark:text-slate-100">
-                            {language === "bn" ? "আমার দোকান (My Shop)" : "My Shop"}
+                            {language === "bn" ? "আমার দোকান" : "My Shop"}
                           </p>
-                          <p className="text-xs text-slate-400 dark:text-slate-500 font-bold mt-0.5">
-                            {user ? (language === "bn" ? "আপনার পাবলিক দোকান এবং লিস্টিং দেখুন" : "View your public shop and listings") : (language === "bn" ? "আপনার দোকান দেখতে লগইন করুন" : "Sign in to access your shop")}
-                          </p>
+                          
                         </div>
                       </div>
                       <ChevronRight className="w-4 h-4 text-slate-400 dark:text-slate-500" />
@@ -2441,11 +2437,9 @@ export default function App() {
                         </div>
                         <div>
                           <p className="text-sm sm:text-base font-extrabold text-slate-800 dark:text-slate-100">
-                            {language === "bn" ? "ভাষা পরিবর্তন করুন (Change language)" : "Change language"}
+                            {language === "bn" ? "ভাষা পরিবর্তন করুন" : "Change language"}
                           </p>
-                          <p className="text-xs text-slate-400 dark:text-slate-500 font-bold mt-0.5">
-                            {language === "bn" ? "বাংলা ও ইংরেজি ভাষা নির্ধারণ করুন" : "Set app-wide language preference"}
-                          </p>
+                          
                         </div>
                       </div>
                       <div className="flex items-center gap-1 text-slate-400 dark:text-slate-500">
@@ -2507,11 +2501,9 @@ export default function App() {
                       </div>
                       <div>
                         <p className="text-sm sm:text-base font-extrabold text-slate-800 dark:text-slate-100">
-                          {language === "bn" ? "ডার্ক মোড (Dark mode)" : "Dark mode"}
+                          {language === "bn" ? "ডার্ক মোড" : "Dark mode"}
                         </p>
-                        <p className="text-xs text-slate-400 dark:text-slate-500 font-bold mt-0.5">
-                          {language === "bn" ? "আপনার চোখের সুবিধার্থে থিম পরিবর্তন করুন" : "Switch comfortable visual light/dark modes"}
-                        </p>
+                        
                       </div>
                     </div>
                     <button
@@ -2546,9 +2538,7 @@ export default function App() {
                           <p className="text-sm sm:text-base font-extrabold text-slate-800 dark:text-slate-100">
                             {language === "bn" ? "আমাদের টিম ও গাড়ি বাজার" : "Our Team & About"}
                           </p>
-                          <p className="text-xs text-slate-400 dark:text-slate-500 font-bold mt-0.5">
-                            {language === "bn" ? "অ্যাপ ডেভেলপমেন্ট টিম এবং লক্ষ্য" : "Meet the creators of Gari Bazar"}
-                          </p>
+                          
                         </div>
                       </div>
                       <div className="flex items-center gap-1 text-slate-400 dark:text-slate-500">
@@ -2597,9 +2587,7 @@ export default function App() {
                           <p className="text-sm sm:text-base font-extrabold text-slate-800 dark:text-slate-100">
                             {language === "bn" ? "শর্তাবলী ও পলিসি কেন্দ্র" : "Terms & Privacy Policies"}
                           </p>
-                          <p className="text-xs text-slate-400 dark:text-slate-500 font-bold mt-0.5">
-                            {language === "bn" ? "প্লে স্টোর কমপ্লায়েন্স ও আইনি নীতিমালা" : "Play Store compliance rules and data usage"}
-                          </p>
+                          
                         </div>
                       </div>
                       <div className="flex items-center gap-1 text-slate-400 dark:text-slate-500">
@@ -2644,11 +2632,9 @@ export default function App() {
                         </div>
                         <div>
                           <p className="text-sm sm:text-base font-extrabold text-slate-800 dark:text-slate-100">
-                            {language === "bn" ? "সাহায্য ও কন্টাক্ট সাপোর্ট" : "Help Desk & Customer Support"}
+                            {language === "bn" ? "সাহায্য ও সাপোর্ট" : "Help & Support"}
                           </p>
-                          <p className="text-xs text-slate-400 dark:text-slate-500 font-bold mt-0.5">
-                            {language === "bn" ? "টিমের সাথে সরাসরি যোগাযোগ করুন" : "Reach out to support desk directly"}
-                          </p>
+                          
                         </div>
                       </div>
                       <div className="flex items-center gap-1 text-slate-400 dark:text-slate-500">
