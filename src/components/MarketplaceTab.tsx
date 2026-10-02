@@ -116,6 +116,10 @@ export default function MarketplaceTab({
   );
 
   const [isCityPickerOpen, setIsCityPickerOpen] = useState(false);
+const feedItems = useMemo(() => filteredListings.filter((item) => !spotlightIds.has(item.id)), [filteredListings, spotlightIds]);
+const spotlightFiller = spotlightAds.length % 2 === 1 && feedItems.length > 0 ? feedItems[0] : null;
+const spotlightGridItems = spotlightFiller ? [...spotlightAds, spotlightFiller] : spotlightAds;
+const feedListings = spotlightFiller ? feedItems.slice(1) : feedItems;
   const [citySearchQuery, setCitySearchQuery] = useState("");
   const otherCities = useMemo(() => CITIES.filter((c) => !POPULAR_CITIES.includes(c)), []);
   const filteredPopularCities = useMemo(
@@ -385,7 +389,7 @@ export default function MarketplaceTab({
                       <h3 className="text-sm font-extrabold font-sans text-amber-600 dark:text-amber-400 uppercase tracking-widest">{activeTranslations.adsTitle}</h3>
                     </div>
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2 sm:gap-4">
-                      {spotlightAds.map((listing) => (
+                      {spotlightGridItems.map((listing) => (
                         <ListingCard
                           key={`spotlight-${listing.id}`}
                           listing={listing}
@@ -457,7 +461,7 @@ export default function MarketplaceTab({
                   </div>
                 ) : (
                   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2 sm:gap-4">
-  {displayListings.map((listing, index) => (
+  {feedListings.map((listing, index) => (
     <ListingCard
       key={listing.id}
       listing={listing}
