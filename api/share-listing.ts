@@ -27,6 +27,9 @@ const SITE_URL = "https://garibazar.shop";
 const DEFAULT_IMAGE = `${SITE_URL}/og-banner.jpg`;
 const CRAWLER_UA = /facebookexternalhit|Facebot|Twitterbot|LinkedInBot|WhatsApp|TelegramBot|Slackbot|Pinterest|Discordbot|redditbot|Googlebot|bingbot|DuckDuckBot|Applebot|YandexBot|Baiduspider/i;
 const UUID_RE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+// Firestore-era auto-generated doc IDs are alphanumeric base62-ish strings.
+// Anything outside this charset is never a real legacy id.
+const SAFE_LEGACY_ID = /^[A-Za-z0-9_-]{1,64}$/;
 
 function escapeHtml(str: string) {
   return String(str)
@@ -41,11 +44,22 @@ async function lookupListingFromSupabase(id: string): Promise<{ title: string; p
   const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!supabaseUrl || !supabaseServiceKey) return null;
 
+  const isUuid = UUID_RE.test(id);
+  // 🔧 (2026-10-01 security audit) `id` is interpolated straight into a
+  // PostgREST .or() filter string below. supabase-js does not escape raw
+  // .or() strings (comma/paren are live filter syntax there), so an id
+  // containing a crafted comma could previously have appended an
+  // unintended extra OR condition, making this public (unauthenticated)
+  // endpoint resolve to a DIFFERENT listing's public preview data than the
+  // one actually requested. No private data is exposed here either way
+  // (only public listing fields), but this closes the injection vector
+  // outright rather than depending on that being harmless by coincidence.
+  if (!isUuid && !SAFE_LEGACY_ID.test(id)) return null;
+
   const supabase = createClient(supabaseUrl, supabaseServiceKey, {
     auth: { autoRefreshToken: false, persistSession: false },
   });
 
-  const isUuid = UUID_RE.test(id);
   const { data, error } = await supabase
     .from("listings")
     .select("title, brand, model, price, location, images")
