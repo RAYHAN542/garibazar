@@ -105,8 +105,15 @@ export default function MarketplaceTab({
   setIsLotteryOpen,
 }: MarketplaceTabProps) {
   const spotlightAds = useMemo(() => pickRotatedAds(adListings, MAX_SPOTLIGHT_ADS), [adListings]);
-  // filteredListings already has ads interleaved by App.tsx -- do not interleave twice.
-  const displayListings = filteredListings;
+  // 🔧 (2026-10-02) যেগুলো উপরের "Premium Sponsored Spotlights" গ্রিডে
+  // (spotlightAds) ইতিমধ্যে দেখানো হচ্ছে, সেগুলো নিচের মূল ফিডে আবার বাদ
+  // দেওয়া হচ্ছে -- আগে একই বুস্ট পোস্ট দুই জায়গায় (উপরে স্পটলাইটে, আবার
+  // নিচে স্বাভাবিক ক্রমে) দেখা যেত, ডুপ্লিকেট লাগছিল।
+  const spotlightIds = useMemo(() => new Set(spotlightAds.map((item) => item.id)), [spotlightAds]);
+  const displayListings = useMemo(
+    () => filteredListings.filter((item) => !spotlightIds.has(item.id)),
+    [filteredListings, spotlightIds]
+  );
 
   const [isCityPickerOpen, setIsCityPickerOpen] = useState(false);
   const [citySearchQuery, setCitySearchQuery] = useState("");
@@ -368,7 +375,9 @@ export default function MarketplaceTab({
                     নিচে দেখাত আর কোনো "বিজ্ঞাপন" ব্যাজ থাকত না। এখন এটা সত্যিকারের
                     একটা পৃথক গ্রিড -- শুধু spotlightAds (সর্বোচ্চ MAX_SPOTLIGHT_ADS,
                     impression-count অনুযায়ী ন্যায্যভাবে ঘোরানো) দেখায়, উপরের
-                    স্লাইডারের মতোই, সবসময় উপরে, মূল ফিডের আগে। */}
+                    স্লাইডারের মতোই, সবসময় উপরে, মূল ফিডের আগে। নিচের মূল গ্রিড
+                    থেকে এই একই পোস্টগুলো বাদ দেওয়া হয় (displayListings), যাতে
+                    ডুপ্লিকেট না দেখায়। */}
                 {spotlightAds.length > 0 && (
                   <div className="mb-5">
                     <div className="mb-2.5 flex items-center gap-2">
