@@ -1,9 +1,10 @@
-import { useMemo, useState } from "react";
-import { ArrowLeft, Search, X, SlidersHorizontal, MapPin, Clock, ChevronRight, RotateCcw } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { ArrowLeft, Search, X, SlidersHorizontal, MapPin, Clock, ChevronRight, RotateCcw, Loader2 } from "lucide-react";
 import { CITIES } from "../translations";
 import { PartListing, SupportedLanguage } from "../types";
 import { isItemVehicle, matchesSubCategoryFilter } from "../utils/listingFilters";
 import { convertBengaliDigitsToEnglish, toPhoneticKey } from "../searchAliases";
+import { searchListings } from "../utils/searchApi";
 
 interface SearchPageProps {
   language: SupportedLanguage;
@@ -55,12 +56,61 @@ const toNum = (s: string) => {
 const formatPrice = (p: number, bn: boolean) =>
   p > 0 ? `৳${p.toLocaleString("en-IN")}` : bn ? "মূল্য জানতে যোগাযোগ করুন" : "Contact for price";
 
+const isPureAlpha = (s: string) => /^[a-z]+$/i.test(s) || /^[\u0980-\u09FF]+$/.test(s);
+
+// Word-aware match: plain words must start at a word boundary (so "cat" no
+// longer matches inside "category"/"location"). `strict` also requires the
+// word to END at a boundary (used for brands and very short words).
+const hasWord = (hay: string, needle: string, strict: boolean): boolean => {
+  if (!needle) return false;
+  if (!isPureAlpha(needle)) return hay.includes(needle);
+  const esc = needle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const b = "[^a-zA-Z\\u0980-\\u09FF]";
+  return new RegExp(`(^|${b})${esc}${strict ? `($|${b})` : ""}`, "i").test(hay);
+};
+
+const matches = (item: PartListing, f: Filters, tokens: string[]): boolean => {
+  const any = item as any;
+  const head = `${norm(item.title)} ${norm(any.brand)} ${norm(any.model)}`;
+  const blob = `${head} ${norm(item.description)} ${norm(item.location)}`;
+
+  if (tokens.length > 0) {
+    const phoneticHead = toPhoneticKey(head);
+    const ok = tokens.every(
+      (t) => hasWord(blob, t, t.length <= 3) || (t.length > 2 && phoneticHead.includes(toPhoneticKey(t)))
+    );
+    if (!ok) return false;
+  }
+
+  if (f.type === "parts") {
+    if (isItemVehicle(item)) return false;
+  } else if (f.type !== "all") {
+    if (!isItemVehicle(item) || !matchesSubCategoryFilter(item, f.type)) return false;
+  }
+
+  const brandQ = norm(f.brand);
+  if (brandQ && !hasWord(head, brandQ, true)) return false;
+  const modelQ = norm(f.model).trim();
+  if (modelQ && !head.includes(modelQ)) return false;
+  if (f.city !== "all" && !norm(item.location).includes(norm(f.city.split(" ")[0]))) return false;
+
+  const price = Number(item.price) || 0;
+  const min = toNum(f.minPrice);
+  const max = toNum(f.maxPrice);
+  if (min !== null && price < min) return false;
+  if (max !== null && price > max) return false;
+  return true;
+};
+
 export default function SearchPage({ language, listings, searchHistory, onSaveHistory, onClose, onSelect }: SearchPageProps) {
   const bn = language === "bn";
   const [query, setQuery] = useState("");
   const [filters, setFilters] = useState<Filters>(EMPTY);
   const [draft, setDraft] = useState<Filters>(EMPTY);
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [remote, setRemote] = useState<PartListing[]>([]);
+  const [loading, setLoading] = useState(false);
+  const reqId = useRef(0);
 
   const activeCount =
     (filters.type !== "all" ? 1 : 0) +
@@ -72,46 +122,59 @@ export default function SearchPage({ language, listings, searchHistory, onSaveHi
 
   const hasSearch = query.trim().length > 0 || activeCount > 0;
 
-  const runFilter = (f: Filters): PartListing[] => {
-    const tokens = convertBengaliDigitsToEnglish(query.toLowerCase()).split(/\s+/).filter(Boolean);
-    const min = toNum(f.minPrice);
-    const max = toNum(f.maxPrice);
-    const modelQ = norm(f.model).trim();
-    const brandQ = norm(f.brand);
+  const tokens = useMemo(
+    () => convertBengaliDigitsToEnglish(query.toLowerCase()).split(/\s+/).filter(Boolean),
+    [query]
+  );
 
-    const out = listings.filter((item) => {
-      const any = item as any;
-      const head = `${norm(item.title)} ${norm(any.brand)} ${norm(any.model)}`;
-      const blob = `${head} ${norm(item.description)} ${norm(item.location)}`;
-
-      if (tokens.length > 0) {
-        const phoneticHead = toPhoneticKey(head);
-        const ok = tokens.every((t) => blob.includes(t) || (t.length > 2 && phoneticHead.includes(toPhoneticKey(t))));
-        if (!ok) return false;
+  // Whole-database search (debounced). Local, already-loaded listings are
+  // still merged in below so phonetic/Bangla matching keeps working too.
+  useEffect(() => {
+    if (!hasSearch) {
+      setRemote([]);
+      setLoading(false);
+      return;
+    }
+    const id = ++reqId.current;
+    setLoading(true);
+    const timer = setTimeout(async () => {
+      try {
+        const rows = await searchListings({
+          tokens,
+          type: filters.type,
+          brand: filters.brand,
+          model: filters.model,
+          city: filters.city !== "all" ? filters.city.split(" ")[0] : "",
+          minPrice: toNum(filters.minPrice),
+          maxPrice: toNum(filters.maxPrice),
+          sort: filters.sort,
+        });
+        if (id === reqId.current) setRemote(rows);
+      } catch {
+        if (id === reqId.current) setRemote([]);
+      } finally {
+        if (id === reqId.current) setLoading(false);
       }
-      if (f.type === "parts") {
-        if (isItemVehicle(item)) return false;
-      } else if (f.type !== "all") {
-        if (!isItemVehicle(item) || !matchesSubCategoryFilter(item, f.type)) return false;
-      }
-      if (brandQ && !blob.includes(brandQ)) return false;
-      if (modelQ && !head.includes(modelQ)) return false;
-      if (f.city !== "all" && !norm(item.location).includes(norm(f.city.split(" ")[0]))) return false;
-      const price = Number(item.price) || 0;
-      if (min !== null && price < min) return false;
-      if (max !== null && price > max) return false;
-      return true;
-    });
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [tokens, filters, hasSearch]);
 
-    return out.sort((a, b) => {
-      if (f.sort === "priceAsc") return (Number(a.price) || 0) - (Number(b.price) || 0);
-      if (f.sort === "priceDesc") return (Number(b.price) || 0) - (Number(a.price) || 0);
-      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-    });
-  };
-
-  const results = useMemo(() => runFilter(filters), [listings, query, filters]);
-  const draftCount = useMemo(() => (sheetOpen ? runFilter(draft).length : 0), [listings, query, draft, sheetOpen]);
+  const results = useMemo(() => {
+    const seen = new Set<string>();
+    const pool: PartListing[] = [];
+    for (const item of [...remote, ...listings]) {
+      if (seen.has(item.id)) continue;
+      seen.add(item.id);
+      pool.push(item);
+    }
+    return pool
+      .filter((item) => matches(item, filters, tokens))
+      .sort((a, b) => {
+        if (filters.sort === "priceAsc") return (Number(a.price) || 0) - (Number(b.price) || 0);
+        if (filters.sort === "priceDesc") return (Number(b.price) || 0) - (Number(a.price) || 0);
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      });
+  }, [remote, listings, filters, tokens]);
 
   const openSheet = () => {
     setDraft(filters);
@@ -264,7 +327,8 @@ export default function SearchPage({ language, listings, searchHistory, onSaveHi
         ) : (
           <div className="pt-3">
             <div className="flex items-center justify-between mb-3">
-              <p className="text-xs font-extrabold text-slate-500 dark:text-slate-400">
+              <p className="flex items-center gap-1.5 text-xs font-extrabold text-slate-500 dark:text-slate-400">
+                {loading && <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-500" />}
                 {bn ? `${results.length}টি ফলাফল` : `${results.length} results`}
               </p>
               <div className="flex gap-1.5">
@@ -282,13 +346,19 @@ export default function SearchPage({ language, listings, searchHistory, onSaveHi
             </div>
 
             {results.length === 0 ? (
-              <div className="text-center py-16">
-                <div className="w-14 h-14 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center mx-auto mb-3">
-                  <Search className="w-6 h-6 text-slate-400" />
+              loading ? (
+                <div className="flex justify-center py-16">
+                  <Loader2 className="w-7 h-7 animate-spin text-amber-500" />
                 </div>
-                <p className="text-sm font-extrabold text-slate-700 dark:text-slate-200">{bn ? "কিছু পাওয়া যায়নি" : "Nothing found"}</p>
-                <p className="text-xs text-slate-400 mt-1">{bn ? "ফিল্টার কমিয়ে বা বানান বদলে চেষ্টা করুন" : "Try fewer filters or a different spelling"}</p>
-              </div>
+              ) : (
+                <div className="text-center py-16">
+                  <div className="w-14 h-14 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center mx-auto mb-3">
+                    <Search className="w-6 h-6 text-slate-400" />
+                  </div>
+                  <p className="text-sm font-extrabold text-slate-700 dark:text-slate-200">{bn ? "কিছু পাওয়া যায়নি" : "Nothing found"}</p>
+                  <p className="text-xs text-slate-400 mt-1">{bn ? "ফিল্টার কমিয়ে বা বানান বদলে চেষ্টা করুন" : "Try fewer filters or a different spelling"}</p>
+                </div>
+              )
             ) : (
               <div className="space-y-2.5">
                 {results.map((item) => (
@@ -397,7 +467,7 @@ export default function SearchPage({ language, listings, searchHistory, onSaveHi
 
             <div className="p-4 border-t border-slate-100 dark:border-slate-800" style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom))" }}>
               <button type="button" onClick={applySheet} className="w-full py-3.5 rounded-2xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-sm shadow-md cursor-pointer">
-                {bn ? `${draftCount}টি ফলাফল দেখুন` : `Show ${draftCount} results`}
+                {bn ? "ফলাফল দেখুন" : "Show results"}
               </button>
             </div>
           </div>
