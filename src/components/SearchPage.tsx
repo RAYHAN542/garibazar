@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, Search, X, SlidersHorizontal, MapPin, Clock, ChevronRight, RotateCcw, Loader2 } from "lucide-react";
+import { ArrowLeft, Search, X, SlidersHorizontal, MapPin, Clock, RotateCcw, Loader2 } from "lucide-react";
 import { CITIES } from "../translations";
 import { PartListing, SupportedLanguage } from "../types";
 import { isItemVehicle, matchesSubCategoryFilter } from "../utils/listingFilters";
@@ -58,9 +58,6 @@ const formatPrice = (p: number, bn: boolean) =>
 
 const isPureAlpha = (s: string) => /^[a-z]+$/i.test(s) || /^[\u0980-\u09FF]+$/.test(s);
 
-// Word-aware match: plain words must start at a word boundary (so "cat" no
-// longer matches inside "category"/"location"). `strict` also requires the
-// word to END at a boundary (used for brands and very short words).
 const hasWord = (hay: string, needle: string, strict: boolean): boolean => {
   if (!needle) return false;
   if (!isPureAlpha(needle)) return hay.includes(needle);
@@ -112,6 +109,10 @@ export default function SearchPage({ language, listings, searchHistory, onSaveHi
   const [loading, setLoading] = useState(false);
   const reqId = useRef(0);
 
+  useEffect(() => {
+    setDraft(filters);
+  }, [filters]);
+
   const activeCount =
     (filters.type !== "all" ? 1 : 0) +
     (filters.brand ? 1 : 0) +
@@ -127,8 +128,6 @@ export default function SearchPage({ language, listings, searchHistory, onSaveHi
     [query]
   );
 
-  // Whole-database search (debounced). Local, already-loaded listings are
-  // still merged in below so phonetic/Bangla matching keeps working too.
   useEffect(() => {
     if (!hasSearch) {
       setRemote([]);
@@ -176,11 +175,7 @@ export default function SearchPage({ language, listings, searchHistory, onSaveHi
       });
   }, [remote, listings, filters, tokens]);
 
-  const openSheet = () => {
-    setDraft(filters);
-    setSheetOpen(true);
-  };
-  const applySheet = () => {
+  const applyDraft = () => {
     setFilters(draft);
     setSheetOpen(false);
   };
@@ -213,6 +208,71 @@ export default function SearchPage({ language, listings, searchHistory, onSaveHi
   const chipOff = "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300";
   const inputCls =
     "w-full bg-slate-100 dark:bg-slate-800 rounded-xl px-3.5 py-2.5 text-sm font-semibold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500/30";
+  const labelCls = "text-[11px] font-extrabold text-slate-400 uppercase tracking-wider mb-2";
+
+  // The advanced-search form: shown directly when the search page opens, and
+  // again inside the bottom sheet once results are on screen.
+  const filterForm = (
+    <div className="space-y-5">
+      <div>
+        <p className={labelCls}>{bn ? "ধরন" : "Type"}</p>
+        <div className="flex flex-wrap gap-2">
+          {TYPES.map((t) => (
+            <button key={t.id} type="button" onClick={() => setDraft({ ...draft, type: t.id })} className={`${chipBase} ${draft.type === t.id ? chipOn : chipOff}`}>
+              {bn ? t.bn : t.en}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div>
+        <p className={labelCls}>{bn ? "ব্র্যান্ড" : "Brand"}</p>
+        <div className="flex flex-wrap gap-2">
+          {BRANDS.map((b) => (
+            <button key={b} type="button" onClick={() => setDraft({ ...draft, brand: draft.brand === b ? "" : b })} className={`${chipBase} ${draft.brand === b ? chipOn : chipOff}`}>
+              {b}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div>
+        <p className={labelCls}>{bn ? "গাড়ির মডেল" : "Model"}</p>
+        <input
+          type="text"
+          value={draft.model}
+          onChange={(e) => setDraft({ ...draft, model: e.target.value })}
+          placeholder={bn ? "যেমন: Axio, Corolla, Noah" : "e.g. Axio, Corolla, Noah"}
+          className={inputCls}
+        />
+      </div>
+
+      <div>
+        <p className={labelCls}>{bn ? "ঠিকানা / শহর" : "Location"}</p>
+        <select value={draft.city} onChange={(e) => setDraft({ ...draft, city: e.target.value })} className={inputCls}>
+          <option value="all">{bn ? "সব শহর" : "All cities"}</option>
+          {CITIES.map((c) => (
+            <option key={c} value={c}>{c}</option>
+          ))}
+        </select>
+      </div>
+
+      <div>
+        <p className={labelCls}>{bn ? "দামের পরিসীমা (৳)" : "Price range (৳)"}</p>
+        <div className="flex items-center gap-2">
+          <input type="text" inputMode="numeric" value={draft.minPrice} onChange={(e) => setDraft({ ...draft, minPrice: e.target.value })} placeholder={bn ? "সর্বনিম্ন" : "Min"} className={inputCls} />
+          <span className="text-slate-400 font-bold">–</span>
+          <input type="text" inputMode="numeric" value={draft.maxPrice} onChange={(e) => setDraft({ ...draft, maxPrice: e.target.value })} placeholder={bn ? "সর্বোচ্চ" : "Max"} className={inputCls} />
+        </div>
+      </div>
+    </div>
+  );
+
+  const applyBtn = (
+    <button type="button" onClick={applyDraft} className="w-full py-3.5 rounded-2xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-sm shadow-md cursor-pointer">
+      {bn ? "ফলাফল দেখুন" : "Show results"}
+    </button>
+  );
 
   return (
     <div
@@ -243,7 +303,7 @@ export default function SearchPage({ language, listings, searchHistory, onSaveHi
         </div>
         <button
           type="button"
-          onClick={openSheet}
+          onClick={() => { setDraft(filters); setSheetOpen(true); }}
           className={`relative w-10 h-10 rounded-full flex items-center justify-center shrink-0 cursor-pointer border ${
             activeCount > 0 ? "bg-amber-500 border-amber-500 text-slate-950" : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300"
           }`}
@@ -274,29 +334,12 @@ export default function SearchPage({ language, listings, searchHistory, onSaveHi
       )}
 
       {/* Body */}
-      <div className="flex-1 overflow-y-auto px-3 pb-10">
-        {!hasSearch ? (
-          <div className="pt-4 space-y-6">
-            <button
-              type="button"
-              onClick={openSheet}
-              className="w-full flex items-center justify-between gap-3 p-4 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 shadow-md cursor-pointer text-left"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-white/30 flex items-center justify-center">
-                  <SlidersHorizontal className="w-5 h-5" />
-                </div>
-                <div>
-                  <p className="text-sm font-black leading-tight">{bn ? "অ্যাডভান্সড সার্চ" : "Advanced Search"}</p>
-                  <p className="text-[11px] font-bold opacity-80 mt-0.5">{bn ? "মডেল, দাম ও শহর দিয়ে ফিল্টার করুন" : "Filter by model, price & city"}</p>
-                </div>
-              </div>
-              <ChevronRight className="w-5 h-5 shrink-0" />
-            </button>
-
+      {!hasSearch ? (
+        <>
+          <div className="flex-1 overflow-y-auto px-4 pt-4 pb-6">
             {searchHistory.length > 0 && (
-              <div>
-                <p className="text-[11px] font-extrabold text-slate-400 uppercase tracking-wider mb-2">{bn ? "সাম্প্রতিক খোঁজ" : "Recent searches"}</p>
+              <div className="mb-5">
+                <p className={labelCls}>{bn ? "সাম্প্রতিক খোঁজ" : "Recent searches"}</p>
                 <div className="flex flex-wrap gap-2">
                   {searchHistory.map((h) => (
                     <button key={h} type="button" onClick={() => setQuery(h)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-600 dark:text-slate-300 cursor-pointer">
@@ -308,23 +351,21 @@ export default function SearchPage({ language, listings, searchHistory, onSaveHi
               </div>
             )}
 
-            <div>
-              <p className="text-[11px] font-extrabold text-slate-400 uppercase tracking-wider mb-2">{bn ? "জনপ্রিয় ব্র্যান্ড" : "Popular brands"}</p>
-              <div className="grid grid-cols-3 gap-2">
-                {BRANDS.map((b) => (
-                  <button
-                    key={b}
-                    type="button"
-                    onClick={() => setFilters({ ...filters, brand: b })}
-                    className="py-3 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-sm font-extrabold text-slate-700 dark:text-slate-200 active:scale-[0.97] transition cursor-pointer"
-                  >
-                    {b}
-                  </button>
-                ))}
-              </div>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-base font-black text-slate-800 dark:text-white">{bn ? "অ্যাডভান্সড সার্চ" : "Advanced Search"}</h3>
+              <button type="button" onClick={() => setDraft(EMPTY)} className="flex items-center gap-1 text-xs font-extrabold text-rose-500 cursor-pointer">
+                <RotateCcw className="w-3.5 h-3.5" />
+                {bn ? "রিসেট" : "Reset"}
+              </button>
             </div>
+            {filterForm}
           </div>
-        ) : (
+          <div className="p-4 bg-white dark:bg-slate-900 border-t border-slate-100 dark:border-slate-800" style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom))" }}>
+            {applyBtn}
+          </div>
+        </>
+      ) : (
+        <div className="flex-1 overflow-y-auto px-3 pb-10">
           <div className="pt-3">
             <div className="flex items-center justify-between mb-3">
               <p className="flex items-center gap-1.5 text-xs font-extrabold text-slate-500 dark:text-slate-400">
@@ -389,11 +430,11 @@ export default function SearchPage({ language, listings, searchHistory, onSaveHi
               </div>
             )}
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
-      {/* Advanced filter sheet */}
-      {sheetOpen && (
+      {/* Filter sheet (while results are showing) */}
+      {sheetOpen && hasSearch && (
         <div className="fixed inset-0 z-[70] flex items-end justify-center" onClick={() => setSheetOpen(false)}>
           <div className="absolute inset-0 bg-black/50" />
           <div
@@ -403,72 +444,16 @@ export default function SearchPage({ language, listings, searchHistory, onSaveHi
             <div className="flex justify-center pt-2.5">
               <div className="w-10 h-1 rounded-full bg-slate-200 dark:bg-slate-700" />
             </div>
-            <div className="flex items-center justify-between px-5 pt-3 pb-2">
+            <div className="flex items-center justify-between px-5 pt-3 pb-3">
               <h3 className="text-lg font-black text-slate-800 dark:text-white">{bn ? "অ্যাডভান্সড সার্চ" : "Advanced Search"}</h3>
               <button type="button" onClick={() => setDraft(EMPTY)} className="flex items-center gap-1 text-xs font-extrabold text-rose-500 cursor-pointer">
                 <RotateCcw className="w-3.5 h-3.5" />
                 {bn ? "রিসেট" : "Reset"}
               </button>
             </div>
-
-            <div className="overflow-y-auto px-5 pb-4 space-y-5">
-              <div>
-                <p className="text-[11px] font-extrabold text-slate-400 uppercase tracking-wider mb-2">{bn ? "ধরন" : "Type"}</p>
-                <div className="flex flex-wrap gap-2">
-                  {TYPES.map((t) => (
-                    <button key={t.id} type="button" onClick={() => setDraft({ ...draft, type: t.id })} className={`${chipBase} ${draft.type === t.id ? chipOn : chipOff}`}>
-                      {bn ? t.bn : t.en}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <p className="text-[11px] font-extrabold text-slate-400 uppercase tracking-wider mb-2">{bn ? "ব্র্যান্ড" : "Brand"}</p>
-                <div className="flex flex-wrap gap-2">
-                  {BRANDS.map((b) => (
-                    <button key={b} type="button" onClick={() => setDraft({ ...draft, brand: draft.brand === b ? "" : b })} className={`${chipBase} ${draft.brand === b ? chipOn : chipOff}`}>
-                      {b}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <p className="text-[11px] font-extrabold text-slate-400 uppercase tracking-wider mb-2">{bn ? "গাড়ির মডেল" : "Model"}</p>
-                <input
-                  type="text"
-                  value={draft.model}
-                  onChange={(e) => setDraft({ ...draft, model: e.target.value })}
-                  placeholder={bn ? "যেমন: Axio, Corolla, Noah" : "e.g. Axio, Corolla, Noah"}
-                  className={inputCls}
-                />
-              </div>
-
-              <div>
-                <p className="text-[11px] font-extrabold text-slate-400 uppercase tracking-wider mb-2">{bn ? "ঠিকানা / শহর" : "Location"}</p>
-                <select value={draft.city} onChange={(e) => setDraft({ ...draft, city: e.target.value })} className={inputCls}>
-                  <option value="all">{bn ? "সব শহর" : "All cities"}</option>
-                  {CITIES.map((c) => (
-                    <option key={c} value={c}>{c}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <p className="text-[11px] font-extrabold text-slate-400 uppercase tracking-wider mb-2">{bn ? "দামের পরিসীমা (৳)" : "Price range (৳)"}</p>
-                <div className="flex items-center gap-2">
-                  <input type="text" inputMode="numeric" value={draft.minPrice} onChange={(e) => setDraft({ ...draft, minPrice: e.target.value })} placeholder={bn ? "সর্বনিম্ন" : "Min"} className={inputCls} />
-                  <span className="text-slate-400 font-bold">–</span>
-                  <input type="text" inputMode="numeric" value={draft.maxPrice} onChange={(e) => setDraft({ ...draft, maxPrice: e.target.value })} placeholder={bn ? "সর্বোচ্চ" : "Max"} className={inputCls} />
-                </div>
-              </div>
-            </div>
-
+            <div className="overflow-y-auto px-5 pb-4">{filterForm}</div>
             <div className="p-4 border-t border-slate-100 dark:border-slate-800" style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom))" }}>
-              <button type="button" onClick={applySheet} className="w-full py-3.5 rounded-2xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-sm shadow-md cursor-pointer">
-                {bn ? "ফলাফল দেখুন" : "Show results"}
-              </button>
+              {applyBtn}
             </div>
           </div>
         </div>
