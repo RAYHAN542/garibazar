@@ -35,6 +35,11 @@ const getTodayInDhaka = (): string => {
 const WIN_CHANCE_DENOMINATOR = 10;
 const BOOST_DURATION_HOURS = 24;
 
+// Firestore-era auto-generated doc IDs are 20-char base62-ish strings --
+// alphanumeric only. Anything outside that charset is never a real legacy
+// id, so there's no reason to let it anywhere near a PostgREST filter string.
+const SAFE_LEGACY_ID = /^[A-Za-z0-9_-]{1,64}$/;
+
 export default async function handler(req: any, res: any) {
   if (applyCors(req, res)) return;
   if (req.method !== "POST") {
@@ -97,7 +102,21 @@ export default async function handler(req: any, res: any) {
     // Matches by id or legacy_firestore_id, same lookup pattern as
     // api/get-seller-contact.ts, so pre- and post-migration listing IDs
     // both resolve correctly.
+    //
+    // 🔧 (2026-10-01 security audit) listingId is interpolated straight into
+    // a PostgREST .or() filter string below. supabase-js does NOT escape
+    // values inside a raw .or() string -- it's parsed as PostgREST filter
+    // syntax (commas separate conditions, parens nest them), so an
+    // attacker-controlled comma could previously have appended an
+    // unintended extra condition to this query. The seller_id ownership
+    // check further down already prevented this from granting access to
+    // someone else's listing in practice, but validating the shape here
+    // closes the injection vector outright instead of relying on that
+    // being the only safety net.
     const isUuid = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(listingId);
+    if (!isUuid && !SAFE_LEGACY_ID.test(listingId)) {
+      return res.status(404).json({ error: "প্রোডাক্টটি খুঁজে পাওয়া যায়নি।" });
+    }
     const { data: listingRow, error: listingErr } = await supabase
       .from("listings")
       .select("id, seller_id, title, is_ad")
