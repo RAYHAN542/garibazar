@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { Search, SlidersHorizontal, Bell, Plus, X, ShoppingBag, Loader2, LayoutGrid, Car, Wrench, Bike, Truck, Construction, MapPin, Check } from "lucide-react";
 import { ListingCard } from "./ListingCard";
 import { PromotedSlider } from "./PromotedSlider";
+import SearchPage from "./SearchPage";
 import { CITIES } from "../translations";
 import { PartListing, SupportedLanguage, TranslationSet } from "../types";
 import type { ActiveTab } from "./HeaderNav";
@@ -116,6 +117,7 @@ export default function MarketplaceTab({
   );
 
   const [isCityPickerOpen, setIsCityPickerOpen] = useState(false);
+const [isSearchOpen, setIsSearchOpen] = useState(false);
 const feedItems = useMemo(() => filteredListings.filter((item) => !spotlightIds.has(item.id)), [filteredListings, spotlightIds]);
 const spotlightFiller = spotlightAds.length % 2 === 1 && feedItems.length > 0 ? feedItems[0] : null;
 const spotlightGridItems = spotlightFiller ? [...spotlightAds, spotlightFiller] : spotlightAds;
@@ -149,7 +151,7 @@ const feedListings = spotlightFiller ? feedItems.slice(1) : feedItems;
                       id="global-search-input"
                       type="text"
                       value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
+                      readOnly onClick={() => setIsSearchOpen(true)} onChange={(e) => setSearchQuery(e.target.value)}
                       onKeyDown={(e) => { if (e.key === "Enter") appendSearchHistory(searchQuery); }}
                       placeholder={activeTranslations.searchPlaceholder}
                       className="w-full pl-8 pr-[78px] py-2 bg-white dark:bg-slate-900 border border-slate-150 dark:border-slate-800 rounded-xl text-[11px] focus:outline-none focus:ring-2 focus:ring-amber-500/15 text-slate-900 dark:text-white shadow-xs font-semibold transition hover:border-amber-550/30"
@@ -230,7 +232,7 @@ const feedListings = spotlightFiller ? feedItems.slice(1) : feedItems;
                       <input
                         type="text"
                         value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
+                        readOnly onClick={() => setIsSearchOpen(true)} onChange={(e) => setSearchQuery(e.target.value)}
                         onKeyDown={(e) => { if (e.key === "Enter") appendSearchHistory(searchQuery); }}
                         placeholder={activeTranslations.searchPlaceholder}
                         className="w-full pl-11 pr-24 py-3 bg-white dark:bg-slate-900 border border-slate-150 dark:border-slate-800 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/15 text-slate-900 dark:text-white shadow-xs font-semibold transition hover:border-amber-550/30"
@@ -494,6 +496,7 @@ const feedListings = spotlightFiller ? feedItems.slice(1) : feedItems;
                   </div>
                 )}
 
+{isSearchOpen && <SearchPage language={language} listings={[...adListings, ...listings.filter((l) => !adListings.some((a) => a.id === l.id))]} searchHistory={searchHistory} onSaveHistory={appendSearchHistory} onClose={() => setIsSearchOpen(false)} onSelect={(l) => { setIsSearchOpen(false); handleViewListingDetails(l); }} />}
                 {isCityPickerOpen && (
                   <div className="fixed inset-0 z-[60] flex items-end justify-center" onClick={() => setIsCityPickerOpen(false)}>
                     <div className="absolute inset-0 bg-black/40 animate-fade-in"></div>
