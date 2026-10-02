@@ -36,11 +36,6 @@ const TYPES = [
   { id: "parts", bn: "পার্টস", en: "Parts" },
 ];
 
-const BRANDS = [
-  "Toyota", "Honda", "Nissan", "Suzuki", "Mitsubishi", "Hyundai",
-  "KIA", "Daihatsu", "Mazda", "Subaru", "Lexus", "BMW",
-  "Mercedes", "CAT", "Hino", "Yamaha",
-];
 
 const SORTS = [
   { id: "latest", bn: "নতুন", en: "Newest" },
@@ -225,16 +220,6 @@ export default function SearchPage({ language, listings, searchHistory, onSaveHi
         </div>
       </div>
 
-      <div>
-        <p className={labelCls}>{bn ? "ব্র্যান্ড" : "Brand"}</p>
-        <div className="flex flex-wrap gap-2">
-          {BRANDS.map((b) => (
-            <button key={b} type="button" onClick={() => setDraft({ ...draft, brand: draft.brand === b ? "" : b })} className={`${chipBase} ${draft.brand === b ? chipOn : chipOff}`}>
-              {b}
-            </button>
-          ))}
-        </div>
-      </div>
 
       <div>
         <p className={labelCls}>{bn ? "গাড়ির মডেল" : "Model"}</p>
