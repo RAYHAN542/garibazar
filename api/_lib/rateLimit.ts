@@ -32,7 +32,7 @@ export async function checkAndBumpRateLimit(
   windowMs: number,
   max: number
 ): Promise<boolean> {
-  const { data, error } = await getSupabaseAdmin().rpc("check_and_bump_rate_limit", {
+  const { data, error } = await (getSupabaseAdmin() as any).rpc("check_and_bump_rate_limit", {
     p_key: key,
     p_window_ms: windowMs,
     p_max_count: max,
