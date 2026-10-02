@@ -73,6 +73,19 @@ const isNativeApp = (): boolean => {
   }
 };
 
+// 🔔 (2026-10-01) Native app-এ browser-এর Notification.permission নেই, তাই
+// সেখানে bell icon-এর লাল ডট/অবস্থা দেখাতে localStorage-এ নিজস্ব flag
+// রাখা হয় -- push-notifications plugin দিয়ে register সফল/ব্যর্থ হলে
+// handleRequestNotificationPermission এখানে লিখে রাখে।
+const NATIVE_PUSH_STATUS_KEY = "gari_bazar_native_push_status";
+const getNativePushStatus = (): NotificationPermission => {
+  try {
+    const v = localStorage.getItem(NATIVE_PUSH_STATUS_KEY);
+    if (v === "granted" || v === "denied") return v;
+  } catch (e) {}
+  return "default";
+};
+
 export default function App() {
   const [language, setLanguage] = useState<SupportedLanguage>(() => {
     try {
@@ -418,13 +431,17 @@ export default function App() {
     })();
   }, [listings, hasOpenedSharedListing]);
 
-  // Push Notifications states. 🔔 (2026-09-30) On the packaged native app,
-  // the device auto-registers with FCM on login (see usePushNotifications
-  // above) -- no banner needed there, so it only shows on web where the
-  // person has to opt in via the browser's own Notification API.
-  const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>(
-    typeof window !== "undefined" && "Notification" in window ? Notification.permission : "default"
-  );
+  // Push Notifications states. 🔔 (2026-10-01) On the packaged native app
+  // there is no browser Notification API, so this state is seeded from a
+  // localStorage flag we write ourselves after a successful/failed native
+  // permission request (see handleRequestNotificationPermission) -- without
+  // this, the bell icon's red "unprompted" dot stayed on forever even after
+  // the user granted permission, since nothing ever updated this state on
+  // native. On web it still reads from the real browser API as before.
+  const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>(() => {
+    if (isNativeApp()) return getNativePushStatus();
+    return typeof window !== "undefined" && "Notification" in window ? Notification.permission : "default";
+  });
   const [showNotificationPrompt, setShowNotificationPrompt] = useState(
     typeof window !== "undefined" && "Notification" in window && Notification.permission === "default" && !isNativeApp()
   );
@@ -557,11 +574,13 @@ export default function App() {
   };
 
   // Request Notification permission
-  // 🔔 (2026-09-30) Native app now has the @capacitor/push-notifications
+  // 🔔 (2026-10-01) Native app now has the @capacitor/push-notifications
   // plugin installed (usePushNotifications.ts handles auto-registration on
-  // login). Tapping the bell here on native now triggers a real permission
-  // request + registration through that same plugin, instead of the old
-  // "coming soon" placeholder message.
+  // login). Tapping the bell here on native triggers a real permission
+  // request + registration through that same plugin, and now also writes
+  // the result to localStorage (NATIVE_PUSH_STATUS_KEY) so `notificationPermission`
+  // actually updates -- fixes the bell's red dot staying on forever even
+  // after a successful native registration.
   const handleRequestNotificationPermission = async () => {
     if (isNativeApp()) {
       try {
@@ -573,12 +592,16 @@ export default function App() {
         setShowNotificationPrompt(false);
         if (permStatus.receive === "granted") {
           await PushNotifications.register();
+          setNotificationPermission("granted");
+          try { localStorage.setItem(NATIVE_PUSH_STATUS_KEY, "granted"); } catch (e) {}
           alert(
             language === "bn"
               ? "পুশ নোটিফিকেশন সফলভাবে চালু হয়েছে! আপনাকে স্বাগতম!"
               : "Push notifications successfully enabled! Welcome aboard!"
           );
         } else {
+          setNotificationPermission("denied");
+          try { localStorage.setItem(NATIVE_PUSH_STATUS_KEY, "denied"); } catch (e) {}
           alert(
             language === "bn"
               ? "নোটিফিকেশন অনুমতি দেওয়া হয়নি। ফোনের সেটিংস থেকে পরে চালু করতে পারেন।"
