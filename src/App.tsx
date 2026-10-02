@@ -1880,7 +1880,7 @@ export default function App() {
     // তাই এখানে বুস্ট পোস্টও বাকি সব পোস্টের মতোই স্বাভাবিক সাজানো অনুযায়ী
     // (sortOrganic) নিজের জায়গায় থাকে -- জোর করে কোনো নির্দিষ্ট স্লটে বসানো
     // হয় না, এবং দুইবার দেখানোও হয় না।
-    return [...finalFiltered].sort(sortOrganic);
+    return [...finalFiltered].filter((i) => !i.isAd).sort(sortOrganic);
   }, [enrichedListings, fuseInstance, debouncedSearchQuery, selectedCategory, selectedSubCategory, selectedCity, sortBy, adRank]);
 
   // 7b. Auto-fetch more when a filter/sub-category matches nothing on the
