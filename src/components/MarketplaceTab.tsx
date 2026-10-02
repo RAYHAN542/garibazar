@@ -361,6 +361,35 @@ export default function MarketplaceTab({
                   }}
                 />
 
+                {/* 🔧 (2026-10-01) আসল, আলাদা "শুধু বুস্ট পোস্ট" গ্রিড -- আগে এই
+                    জায়গায় যেই "Premium Sponsored Spotlights" হেডার দেখানো হতো,
+                    সেটা আসলে নিচের সাধারণ মূল গ্রিডেরই (ads + organic মিশানো)
+                    একটা ভুল লেবেল ছিল, তাই বুস্ট-ছাড়া পোস্টও "স্পনসর্ড" হেডারের
+                    নিচে দেখাত আর কোনো "বিজ্ঞাপন" ব্যাজ থাকত না। এখন এটা সত্যিকারের
+                    একটা পৃথক গ্রিড -- শুধু spotlightAds (সর্বোচ্চ MAX_SPOTLIGHT_ADS,
+                    impression-count অনুযায়ী ন্যায্যভাবে ঘোরানো) দেখায়, উপরের
+                    স্লাইডারের মতোই, সবসময় উপরে, মূল ফিডের আগে। */}
+                {spotlightAds.length > 0 && (
+                  <div className="mb-5">
+                    <div className="mb-2.5 flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 bg-amber-500 rounded-full animate-ping"></span>
+                      <h3 className="text-sm font-extrabold font-sans text-amber-600 dark:text-amber-400 uppercase tracking-widest">{activeTranslations.adsTitle}</h3>
+                    </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2 sm:gap-4">
+                      {spotlightAds.map((listing) => (
+                        <ListingCard
+                          key={`spotlight-${listing.id}`}
+                          listing={listing}
+                          language={language}
+                          isAdmin={isUserAdmin}
+                          onViewDetails={handleViewListingDetails}
+                          onPromoteClick={(item) => { if (!user) { setIsAuthOpen(true); } else { setPromotingListing(item); } }}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {showNotificationPrompt && (
                   <div className="mb-6 bg-gradient-to-r from-blue-600/10 to-orange-505/10 border border-orange-500/20 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 animate-fade-in shadow-sm">
                     <div className="flex items-start gap-3">
@@ -385,13 +414,6 @@ export default function MarketplaceTab({
                         {language === "bn" ? "চালু করুন" : "Enable"}
                       </button>
                     </div>
-                  </div>
-                )}
-
-                {displayListings.some((item) => item.isAd) && (
-                  <div className="mb-2.5 flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 bg-amber-500 rounded-full animate-ping"></span>
-                    <h3 className="text-sm font-extrabold font-sans text-amber-600 dark:text-amber-400 uppercase tracking-widest">{activeTranslations.adsTitle}</h3>
                   </div>
                 )}
 
