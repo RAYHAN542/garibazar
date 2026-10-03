@@ -4,7 +4,7 @@
  */
 
 import { useState, useEffect, useMemo, useRef, lazy, Suspense } from "react";
-import { logAnalyticsEvent } from "./firebase";
+import { logAnalyticsEvent } from "./utils/analytics";
 import { supabase } from "./supabase";
 import { logger } from "./utils/logger";
 import { trackEvent } from "./utils/trackEvent";

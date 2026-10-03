@@ -6,7 +6,7 @@ import SearchPage from "./SearchPage";
 import { CITIES } from "../translations";
 import { PartListing, SupportedLanguage, TranslationSet } from "../types";
 import type { ActiveTab } from "./HeaderNav";
-import { logAnalyticsEvent } from "../firebase";
+import { logAnalyticsEvent } from "../utils/analytics";
 import { pickRotatedAds, MAX_SPOTLIGHT_ADS } from "../utils/adRotation";
 
 interface MarketplaceTabProps {

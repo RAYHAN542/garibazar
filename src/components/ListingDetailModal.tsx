@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { PartListing, SupportedLanguage } from "../types";
 import { X, MapPin, Sparkles, Play, SquarePlay, Flag, ShieldAlert, CheckCircle2, ChevronLeft, ChevronRight, Loader2, ShoppingBag, MessageSquare, Share2 } from "lucide-react";
-import { auth, logAnalyticsEvent } from "../firebase";
+import { auth } from "../firebase";
+import { logAnalyticsEvent } from "../utils/analytics";
 import { supabase } from "../supabase";
 import { trackListingClick } from "../utils/counters";
 import { getOptimizedImageUrl } from "../utils/cloudinary";

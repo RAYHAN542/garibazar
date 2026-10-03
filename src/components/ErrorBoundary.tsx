@@ -1,6 +1,6 @@
 import React, { ReactNode } from "react";
 import { AlertTriangle, Loader2, Home } from "lucide-react";
-import { logAnalyticsEvent } from "../firebase";
+import { logAnalyticsEvent } from "../utils/analytics";
 
 interface Props {
   children: ReactNode;
