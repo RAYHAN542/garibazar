@@ -136,6 +136,25 @@ export default async function handler(req: any, res: any) {
       return res.status(400).json({ error: "এই প্রোডাক্টটি ইতিমধ্যে বিজ্ঞাপন হিসেবে লাইভ আছে।" });
     }
 
+    // Atomic claim: only one concurrent request can win today's draw slot
+    const { data: claimed, error: claimErr } = await supabase
+      .from("users")
+      .update({ last_lottery_date: today })
+      .eq("uid", uid)
+      .or(`last_lottery_date.is.null,last_lottery_date.neq.${today}`)
+      .select("uid")
+      .maybeSingle();
+    if (claimErr) {
+      console.error("lottery draw: claim error:", claimErr.message);
+      return res.status(500).json({ error: "সার্ভারে সমস্যা হয়েছে। আবার চেষ্টা করুন।" });
+    }
+    if (!claimed) {
+      return res.status(429).json({
+        error: "আজকের লটারি ইতিমধ্যে ব্যবহার করেছেন। আগামীকাল আবার চেষ্টা করুন।",
+        alreadyUsedToday: true,
+      });
+    }
+
     // 4. Draw — exactly 1-in-10 (10%) chance, server-side crypto RNG
     const roll = randomInt(0, WIN_CHANCE_DENOMINATOR); // 0..9
     const win = roll === 0;
