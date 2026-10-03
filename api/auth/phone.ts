@@ -8,6 +8,15 @@ const supabaseAdmin = createClient(SUPABASE_URL as string, SUPABASE_SERVICE_ROLE
   auth: { autoRefreshToken: false, persistSession: false },
 });
 
+// Sign-in must NOT use the shared admin client: supabase-js keeps the signed-in
+// user's session on the client instance, so later "admin" queries on a warm
+// instance could silently run as that user. Use a throwaway client instead.
+function newSignInClient() {
+  return createClient(SUPABASE_URL as string, SUPABASE_SERVICE_ROLE_KEY as string, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+}
+
 const MAX_FAILED_ATTEMPTS = 5;
 const LOCK_DURATION_MS = 15 * 60 * 1000;
 const RATE_LIMIT_WINDOW_MS = 60 * 1000;
@@ -30,17 +39,16 @@ function getClientIp(req: any): string {
 }
 
 async function isRateLimited(key: string): Promise<boolean> {
-  const now = new Date();
-  const { data } = await supabaseAdmin.from("rate_limits").select("*").eq("key", key).maybeSingle();
-
-  if (!data || now.getTime() - new Date(data.window_start).getTime() > RATE_LIMIT_WINDOW_MS) {
-    await supabaseAdmin.from("rate_limits").upsert({ key, count: 1, window_start: now.toISOString() });
+  const { data, error } = await supabaseAdmin.rpc("check_and_bump_rate_limit", {
+    p_key: `auth_ip_${key}`,
+    p_window_ms: RATE_LIMIT_WINDOW_MS,
+    p_max_count: RATE_LIMIT_MAX,
+  });
+  if (error) {
+    console.error("auth rate limit rpc failed:", error.message);
     return false;
   }
-
-  const newCount = (data.count || 0) + 1;
-  await supabaseAdmin.from("rate_limits").update({ count: newCount }).eq("key", key);
-  return newCount > RATE_LIMIT_MAX;
+  return data !== true;
 }
 
 async function handleSignup(req: any, res: any) {
@@ -70,7 +78,7 @@ async function handleSignup(req: any, res: any) {
     throw createError;
   }
 
-  const { data: sessionData, error: signInError } = await supabaseAdmin.auth.signInWithPassword({ phone, password });
+  const { data: sessionData, error: signInError } = await newSignInClient().auth.signInWithPassword({ phone, password });
   if (signInError || !sessionData.session) throw signInError || new Error("no session after signup");
 
   await supabaseAdmin.from("users").upsert(
@@ -94,40 +102,30 @@ async function handleLogin(req: any, res: any) {
     return res.status(400).json({ error: "মোবাইল নম্বর ও পাসওয়ার্ড দিন।" });
   }
 
-  const { data: lockRow } = await supabaseAdmin
-    .from("login_lockouts")
-    .select("*")
-    .eq("phone", phone)
-    .maybeSingle();
-
-  const now = Date.now();
-  if (lockRow?.lock_until && now < new Date(lockRow.lock_until).getTime()) {
-    const waitMin = Math.ceil((new Date(lockRow.lock_until).getTime() - now) / 60000);
+  const { data: lockUntil, error: reserveErr } = await supabaseAdmin.rpc("reserve_login_attempt", {
+    p_phone: phone,
+    p_max: MAX_FAILED_ATTEMPTS,
+    p_lock_ms: LOCK_DURATION_MS,
+  });
+  if (reserveErr) {
+    console.error("reserve_login_attempt failed:", reserveErr.message);
+  } else if (lockUntil) {
+    const waitMin = Math.max(1, Math.ceil((new Date(lockUntil as string).getTime() - Date.now()) / 60000));
     return res.status(429).json({
       error: `অনেকবার ভুল পাসওয়ার্ড দেওয়া হয়েছে। ${waitMin} মিনিট পর আবার চেষ্টা করুন।`,
     });
   }
 
-  const { data: sessionData, error } = await supabaseAdmin.auth.signInWithPassword({ phone, password });
+  const { data: sessionData, error } = await newSignInClient().auth.signInWithPassword({ phone, password });
 
   if (error) {
-    const failedAttempts = (lockRow?.failed_attempts || 0) + 1;
-    const update: any = { phone, failed_attempts: failedAttempts, updated_at: new Date().toISOString() };
-    if (failedAttempts >= MAX_FAILED_ATTEMPTS) {
-      update.lock_until = new Date(now + LOCK_DURATION_MS).toISOString();
-      update.failed_attempts = 0;
-    }
-    await supabaseAdmin.from("login_lockouts").upsert(update, { onConflict: "phone" });
-
     if (/invalid login credentials/i.test(error.message || "")) {
       return res.status(400).json({ error: "ভুল পাসওয়ার্ড অথবা এই নম্বরে কোনো অ্যাকাউন্ট নেই।" });
     }
     throw error;
   }
 
-  if (lockRow?.failed_attempts || lockRow?.lock_until) {
-    await supabaseAdmin.from("login_lockouts").update({ failed_attempts: 0, lock_until: null }).eq("phone", phone);
-  }
+  await supabaseAdmin.from("login_lockouts").update({ failed_attempts: 0, lock_until: null }).eq("phone", phone);
 
   return res.status(200).json({
     access_token: sessionData.session!.access_token,
