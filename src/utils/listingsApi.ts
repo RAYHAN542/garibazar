@@ -19,6 +19,9 @@ import { PartListing } from "../types";
 
 const INITIAL_FETCH_LIMIT = 20;
 const UUID_RE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+// Firestore-era auto-generated doc IDs are alphanumeric base62-ish strings.
+// Anything outside this charset is never a real legacy id.
+const SAFE_LEGACY_ID = /^[A-Za-z0-9_-]{1,64}$/;
 
 function mapRowToListing(row: any): PartListing {
   const images: string[] = Array.isArray(row.images) ? row.images : [];
@@ -204,8 +207,17 @@ export async function fetchAdminListings(limit = 300): Promise<PartListing[]> {
 // since the migration. Same dual id/legacy_firestore_id lookup pattern
 // used server-side (api/share-listing.ts, api/get-seller-contact.ts,
 // api/draw.ts), since an older shared link may carry a pre-migration id.
+//
+// 🔧 (2026-10-01 security audit) `id` is interpolated straight into a
+// PostgREST .or() filter string below -- supabase-js does not escape raw
+// .or() strings, so a crafted comma could previously append an unintended
+// extra OR condition. RLS still only ever allows public listing fields to
+// be read either way, so this was never a private-data exposure, but
+// validating the id's shape here closes the injection vector directly
+// instead of relying on that being coincidentally harmless.
 export async function fetchListingById(id: string): Promise<PartListing | null> {
   const isUuid = UUID_RE.test(id);
+  if (!isUuid && !SAFE_LEGACY_ID.test(id)) return null;
   const { data, error } = await supabase
     .from("listings")
     .select("*")
