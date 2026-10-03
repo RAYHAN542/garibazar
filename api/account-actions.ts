@@ -103,9 +103,11 @@ async function handleDeleteAccount(req: any, res: any) {
     console.error("[account-actions/delete_account] app uid resolution failed, using auth uid:", e);
   }
 
-  await supabaseAdmin.from("listings").delete().eq("seller_id", appUid);
-  await supabaseAdmin.from("public_profiles").delete().eq("uid", appUid);
-  await supabaseAdmin.from("users").delete().eq("uid", appUid);
+  const { error: delDataErr } = await supabaseAdmin.rpc("delete_user_data", { p_uid: appUid });
+  if (delDataErr) {
+    console.error("delete_user_data failed:", delDataErr.message);
+    return res.status(500).json({ error: "অ্যাকাউন্ট মুছতে সমস্যা হয়েছে। আবার চেষ্টা করুন।" });
+  }
   await supabaseAdmin.from("user_auth_links").delete().eq("auth_uid", authUid);
 
   const { error: authDelErr } = await supabaseAdmin.auth.admin.deleteUser(authUid);
