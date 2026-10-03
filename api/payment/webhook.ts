@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import { timingSafeEqual } from "crypto";
 
 // 🔧 (2026-09-23) এই ওয়েবহুক আগে সম্পূর্ণ Firestore-নির্ভর ছিল --
 // refill_requests, listings, users সবকিছু Firestore-এ read/write হতো।
@@ -43,6 +44,17 @@ async function verifyWithUddoktaPay(invoiceId: string, apiKey: string, baseUrl: 
   return data;
 }
 
+// If applying the effect (ad / wallet) fails AFTER the request was claimed,
+// release the claim so UddoktaPay's retry can process it again.
+async function releaseClaim(supabase: any, requestId: string) {
+  const { error } = await supabase
+    .from("refill_requests")
+    .update({ status: "pending", approved_at: null, transaction_id: null, invoice_id: null })
+    .eq("id", requestId)
+    .eq("status", "approved");
+  if (error) console.error("payment webhook: releaseClaim failed:", requestId, error.message);
+}
+
 export default async function handler(req: any, res: any) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
@@ -63,7 +75,9 @@ export default async function handler(req: any, res: any) {
 
     // 1. Verify this webhook call itself carries our API key (first line of defense)
     const headerKey = req.headers["rt-uddoktapay-api-key"];
-    if (!headerKey || headerKey !== apiKey) {
+    const hkBuf = Buffer.from(String(headerKey || ""));
+    const akBuf = Buffer.from(apiKey);
+    if (!headerKey || hkBuf.length !== akBuf.length || !timingSafeEqual(hkBuf, akBuf)) {
       return res.status(401).json({ error: "Unauthorized webhook." });
     }
 
@@ -177,7 +191,12 @@ export default async function handler(req: any, res: any) {
       .select("id")
       .maybeSingle();
 
-    if (claimErr) throw new Error(`refill_requests claim failed: ${claimErr.message}`);
+    if (claimErr) {
+      if ((claimErr as any).code === "23505") {
+        throw new PermanentWebhookError(`transaction_id ${transactionId} already approved another request`);
+      }
+      throw new Error(`refill_requests claim failed: ${claimErr.message}`);
+    }
     if (!claimed) {
       // Lost the race to a concurrent webhook delivery — already handled.
       return res.status(200).json({ received: true });
@@ -195,7 +214,10 @@ export default async function handler(req: any, res: any) {
           ad_expires_at: new Date(Date.now() + duration * 24 * 60 * 60 * 1000).toISOString(),
         })
         .eq("id", request.listing_id);
-      if (updateErr) console.error("payment webhook: failed to activate ad:", updateErr.message);
+      if (updateErr) {
+        await releaseClaim(supabase, requestId);
+        throw new Error(`failed to activate ad: ${updateErr.message}`);
+      }
     } else {
       // Atomic increment via a Postgres expression, not a read-then-write --
       // avoids losing a concurrent top-up.
@@ -203,7 +225,10 @@ export default async function handler(req: any, res: any) {
         p_uid: request.user_id,
         p_amount: Number(request.amount),
       });
-      if (creditErr) console.error("payment webhook: failed to credit wallet:", creditErr.message);
+      if (creditErr) {
+        await releaseClaim(supabase, requestId);
+        throw new Error(`failed to credit wallet: ${creditErr.message}`);
+      }
     }
 
     return res.status(200).json({ received: true });
