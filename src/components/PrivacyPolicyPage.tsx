@@ -84,7 +84,7 @@ export default function PrivacyPolicyPage({
             <div className="flex flex-wrap items-center gap-x-4 gap-y-2 pt-2 border-t border-slate-800 text-[11px] text-slate-400 font-medium">
               <span className="inline-flex items-center gap-1">
                 <Calendar className="w-3 h-3 text-indigo-400" />
-                {lang === "bn" ? "সর্বশেষ আপডেট: ৩০ সেপ্টেম্বর, ২০২৬" : "Last Updated: September 30, 2026"}
+                {lang === "bn" ? "সর্বশেষ আপডেট: ৪ অক্টোবর, ২০২৬" : "Last Updated: October 4, 2026"}
               </span>
               <span className="inline-flex items-center gap-1">
                 <Mail className="w-3 h-3 text-indigo-400" />
@@ -167,7 +167,7 @@ export default function PrivacyPolicyPage({
                   <li>জাল লিস্টিং, স্প্যাম অ্যাকাউন্ট ও অপব্যবহার ঠেকাতে তথ্য ব্যবহার করা হয়।</li>
                   <li><strong>আমরা আপনার ব্যক্তিগত তথ্য বিক্রি করি না।</strong></li>
                   <li>
-                    আমাদের হয়ে তথ্য প্রক্রিয়াকরণকারী সেবাদাতা: Supabase (অ্যাকাউন্ট, চ্যাট, ব্যবহারের পরিসংখ্যান), Google Firebase/Firestore (লিস্টিং সংক্রান্ত ডেটা),
+                    আমাদের হয়ে তথ্য প্রক্রিয়াকরণকারী সেবাদাতা: Supabase (অ্যাকাউন্ট, লিস্টিং, চ্যাট, ব্যবহারের পরিসংখ্যান), Google Firebase (শুধু পুশ নোটিফিকেশন, FCM),
                     Cloudinary (ছবি), Vercel (হোস্টিং ও সার্ভার), UddoktaPay ও bKash (ওয়েবসাইটের পেমেন্ট)।
                   </li>
                   <li>
@@ -180,7 +180,7 @@ export default function PrivacyPolicyPage({
               <section className="space-y-3">
                 <SectionTitle>৩. ডেটা স্টোরেজ ও নিরাপত্তা</SectionTitle>
                 <p>
-                  আপনার অ্যাকাউন্ট, চ্যাট ও ব্যবহারের পরিসংখ্যান <strong>Supabase</strong>-এ, লিস্টিং সংক্রান্ত ডেটা <strong>Google Firebase Firestore</strong>-এ এবং ছবি <strong>Cloudinary</strong>-তে সংরক্ষিত হয়।
+                  আপনার অ্যাকাউন্ট, লিস্টিং, চ্যাট ও ব্যবহারের পরিসংখ্যান <strong>Supabase</strong>-এ এবং ছবি <strong>Cloudinary</strong>-তে সংরক্ষিত হয়। পুশ নোটিফিকেশন পাঠাতে অ্যাপের ডিভাইস টোকেন <strong>Google Firebase Cloud Messaging (FCM)</strong> ব্যবহার করে।
                   সব যোগাযোগ HTTPS/SSL এনক্রিপশনের মাধ্যমে হয় এবং অননুমোদিত প্রবেশ ঠেকাতে ডেটাবেসে অ্যাক্সেস নিয়ন্ত্রণ (security rules) প্রয়োগ করা আছে।
                 </p>
               </section>
@@ -279,7 +279,7 @@ export default function PrivacyPolicyPage({
                   <li>We use it to prevent counterfeit listings, spam accounts and abuse.</li>
                   <li><strong>We do not sell your personal information.</strong></li>
                   <li>
-                    Service providers that process data on our behalf: Supabase (accounts, chat, usage statistics), Google Firebase/Firestore (listing data),
+                    Service providers that process data on our behalf: Supabase (accounts, listings, chat, usage statistics), Google Firebase (push notifications only, FCM),
                     Cloudinary (images), Vercel (hosting and servers), and UddoktaPay and bKash (website payments).
                   </li>
                   <li>
@@ -292,7 +292,7 @@ export default function PrivacyPolicyPage({
               <section className="space-y-3">
                 <SectionTitle>3. Data Storage and Security</SectionTitle>
                 <p>
-                  Your account, chat and usage statistics are stored in <strong>Supabase</strong>, listing-related data in <strong>Google Firebase Firestore</strong>, and images on <strong>Cloudinary</strong>.
+                  Your account, listings, chat and usage statistics are stored in <strong>Supabase</strong> and images on <strong>Cloudinary</strong>. The app's device token is used with <strong>Google Firebase Cloud Messaging (FCM)</strong> to deliver push notifications.
                   All communication uses HTTPS/SSL encryption, and access rules (security rules) are applied to the databases to prevent unauthorized access.
                 </p>
               </section>
