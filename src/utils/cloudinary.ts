@@ -3,7 +3,8 @@ import { supabase } from "../supabase";
 import { apiUrl } from "./apiBase";
 
 const MAX_UPLOAD_DIMENSION = 1600;
-const MAX_UPLOAD_BYTES = 5 * 1024 * 1024; // 5MB
+const MAX_UPLOAD_BYTES = 5 * 1024 * 1024; // 5MB (checked after compression)
+const HARD_MAX_INPUT_BYTES = 20 * 1024 * 1024; // 20MB raw input guard
 
 // Resizes + compresses an image in the browser before it ever leaves the
 // device, using the native Canvas API (no extra npm dependency). Cloudinary
@@ -72,8 +73,8 @@ export const uploadToCloudinary = async (file: File | Blob): Promise<string> => 
     if (!file.type.startsWith("image/")) {
       throw new Error("শুধুমাত্র ছবি (image) ফাইল আপলোড করা যাবে। / Only image files can be uploaded.");
     }
-    if (file.size > MAX_UPLOAD_BYTES) {
-      throw new Error("ছবির সাইজ 5MB-এর বেশি হতে পারবে না। / Image size must be under 5MB.");
+    if (file.size > HARD_MAX_INPUT_BYTES) {
+      throw new Error("ছবির সাইজ অনেক বড় (সর্বোচ্চ 20MB)। / Image too large (max 20MB).");
     }
   }
 
@@ -95,9 +96,19 @@ export const uploadToCloudinary = async (file: File | Blob): Promise<string> => 
       // If compression fails for any reason (unsupported format, corrupt
       // file, etc.) fall back to uploading the original rather than
       // blocking the listing entirely.
-      logger.debug("[Cloudinary] Client-side compression failed, uploading original:", err);
+      logger.debug("[Cloudinary] Client-side compression failed:", err);
+      const t = (file.type || "").toLowerCase();
+      const n = (file.name || "").toLowerCase();
+      const isHeic = t.includes("heic") || t.includes("heif") || /\.(heic|heif)$/.test(n);
+      if (isHeic || !["image/jpeg", "image/png", "image/webp"].includes(t)) {
+        throw new Error("এই ছবির ফরম্যাট সাপোর্ট করে না (iPhone HEIC হতে পারে)। JPG/PNG ছবি দিন, অথবা iPhone Settings > Camera > Formats > Most Compatible করুন। / Unsupported image format (HEIC). Please use JPG or PNG.");
+      }
       uploadBody = file;
     }
+  }
+
+  if (uploadBody.size > MAX_UPLOAD_BYTES) {
+    throw new Error("ছবির সাইজ 5MB-এর বেশি হতে পারবে না। / Image size must be under 5MB.");
   }
 
   // Ask our server for a signature. This also doubles as the auth check --
@@ -114,7 +125,8 @@ export const uploadToCloudinary = async (file: File | Blob): Promise<string> => 
   try {
     signRes = await fetch(apiUrl("/api/cloudinary-sign"), {
       method: "POST",
-      headers: { Authorization: `Bearer ${accessToken}` },
+      headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ v: 2 }),
     });
   } catch (err: any) {
     throw new Error(`[SIGN] ${err?.message || err}`);
@@ -123,7 +135,7 @@ export const uploadToCloudinary = async (file: File | Blob): Promise<string> => 
     const errData = await signRes.json().catch(() => ({}));
     throw new Error(`[SIGN ${signRes.status}] ${errData?.error || "Failed to authorize upload."}`);
   }
-  const { signature, timestamp, apiKey, cloudName, folder, allowedFormats } = await signRes.json();
+  const { signature, timestamp, apiKey, cloudName, folder, allowedFormats, publicId } = await signRes.json();
 
   const formData = new FormData();
   formData.append("file", uploadBody, uploadBody.type === "image/webp" ? "image.webp" : "image.jpg");
@@ -135,6 +147,7 @@ export const uploadToCloudinary = async (file: File | Blob): Promise<string> => 
   formData.append("signature", signature);
   formData.append("folder", folder);
   formData.append("allowed_formats", allowedFormats);
+  if (publicId) formData.append("public_id", publicId);
 
   const url = `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`;
   logger.debug(`[Cloudinary] Starting signed upload to ${url}`);

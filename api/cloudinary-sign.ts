@@ -106,6 +106,10 @@ export default async function handler(req: any, res: any) {
       folder: `listings/${uid}`,
       allowed_formats: "jpg,png,webp",
     };
+    // v2 clients get a one-time random public_id signed in, so a replayed
+    // signature can only overwrite the same asset (no unlimited uploads).
+    const publicId = req.body?.v === 2 ? crypto.randomUUID() : null;
+    if (publicId) paramsToSign.public_id = publicId;
     const toSign = Object.keys(paramsToSign)
       .sort()
       .map((key) => `${key}=${paramsToSign[key]}`)
@@ -122,6 +126,7 @@ export default async function handler(req: any, res: any) {
       cloudName,
       folder: paramsToSign.folder,
       allowedFormats: paramsToSign.allowed_formats,
+      publicId,
     });
   } catch (err: any) {
     console.error("[cloudinary-sign] error:", err?.message || err);
