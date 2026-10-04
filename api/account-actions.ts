@@ -108,6 +108,24 @@ async function handleDeleteAccount(req: any, res: any) {
     console.error("delete_user_data failed:", delDataErr.message);
     return res.status(500).json({ error: "অ্যাকাউন্ট মুছতে সমস্যা হয়েছে। আবার চেষ্টা করুন।" });
   }
+  // Best-effort: remove this user's uploaded images from Cloudinary.
+  // appUid is validated so an empty/odd value can never match another prefix.
+  try {
+    const cName = process.env.CLOUDINARY_CLOUD_NAME;
+    const cKey = process.env.CLOUDINARY_API_KEY;
+    const cSecret = process.env.CLOUDINARY_API_SECRET;
+    if (cName && cKey && cSecret && /^[A-Za-z0-9_-]{6,128}$/.test(appUid)) {
+      const basic = Buffer.from(`${cKey}:${cSecret}`).toString("base64");
+      const prefix = encodeURIComponent(`listings/${appUid}/`);
+      const cr = await fetch(
+        `https://api.cloudinary.com/v1_1/${cName}/resources/image/upload?prefix=${prefix}&invalidate=true`,
+        { method: "DELETE", headers: { Authorization: `Basic ${basic}` } },
+      );
+      if (!cr.ok) console.error("[account-actions/delete_account] cloudinary cleanup failed:", cr.status);
+    }
+  } catch (e) {
+    console.error("[account-actions/delete_account] cloudinary cleanup error:", e);
+  }
   await supabaseAdmin.from("user_auth_links").delete().eq("auth_uid", authUid);
 
   const { error: authDelErr } = await supabaseAdmin.auth.admin.deleteUser(authUid);
