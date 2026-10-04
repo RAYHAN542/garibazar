@@ -266,7 +266,7 @@ export function ChatView({ currentUser, language, onLoginPrompt, initialListingT
   ];
 
   const visibleThreads = threads.filter((t) => {
-    const partnerId = t.buyerId === currentUser.uid ? t.sellerId : t.buyerId;
+    const partnerId = t.buyerId === currentUser?.uid ? t.sellerId : t.buyerId;
     return !blockedUids.includes(partnerId);
   });
 
@@ -351,8 +351,9 @@ export function ChatView({ currentUser, language, onLoginPrompt, initialListingT
 
     let active = true;
 
+    let didInitialLoad = false;
     const fetchMessages = async () => {
-      setLoadingMessages(true);
+      if (!didInitialLoad) setLoadingMessages(true);
       setMessagesError(null);
       const { data, error } = await supabase
         .from("chat_messages")
@@ -382,6 +383,7 @@ export function ChatView({ currentUser, language, onLoginPrompt, initialListingT
 
       setMessages([...list, ...pendingMessagesRef.current]);
       setLoadingMessages(false);
+      didInitialLoad = true;
       prevLimitRef.current = msgLimit;
     };
 
