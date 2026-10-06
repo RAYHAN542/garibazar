@@ -84,7 +84,7 @@ export default function PrivacyPolicyPage({
             <div className="flex flex-wrap items-center gap-x-4 gap-y-2 pt-2 border-t border-slate-800 text-[11px] text-slate-400 font-medium">
               <span className="inline-flex items-center gap-1">
                 <Calendar className="w-3 h-3 text-indigo-400" />
-                {lang === "bn" ? "সর্বশেষ আপডেট: ৪ অক্টোবর, ২০২৬" : "Last Updated: October 4, 2026"}
+                {lang === "bn" ? "সর্বশেষ আপডেট: ৭ অক্টোবর, ২০২৬" : "Last Updated: October 7, 2026"}
               </span>
               <span className="inline-flex items-center gap-1">
                 <Mail className="w-3 h-3 text-indigo-400" />
@@ -172,7 +172,7 @@ export default function PrivacyPolicyPage({
                   </li>
                   <li>
                     ওয়েবসাইটে Google AdSense ও Adsterra-র মতো তৃতীয় পক্ষের বিজ্ঞাপন দেখানো হতে পারে। তারা নিজেদের নীতি অনুযায়ী কুকি বা ডিভাইস শনাক্তকারী ব্যবহার করতে পারে।
-                    অ্যান্ড্রয়েড অ্যাপে বর্তমানে কোনো তৃতীয় পক্ষের বিজ্ঞাপন নেই। ভবিষ্যতে অ্যাপে বিজ্ঞাপন যুক্ত করলে আগে এই নীতি হালনাগাদ করা হবে।
+                    অ্যান্ড্রয়েড অ্যাপে Google AdMob-এর মাধ্যমে বিজ্ঞাপন দেখানো হয়। Google বিজ্ঞাপন দেখাতে ও তার কার্যকারিতা মাপতে আপনার ডিভাইসের বিজ্ঞাপন আইডি (Advertising ID) ও অনুরূপ শনাক্তকারী ব্যবহার করতে পারে। ফোনের Settings → Google → Ads থেকে বিজ্ঞাপন আইডি মুছতে বা বিজ্ঞাপন-ব্যক্তিগতকরণ বন্ধ করতে পারেন। Google কীভাবে তথ্য ব্যবহার করে তা জানতে: policies.google.com/technologies/partner-sites
                   </li>
                 </ul>
               </section>
@@ -284,7 +284,7 @@ export default function PrivacyPolicyPage({
                   </li>
                   <li>
                     The website may show third-party ads such as Google AdSense and Adsterra, which may use cookies or device identifiers under their own policies.
-                    The Android app currently shows no third-party ads. If ads are added to the app in the future, this policy will be updated first.
+                    The Android app shows ads through Google AdMob. Google may use your device's Advertising ID and similar identifiers to show ads and measure their performance. You can reset your advertising ID or turn off ad personalization in your phone's Settings → Google → Ads. To learn how Google uses data, see policies.google.com/technologies/partner-sites
                   </li>
                 </ul>
               </section>
