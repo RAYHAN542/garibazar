@@ -10,6 +10,7 @@ function NativeAdSlotInner({ slotId }: { slotId: string }) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const [status, setStatus] = useState<Status>("loading");
   const [height, setHeight] = useState(320);
+  const [errMsg, setErrMsg] = useState("");
 
   // ১) ad লোড
   useEffect(() => {
@@ -19,8 +20,11 @@ function NativeAdSlotInner({ slotId }: { slotId: string }) {
         await initNativeAds();
         await NativeAds.load({ id: slotId, adUnitId: NATIVE_FEED_UNIT });
         if (!cancelled) setStatus("ready");
-      } catch {
-        if (!cancelled) setStatus("failed");
+      } catch (e) {
+        if (!cancelled) {
+          setErrMsg((e as { message?: string })?.message ?? String(e));
+          setStatus("failed");
+        }
       }
     })();
     return () => {
@@ -123,7 +127,15 @@ function NativeAdSlotInner({ slotId }: { slotId: string }) {
     };
   }, [status, slotId]);
 
-  if (status !== "ready") return null;
+  if (status !== "ready") {
+    // টেস্ট বিল্ডে (VITE_ADMOB_LIVE != true) ad না এলে কারণ দেখাও
+    if (import.meta.env.VITE_ADMOB_LIVE === "true") return null;
+    return (
+      <div className="col-span-full rounded-lg bg-amber-50 px-3 py-2 text-[11px] text-amber-800">
+        Ad debug: {status}{errMsg ? " - " + errMsg : ""}
+      </div>
+    );
+  }
   return (
     <div
       ref={hostRef}
