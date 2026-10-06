@@ -7,6 +7,7 @@ import { supabase } from "../supabase";
 import { trackListingClick } from "../utils/counters";
 import { getOptimizedImageUrl } from "../utils/cloudinary";
 import { apiUrl } from "../utils/apiBase";
+import { NativeAdSlot } from "./NativeAdSlot";
 
 // Masks all but the last 4 digits so the full number isn't visible in plain
 // text to anonymous visitors or scrapers. The underlying tel: link still
@@ -519,6 +520,12 @@ export function ListingDetailModal({ listing, language, currentUser, onClose, on
         >
           <X className="w-5 h-5" />
         </button>
+
+        {/* Native ad: ছবির আগে (Bikroy-র মতো)। শুধু Android অ্যাপে; ওয়েবে কিছুই না।
+            pt-14 = উপরে ফাঁকা জায়গা, যাতে ক্লোজ (X) বাটন বিজ্ঞাপনের নিচে চাপা না পড়ে। */}
+        <div className="px-3 pt-14 empty:hidden">
+          <NativeAdSlot slotId={`detail-ad-${listing.id}`} />
+        </div>
 
         <div className="flex flex-col">
           {/* Top Image or Video player */}

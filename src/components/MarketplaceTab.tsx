@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import { Search, SlidersHorizontal, Bell, Plus, X, ShoppingBag, Loader2, LayoutGrid, Car, Wrench, Bike, Truck, Construction, MapPin, Check } from "lucide-react";
 import { ListingCard } from "./ListingCard";
 import { PromotedSlider } from "./PromotedSlider";
@@ -463,7 +463,7 @@ const feedListings = spotlightFiller ? feedItems.slice(1) : feedItems;
                   </div>
                 ) : (
                   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2 sm:gap-4">
-  {feedListings.map((listing, index) => (
+  {feedListings.map((listing, index) => (<Fragment key={listing.id}>
     <ListingCard
       key={listing.id}
       listing={listing}
@@ -472,7 +472,7 @@ const feedListings = spotlightFiller ? feedItems.slice(1) : feedItems;
       priority={index === 0}
       onViewDetails={handleViewListingDetails}
       onPromoteClick={(item) => { if (!user) { setIsAuthOpen(true); } else { setPromotingListing(item); } }}
-    />
+    /></Fragment>
   ))}
 </div>
 )}
