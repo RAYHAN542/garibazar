@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { NativeAds, NATIVE_FEED_UNIT, initNativeAds, isNativeAdsSupported } from "../utils/nativeAds";
+import { NativeAds, IS_TEST_UNIT, resolveNativeUnit, initNativeAds, isNativeAdsSupported } from "../utils/nativeAds";
 
 type Status = "loading" | "ready" | "failed";
 type Payload =
@@ -11,6 +11,7 @@ function NativeAdSlotInner({ slotId }: { slotId: string }) {
   const [status, setStatus] = useState<Status>("loading");
   const [height, setHeight] = useState(320);
   const [errMsg, setErrMsg] = useState("");
+  const [isTest, setIsTest] = useState(false);
 
   // ১) ad লোড
   useEffect(() => {
@@ -18,7 +19,9 @@ function NativeAdSlotInner({ slotId }: { slotId: string }) {
     (async () => {
       try {
         await initNativeAds();
-        await NativeAds.load({ id: slotId, adUnitId: NATIVE_FEED_UNIT });
+        const unit = await resolveNativeUnit();
+        if (!cancelled) setIsTest(IS_TEST_UNIT(unit));
+        await NativeAds.load({ id: slotId, adUnitId: unit });
         if (!cancelled) setStatus("ready");
       } catch (e) {
         if (!cancelled) {
@@ -129,7 +132,7 @@ function NativeAdSlotInner({ slotId }: { slotId: string }) {
 
   if (status !== "ready") {
     // টেস্ট বিল্ডে (VITE_ADMOB_LIVE != true) ad না এলে কারণ দেখাও
-    if (import.meta.env.VITE_ADMOB_LIVE === "true") return null;
+    if (!isTest) return null;
     return (
       <div className="col-span-full rounded-lg bg-amber-50 px-3 py-2 text-[11px] text-amber-800">
         Ad debug: {status}{errMsg ? " - " + errMsg : ""}

@@ -84,6 +84,25 @@ public class NativeAdsPlugin extends Plugin {
         });
     }
 
+    /** Play Store থেকে ইনস্টল হলে fromPlayStore=true; sideload/APK হলে false। */
+    @PluginMethod
+    public void installSource(PluginCall call) {
+        String installer = null;
+        try {
+            String pkg = getContext().getPackageName();
+            if (android.os.Build.VERSION.SDK_INT >= 30) {
+                installer = getContext().getPackageManager().getInstallSourceInfo(pkg).getInstallingPackageName();
+            } else {
+                installer = getContext().getPackageManager().getInstallerPackageName(pkg);
+            }
+        } catch (Exception ignored) {
+        }
+        com.getcapacitor.JSObject ret = new com.getcapacitor.JSObject();
+        ret.put("fromPlayStore", "com.android.vending".equals(installer));
+        ret.put("installer", installer == null ? "" : installer);
+        call.resolve(ret);
+    }
+
     @PluginMethod
     public void load(PluginCall call) {
         final String id = call.getString("id");

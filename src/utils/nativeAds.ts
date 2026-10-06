@@ -2,6 +2,7 @@ import { Capacitor, registerPlugin } from "@capacitor/core";
 
 export interface NativeAdsPlugin {
   initialize(options?: { testDeviceIds?: string[] }): Promise<void>;
+  installSource(): Promise<{ fromPlayStore: boolean; installer: string }>;
   load(options: { id: string; adUnitId: string }): Promise<void>;
   show(options: {
     id: string;
@@ -25,15 +26,35 @@ export const isNativeAdsSupported = (): boolean =>
 const TEST_NATIVE_UNIT = "ca-app-pub-3940256099942544/2247696110";
 const LIVE_NATIVE_UNIT = "ca-app-pub-1085596401571838/3337709776";
 
-/** ডিফল্ট = Google-এর টেস্ট ad ইউনিট। আসল ইউনিট শুধু বিল্ডে VITE_ADMOB_LIVE=true দিলে। */
-export const NATIVE_FEED_UNIT: string =
-  import.meta.env.VITE_ADMOB_LIVE === "true" ? LIVE_NATIVE_UNIT : TEST_NATIVE_UNIT;
+export const IS_TEST_UNIT = (unit: string): boolean => unit === TEST_NATIVE_UNIT;
+
+let unitPromise: Promise<string> | null = null;
+
+/**
+ * আসল (live) ইউনিট শুধু তখনই যখন অ্যাপ Play Store থেকে ইনস্টল।
+ * sideload করা APK-তে সবসময় Google-এর test ইউনিট -- নিজের ফোনে আসল ad-এ ক্লিকের ঝুঁকি নেই।
+ */
+export function resolveNativeUnit(): Promise<string> {
+  if (!unitPromise) {
+    unitPromise = (async () => {
+      try {
+        const r = await NativeAds.installSource();
+        return r.fromPlayStore ? LIVE_NATIVE_UNIT : TEST_NATIVE_UNIT;
+      } catch {
+        return TEST_NATIVE_UNIT;
+      }
+    })();
+  }
+  return unitPromise;
+}
 
 let initPromise: Promise<void> | null = null;
 
 export function initNativeAds(): Promise<void> {
   if (!initPromise) {
-    initPromise = NativeAds.initialize({}).catch((err) => {
+    initPromise = NativeAds.initialize({
+      testDeviceIds: String(import.meta.env.VITE_ADMOB_TEST_DEVICES || "").split(",").map((x: string) => x.trim()).filter(Boolean),
+    }).catch((err) => {
       initPromise = null;
       throw err;
     });
