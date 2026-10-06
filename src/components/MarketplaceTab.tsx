@@ -8,7 +8,6 @@ import { PartListing, SupportedLanguage, TranslationSet } from "../types";
 import type { ActiveTab } from "./HeaderNav";
 import { logAnalyticsEvent } from "../utils/analytics";
 import { pickRotatedAds, MAX_SPOTLIGHT_ADS } from "../utils/adRotation";
-import { NativeAdSlot } from "./NativeAdSlot";
 
 interface MarketplaceTabProps {
   language: SupportedLanguage;
@@ -50,11 +49,6 @@ interface MarketplaceTabProps {
   handleRequestNotificationPermission: () => Promise<void>;
   setIsLotteryOpen: (v: boolean) => void;
 }
-
-// Native ad (শুধু Android অ্যাপে; ওয়েবে NativeAdSlot কিছুই দেখায় না):
-// ৬ নম্বর লিস্টিংয়ের পরে, তারপর প্রতি ১২টায়, মোট সর্বোচ্চ ৩টা।
-const isAdSlot = (index: number): boolean =>
-  index === 5 || (index > 5 && (index - 5) % 12 === 0 && (index - 5) / 12 <= 2);
 
 const POPULAR_CITIES = ["Dhaka (ঢাকা)", "Chittagong (চট্টগ্রাম)", "Sylhet (সিলেট)", "Rajshahi (রাজশাহী)", "Khulna (খুলনা)", "Barisal (বরিশাল)"];
 
@@ -478,7 +472,7 @@ const feedListings = spotlightFiller ? feedItems.slice(1) : feedItems;
       priority={index === 0}
       onViewDetails={handleViewListingDetails}
       onPromoteClick={(item) => { if (!user) { setIsAuthOpen(true); } else { setPromotingListing(item); } }}
-    />{isAdSlot(index) && <NativeAdSlot slotId={`feed-ad-${index}`} />}</Fragment>
+    /></Fragment>
   ))}
 </div>
 )}
