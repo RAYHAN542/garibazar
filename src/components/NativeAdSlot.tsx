@@ -42,7 +42,7 @@ function NativeAdSlotInner({ slotId }: { slotId: string }) {
     if (!el) return undefined;
     const apply = () => {
       const w = el.clientWidth;
-      if (w > 0) setHeight(Math.min(360, Math.max(280, Math.round(w * 0.5625 + 156))));
+      if (w > 0) setHeight(Math.min(300, Math.max(210, Math.round(w * 0.5625 + 66))));
     };
     apply();
     if (typeof ResizeObserver === "undefined") return undefined;
@@ -62,6 +62,7 @@ function NativeAdSlotInner({ slotId }: { slotId: string }) {
     let inFlight = false;
     let pending: Payload | null = null;
     let lastKey = "";
+    let lastSent = 0;
 
     const dispatch = (p: Payload) => {
       if (inFlight) {
@@ -117,8 +118,11 @@ function NativeAdSlotInner({ slotId }: { slotId: string }) {
       const key = payload.visible
         ? [payload.x, payload.y, payload.width, payload.height, payload.clipBottom].map((n) => Math.round(n * 2)).join(",")
         : "hidden";
-      if (key === lastKey) return;
+      // ভিজিবল থাকলে প্রতি ~৭০০ms-এ পজিশন আবার পাঠাই (native পাহারাদারের 'জীবিত' সংকেত)।
+      const now = performance.now();
+      if (key === lastKey && (!payload.visible || now - lastSent < 700)) return;
       lastKey = key;
+      lastSent = now;
       dispatch(payload);
     };
     raf = requestAnimationFrame(tick);

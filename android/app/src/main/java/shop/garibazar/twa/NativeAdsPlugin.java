@@ -49,9 +49,34 @@ public class NativeAdsPlugin extends Plugin {
         NativeAd ad;
         NativeAdView adView;
         FrameLayout container;
+        long lastTouch;
     }
 
     private final Map<String, Slot> slots = new HashMap<>();
+
+    // পাহারাদার: JS ২.৫ সেকেন্ড সাড়া না দিলে (পেজ রিলোড/Back) ad লুকিয়ে ফেলে।
+    private final android.os.Handler wdHandler = new android.os.Handler(android.os.Looper.getMainLooper());
+    private boolean wdRunning = false;
+    private final Runnable watchdog = new Runnable() {
+        @Override
+        public void run() {
+            long now = android.os.SystemClock.uptimeMillis();
+            for (Slot sl : new ArrayList<>(slots.values())) {
+                if (sl.container != null && sl.container.getVisibility() == View.VISIBLE
+                        && now - sl.lastTouch > 2500) {
+                    sl.container.setVisibility(View.GONE);
+                }
+            }
+            wdHandler.postDelayed(this, 1000);
+        }
+    };
+
+    private void ensureWatchdog() {
+        if (!wdRunning) {
+            wdRunning = true;
+            wdHandler.postDelayed(watchdog, 1000);
+        }
+    }
 
     private int dp(float v) {
         return Math.round(TypedValue.applyDimension(
@@ -76,10 +101,10 @@ public class NativeAdsPlugin extends Plugin {
         } catch (Exception ignored) {
         }
         getActivity().runOnUiThread(() -> {
-            if (!testIds.isEmpty()) {
-                MobileAds.setRequestConfiguration(
-                    new RequestConfiguration.Builder().setTestDeviceIds(testIds).build());
-            }
+            RequestConfiguration.Builder cfg = new RequestConfiguration.Builder()
+                .setMaxAdContentRating(RequestConfiguration.MAX_AD_CONTENT_RATING_PG);
+            if (!testIds.isEmpty()) cfg.setTestDeviceIds(testIds);
+            MobileAds.setRequestConfiguration(cfg.build());
             MobileAds.initialize(getContext(), status -> call.resolve());
         });
     }
@@ -188,6 +213,8 @@ public class NativeAdsPlugin extends Plugin {
     }
 
     private void position(Slot s, float x, float y, float w, float h, float clipTop, float clipBottom) {
+        s.lastTouch = android.os.SystemClock.uptimeMillis();
+        ensureWatchdog();
         View web = getBridge().getWebView();
         ViewGroup parent = (ViewGroup) web.getParent();
         float d = getContext().getResources().getDisplayMetrics().density;
@@ -235,7 +262,7 @@ public class NativeAdsPlugin extends Plugin {
 
         LinearLayout info = new LinearLayout(ctx);
         info.setOrientation(LinearLayout.VERTICAL);
-        info.setPadding(dp(12), dp(10), dp(12), dp(12));
+        info.setPadding(dp(12), dp(8), dp(12), dp(8));
 
         LinearLayout row = new LinearLayout(ctx);
         row.setOrientation(LinearLayout.HORIZONTAL);
@@ -292,6 +319,7 @@ public class NativeAdsPlugin extends Plugin {
         LinearLayout.LayoutParams bodyLp = new LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
         bodyLp.topMargin = dp(6);
+        body.setVisibility(View.GONE); // কমপ্যাক্ট: বর্ণনা লুকানো
         info.addView(body, bodyLp);
 
         Button cta = new Button(ctx);
@@ -303,9 +331,10 @@ public class NativeAdsPlugin extends Plugin {
         cta.setPadding(dp(8), 0, dp(8), 0);
         cta.setBackground(roundRect(Color.parseColor("#16A34A"), dp(10), 0, 0));
         LinearLayout.LayoutParams ctaLp = new LinearLayout.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT, dp(40));
-        ctaLp.topMargin = dp(8);
-        info.addView(cta, ctaLp);
+            ViewGroup.LayoutParams.WRAP_CONTENT, dp(36));
+        ctaLp.leftMargin = dp(8);
+        cta.setMinWidth(dp(88));
+        row.addView(cta, ctaLp);
 
         root.addView(info, new LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));

@@ -523,7 +523,7 @@ export function ListingDetailModal({ listing, language, currentUser, onClose, on
 
         {/* Native ad: ছবির আগে (Bikroy-র মতো)। শুধু Android অ্যাপে; ওয়েবে কিছুই না।
             pt-14 = উপরে ফাঁকা জায়গা, যাতে ক্লোজ (X) বাটন বিজ্ঞাপনের নিচে চাপা না পড়ে। */}
-        <div className="px-3 pt-14 empty:hidden">
+        <div className="px-9 pt-14 empty:hidden">
           <NativeAdSlot slotId={`detail-ad-${listing.id}`} />
         </div>
 
