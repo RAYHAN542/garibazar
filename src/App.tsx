@@ -2269,6 +2269,7 @@ export default function App() {
                 </div>
 
                 {/* A2. Install Gari Bazar PWA — do not download the APK */}
+                {!isNativeApp() && (
                 <button
                   type="button"
                   onClick={handleInstallApp}
@@ -2290,6 +2291,7 @@ export default function App() {
                     <Download className="w-4.5 h-4.5" />
                   </div>
                 </button>
+                )}
 
                 {/* B. Settings Menu List styling modeled on user's Settings screenshot */}
                 <div className="bg-white dark:bg-slate-900 border border-slate-150/80 dark:border-slate-800 rounded-3xl shadow-sm overflow-hidden divide-y divide-slate-100 dark:divide-slate-800/60">
