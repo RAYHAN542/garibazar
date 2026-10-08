@@ -1,27 +1,15 @@
-import { initializeApp, getApps, cert } from "firebase-admin/app";
-import { getAuth } from "firebase-admin/auth";
 import { createClient } from "@supabase/supabase-js";
 import { applyCors } from "../_lib/cors.js";
 import { verifySupabaseToken } from "../_lib/verifyJwt.js";
 
 // 🔧 (2026-09-23) এই এন্ডপয়েন্ট আগে সম্পূর্ণ Firebase+Firestore নির্ভর ছিল --
-// auth টোকেন Firebase-only যাচাই হতো (Supabase দিয়ে লগইন করা ইউজারদের জন্য
-// সবসময় ব্যর্থ হতো), আর refill_requests/listings/users সবই Firestore থেকে
-// পড়া হতো, যেখানে migration-এর পর এগুলো Supabase-এ থাকে। ফলাফল: প্রায়
-// কারো জন্যই "Ad Promote" পেমেন্ট কাজ করত না। এখন auth Supabase টোকেন
-// (Firebase fallback সহ) আর ডেটা Supabase থেকে পড়া হয়।
-if (!getApps().length) {
-  const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
-  if (serviceAccountJson) {
-    try {
-      const serviceAccount = JSON.parse(serviceAccountJson);
-      initializeApp({ credential: cert(serviceAccount) });
-    } catch (e) {
-      console.error("Failed to parse FIREBASE_SERVICE_ACCOUNT_KEY:", e);
-    }
-  }
-}
-
+// এখন auth ও ডেটা দুইই Supabase থেকে।
+//
+// 🔧 (2026-10-XX, Firebase removal) Firebase ID-token fallback সরানো হলো।
+// NOTE: এই মুহূর্তে কোনো Google/Facebook-লগইন (এখনো Firebase-only) ইউজার
+// থাকলে তারা "Promote Ad"/"Refill" পেমেন্ট শুরু করতে পারবেন না, যতক্ষণ না
+// AuthModal.tsx-এর Google/Facebook লগইনও Supabase Auth-এ migrate হয়
+// (porikolpona অনুযায়ী এই migration-এর শেষ ধাপ)।
 const SITE_URL = "https://garibazar.shop";
 
 // সার্ভার-সাইড দামের তালিকা -- src/translations.ts-এর AD_PACKAGES-এর সাথে
@@ -57,22 +45,13 @@ export default async function handler(req: any, res: any) {
     }
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // 1. Verify the caller is signed in -- Supabase session first, legacy
-    // Firebase ID token as a fallback for any still-cached old session.
+    // 1. Verify the caller is signed in -- Supabase session token only.
     const authHeader = req.headers.authorization || "";
     const idToken = authHeader.replace("Bearer ", "");
     if (!idToken) {
       return res.status(401).json({ error: "অননুমোদিত অনুরোধ।" });
     }
-    let uid: string | null = await verifySupabaseToken(idToken);
-    if (!uid && getApps().length) {
-      try {
-        const decoded = await getAuth().verifyIdToken(idToken);
-        uid = decoded.uid;
-      } catch {
-        // fall through -- uid stays null, handled below
-      }
-    }
+    const uid = await verifySupabaseToken(idToken);
     if (!uid) {
       return res.status(401).json({ error: "যাচাই ব্যর্থ হয়েছে।" });
     }
