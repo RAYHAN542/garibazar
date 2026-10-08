@@ -158,8 +158,8 @@ export default function LegalHubModal({ isOpen = true, onClose, language, standa
                 <span className="font-bold text-slate-900 block">{language === "bn" ? "৩. ডেটা শেয়ারিং এবং থার্ড-পার্টি ডিসক্লোজার" : "3. Third-Party Sharing Policies"}</span>
                 <p>
                   {language === "bn"
-                    ? "আমরা আপনার ব্যক্তিগত তথ্য বিক্রি করি না। আপনার মোবাইল নম্বর গাড়ি পার্টস বিক্রয়ের যোগাযোগের উদ্দেশ্যে আগ্রহী ক্রেতাদের দেখানো হয়। আমাদের হয়ে তথ্য প্রক্রিয়াকরণকারী সেবাদাতা: Supabase, Google Firebase, Cloudinary, Vercel এবং পেমেন্টের জন্য UddoktaPay/bKash। ওয়েবসাইটে Google AdSense ও Adsterra-র তৃতীয় পক্ষের বিজ্ঞাপন দেখানো হতে পারে; অ্যান্ড্রয়েড অ্যাপে বর্তমানে কোনো তৃতীয় পক্ষের বিজ্ঞাপন নেই।"
-                    : "We do not sell your personal information. Your phone number is shown to interested buyers so they can contact sellers. Service providers that process data on our behalf: Supabase, Google Firebase, Cloudinary, Vercel, and UddoktaPay/bKash for payments. The website may show third-party ads from Google AdSense and Adsterra; the Android app currently shows no third-party ads."}
+                    ? "আমরা আপনার ব্যক্তিগত তথ্য বিক্রি করি না। আপনার মোবাইল নম্বর গাড়ি পার্টস বিক্রয়ের যোগাযোগের উদ্দেশ্যে আগ্রহী ক্রেতাদের দেখানো হয়। আমাদের হয়ে তথ্য প্রক্রিয়াকরণকারী সেবাদাতা: Supabase, Google Firebase, Cloudinary, Vercel এবং পেমেন্টের জন্য UddoktaPay/bKash। ওয়েবসাইটে Google AdSense-এর তৃতীয় পক্ষের বিজ্ঞাপন দেখানো হতে পারে; অ্যান্ড্রয়েড অ্যাপে Google AdMob-এর মাধ্যমে বিজ্ঞাপন দেখানো হয়।"
+                    : "We do not sell your personal information. Your phone number is shown to interested buyers so they can contact sellers. Service providers that process data on our behalf: Supabase, Google Firebase, Cloudinary, Vercel, and UddoktaPay/bKash for payments. The website may show third-party ads from Google AdSense; the Android app shows ads through Google AdMob."}
                 </p>
               </div>
             </div>

@@ -171,7 +171,7 @@ export default function PrivacyPolicyPage({
                     Cloudinary (ছবি), Vercel (হোস্টিং ও সার্ভার), UddoktaPay ও bKash (ওয়েবসাইটের পেমেন্ট)।
                   </li>
                   <li>
-                    ওয়েবসাইটে Google AdSense ও Adsterra-র মতো তৃতীয় পক্ষের বিজ্ঞাপন দেখানো হতে পারে। তারা নিজেদের নীতি অনুযায়ী কুকি বা ডিভাইস শনাক্তকারী ব্যবহার করতে পারে।
+                    ওয়েবসাইটে Google AdSense-এর মতো তৃতীয় পক্ষের বিজ্ঞাপন দেখানো হতে পারে। তারা নিজেদের নীতি অনুযায়ী কুকি বা ডিভাইস শনাক্তকারী ব্যবহার করতে পারে।
                     অ্যান্ড্রয়েড অ্যাপে Google AdMob-এর মাধ্যমে বিজ্ঞাপন দেখানো হয়। Google বিজ্ঞাপন দেখাতে ও তার কার্যকারিতা মাপতে আপনার ডিভাইসের বিজ্ঞাপন আইডি (Advertising ID) ও অনুরূপ শনাক্তকারী ব্যবহার করতে পারে। ফোনের Settings → Google → Ads থেকে বিজ্ঞাপন আইডি মুছতে বা বিজ্ঞাপন-ব্যক্তিগতকরণ বন্ধ করতে পারেন। Google কীভাবে তথ্য ব্যবহার করে তা জানতে: policies.google.com/technologies/partner-sites
                   </li>
                 </ul>
@@ -283,7 +283,7 @@ export default function PrivacyPolicyPage({
                     Cloudinary (images), Vercel (hosting and servers), and UddoktaPay and bKash (website payments).
                   </li>
                   <li>
-                    The website may show third-party ads such as Google AdSense and Adsterra, which may use cookies or device identifiers under their own policies.
+                    The website may show third-party ads such as Google AdSense, which may use cookies or device identifiers under their own policies.
                     The Android app shows ads through Google AdMob. Google may use your device's Advertising ID and similar identifiers to show ads and measure their performance. You can reset your advertising ID or turn off ad personalization in your phone's Settings → Google → Ads. To learn how Google uses data, see policies.google.com/technologies/partner-sites
                   </li>
                 </ul>
