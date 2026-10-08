@@ -1,8 +1,1 @@
-[{
-  "relation": ["delegate_permission/common.handle_all_urls"],
-  "target": {
-    "namespace": "android_app",
-    "package_name": "shop.garibazar.twa",
-    "sha256_cert_fingerprints": ["C2:58:72:3A:B0:E8:9D:78:2A:0D:28:42:52:3F:F1:C4:57:03:89:86:15:AF:BF:A8:46:BA:A1:83:3E:DA:C2:28"]
-  }
-}]
+[{"relation":["delegate_permission/common.handle_all_urls"],"target":{"namespace":"android_app","package_name":"shop.garibazar.twa","sha256_cert_fingerprints":["33:22:41:4E:89:D5:62:B0:F1:2E:B2:9F:F3:9D:31:44:62:EA:A3:2F:93:A9:8C:B0:1E:EC:F9:B6:4A:3F:B1:E6","C2:58:72:3A:B0:E8:9D:78:2A:0D:28:42:52:3F:F1:C4:57:03:89:86:15:AF:BF:A8:46:BA:A1:83:3E:DA:C2:28"]}}]
