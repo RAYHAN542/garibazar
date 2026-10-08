@@ -1,5 +1,3 @@
-import { initializeApp, getApps, cert } from "firebase-admin/app";
-import { getAuth } from "firebase-admin/auth";
 import { createClient } from "@supabase/supabase-js";
 import { applyCors } from "./_lib/cors.js";
 import { checkAndBumpRateLimit, getClientIp } from "./_lib/rateLimit.js";
@@ -9,39 +7,16 @@ import { verifySupabaseToken } from "./_lib/verifyJwt.js";
 // api/account-actions.ts
 // ============================================================================
 // 🔧 (2026-09-26) Vercel's Hobby plan caps a deployment at 12 Serverless
-// Functions. This project had grown to 13 (api/delete-account.ts,
-// api/report-listing.ts, api/submit-support-ticket.ts among them) --
-// EVERY production deployment for a while had been failing at the build
-// step with `exceeded_serverless_functions_per_deployment`, meaning none
-// of that period's fixes had actually gone live, despite each individual
-// commit's code being correct.
+// Functions. delete-account.ts, report-listing.ts, submit-support-ticket.ts
+// were merged here for that reason. Dispatched by an `action` field in the
+// request body, same pattern as api/auth/phone.ts and api/track-event.ts.
 //
-// These three were the safest candidates to merge into one function:
-// all three are POST-only, called exclusively from this app's own client
-// code (no external service/webhook URL depends on their path, unlike
-// api/payment/webhook.ts), and are all "account/moderation safety" actions
-// in the same broad category. Dispatched here by a `action` field in the
-// request body -- same pattern already used by api/auth/phone.ts
-// ("login"/"signup") and api/track-event.ts (several event types).
-// toggle_sold was added later for the same reason ListingDetailModal's
-// other privileged writes (report_listing) already live here: a listing's
-// is_sold flag needs to work for BOTH auth types this app currently has
-// (Supabase-session phone/OTP users AND still-Firebase-only Google/
-// Facebook users) -- a direct client-side supabase.from(...).update() only
-// works for the former, since RLS's ownership check needs a real Supabase
-// JWT, which Google/Facebook-logged-in users don't have yet.
+// 🔧 (2026-10-XX, Firebase removal) Firebase ID-token fallback removed.
+// NOTE: any still-active Google/Facebook (Firebase-only) session can no
+// longer use delete_account/report_listing/toggle_sold/submit_support_ticket
+// until AuthModal.tsx's social login is also migrated to Supabase Auth
+// (final step of this migration).
 // ============================================================================
-
-if (!getApps().length) {
-  const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
-  if (serviceAccountJson) {
-    try {
-      initializeApp({ credential: cert(JSON.parse(serviceAccountJson)) });
-    } catch (e) {
-      console.error("Failed to parse FIREBASE_SERVICE_ACCOUNT_KEY:", e);
-    }
-  }
-}
 
 const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -52,26 +27,11 @@ const supabaseAdmin =
       })
     : null;
 
-// Resolves either a Supabase session token or, as a fallback, a legacy
-// Firebase ID token -- same dual-auth pattern used across the app's other
-// endpoints during this migration. NOTE: this Firebase fallback stays in
-// place until AuthModal.tsx's Google/Facebook login itself moves to
-// Supabase Auth -- removing it now would break every Google/Facebook user,
-// since that's still their only session type.
 async function resolveUid(req: any): Promise<string | null> {
   const authHeader = req.headers.authorization || "";
   const idToken = authHeader.replace("Bearer ", "").trim();
   if (!idToken) return null;
-  let uid: string | null = await verifySupabaseToken(idToken);
-  if (!uid && getApps().length) {
-    try {
-      const decoded = await getAuth().verifyIdToken(idToken);
-      uid = decoded.uid;
-    } catch {
-      // fall through -- uid stays null
-    }
-  }
-  return uid;
+  return await verifySupabaseToken(idToken);
 }
 
 // ---------------------------------------------------------------------------
@@ -200,13 +160,6 @@ async function handleReportListing(req: any, res: any) {
 // ---------------------------------------------------------------------------
 // toggle_sold
 // ---------------------------------------------------------------------------
-// 🔧 (2026-09-26) Was a direct client-side Firestore updateDoc() in
-// ListingDetailModal.tsx -- listings have lived in Supabase since the
-// migration, so that call silently did nothing for any listing created
-// since then (the Firestore doc it targeted never existed). Routed through
-// the server (like report_listing above) rather than a direct Supabase
-// client write, specifically so it also works for Google/Facebook-logged-in
-// sellers who don't have a Supabase session yet.
 async function handleToggleSold(req: any, res: any) {
   const uid = await resolveUid(req);
   if (!uid) {
@@ -281,10 +234,6 @@ async function handleSubmitSupportTicket(req: any, res: any) {
     return res.status(500).json({ error: "সার্ভার কনফিগারেশনে সমস্যা।" });
   }
 
-  // 🔧 (2026-09-26) Migrated off Firestore's support_tickets collection --
-  // this was the last firebase-admin write left in this file (Auth
-  // verification via getAuth() still needs firebase-admin, but Firestore
-  // itself is no longer touched anywhere in this file).
   const { error: insertErr } = await supabaseAdmin.from("support_tickets").insert({
     name: (name || "").toString().slice(0, 200) || (uid ? "User" : "Anonymous"),
     email: (email || "").toString().slice(0, 200) || "anonymous@garibazar.com",
