@@ -1,31 +1,16 @@
-import { initializeApp, getApps, cert } from "firebase-admin/app";
-import { getAuth } from "firebase-admin/auth";
 import { createClient } from "@supabase/supabase-js";
 import { randomInt } from "crypto";
 import { applyCors } from "./_lib/cors.js";
 import { verifySupabaseToken } from "./_lib/verifyJwt.js";
 
 // 🔧 (2026-09-24) এই এন্ডপয়েন্ট আগে সম্পূর্ণ Firebase+Firestore নির্ভর ছিল --
-// auth টোকেন শুধু Firebase হিসেবে যাচাই হতো (Supabase দিয়ে লগইন করা
-// ইউজারদের জন্য সবসময় ব্যর্থ হতো), আর users/listings/lottery_draws সবই
-// Firestore থেকে পড়া হতো, যেখানে migration-এর পর এগুলো Supabase-এ থাকে --
-// তাই migration-পরবর্তী কোনো listing-ই খুঁজে পেত না। এখন
-// api/get-seller-contact.ts ও api/payment/create-charge.ts-এর মতো auth
-// Supabase টোকেন (Firebase fallback সহ) আর ডেটা Supabase থেকে পড়া/লেখা হয়।
-if (!getApps().length) {
-  const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
-  if (serviceAccountJson) {
-    try {
-      const serviceAccount = JSON.parse(serviceAccountJson);
-      initializeApp({ credential: cert(serviceAccount) });
-    } catch (e) {
-      console.error("Failed to parse FIREBASE_SERVICE_ACCOUNT_KEY:", e);
-    }
-  }
-}
-
-// একজন ইউজার দিনে একবারই ঘুরাতে পারবে — বাংলাদেশ টাইমজোন (Asia/Dhaka) অনুযায়ী "আজ" নির্ধারণ করা হয়,
-// যাতে মধ্যরাতে UTC/BD টাইমের গ্যাপে কেউ দুইবার সুযোগ না পায়।
+// migration-পরবর্তী কোনো listing-ই খুঁজে পেত না। এখন users/listings/
+// lottery_draws সবই Supabase থেকে পড়া/লেখা হয়।
+//
+// 🔧 (2026-10-XX) Firebase ID-token fallback পুরোপুরি সরানো হলো -- phone
+// login (একমাত্র সক্রিয় লগইন পদ্ধতি) অনেক আগেই ১০০% Supabase-এ চলে
+// গেছে, কোনো আসল ইউজারের কাছে আর বৈধ Firebase ID token নেই। এখন থেকে
+// শুধু Supabase session token-ই যাচাই করা হয়।
 const getTodayInDhaka = (): string => {
   return new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Dhaka" }); // YYYY-MM-DD
 };
@@ -54,22 +39,13 @@ export default async function handler(req: any, res: any) {
     }
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // 1. Verify the caller is signed in -- Supabase session first, legacy
-    // Firebase ID token as a fallback for any still-cached old session.
+    // 1. Verify the caller is signed in -- Supabase session token only.
     const authHeader = req.headers.authorization || "";
     const idToken = authHeader.replace("Bearer ", "");
     if (!idToken) {
       return res.status(401).json({ error: "অননুমোদিত অনুরোধ। প্রথমে লগইন করুন।" });
     }
-    let uid: string | null = await verifySupabaseToken(idToken);
-    if (!uid && getApps().length) {
-      try {
-        const decoded = await getAuth().verifyIdToken(idToken);
-        uid = decoded.uid;
-      } catch {
-        // fall through -- uid stays null, handled below
-      }
-    }
+    const uid = await verifySupabaseToken(idToken);
     if (!uid) {
       return res.status(401).json({ error: "যাচাই ব্যর্থ হয়েছে।" });
     }
@@ -99,20 +75,6 @@ export default async function handler(req: any, res: any) {
     }
 
     // 3. Validate the listing belongs to this user and isn't already boosted.
-    // Matches by id or legacy_firestore_id, same lookup pattern as
-    // api/get-seller-contact.ts, so pre- and post-migration listing IDs
-    // both resolve correctly.
-    //
-    // 🔧 (2026-10-01 security audit) listingId is interpolated straight into
-    // a PostgREST .or() filter string below. supabase-js does NOT escape
-    // values inside a raw .or() string -- it's parsed as PostgREST filter
-    // syntax (commas separate conditions, parens nest them), so an
-    // attacker-controlled comma could previously have appended an
-    // unintended extra condition to this query. The seller_id ownership
-    // check further down already prevented this from granting access to
-    // someone else's listing in practice, but validating the shape here
-    // closes the injection vector outright instead of relying on that
-    // being the only safety net.
     const isUuid = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(listingId);
     if (!isUuid && !SAFE_LEGACY_ID.test(listingId)) {
       return res.status(404).json({ error: "প্রোডাক্টটি খুঁজে পাওয়া যায়নি।" });
@@ -136,7 +98,8 @@ export default async function handler(req: any, res: any) {
       return res.status(400).json({ error: "এই প্রোডাক্টটি ইতিমধ্যে বিজ্ঞাপন হিসেবে লাইভ আছে।" });
     }
 
-    // Atomic claim: only one concurrent request can win today's draw slot
+    // Atomic claim: only one concurrent request can win today's draw slot.
+    // This IS the "mark today as used" step -- nothing further needed later.
     const { data: claimed, error: claimErr } = await supabase
       .from("users")
       .update({ last_lottery_date: today })
@@ -170,15 +133,6 @@ export default async function handler(req: any, res: any) {
         console.error("lottery draw: failed to apply boost:", boostErr.message);
         return res.status(500).json({ error: "সার্ভারে সমস্যা হয়েছে। আবার চেষ্টা করুন।" });
       }
-    }
-
-    // Always mark today's draw as used, regardless of outcome
-    const { error: markUsedErr } = await supabase
-      .from("users")
-      .update({ last_lottery_date: today })
-      .eq("uid", uid);
-    if (markUsedErr) {
-      console.error("lottery draw: failed to mark today used:", markUsedErr.message);
     }
 
     // Audit trail for admin visibility
