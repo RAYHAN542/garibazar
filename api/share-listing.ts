@@ -1,28 +1,13 @@
-import { initializeApp, getApps, cert } from "firebase-admin/app";
-import { getFirestore } from "firebase-admin/firestore";
 import { createClient } from "@supabase/supabase-js";
 
 // 🔧 (2026-09-26) Migrated primary lookup off Firestore -- listings have
-// lived in Supabase since the migration (see src/utils/listingsApi.ts), but
-// this endpoint only ever checked Firestore, so every listing shared since
-// then showed a generic fallback preview card on Facebook/WhatsApp instead
-// of its real title/price/photo. Now checks Supabase first (matching by
-// UUID id or legacy_firestore_id, same dual-lookup pattern as
-// api/get-seller-contact.ts and api/draw.ts), and only falls back to
-// Firestore for a genuinely old link that predates the Supabase migration
-// data import.
-if (!getApps().length) {
-  const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
-  if (serviceAccountJson) {
-    try {
-      const serviceAccount = JSON.parse(serviceAccountJson);
-      initializeApp({ credential: cert(serviceAccount) });
-    } catch (e) {
-      console.error("Failed to parse FIREBASE_SERVICE_ACCOUNT_KEY:", e);
-    }
-  }
-}
-
+// lived in Supabase since the migration (see src/utils/listingsApi.ts).
+//
+// 🔧 (2026-10-XX, Firebase removal) The Firestore fallback for genuinely
+// pre-migration links is gone -- any listing never imported into Supabase
+// now gets the generic site-wide fallback preview card instead of its real
+// title/price/photo. That's a shrinking, already-rare case (every listing
+// posted since the migration has always lived in Supabase only).
 const SITE_URL = "https://garibazar.shop";
 const DEFAULT_IMAGE = `${SITE_URL}/og-banner.jpg`;
 const CRAWLER_UA = /facebookexternalhit|Facebot|Twitterbot|LinkedInBot|WhatsApp|TelegramBot|Slackbot|Pinterest|Discordbot|redditbot|Googlebot|bingbot|DuckDuckBot|Applebot|YandexBot|Baiduspider/i;
@@ -46,14 +31,10 @@ async function lookupListingFromSupabase(id: string): Promise<{ title: string; p
 
   const isUuid = UUID_RE.test(id);
   // 🔧 (2026-10-01 security audit) `id` is interpolated straight into a
-  // PostgREST .or() filter string below. supabase-js does not escape raw
-  // .or() strings (comma/paren are live filter syntax there), so an id
-  // containing a crafted comma could previously have appended an
-  // unintended extra OR condition, making this public (unauthenticated)
-  // endpoint resolve to a DIFFERENT listing's public preview data than the
-  // one actually requested. No private data is exposed here either way
-  // (only public listing fields), but this closes the injection vector
-  // outright rather than depending on that being harmless by coincidence.
+  // PostgREST .or() filter string below -- supabase-js doesn't escape raw
+  // .or() strings, so validating the id's shape first closes the filter-
+  // injection vector outright (no private data is exposed either way, this
+  // is a public preview-card lookup).
   if (!isUuid && !SAFE_LEGACY_ID.test(id)) return null;
 
   const supabase = createClient(supabaseUrl, supabaseServiceKey, {
@@ -107,20 +88,6 @@ export default async function handler(req: any, res: any) {
         description = [priceText, supabaseListing.location].filter(Boolean).join(" | ");
         if (supabaseListing.images && supabaseListing.images[0]) {
           image = supabaseListing.images[0];
-        }
-      } else if (getApps().length) {
-        // Fallback: a link genuinely from before the Supabase data import.
-        const db = getFirestore();
-        const snap = await db.collection("listings").doc(id).get();
-        if (snap.exists) {
-          const listing = snap.data() as any;
-          const name = listing.title || `${listing.brand || ""} ${listing.model || ""}`.trim() || "গাড়ি/পার্টস বিজ্ঞাপন";
-          const priceText = listing.price ? `৳${Number(listing.price).toLocaleString("en-BD")}` : "মূল্য জানতে যোগাযোগ করুন";
-          title = `${name} - গাড়ি বাজার`;
-          description = [priceText, listing.location].filter(Boolean).join(" | ");
-          if (Array.isArray(listing.images) && listing.images[0]) {
-            image = listing.images[0];
-          }
         }
       }
     }
