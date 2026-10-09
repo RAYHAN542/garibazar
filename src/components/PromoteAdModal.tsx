@@ -3,7 +3,6 @@ import { PartListing, SupportedLanguage } from "../types";
 import { X, CheckCircle, ShieldAlert, Award, Loader2, CreditCard, Lock } from "lucide-react";
 import { AD_PACKAGES } from "../translations";
 import { apiUrl } from "../utils/apiBase";
-import { auth } from "../firebase";
 import { supabase } from "../supabase";
 
 interface PromoteAdModalProps {
@@ -74,7 +73,7 @@ export function PromoteAdModal({ listing, language, currentUser, onClose, onProm
 
       // 2. Ask our server to open a real UddoktaPay checkout session for this request.
       const { data: sessionData } = await supabase.auth.getSession();
-      const idToken = sessionData?.session?.access_token || (await auth.currentUser?.getIdToken());
+      const idToken = sessionData?.session?.access_token;
       const res = await fetch(apiUrl("/api/payment/create-charge"), {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },

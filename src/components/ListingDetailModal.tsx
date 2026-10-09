@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { PartListing, SupportedLanguage } from "../types";
 import { X, MapPin, Sparkles, Play, SquarePlay, Flag, ShieldAlert, CheckCircle2, ChevronLeft, ChevronRight, Loader2, ShoppingBag, MessageSquare, Share2 } from "lucide-react";
-import { auth } from "../firebase";
 import { logAnalyticsEvent } from "../utils/analytics";
 import { supabase } from "../supabase";
 import { trackListingClick } from "../utils/counters";
@@ -276,8 +275,7 @@ export function ListingDetailModal({ listing, language, currentUser, onClose, on
     const { data: sessionData } = await supabase.auth.getSession();
     const supaToken = sessionData?.session?.access_token;
     if (supaToken) return supaToken;
-    const fbToken = await auth.currentUser?.getIdToken().catch(() => undefined);
-    return fbToken || null;
+    return null;
   };
 
   const fetchContactNumberViaApi = async (): Promise<string | null> => {

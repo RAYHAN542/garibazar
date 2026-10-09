@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Trash2, AlertTriangle, ArrowLeft, Globe, Loader2, CheckCircle, Mail } from "lucide-react";
 import { SupportedLanguage } from "../types";
-import { auth } from "../firebase";
 import { supabase } from "../supabase";
 import { apiUrl } from "../utils/apiBase";
 
@@ -38,7 +37,7 @@ export default function DataDeletionPage({
       try {
         const { data } = await supabase.auth.getSession();
         if (!active) return;
-        if (data?.session?.user || auth.currentUser) {
+        if (data?.session?.user) {
           setIsLoggedIn(true);
         }
       } finally {
@@ -52,8 +51,7 @@ export default function DataDeletionPage({
     const { data: sessionData } = await supabase.auth.getSession();
     const supaToken = sessionData?.session?.access_token;
     if (supaToken) return supaToken;
-    const fbToken = await auth.currentUser?.getIdToken().catch(() => undefined);
-    return fbToken || null;
+    return null;
   };
 
   const handleDataDeletion = async () => {

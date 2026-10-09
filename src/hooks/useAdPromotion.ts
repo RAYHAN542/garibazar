@@ -89,7 +89,7 @@ export function useAdPromotion({
 
       // 2. Ask our server to open a real UddoktaPay checkout session for this request.
       const { data: sessionData } = await supabase.auth.getSession();
-      const idToken = sessionData?.session?.access_token || (await (await import("../firebase")).auth.currentUser?.getIdToken());
+      const idToken = sessionData?.session?.access_token;
       const res = await fetch(apiUrl("/api/payment/create-charge"), {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
