@@ -1,4 +1,5 @@
 import { apiUrl } from "./apiBase";
+import { nativeFetch } from "./nativeFetch";
 
 // Fire-and-forget visitor/login/signup analytics. This never blocks or
 // throws -- if it fails for any reason (offline, ad-blocker, slow network)
@@ -6,7 +7,7 @@ import { apiUrl } from "./apiBase";
 // even if the page navigates away right after this is called.
 export function trackEvent(type: "visit" | "login" | "signup" | "install", uid?: string | null, identifier?: string | null) {
   try {
-    fetch(apiUrl("/api/track-event"), {
+    nativeFetch(apiUrl("/api/track-event"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

@@ -1,4 +1,5 @@
 import { useMemo, useRef, useState } from "react";
+import { nativeFetch } from "../utils/nativeFetch";
 import { X, PartyPopper, Frown, Loader2, ShieldAlert, Gift, ChevronDown, Check } from "lucide-react";
 import { PartListing, SupportedLanguage } from "../types";
 import { supabase } from "../supabase";
@@ -96,7 +97,7 @@ export function LotteryModal({ isOpen, onClose, language, currentUser, userMetad
             : "Your session has expired. Please log in again."
         );
       }
-      const res = await fetch(apiUrl("/api/draw"), {
+      const res = await nativeFetch(apiUrl("/api/draw"), {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
         body: JSON.stringify({ listingId: activeListingId }),

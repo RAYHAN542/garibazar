@@ -1,4 +1,5 @@
 import { logger } from "./logger";
+import { nativeFetch } from "./nativeFetch";
 import { apiUrl } from "./apiBase";
 
 export const logAnalyticsEvent = (eventName: string, eventParams?: any) => {
@@ -19,7 +20,7 @@ export const logAnalyticsEvent = (eventName: string, eventParams?: any) => {
 
   const type = eventName === "login" ? "login" : eventName === "signup" ? "signup" : "visit";
   try {
-    fetch(apiUrl("/api/track-event"), {
+    nativeFetch(apiUrl("/api/track-event"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

@@ -1,4 +1,5 @@
 import type { PartListing } from "../types";
+import { nativeFetch } from "./nativeFetch";
 import { apiUrl } from "./apiBase";
 
 // Fair rotation for boosted/sponsored ads.
@@ -50,7 +51,7 @@ function isLiveAd(item: PartListing): boolean {
 function reportImpressions(ids: string[]) {
   if (ids.length === 0) return;
   try {
-    fetch(apiUrl("/api/track-event"), {
+    nativeFetch(apiUrl("/api/track-event"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ ids }),

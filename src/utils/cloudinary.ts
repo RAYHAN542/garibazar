@@ -1,4 +1,5 @@
 import { logger } from "./logger";
+import { nativeFetch } from "./nativeFetch";
 import { supabase } from "../supabase";
 import { apiUrl } from "./apiBase";
 
@@ -123,7 +124,7 @@ export const uploadToCloudinary = async (file: File | Blob): Promise<string> => 
   // alone (which is all we can see without remote DevTools on the device).
   let signRes: Response;
   try {
-    signRes = await fetch(apiUrl("/api/cloudinary-sign"), {
+    signRes = await nativeFetch(apiUrl("/api/cloudinary-sign"), {
       method: "POST",
       headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
       body: JSON.stringify({ v: 2 }),

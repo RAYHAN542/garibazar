@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { nativeFetch } from "../utils/nativeFetch";
 import { PartListing, SupportedLanguage } from "../types";
 import { X, MapPin, Sparkles, Play, SquarePlay, Flag, ShieldAlert, CheckCircle2, ChevronLeft, ChevronRight, Loader2, ShoppingBag, MessageSquare, Share2 } from "lucide-react";
 import { logAnalyticsEvent } from "../utils/analytics";
@@ -281,7 +282,7 @@ export function ListingDetailModal({ listing, language, currentUser, onClose, on
   const fetchContactNumberViaApi = async (): Promise<string | null> => {
     const idToken = await getAuthToken();
     if (!idToken) throw new Error("লগইন সেশন পাওয়া যায়নি");
-    const resp = await fetch(apiUrl("/api/get-seller-contact"), {
+    const resp = await nativeFetch(apiUrl("/api/get-seller-contact"), {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -377,7 +378,7 @@ export function ListingDetailModal({ listing, language, currentUser, onClose, on
       const idToken = await getAuthToken();
       if (!idToken) throw new Error("লগইন সেশন পাওয়া যায়নি");
 
-      const resp = await fetch(apiUrl("/api/account-actions"), {
+      const resp = await nativeFetch(apiUrl("/api/account-actions"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -433,7 +434,7 @@ export function ListingDetailModal({ listing, language, currentUser, onClose, on
       const idToken = await getAuthToken();
       if (!idToken) throw new Error("লগইন সেশন পাওয়া যায়নি");
 
-      const resp = await fetch(apiUrl("/api/account-actions"), {
+      const resp = await nativeFetch(apiUrl("/api/account-actions"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

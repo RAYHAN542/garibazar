@@ -1,4 +1,5 @@
 import React, { useState, useRef } from "react";
+import { nativeFetch } from "../utils/nativeFetch";
 import { X, MapPin, Loader2, Sparkles, Camera, Phone, ArrowLeft } from "lucide-react";
 import { CITIES } from "../translations";
 import { SupportedLanguage } from "../types";
@@ -197,7 +198,7 @@ export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModa
     }
     setLoading(true);
     try {
-      const resp = await fetch(apiUrl("/api/auth/phone"), {
+      const resp = await nativeFetch(apiUrl("/api/auth/phone"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "login", phone: cleanPhone, password: phonePassword }),
@@ -253,7 +254,7 @@ export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModa
 
     setLoading(true);
     try {
-      const resp = await fetch(apiUrl("/api/auth/phone"), {
+      const resp = await nativeFetch(apiUrl("/api/auth/phone"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "signup", phone: cleanPhone, password: phonePassword }),

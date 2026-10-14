@@ -326,14 +326,21 @@ export function ChatView({ currentUser, language, onLoginPrompt, initialListingT
     setLoadingThreads(true);
     fetchThreads();
 
+    let threadsPoll: ReturnType<typeof setInterval> | null = null;
     const channel = supabase
       .channel(`chats-list-${currentUser.uid}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "chats", filter: `participant_a=eq.${currentUser.uid}` }, fetchThreads)
       .on("postgres_changes", { event: "*", schema: "public", table: "chats", filter: `participant_b=eq.${currentUser.uid}` }, fetchThreads)
-      .subscribe();
+      .subscribe((status) => {
+        // Live connection failed (e.g. mobile-network DNS) -- poll instead.
+        if (status !== "SUBSCRIBED" && !threadsPoll) threadsPoll = setInterval(fetchThreads, 8000);
+        if (status === "SUBSCRIBED" && threadsPoll) { clearInterval(threadsPoll); threadsPoll = null; }
+      });
+
 
     return () => {
       active = false;
+      if (threadsPoll) clearInterval(threadsPoll);
       supabase.removeChannel(channel);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -389,13 +396,20 @@ export function ChatView({ currentUser, language, onLoginPrompt, initialListingT
 
     fetchMessages();
 
+    let msgPoll: ReturnType<typeof setInterval> | null = null;
     const channel = supabase
       .channel(`chat-messages-${activeThread.id}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "chat_messages", filter: `chat_id=eq.${activeThread.id}` }, fetchMessages)
-      .subscribe();
+      .subscribe((status) => {
+        // Live connection failed (e.g. mobile-network DNS) -- poll instead.
+        if (status !== "SUBSCRIBED" && !msgPoll) msgPoll = setInterval(fetchMessages, 5000);
+        if (status === "SUBSCRIBED" && msgPoll) { clearInterval(msgPoll); msgPoll = null; }
+      });
+
 
     return () => {
       active = false;
+      if (msgPoll) clearInterval(msgPoll);
       supabase.removeChannel(channel);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps

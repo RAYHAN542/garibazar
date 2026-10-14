@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { nativeFetch } from "../utils/nativeFetch";
 import { logAnalyticsEvent } from "../utils/analytics";
 import { supabase } from "../supabase";
 import { SupportedLanguage } from "../types";
@@ -90,7 +91,7 @@ export function useAdPromotion({
       // 2. Ask our server to open a real UddoktaPay checkout session for this request.
       const { data: sessionData } = await supabase.auth.getSession();
       const idToken = sessionData?.session?.access_token;
-      const res = await fetch(apiUrl("/api/payment/create-charge"), {
+      const res = await nativeFetch(apiUrl("/api/payment/create-charge"), {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
         body: JSON.stringify({ requestId: inserted.id })

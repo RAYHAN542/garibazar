@@ -4,6 +4,7 @@
  */
 
 import { useState, useEffect, useMemo, useRef, lazy, Suspense } from "react";
+import { nativeFetch, isNetworkError } from "./utils/nativeFetch";
 import { logAnalyticsEvent } from "./utils/analytics";
 import { supabase } from "./supabase";
 import { logger } from "./utils/logger";
@@ -1212,7 +1213,11 @@ export default function App() {
       // them retry, whichever it was.
       const isTimeout = error instanceof TimeoutError;
       setListingsError(
-        isTimeout
+        isNetworkError(error)
+          ? (language === "bn"
+              ? "নেটওয়ার্ক থেকে সার্ভারে পৌঁছানো যাচ্ছে না। আবার চেষ্টা করুন। সমস্যা থাকলে: Settings → Network → Private DNS → dns.google দিন।"
+              : "Can't reach the server on this network. Try again. If it persists: Settings → Network → Private DNS → dns.google.")
+          : isTimeout
           ? (language === "bn"
               ? "লোড হতে বেশি সময় লাগছে। নেটওয়ার্ক চেক করে আবার চেষ্টা করুন।"
               : "Taking too long to load. Check your connection and try again.")
@@ -1623,7 +1628,7 @@ export default function App() {
       // Supabase-এর support_tickets টেবিলে লেখে।
       const { data: { session } } = await supabase.auth.getSession();
       const idToken = user?.uid ? (session?.access_token || null) : null;
-      const resp = await fetch(apiUrl("/api/account-actions"), {
+      const resp = await nativeFetch(apiUrl("/api/account-actions"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

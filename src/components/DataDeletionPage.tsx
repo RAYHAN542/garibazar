@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { nativeFetch } from "../utils/nativeFetch";
 import { Trash2, AlertTriangle, ArrowLeft, Globe, Loader2, CheckCircle, Mail } from "lucide-react";
 import { SupportedLanguage } from "../types";
 import { supabase } from "../supabase";
@@ -79,7 +80,7 @@ export default function DataDeletionPage({
       // (action: "delete_account") সার্ভার সাইডে service role দিয়ে
       // listings/public_profiles/users/user_auth_links মুছে এবং Supabase
       // Auth থেকে ইউজারকে ডিলিট করে।
-      const resp = await fetch(apiUrl("/api/account-actions"), {
+      const resp = await nativeFetch(apiUrl("/api/account-actions"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
