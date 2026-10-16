@@ -661,15 +661,24 @@ export function ListingDetailModal({ listing, language, currentUser, onClose, on
                 <span className="text-xs font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wider block">
                   {language === "bn" ? "দাম (মূল্য)" : "Price (Dam)"}
                 </span>
-                <span className={`text-3xl font-black font-mono tracking-tight ${isSold ? 'line-through text-slate-450' : 'text-amber-500'}`}>
-                  ৳{listing.price.toLocaleString("en-IN")}
-                </span>
+                {/* দাম ০ বা ফাঁকা হলে "৳0" না দেখিয়ে "আলোচনা সাপেক্ষ" দেখানো হয় */}
+                {Number(listing.price) > 0 ? (
+                  <span className={`text-3xl font-black font-mono tracking-tight ${isSold ? 'line-through text-slate-450' : 'text-amber-500'}`}>
+                    ৳{Number(listing.price).toLocaleString("en-IN")}
+                  </span>
+                ) : (
+                  <span className={`text-2xl font-black tracking-tight ${isSold ? 'line-through text-slate-450' : 'text-amber-500'}`}>
+                    {language === "bn" ? "আলোচনা সাপেক্ষ" : "Negotiable"}
+                  </span>
+                )}
               </div>
-              <div className="text-right">
-                <span className="text-[10px] bg-amber-500/20 text-amber-700 dark:text-amber-455 font-extrabold px-2.5 py-1 rounded">
-                  {language === "bn" ? "ফিক্সড দাম" : "Fixed Price"}
-                </span>
-              </div>
+              {Number(listing.price) > 0 && (
+                <div className="text-right">
+                  <span className="text-[10px] bg-amber-500/20 text-amber-700 dark:text-amber-455 font-extrabold px-2.5 py-1 rounded">
+                    {language === "bn" ? "ফিক্সড দাম" : "Fixed Price"}
+                  </span>
+                </div>
+              )}
             </div>
 
             {/* 2. Part name / Model */}
