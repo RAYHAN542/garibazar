@@ -287,6 +287,33 @@ export default async function handler(req: any, res: any) {
       return;
     }
 
+    // Android app first-open install. Handled BEFORE the owner-IP / rate-limit
+    // / geo / bot filters on purpose: those filters silently dropped the
+    // request (owner testing from own IP, empty or native-HTTP User-Agent
+    // treated as a bot, hosting-ISP match), so app_installs stayed empty and
+    // the admin dashboard always showed 0. It is safe to skip them here
+    // because register_app_install dedupes per device_id in the database.
+    if (body?.type === "app_install") {
+      const deviceId = typeof body?.deviceId === "string" ? body.deviceId : "";
+      if (!/^[A-Za-z0-9-]{16,64}$/.test(deviceId)) {
+        res.status(200).json({ ok: false });
+        return;
+      }
+      const installUa = (req.headers["user-agent"] || "").toString().slice(0, 300);
+      const installIp = getClientIp(req);
+      const { data: counted, error: aiErr } = await supabaseAdmin.rpc(
+        "register_app_install",
+        { p_device_id: deviceId, p_user_agent: installUa, p_ip: installIp }
+      );
+      if (aiErr) {
+        console.error("register_app_install error:", aiErr);
+        res.status(200).json({ ok: false });
+        return;
+      }
+      res.status(200).json({ ok: true, counted: !!counted });
+      return;
+    }
+
     const type = ALLOWED_TYPES.has(body?.type) ? body.type : "visit";
     const uid = typeof body?.uid === "string" ? body.uid.slice(0, 128) : null;
     const identifier = typeof body?.identifier === "string" ? body.identifier.slice(0, 128) : null;
@@ -318,27 +345,7 @@ export default async function handler(req: any, res: any) {
 
     // login/signup/install ইভেন্ট সবসময় লগ হয় (গুরুত্বপূর্ণ, কম ফ্রিকোয়েন্ট);
     // শুধু "visit" টাইপের জন্যই dedup প্রযোজ্য (এটাই বেশিরভাগ ট্রাফিক)।
-    // Android app first-open install (deduped per device in DB)
-  if (body?.type === "app_install") {
-    const deviceId = typeof body?.deviceId === "string" ? body.deviceId : "";
-    if (!/^[A-Za-z0-9-]{16,64}$/.test(deviceId)) {
-      res.status(200).json({ ok: false });
-      return;
-    }
-    const { data: counted, error: aiErr } = await supabaseAdmin.rpc(
-      "register_app_install",
-      { p_device_id: deviceId, p_user_agent: userAgent, p_ip: ip }
-    );
-    if (aiErr) {
-      console.error("register_app_install error:", aiErr);
-      res.status(200).json({ ok: false });
-      return;
-    }
-    res.status(200).json({ ok: true, counted: !!counted });
-    return;
-  }
-
-  const skipDetailedLog = type === "visit" && shouldSkipDetailedLog(ip);
+    const skipDetailedLog = type === "visit" && shouldSkipDetailedLog(ip);
     const metricCol =
       type === "login" ? "total_logins" : type === "signup" ? "total_signups" : type === "install" ? "total_installs" : "total_visits";
 
