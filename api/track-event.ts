@@ -318,7 +318,27 @@ export default async function handler(req: any, res: any) {
 
     // login/signup/install ইভেন্ট সবসময় লগ হয় (গুরুত্বপূর্ণ, কম ফ্রিকোয়েন্ট);
     // শুধু "visit" টাইপের জন্যই dedup প্রযোজ্য (এটাই বেশিরভাগ ট্রাফিক)।
-    const skipDetailedLog = type === "visit" && shouldSkipDetailedLog(ip);
+    // Android app first-open install (deduped per device in DB)
+  if (body?.type === "app_install") {
+    const deviceId = typeof body?.deviceId === "string" ? body.deviceId : "";
+    if (!/^[A-Za-z0-9-]{16,64}$/.test(deviceId)) {
+      res.status(200).json({ ok: false });
+      return;
+    }
+    const { data: counted, error: aiErr } = await supabaseAdmin.rpc(
+      "register_app_install",
+      { p_device_id: deviceId, p_user_agent: userAgent, p_ip: ip }
+    );
+    if (aiErr) {
+      console.error("register_app_install error:", aiErr);
+      res.status(200).json({ ok: false });
+      return;
+    }
+    res.status(200).json({ ok: true, counted: !!counted });
+    return;
+  }
+
+  const skipDetailedLog = type === "visit" && shouldSkipDetailedLog(ip);
     const metricCol =
       type === "login" ? "total_logins" : type === "signup" ? "total_signups" : type === "install" ? "total_installs" : "total_visits";
 

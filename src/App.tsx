@@ -65,6 +65,7 @@ const HOME_CATEGORIES = [
 ];
 
 import { checkIsProduction, isItemVehicle, matchesSubCategoryFilter } from "./utils/listingFilters";
+import { trackAppInstall } from "./utils/trackAppInstall";
 
 const isNativeApp = (): boolean => {
   try {
@@ -365,6 +366,11 @@ export default function App() {
     } catch {
       trackEvent("visit");
     }
+  }, []);
+
+  // Android app: count a new install once per device (see utils/trackAppInstall)
+  useEffect(() => {
+    trackAppInstall();
   }, []);
 
   // Open a specific listing when arriving via a shared link (?listing=<id>)

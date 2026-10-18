@@ -150,7 +150,7 @@ export function AdminPanel({ language, currentUser, listings: listingsProp, isUs
   // Visitor / login / signup analytics states
   const [visitEvents, setVisitEvents] = useState<any[]>([]);
   const [loadingVisits, setLoadingVisits] = useState(true);
-  const [analyticsStats, setAnalyticsStats] = useState<{ totalVisits?: number; totalLogins?: number; totalSignups?: number; totalInstalls?: number }>({});
+  const [analyticsStats, setAnalyticsStats] = useState<{ totalVisits?: number; totalLogins?: number; totalSignups?: number; totalInstalls?: number; totalAppInstalls?: number; appInstallsToday?: number; appInstallsYesterday?: number; appInstalls7d?: number }>({});
 
   // Support tickets states
   const [ticketsList, setTicketsList] = useState<any[]>([]);
@@ -321,15 +321,22 @@ export function AdminPanel({ language, currentUser, listings: listingsProp, isUs
       // (this table is auto-maintained by a DB trigger on site_visits insert).
       const { data: dailyRows, error: dailyErr } = await supabase
         .from("analytics_daily")
-        .select("total_visits,total_logins,total_signups,total_installs");
+        .select("day,total_visits,total_logins,total_signups,total_installs,total_app_installs");
       if (dailyErr) throw dailyErr;
 
-      const totals = { totalVisits: 0, totalLogins: 0, totalSignups: 0, totalInstalls: 0 };
+      const dayStr = (offset: number) => new Date(Date.now() - offset * 86400000).toISOString().slice(0, 10);
+    const todayUtc = dayStr(0), yesterdayUtc = dayStr(1), weekAgoUtc = dayStr(6);
+    const totals = { totalVisits: 0, totalLogins: 0, totalSignups: 0, totalInstalls: 0, totalAppInstalls: 0, appInstallsToday: 0, appInstallsYesterday: 0, appInstalls7d: 0 };
       (dailyRows || []).forEach((row: any) => {
         totals.totalVisits += row.total_visits || 0;
         totals.totalLogins += row.total_logins || 0;
         totals.totalSignups += row.total_signups || 0;
         totals.totalInstalls += row.total_installs || 0;
+      const appN = row.total_app_installs || 0;
+      totals.totalAppInstalls += appN;
+      if (row.day === todayUtc) totals.appInstallsToday += appN;
+      if (row.day === yesterdayUtc) totals.appInstallsYesterday += appN;
+      if (row.day >= weekAgoUtc) totals.appInstalls7d += appN;
       });
 
       // Add any pre-migration legacy totals carried over from Firestore, if present.
@@ -1185,7 +1192,24 @@ export function AdminPanel({ language, currentUser, listings: listingsProp, isUs
             </div>
           </div>
 
-          <h6 className="text-xs font-black text-slate-500 uppercase tracking-wider pt-2">
+          <div className="p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl">
+          <p className="text-[9px] text-slate-400 font-bold uppercase mb-2">{language === "bn" ? "প্লে স্টোর অ্যাপ ইনস্টল (নতুন)" : "Play Store app installs (new)"}</p>
+          <div className="grid grid-cols-4 gap-2 text-center">
+            {[
+              { l: language === "bn" ? "আজ" : "Today", n: analyticsStats.appInstallsToday },
+              { l: language === "bn" ? "গতকাল" : "Yesterday", n: analyticsStats.appInstallsYesterday },
+              { l: language === "bn" ? "৭ দিন" : "7 days", n: analyticsStats.appInstalls7d },
+              { l: language === "bn" ? "মোট" : "Total", n: analyticsStats.totalAppInstalls },
+            ].map((it) => (
+              <div key={it.l}>
+                <p className="text-lg font-black text-slate-850 dark:text-white">{(it.n || 0).toLocaleString()}</p>
+                <p className="text-[9px] text-slate-400 font-bold uppercase">{it.l}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <h6 className="text-xs font-black text-slate-500 uppercase tracking-wider pt-2">
             {language === "bn" ? "সাম্প্রতিক ভিজিট লগ" : "Recent Visit Log"}
           </h6>
 
