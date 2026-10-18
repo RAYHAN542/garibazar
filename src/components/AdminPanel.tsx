@@ -31,6 +31,27 @@ const getTrafficSource = (referrer: string | undefined, language: SupportedLangu
   }
 };
 
+// Friendly label for the Play Install Referrer source recorded in app_installs.source
+// (website = Play Store button on the site, facebook = Facebook ad link,
+// organic = found inside Play Store, unknown = older app version / no referrer).
+const getInstallSourceLabel = (source: string, language: SupportedLanguage): string => {
+  const bn = language === "bn";
+  switch (source) {
+    case "website":
+      return bn ? "ওয়েবসাইট বাটন" : "Website button";
+    case "facebook":
+      return bn ? "ফেসবুক অ্যাড" : "Facebook ads";
+    case "organic":
+      return bn ? "অর্গানিক (প্লে স্টোর)" : "Organic (Play Store)";
+    case "unknown":
+      return bn ? "অজানা (পুরোনো ভার্সন)" : "Unknown (old version)";
+    case "other":
+      return bn ? "অন্যান্য" : "Other";
+    default:
+      return source;
+  }
+};
+
 // 🔧 (2026-09-25) refill_requests এখন Supabase-এ থাকে (snake_case কলাম) --
 // এই ম্যাপার সেগুলোকে JSX-এর আগে থেকে ব্যবহৃত camelCase শেপে রূপান্তর করে,
 // যাতে নিচের রেন্ডার/handler কোড প্রায় অপরিবর্তিত থাকতে পারে।
@@ -151,6 +172,8 @@ export function AdminPanel({ language, currentUser, listings: listingsProp, isUs
   const [visitEvents, setVisitEvents] = useState<any[]>([]);
   const [loadingVisits, setLoadingVisits] = useState(true);
   const [analyticsStats, setAnalyticsStats] = useState<{ totalVisits?: number; totalLogins?: number; totalSignups?: number; totalInstalls?: number; totalAppInstalls?: number; appInstallsToday?: number; appInstallsYesterday?: number; appInstalls7d?: number }>({});
+  // Where Play Store app installs came from (website / facebook / organic ...)
+  const [installSources, setInstallSources] = useState<{ source: string; total: number; today: number; last7d: number }[]>([]);
 
   // Support tickets states
   const [ticketsList, setTicketsList] = useState<any[]>([]);
@@ -349,6 +372,23 @@ export function AdminPanel({ language, currentUser, listings: listingsProp, isUs
       });
 
       setAnalyticsStats(totals);
+
+      // Per-source breakdown of Play Store app installs (website / facebook /
+      // organic ...). Separate try so a failure here never hides the totals above.
+      try {
+        const { data: srcRows, error: srcErr } = await supabase.rpc("get_app_install_sources");
+        if (srcErr) throw srcErr;
+        setInstallSources(
+          (srcRows || []).map((r: any) => ({
+            source: String(r.source || "unknown"),
+            total: Number(r.total) || 0,
+            today: Number(r.today) || 0,
+            last7d: Number(r.last7d) || 0,
+          }))
+        );
+      } catch (srcCatch) {
+        console.error("Could not fetch install sources:", srcCatch);
+      }
     } catch (err) {
       console.error("Could not fetch analytics summary:", err);
     }
@@ -1208,6 +1248,37 @@ export function AdminPanel({ language, currentUser, listings: listingsProp, isUs
             ))}
           </div>
         </div>
+
+          {/* Where the Play Store installs came from (website / facebook / organic ...) */}
+          <div className="p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl">
+            <p className="text-[9px] text-slate-400 font-bold uppercase mb-2">
+              {language === "bn" ? "ইনস্টলের সোর্স (কোথা থেকে এল)" : "Install sources (where from)"}
+            </p>
+            {installSources.length === 0 ? (
+              <p className="text-xs text-slate-400 font-semibold">
+                {language === "bn" ? "এখনো কোনো ডেটা নেই" : "No data yet"}
+              </p>
+            ) : (
+              <div className="space-y-2">
+                <div className="grid grid-cols-4 gap-2 text-[9px] text-slate-400 font-bold uppercase text-center">
+                  <span className="text-left">{language === "bn" ? "সোর্স" : "Source"}</span>
+                  <span>{language === "bn" ? "আজ" : "Today"}</span>
+                  <span>{language === "bn" ? "৭ দিন" : "7 days"}</span>
+                  <span>{language === "bn" ? "মোট" : "Total"}</span>
+                </div>
+                {installSources.map((s) => (
+                  <div key={s.source} className="grid grid-cols-4 gap-2 items-center text-center border-t border-slate-100 dark:border-slate-800 pt-2">
+                    <span className="text-left text-[11px] font-bold text-slate-700 dark:text-slate-200">
+                      {getInstallSourceLabel(s.source, language)}
+                    </span>
+                    <span className="text-sm font-black text-slate-850 dark:text-white">{s.today.toLocaleString()}</span>
+                    <span className="text-sm font-black text-slate-850 dark:text-white">{s.last7d.toLocaleString()}</span>
+                    <span className="text-sm font-black text-slate-850 dark:text-white">{s.total.toLocaleString()}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
 
         <h6 className="text-xs font-black text-slate-500 uppercase tracking-wider pt-2">
             {language === "bn" ? "সাম্প্রতিক ভিজিট লগ" : "Recent Visit Log"}
