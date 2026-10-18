@@ -66,6 +66,7 @@ const HOME_CATEGORIES = [
 
 import { checkIsProduction, isItemVehicle, matchesSubCategoryFilter } from "./utils/listingFilters";
 import { trackAppInstall } from "./utils/trackAppInstall";
+import { isAndroidWeb, playStoreUrl } from "./utils/playStore";
 
 const isNativeApp = (): boolean => {
   try {
@@ -2283,7 +2284,7 @@ export default function App() {
                 {!isNativeApp() && (
                 <button
                   type="button"
-                  onClick={handleInstallApp}
+                  onClick={() => { if (isAndroidWeb()) { window.location.href = playStoreUrl("profile_button"); } else { handleInstallApp(); } }}
                   className="w-full flex items-center gap-3.5 bg-gradient-to-br from-amber-500 to-orange-600 rounded-3xl p-5 shadow-sm text-white text-left active:scale-[0.99] transition-transform"
                   aria-label={language === "bn" ? "গাড়ি বাজার অ্যাপ ইনস্টল করুন" : "Install Gari Bazar App"}
                 >
@@ -2295,7 +2296,7 @@ export default function App() {
                       {language === "bn" ? "গাড়ি বাজার অ্যাপ ইনস্টল করুন" : "Install Gari Bazar App"}
                     </p>
                     <p className="text-[11px] sm:text-xs text-white/80 font-semibold mt-0.5">
-                      {language === "bn" ? "ডাউনলোড নয় — ফোনেই সরাসরি ইনস্টল করুন" : "Install directly on your phone — no APK download"}
+                      {language === "bn" ? "Google Play থেকে ফ্রি ইনস্টল করুন" : "Install free from Google Play"}
                     </p>
                   </div>
                   <div className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center shrink-0">

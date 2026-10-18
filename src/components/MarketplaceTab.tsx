@@ -2,6 +2,7 @@ import { Fragment, useMemo, useState } from "react";
 import { Search, SlidersHorizontal, Bell, Plus, X, ShoppingBag, Loader2, LayoutGrid, Car, Wrench, Bike, Truck, Construction, MapPin, Check } from "lucide-react";
 import { ListingCard } from "./ListingCard";
 import { PromotedSlider } from "./PromotedSlider";
+import { PlayStoreStrip, PlayStorePopup } from "./PlayStoreInstall";
 import SearchPage from "./SearchPage";
 import { CITIES } from "../translations";
 import { PartListing, SupportedLanguage, TranslationSet } from "../types";
@@ -373,6 +374,9 @@ const feedListings = spotlightFiller ? feedItems.slice(1) : feedItems;
                     setDashboardSubTab("ads");
                   }}
                 />
+
+        <PlayStoreStrip language={language} />
+        <PlayStorePopup language={language} />
 
                 {/* 🔧 (2026-10-01) আসল, আলাদা "শুধু বুস্ট পোস্ট" গ্রিড -- আগে এই
                     জায়গায় যেই "Premium Sponsored Spotlights" হেডার দেখানো হতো,

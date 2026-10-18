@@ -1,9 +1,11 @@
 {
+  "redirects": [
+    { "source": "/download", "destination": "https://play.google.com/store/apps/details?id=shop.garibazar.twa&referrer=utm_source%3Dwebsite%26utm_medium%3Ddownload_link", "permanent": false }
+  ],
   "rewrites": [
     { "source": "/l/:id", "destination": "/api/share-listing?id=:id" },
     { "source": "/sitemap.xml", "destination": "/api/sitemap" },
     { "source": "/ads.txt", "destination": "/ads.txt" },
-    { "source": "/download", "destination": "/download.html" },
     { "source": "/delete-account", "destination": "/delete-account.html" },
     { "source": "/about", "destination": "/about.html" },
     { "source": "/contact", "destination": "/contact.html" },
