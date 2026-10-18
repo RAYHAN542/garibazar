@@ -301,9 +301,20 @@ export default async function handler(req: any, res: any) {
       }
       const installUa = (req.headers["user-agent"] || "").toString().slice(0, 300);
       const installIp = getClientIp(req);
+      // Where the install came from (website / facebook / organic ...), read
+      // from the Play Install Referrer by the app on first open.
+      const installSource =
+        typeof body?.source === "string" && /^[a-z0-9_.-]{1,40}$/i.test(body.source) ? body.source.toLowerCase() : "unknown";
+      const installReferrer = typeof body?.referrer === "string" ? body.referrer.slice(0, 300) : "";
       const { data: counted, error: aiErr } = await supabaseAdmin.rpc(
         "register_app_install",
-        { p_device_id: deviceId, p_user_agent: installUa, p_ip: installIp }
+        {
+          p_device_id: deviceId,
+          p_user_agent: installUa,
+          p_ip: installIp,
+          p_source: installSource,
+          p_referrer: installReferrer,
+        }
       );
       if (aiErr) {
         console.error("register_app_install error:", aiErr);
