@@ -162,7 +162,7 @@ export default function SearchPage({ language, listings, searchHistory, onSaveHi
       pool.push(item);
     }
     return pool
-      .filter((item) => matches(item, filters, tokens))
+      .filter((item) => matches(item, filters, remote.some((r) => r.id === item.id) ? [] : tokens))
       .sort((a, b) => {
         if (filters.sort === "priceAsc") return (Number(a.price) || 0) - (Number(b.price) || 0);
         if (filters.sort === "priceDesc") return (Number(b.price) || 0) - (Number(a.price) || 0);

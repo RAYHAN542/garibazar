@@ -66,6 +66,7 @@ const HOME_CATEGORIES = [
 
 import { checkIsProduction, isItemVehicle, matchesSubCategoryFilter } from "./utils/listingFilters";
 import { trackAppInstall } from "./utils/trackAppInstall";
+import { searchListings } from "./utils/searchApi";
 import { isAndroidWeb, playStoreUrl } from "./utils/playStore";
 
 const isNativeApp = (): boolean => {
@@ -686,6 +687,19 @@ export default function App() {
   // Searches & Filtering
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
+  const [serverSearchHits, setServerSearchHits] = useState<PartListing[]>([]);
+  useEffect(() => {
+    const q = debouncedSearchQuery.trim();
+    if (!q) {
+      setServerSearchHits([]);
+      return;
+    }
+    let cancelled = false;
+    searchListings({ tokens: q.split(/\s+/).filter(Boolean), type: "all", limit: 100 })
+      .then((rows) => { if (!cancelled) setServerSearchHits(rows); })
+      .catch(() => { if (!cancelled) setServerSearchHits([]); });
+    return () => { cancelled = true; };
+  }, [debouncedSearchQuery]);
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedSearchQuery(searchQuery);
@@ -1846,7 +1860,10 @@ export default function App() {
         }
       }
       
-      baseListings = matchedItems;
+      for (const hit of serverSearchHits) {
+      if (!seenIds.has(hit.id)) { seenIds.add(hit.id); matchedItems.push(hit); }
+    }
+    baseListings = matchedItems;
     }
     
     // Filter matching categories and geographic cities. This is now a
@@ -1893,7 +1910,7 @@ export default function App() {
     // (sortOrganic) নিজের জায়গায় থাকে -- জোর করে কোনো নির্দিষ্ট স্লটে বসানো
     // হয় না, এবং দুইবার দেখানোও হয় না।
     return [...finalFiltered].filter((i) => !i.isAd).sort(sortOrganic);
-  }, [enrichedListings, fuseInstance, debouncedSearchQuery, selectedCategory, selectedSubCategory, selectedCity, sortBy, adRank]);
+  }, [enrichedListings, fuseInstance, serverSearchHits, debouncedSearchQuery, selectedCategory, selectedSubCategory, selectedCity, sortBy, adRank]);
 
   // 7b. Auto-fetch more when a filter/sub-category matches nothing on the
   // current page but more listings might still exist further back. Mostly a

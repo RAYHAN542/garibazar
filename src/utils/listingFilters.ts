@@ -62,6 +62,7 @@ export const isItemVehicle = (item: PartListing): boolean => {
 // making it look like there were no matches until enough extra clicks happened to surface one.
 export const matchesSubCategoryFilter = (item: PartListing, subCategory: string): boolean => {
   if (subCategory === "all") return true;
+  if ((subCategory === "car" && item.subCategory === "microbus") || (subCategory === "truck" && item.subCategory === "bus")) return true;
 
   const matchesField = item.subCategory === subCategory || item.category === subCategory;
 

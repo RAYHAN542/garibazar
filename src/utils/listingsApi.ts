@@ -98,7 +98,9 @@ function applyCategoryFilters(query: any, filters?: CategoryFilters) {
       // once, not just whatever didn't fit a more specific sub-category.
       query = query.in("sub_category", ["other_heavy_equipment", "excavator", "crane", "bulldozer", "forklift"]);
     } else {
-      query = query.eq("sub_category", filters.subCategory);
+      const groups: Record<string, string[]> = { car: ["car", "microbus"], truck: ["truck", "bus"] };
+      const g = groups[filters.subCategory];
+      query = g ? query.in("sub_category", g) : query.eq("sub_category", filters.subCategory);
     }
   }
   return query;

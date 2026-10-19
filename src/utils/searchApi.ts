@@ -58,6 +58,26 @@ function mapRow(row: any): PartListing {
 }
 
 export async function searchListings(p: SearchParams): Promise<PartListing[]> {
+  try {
+    const words = [...(p.tokens || []), p.brand || "", p.model || ""].map(clean).filter(Boolean).join(" ");
+    const { data, error } = await supabase.rpc("search_listings_v2", {
+      q: words,
+      p_type: p.type || "all",
+      p_city: clean(p.city || ""),
+      p_min: p.minPrice ?? null,
+      p_max: p.maxPrice ?? null,
+      p_sort: p.sort || "latest",
+      p_limit: p.limit ?? 100,
+      p_offset: 0,
+    });
+    if (error) throw error;
+    return (data || []).map(mapRow);
+  } catch {
+    return searchListingsLegacy(p);
+  }
+}
+
+async function searchListingsLegacy(p: SearchParams): Promise<PartListing[]> {
   let q: any = supabase.from("listings").select("*").eq("is_deleted", false);
 
   for (const raw of p.tokens.slice(0, 6)) {
