@@ -64,6 +64,20 @@ export const matchesSubCategoryFilter = (item: PartListing, subCategory: string)
   if (subCategory === "all") return true;
   const HEAVY_GROUP = ["other_heavy_equipment", "excavator", "crane", "bulldozer", "forklift"];
   if (subCategory === "other_heavy_equipment" && HEAVY_GROUP.includes(String(item.subCategory))) return true;
+  const KNOWN_KINDS = ["car", "microbus", "bike", "truck", "bus", "excavator", "crane", "bulldozer", "forklift", "other_heavy_equipment"];
+  const itemKind = String(item.subCategory || "");
+  if (item.category === "vehicles" && KNOWN_KINDS.includes(itemKind)) {
+    const KIND_GROUPS: Record<string, string[]> = {
+      car: ["car", "microbus"],
+      truck: ["truck", "bus"],
+      bike: ["bike"],
+      other_heavy_equipment: ["other_heavy_equipment", "excavator", "crane", "bulldozer", "forklift"],
+      excavator: ["excavator"], crane: ["crane"], bus: ["bus"], microbus: ["microbus"],
+      bulldozer: ["bulldozer"], forklift: ["forklift"],
+    };
+    const allowed = KIND_GROUPS[subCategory];
+    if (allowed) return allowed.includes(itemKind);
+  }
   if ((subCategory === "car" && item.subCategory === "microbus") || (subCategory === "truck" && item.subCategory === "bus")) return true;
 
   const matchesField = item.subCategory === subCategory || item.category === subCategory;
