@@ -10,6 +10,9 @@
     { "source": "/about", "destination": "/about.html" },
     { "source": "/contact", "destination": "/contact.html" },
     { "source": "/faq", "destination": "/faq.html" },
+    { "source": "/guides", "destination": "/guides.html" },
+    { "source": "/guides/used-car-checklist", "destination": "/guide-used-car.html" },
+    { "source": "/guides/car-battery-guide", "destination": "/guide-battery.html" },
     { "source": "/(.*)", "destination": "/index.html" }
   ],
   "headers": [
