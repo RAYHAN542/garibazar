@@ -4,6 +4,8 @@ import { Camera, Loader2, AlertTriangle, X } from "lucide-react";
 import { supabase } from "../supabase";
 import { sanitizeText, validatePriceInput, validateBanglaPhone } from "../utils/sanitizer";
 import { uploadToCloudinary } from "../utils/cloudinary";
+import { nativeFetch } from "../utils/nativeFetch";
+import { apiUrl } from "../utils/apiBase";
 import { CITIES } from "../translations";
 import { detectDistrictFromArea } from "../data/areaMap";
 import vehicleCardImg from "../assets/images/vehicle-card-new.webp";
@@ -181,6 +183,56 @@ export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPromp
   // scroll কোনো কারণে কাজ না করলেও ইউজার কারণটা দেখতে পায়।
   const errorBannerRef = useRef<HTMLDivElement>(null);
 
+  // অ্যাকাউন্ট ছাড়া পোস্ট: ব্যবহারকারী শুধু ফোন নম্বর দেয়, ভেতরে ভেতরে সেই নম্বরে অ্যাকাউন্ট
+  // খুলে নেওয়া হয় (এলোমেলো পাসওয়ার্ড এই ফোনেই সেভ থাকে)। নম্বরে আগে থেকে অ্যাকাউন্ট থাকলে
+  // এই ফোনের সেভ করা পাসওয়ার্ড দিয়ে ঢোকার চেষ্টা হয়, না পারলে false রিটার্ন করে।
+  const guestUserRef = useRef<{ uid: string; phone: string } | null>(null);
+  const getUid = (): string | undefined => currentUser?.uid || guestUserRef.current?.uid;
+
+  const ensureGuestSession = async (cleanPhone: string): Promise<boolean> => {
+    const callAuth = async (action: "signup" | "login", password: string) => {
+      const resp = await nativeFetch(apiUrl("/api/auth/phone"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action, phone: cleanPhone, password }),
+      });
+      return { ok: resp.ok, data: await resp.json() } as { ok: boolean; data: any };
+    };
+
+    let saved: { phone: string; password: string } | null = null;
+    try {
+      saved = JSON.parse(localStorage.getItem("gari_bazar_guest_cred") || "null");
+    } catch (e) {}
+
+    let result: { ok: boolean; data: any };
+    const hasSaved = !!saved && saved.phone === cleanPhone;
+    if (hasSaved && saved) {
+      result = await callAuth("login", saved.password);
+    } else {
+      const bytes = new Uint8Array(16);
+      crypto.getRandomValues(bytes);
+      const password = Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+      result = await callAuth("signup", password);
+      if (result.ok) {
+        try {
+          localStorage.setItem("gari_bazar_guest_cred", JSON.stringify({ phone: cleanPhone, password }));
+        } catch (e) {}
+      }
+    }
+
+    if (!result.ok) {
+      if (hasSaved || result.data?.code === "ALREADY_REGISTERED") return false;
+      throw new Error(result.data?.error || "Account could not be created");
+    }
+
+    await supabase.auth.setSession({
+      access_token: result.data.access_token,
+      refresh_token: result.data.refresh_token,
+    });
+    guestUserRef.current = { uid: result.data.uid, phone: result.data.phone };
+    return true;
+  };
+
   const showError = (msg: string) => {
     setError(msg);
     requestAnimationFrame(() => {
@@ -213,12 +265,15 @@ export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPromp
     const newImages = files.map(f => ({
       file: f,
       preview: URL.createObjectURL(f),
-      status: "uploading" as const,
+      status: (currentUser ? "uploading" : "idle") as "uploading" | "idle",
       progress: 30
     }));
 
     setImages(prev => [...prev, ...newImages]);
     setError(null);
+
+    // অ্যাকাউন্ট ছাড়া ব্যবহারকারীর ছবি পোস্ট চাপার সময় আপলোড হবে
+    if (!currentUser) return;
 
     await Promise.all(
       newImages.map((img, i) => uploadImageToCloudinary(img.file, currentLength + i))
@@ -239,10 +294,6 @@ export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPromp
   // submitListing() আসল Supabase write টা করে।
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!currentUser) {
-      onLoginPrompt();
-      return;
-    }
 
     if (!description.trim()) {
       showError(language === "bn" ? "অনুগ্রহ করে বিবরণ লিখুন" : "Please write a description");
@@ -256,6 +307,34 @@ export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPromp
     }
 
     const uploadedUrls = images.filter(img => img.status === "success" && img.url).map(img => img.url as string);
+    if (!currentUser) {
+      if (images.length === 0) {
+        showError(language === "bn" ? "কমপক্ষে একটি ছবি দিন" : "Please add at least one photo");
+        return;
+      }
+      setIsSubmitting(true);
+      try {
+        const ok = await ensureGuestSession(cleanPhoneDigits);
+        if (!ok) {
+          showError(language === "bn" ? "এই নম্বরে আগে থেকেই অ্যাকাউন্ট আছে। অনুগ্রহ করে লগইন করুন।" : "This number already has an account. Please log in.");
+          onLoginPrompt();
+          return;
+        }
+        const pending = images.map((img, idx) => ({ img, idx })).filter(({ img }) => img.status !== "success");
+        setImages(prev => prev.map(img => img.status === "success" ? img : { ...img, status: "uploading", progress: 30, errorMessage: undefined }));
+        await Promise.all(pending.map(({ img, idx }) => uploadImageToCloudinary(img.file, idx)));
+      } catch (err: any) {
+        console.error("Guest account failed:", err);
+        showError(err?.message || (language === "bn" ? "অ্যাকাউন্ট খোলা যায়নি, আবার চেষ্টা করুন" : "Could not continue, please try again"));
+        return;
+      } finally {
+        setIsSubmitting(false);
+      }
+      setError(null);
+      setShowCategoryModal(true);
+      return;
+    }
+
     if (uploadedUrls.length === 0) {
       showError(language === "bn" ? "কমপক্ষে একটি ছবি সফলভাবে আপলোড হতে হবে" : "At least one image must be successfully uploaded");
       return;
@@ -269,6 +348,16 @@ export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPromp
     setShowCategoryModal(false);
     const cleanPhoneDigits = toEnglishDigits(phone).replace(/\D/g, "");
     const uploadedUrls = images.filter(img => img.status === "success" && img.url).map(img => img.url as string);
+    if (uploadedUrls.length === 0) {
+      showError(language === "bn" ? "ছবি আপলোড হয়নি। ছবি মুছে আবার দিন।" : "Photo upload failed. Remove the photo and add it again.");
+      return;
+    }
+    const sellerUid = getUid();
+    if (!sellerUid) {
+      showError(language === "bn" ? "অনুগ্রহ করে আবার চেষ্টা করুন" : "Please try again");
+      return;
+    }
+    const sellerDisplayName = currentUser?.displayName || (language === "bn" ? "বিক্রেতা" : "Seller");
     setIsSubmitting(true);
     setError(null);
 
@@ -301,8 +390,8 @@ export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPromp
           description: cleanDesc,
           location: detectedLocation,
           images: uploadedUrls,
-          seller_id: currentUser.uid,
-          seller_name: currentUser.displayName || "Rayhan",
+          seller_id: sellerUid,
+          seller_name: sellerDisplayName,
           type: selectedType
         })
         .select("id")
@@ -319,7 +408,7 @@ export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPromp
         .from("listing_contacts")
         .insert({
           listing_id: insertedListing.id,
-          seller_id: currentUser.uid,
+          seller_id: sellerUid,
           phone: cleanPhone
         });
 
@@ -340,8 +429,8 @@ export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPromp
           subCategory: normalizedSubCategory,
           description: cleanDesc,
           contactNumber: cleanPhone,
-          sellerId: currentUser.uid,
-          sellerName: currentUser.displayName || "Rayhan",
+          sellerId: sellerUid,
+          sellerName: sellerDisplayName,
           type: selectedType
         });
       }
