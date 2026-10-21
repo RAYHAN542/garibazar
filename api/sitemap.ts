@@ -28,6 +28,12 @@ export default async function handler(req: any, res: any) {
     { loc: `${SITE_URL}/privacy-policy`, changefreq: "monthly", priority: "0.5" },
     { loc: `${SITE_URL}/terms`, changefreq: "monthly", priority: "0.5" },
     { loc: `${SITE_URL}/about`, changefreq: "monthly", priority: "0.5" },
+    { loc: `${SITE_URL}/guides`, changefreq: "monthly", priority: "0.6" },
+    { loc: `${SITE_URL}/guides/used-car-checklist`, changefreq: "monthly", priority: "0.6" },
+    { loc: `${SITE_URL}/guides/car-battery-guide`, changefreq: "monthly", priority: "0.6" },
+    { loc: `${SITE_URL}/guides/fake-motorcycle-parts`, changefreq: "monthly", priority: "0.6" },
+    { loc: `${SITE_URL}/contact`, changefreq: "monthly", priority: "0.6" },
+    { loc: `${SITE_URL}/faq`, changefreq: "monthly", priority: "0.6" },
     { loc: `${SITE_URL}/data-deletion`, changefreq: "monthly", priority: "0.5" },
   ];
 
