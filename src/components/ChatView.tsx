@@ -4,6 +4,11 @@ import { SupportedLanguage, PartListing } from "../types";
 import { Send, User, MessageSquare, ArrowLeft, Loader2, HeartHandshake, ShieldCheck } from "lucide-react";
 import { ImageWithFallback } from "./ImageWithFallback";
 
+// নাম ফাঁকা বা সাধারণ ফলব্যাক হলে "বেনামী" দেখাবে।
+const ANON_NAMES = ["", "user", "seller", "buyer", "anonymous seller", "বিক্রেতা", "ব্যবহারকারী", "বেনামী", "anonymous"];
+const partnerLabel = (name: string | null | undefined, language: string): string =>
+  ANON_NAMES.includes((name || "").trim().toLowerCase()) ? (language === "bn" ? "বেনামী" : "Anonymous") : (name as string);
+
 interface ChatViewProps {
   currentUser: any;
   language: SupportedLanguage;
@@ -196,7 +201,7 @@ export function ChatView({ currentUser, language, onLoginPrompt, initialListingT
   const handleBlockSeller = async () => {
     if (!currentUser || !activeThread) return;
     const partnerId = activeThread.buyerId === currentUser.uid ? activeThread.sellerId : activeThread.buyerId;
-    const partnerName = activeThread.buyerId === currentUser.uid ? activeThread.sellerName : activeThread.buyerName;
+    const partnerName = partnerLabel(activeThread.buyerId === currentUser.uid ? activeThread.sellerName : activeThread.buyerName, language);
 
     const confirmBlock = window.confirm(
       language === "bn"
@@ -664,7 +669,7 @@ export function ChatView({ currentUser, language, onLoginPrompt, initialListingT
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between mb-0.5">
                       <span className="font-bold text-slate-200 text-xs truncate max-w-[110px]">
-                        {chatPartner}
+                        {partnerLabel(chatPartner, language)}
                       </span>
                       <span className="text-[10px] text-amber-500 font-extrabold font-mono">
                         ৳{thread.listingPrice.toLocaleString("en-IN")}
@@ -709,7 +714,7 @@ export function ChatView({ currentUser, language, onLoginPrompt, initialListingT
                   </h3>
                   <div className="flex items-center gap-1.5 text-[10px] text-slate-400">
                     <span className="font-bold text-slate-300 truncate max-w-[110px]">
-                      {activeThread.buyerId === currentUser.uid ? activeThread.sellerName : activeThread.buyerName}
+                      {partnerLabel(activeThread.buyerId === currentUser.uid ? activeThread.sellerName : activeThread.buyerName, language)}
                     </span>
                     <span className="shrink-0">•</span>
                     <span className="font-black text-amber-500 font-mono shrink-0">
