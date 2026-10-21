@@ -10,7 +10,7 @@ import { createClient } from "@supabase/supabase-js";
 // posted since the migration has always lived in Supabase only).
 const SITE_URL = "https://garibazar.shop";
 const DEFAULT_IMAGE = `${SITE_URL}/og-banner.jpg`;
-const CRAWLER_UA = /facebookexternalhit|Facebot|Twitterbot|LinkedInBot|WhatsApp|TelegramBot|Slackbot|Pinterest|Discordbot|redditbot|Googlebot|bingbot|DuckDuckBot|Applebot|YandexBot|Baiduspider/i;
+const CRAWLER_UA = /facebookexternalhit|Facebot|Twitterbot|LinkedInBot|WhatsApp|TelegramBot|Slackbot|Pinterest|Discordbot|redditbot|Googlebot|Mediapartners-Google|AdsBot-Google|Google-InspectionTool|bingbot|DuckDuckBot|Applebot|YandexBot|Baiduspider/i;
 const UUID_RE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
 // Firestore-era auto-generated doc IDs are alphanumeric base62-ish strings.
 // Anything outside this charset is never a real legacy id.
