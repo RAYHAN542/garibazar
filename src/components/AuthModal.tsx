@@ -247,10 +247,6 @@ export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModa
       setError(language === "bn" ? "পাসওয়ার্ড কমপক্ষে ৮ ক্যারেক্টার হতে হবে" : "Password must be at least 8 characters");
       return;
     }
-    if (phonePassword !== phonePasswordConfirm) {
-      setError(language === "bn" ? "দুই পাসওয়ার্ড মিলছে না" : "Passwords don't match");
-      return;
-    }
 
     setLoading(true);
     try {
@@ -429,20 +425,11 @@ export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModa
             {/* 4. Password */}
             <div>
               <label className="text-[10px] font-bold block mb-1 text-slate-500">{language === "bn" ? "পাসওয়ার্ড *" : "Password *"}</label>
-              <input type="password" required value={phonePassword} onChange={(e) => setPhonePassword(e.target.value)}
+              <input type="text" autoCapitalize="none" autoCorrect="off" spellCheck={false} required value={phonePassword} onChange={(e) => setPhonePassword(e.target.value)}
                 className="w-full px-3 py-2 text-sm border rounded-lg dark:bg-slate-800 dark:border-slate-700 dark:text-white"
                 placeholder={language === "bn" ? "কমপক্ষে ৮ ক্যারেক্টার" : "At least 8 characters"} />
             </div>
 
-            {/* 5. Confirm password */}
-            {phoneAuthMode === "signup" && (
-              <div>
-                <label className="text-[10px] font-bold block mb-1 text-slate-500">{language === "bn" ? "পাসওয়ার্ড আবার দিন *" : "Confirm Password *"}</label>
-                <input type="password" required value={phonePasswordConfirm} onChange={(e) => setPhonePasswordConfirm(e.target.value)}
-                  className="w-full px-3 py-2 text-sm border rounded-lg dark:bg-slate-800 dark:border-slate-700 dark:text-white"
-                  placeholder={language === "bn" ? "পাসওয়ার্ড আবার লিখুন" : "Re-enter password"} />
-              </div>
-            )}
 
             <button type="submit" disabled={loading || uploadingPhoto}
               className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white font-bold rounded-lg text-sm flex items-center justify-center gap-2">
