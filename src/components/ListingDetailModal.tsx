@@ -8,6 +8,7 @@ import { trackListingClick } from "../utils/counters";
 import { getOptimizedImageUrl } from "../utils/cloudinary";
 import { apiUrl } from "../utils/apiBase";
 import { NativeAdSlot } from "./NativeAdSlot";
+import { WebAdSlot } from "./WebAdSlot";
 
 // Masks all but the last 4 digits so the full number isn't visible in plain
 // text to anonymous visitors or scrapers. The underlying tel: link still
@@ -524,6 +525,7 @@ export function ListingDetailModal({ listing, language, currentUser, onClose, on
             pt-14 = উপরে ফাঁকা জায়গা, যাতে ক্লোজ (X) বাটন বিজ্ঞাপনের নিচে চাপা না পড়ে। */}
         <div className="px-9 pt-14 empty:hidden">
           <NativeAdSlot slotId={`detail-ad-${listing.id}`} />
+          <WebAdSlot />
         </div>
 
         <div className="flex flex-col">
