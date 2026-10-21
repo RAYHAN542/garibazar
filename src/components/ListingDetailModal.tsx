@@ -10,6 +10,12 @@ import { apiUrl } from "../utils/apiBase";
 import { NativeAdSlot } from "./NativeAdSlot";
 import { WebAdSlot } from "./WebAdSlot";
 
+// নাম ফাঁকা বা সাধারণ ফলব্যাক ("User", "Seller", "বিক্রেতা") হলে ফেসবুকের মতো "বেনামী" দেখাবে।
+const ANON_SELLER_NAMES = ["", "user", "seller", "বিক্রেতা", "ব্যবহারকারী", "বেনামী", "anonymous"];
+const isAnonSeller = (name?: string | null) => ANON_SELLER_NAMES.includes((name || "").trim().toLowerCase());
+const sellerLabel = (name: string | null | undefined, language: string) =>
+  isAnonSeller(name) ? (language === "bn" ? "বেনামী" : "Anonymous") : (name as string);
+
 // Masks all but the last 4 digits so the full number isn't visible in plain
 // text to anonymous visitors or scrapers. The underlying tel: link still
 // uses the real number, so calling still works without the digits being
@@ -745,28 +751,28 @@ export function ListingDetailModal({ listing, language, currentUser, onClose, on
                   }}
                 >
                   <div className="w-12 h-12 rounded-full bg-gradient-to-tr from-amber-500 to-orange-500 text-slate-955 font-black text-lg flex items-center justify-center uppercase shadow-md shadow-amber-500/10 group-hover/seller:rotate-6 transition-transform">
-                    {listing.sellerName?.charAt(0)?.toUpperCase() || "S"}
+                    {isAnonSeller(listing.sellerName) ? "👤" : (listing.sellerName?.charAt(0)?.toUpperCase() || "S")}
                   </div>
                   <div>
                     <span className="text-slate-400 text-[10px] uppercase font-bold tracking-wider block">
                       {language === "bn" ? "বিক্রেতার নাম (দোকান দেখুন 🛒)" : "Seller Name (View Shop 🛒)"}
                     </span>
                     <p className="font-extrabold text-slate-850 dark:text-white text-base group-hover/seller:text-amber-500 transition-colors">
-                      {listing.sellerName}
+                      {sellerLabel(listing.sellerName, language)}
                     </p>
                   </div>
                 </div>
               ) : (
                 <div className="flex items-center gap-3">
                   <div className="w-12 h-12 rounded-full bg-gradient-to-tr from-amber-500 to-orange-500 text-slate-955 font-black text-lg flex items-center justify-center uppercase shadow-md shadow-amber-500/10">
-                    {listing.sellerName?.charAt(0)?.toUpperCase() || "S"}
+                    {isAnonSeller(listing.sellerName) ? "👤" : (listing.sellerName?.charAt(0)?.toUpperCase() || "S")}
                   </div>
                   <div>
                     <span className="text-slate-400 text-[10px] uppercase font-bold tracking-wider block">
                       {language === "bn" ? "বিক্রেতা" : "Seller"}
                     </span>
                     <p className="font-extrabold text-slate-850 dark:text-white text-base">
-                      {listing.sellerName}
+                      {sellerLabel(listing.sellerName, language)}
                     </p>
                   </div>
                 </div>

@@ -357,7 +357,7 @@ export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPromp
       showError(language === "bn" ? "অনুগ্রহ করে আবার চেষ্টা করুন" : "Please try again");
       return;
     }
-    const sellerDisplayName = currentUser?.displayName || (language === "bn" ? "বিক্রেতা" : "Seller");
+    const sellerDisplayName = currentUser?.displayName || (language === "bn" ? "বেনামী" : "Anonymous");
     setIsSubmitting(true);
     setError(null);
 
