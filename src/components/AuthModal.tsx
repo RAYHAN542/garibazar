@@ -350,29 +350,36 @@ export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModa
         {error && <div className="p-3 bg-red-500/10 text-red-600 rounded-lg text-xs mb-3 text-center">{error}</div>}
 
         {step === "start" ? (
-          <div className="space-y-3">
-            <p className="text-sm text-slate-500 dark:text-slate-400 text-center mb-1">
-              {language === "bn"
-                ? "গাড়ি বাজারে বিক্রি করতে বা কেনার জন্য সাইন-ইন করুন।"
-                : "Sign in to buy or sell on Gari Bazar."}
-            </p>
+          <div className="space-y-4">
             <button
               type="button"
-              onClick={() => { setError(""); setStep("phone"); }}
-              disabled={loading}
-              className="w-full py-3 px-4 bg-slate-50 hover:bg-slate-100 disabled:opacity-60 text-slate-800 font-semibold rounded-xl text-sm flex items-center justify-center gap-3 border border-slate-200 transition-colors dark:bg-slate-800 dark:hover:bg-slate-700/80 dark:text-white dark:border-slate-700"
+              onClick={() => { setError(""); setPhoneAuthMode("signup"); setStep("phone"); }}
+              className="w-full py-4 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-2xl text-lg flex items-center justify-center gap-2 shadow-lg"
             >
-              <span className="w-8 h-8 rounded-full bg-amber-500 flex items-center justify-center shrink-0 shadow-sm">
-                <Phone className="w-4 h-4 text-slate-900" />
-              </span>
-              {language === "bn" ? "মোবাইল নম্বর দিয়ে চালিয়ে যান" : "Continue with Phone"}
+              <Sparkles className="w-5 h-5" />
+              {language === "bn" ? "নতুন অ্যাকাউন্ট খুলুন" : "Create New Account"}
             </button>
+            <p className="text-xs text-slate-500 text-center">
+              {language === "bn" ? "প্রথমবার এলে এখানে চাপুন" : "First time here? Tap above"}
+            </p>
+            <div className="border-t border-slate-200 dark:border-slate-700 pt-4">
+              <p className="text-sm text-slate-500 dark:text-slate-400 text-center mb-2">
+                {language === "bn" ? "আগে থেকে অ্যাকাউন্ট আছে?" : "Already have an account?"}
+              </p>
+              <button
+                type="button"
+                onClick={() => { setError(""); setPhoneAuthMode("login"); setStep("phone"); }}
+                className="w-full py-2.5 px-4 bg-white dark:bg-slate-800 text-slate-700 dark:text-white font-bold rounded-xl text-sm border border-slate-300 dark:border-slate-600"
+              >
+                {language === "bn" ? "লগইন করুন" : "Log In"}
+              </button>
+            </div>
           </div>
         ) : step === "phone" ? (
           <form onSubmit={phoneAuthMode === "login" ? handlePhoneLogin : handlePhoneSignup} className="space-y-4">
             <p className="text-xs text-slate-500 text-center">
               {phoneAuthMode === "login"
-                ? (language === "bn" ? "আপনার মোবাইল নম্বর ও পাসওয়ার্ড দিয়ে সাইন-ইন করুন।" : "Sign in with your mobile number and password.")
+                ? (language === "bn" ? "আপনার মোবাইল নম্বর ও পাসওয়ার্ড দিয়ে লগইন করুন।" : "Sign in with your mobile number and password.")
                 : (language === "bn" ? "নতুন অ্যাকাউন্ট তৈরি করুন।" : "Create your new account.")}
             </p>
 
@@ -443,7 +450,7 @@ export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModa
               {uploadingPhoto
                 ? (language === "bn" ? "ছবি আপলোড হচ্ছে..." : "Uploading photo...")
                 : phoneAuthMode === "login"
-                  ? (language === "bn" ? "সাইন-ইন করুন" : "Sign In")
+                  ? (language === "bn" ? "লগইন করুন" : "Sign In")
                   : (language === "bn" ? "অ্যাকাউন্ট তৈরি করুন" : "Create Account")}
             </button>
 
@@ -456,7 +463,7 @@ export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModa
                 className="text-emerald-600 dark:text-emerald-400 font-bold text-sm hover:underline text-right">
                 {phoneAuthMode === "login"
                   ? (language === "bn" ? "নতুন অ্যাকাউন্ট তৈরি করুন" : "Create new account")
-                  : (language === "bn" ? "আগে থেকে অ্যাকাউন্ট আছে? সাইন-ইন" : "Already have an account? Sign in")}
+                  : (language === "bn" ? "আগে থেকে অ্যাকাউন্ট আছে? লগইন করুন" : "Already have an account? Sign in")}
               </button>
             </div>
           </form>
