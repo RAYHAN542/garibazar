@@ -24,7 +24,7 @@ function escapeHtml(str: string) {
     .replace(/"/g, "&quot;");
 }
 
-async function lookupListingFromSupabase(id: string): Promise<{ title: string; price?: number; location?: string; images?: string[] } | null> {
+async function lookupListingFromSupabase(id: string): Promise<{ title: string; price?: number; location?: string; images?: string[]; description?: string; brand?: string; model?: string } | null> {
   const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
   const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!supabaseUrl || !supabaseServiceKey) return null;
@@ -43,7 +43,7 @@ async function lookupListingFromSupabase(id: string): Promise<{ title: string; p
 
   const { data, error } = await supabase
     .from("listings")
-    .select("title, brand, model, price, location, images")
+    .select("title, brand, model, price, location, images, description")
     .or(isUuid ? `legacy_firestore_id.eq.${id},id.eq.${id}` : `legacy_firestore_id.eq.${id}`)
     .maybeSingle();
 
@@ -58,6 +58,9 @@ async function lookupListingFromSupabase(id: string): Promise<{ title: string; p
     price: data.price != null ? Number(data.price) : undefined,
     location: data.location || undefined,
     images: Array.isArray(data.images) ? data.images : undefined,
+    description: data.description || undefined,
+    brand: data.brand || undefined,
+    model: data.model || undefined,
   };
 }
 
@@ -78,6 +81,7 @@ export default async function handler(req: any, res: any) {
   let title = "গাড়ি বাজার (Gari Bazar) - Auto Spares Marketplace";
   let description = "খুব সহজেই এবং নিরাপদে গাড়ি ও বাইকের জেনুইন স্পেয়ার পার্টস কেনা-বেচা করুন গাড়ি বাজার-এ।";
   let image = DEFAULT_IMAGE;
+  let bodyHtml = "";
 
   try {
     if (id) {
@@ -85,6 +89,14 @@ export default async function handler(req: any, res: any) {
       if (supabaseListing) {
         const priceText = supabaseListing.price ? `৳${Number(supabaseListing.price).toLocaleString("en-BD")}` : "মূল্য জানতে যোগাযোগ করুন";
         title = `${supabaseListing.title} - গাড়ি বাজার`;
+        const esc = escapeHtml;
+        const imgs = (supabaseListing.images || []).slice(0, 4);
+        const specs = [supabaseListing.brand, supabaseListing.model].filter(Boolean).join(" ");
+        bodyHtml = `<h1>${esc(supabaseListing.title)}</h1>
+<p><strong>${esc(priceText)}</strong>${supabaseListing.location ? " | " + esc(supabaseListing.location) : ""}</p>
+${specs ? `<p>ব্র্যান্ড/মডেল: ${esc(specs)}</p>` : ""}
+${supabaseListing.description ? `<h2>বিবরণ</h2><p>${esc(supabaseListing.description).replace(/\n/g, "<br>")}</p>` : ""}
+${imgs.map((src) => `<img src="${esc(src)}" alt="${esc(supabaseListing.title)}" width="480" loading="lazy" />`).join("\n")}`;
         description = [priceText, supabaseListing.location].filter(Boolean).join(" | ");
         if (supabaseListing.images && supabaseListing.images[0]) {
           image = supabaseListing.images[0];
@@ -99,6 +111,7 @@ export default async function handler(req: any, res: any) {
 <html lang="bn">
 <head>
 <meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>${escapeHtml(title)}</title>
 <meta name="description" content="${escapeHtml(description)}" />
 <link rel="canonical" href="${escapeHtml(shareUrl)}" />
@@ -113,7 +126,12 @@ export default async function handler(req: any, res: any) {
 <meta name="twitter:image" content="${escapeHtml(image)}" />
 </head>
 <body>
-<a href="${escapeHtml(appUrl)}">${escapeHtml(title)}</a>
+<header><a href="${SITE_URL}/">গাড়ি বাজার</a></header>
+<main>
+${bodyHtml || `<h1>${escapeHtml(title)}</h1><p>${escapeHtml(description)}</p>`}
+<p><a href="${escapeHtml(appUrl)}">গাড়ি বাজারে বিজ্ঞাপনটি দেখুন ও বিক্রেতার সাথে যোগাযোগ করুন</a></p>
+</main>
+<footer><a href="${SITE_URL}/about">আমাদের সম্পর্কে</a> · <a href="${SITE_URL}/guides">গাইড</a> · <a href="${SITE_URL}/contact">যোগাযোগ</a> · <a href="${SITE_URL}/privacy-policy">গোপনীয়তা নীতি</a></footer>
 </body>
 </html>`;
 
