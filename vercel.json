@@ -14,6 +14,7 @@
     { "source": "/guides/used-car-checklist", "destination": "/guide-used-car.html" },
     { "source": "/guides/car-battery-guide", "destination": "/guide-battery.html" },
     { "source": "/guides/fake-motorcycle-parts", "destination": "/guide-fake-parts.html" },
+    { "source": "/guides/engine-oil-guide", "destination": "/guide-engine-oil.html" },
     { "source": "/(.*)", "destination": "/index.html" }
   ],
   "headers": [
