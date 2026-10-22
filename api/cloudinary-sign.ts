@@ -1,6 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 import crypto from "crypto";
 import { applyCors } from "./_lib/cors.js";
+import { handleVideoUpload } from "./_lib/r2-video.js";
 
 // ------------------------------------------------------------------------
 // Signs Cloudinary uploads server-side so the browser never uploads
@@ -24,6 +25,11 @@ import { applyCors } from "./_lib/cors.js";
 //        CLOUDINARY_API_KEY
 //        CLOUDINARY_API_SECRET
 //        CLOUDINARY_CLOUD_NAME   (e.g. "dpihzqpdi", already used elsewhere)
+//
+// 🎬 Video uploads: a request with body.kind === "video" is handed to
+// api/_lib/r2-video.ts (Cloudflare R2 presigned PUT) right after the user is
+// verified. It lives here, not in its own api/ file, because Vercel Hobby
+// allows only 12 serverless functions and the project is already at 12.
 // ------------------------------------------------------------------------
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL as string;
@@ -83,6 +89,12 @@ export default async function handler(req: any, res: any) {
       return res.status(401).json({ error: "যাচাই ব্যর্থ হয়েছে।" });
     }
     const uid = userData.user.id;
+
+    // 🎬 Video upload (Cloudflare R2) -- handled before the photo rate limit
+    // so videos don't use up the 40/hour photo-signature budget.
+    if (req.body?.kind === "video") {
+      return handleVideoUpload(req, res, uid, supabaseAdmin);
+    }
 
     const allowed = await checkAndBumpRateLimit(uid);
     if (!allowed) {
