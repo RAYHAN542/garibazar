@@ -224,6 +224,28 @@ export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModa
     }
   };
 
+  // Guest who posted earlier from this phone has a saved random password in localStorage.
+  // If they now "create account" with the same number, log into that guest account (claim it)
+  // so their old posts stay with them. No saved password -> returns null (old behavior).
+  const tryClaimGuestAccount = async (cleanPhone: string): Promise<any | null> => {
+    let saved: { phone: string; password: string } | null = null;
+    try {
+      saved = JSON.parse(localStorage.getItem("gari_bazar_guest_cred") || "null");
+    } catch (e) {}
+    if (!saved || saved.phone !== cleanPhone || !saved.password) return null;
+    try {
+      const r = await nativeFetch(apiUrl("/api/auth/phone"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "login", phone: cleanPhone, password: saved.password }),
+      });
+      const d = await r.json();
+      return r.ok ? d : null;
+    } catch (e) {
+      return null;
+    }
+  };
+
   const handlePhoneSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
@@ -255,9 +277,18 @@ export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModa
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "signup", phone: cleanPhone, password: phonePassword }),
       });
-      const data = await resp.json();
+      let data = await resp.json();
+      let claimedGuest = false;
 
-      if (!resp.ok) {
+      if (!resp.ok && data.code === "ALREADY_REGISTERED") {
+        const claim = await tryClaimGuestAccount(cleanPhone);
+        if (claim) {
+          data = claim;
+          claimedGuest = true;
+        }
+      }
+
+      if (!resp.ok && !claimedGuest) {
         if (data.code === "ALREADY_REGISTERED") setPhoneAuthMode("login");
         setError(data.error || (language === "bn" ? "অ্যাকাউন্ট তৈরি করা যায়নি।" : "Could not create account."));
         return;
@@ -267,6 +298,22 @@ export function AuthModal({ isOpen, onClose, language, onAuthSuccess }: AuthModa
         access_token: data.access_token,
         refresh_token: data.refresh_token
       });
+
+      if (claimedGuest) {
+        const { error: pwError } = await supabase.auth.updateUser({ password: phonePassword });
+        if (pwError) {
+          console.error("Claim: password update failed:", pwError);
+          setError(
+            language === "bn"
+              ? "অ্যাকাউন্টে ঢোকা গেছে, কিন্তু পাসওয়ার্ড সেট হয়নি। আবার চেষ্টা করুন।"
+              : "Signed in, but could not set your password. Please try again."
+          );
+          return;
+        }
+        try {
+          localStorage.setItem("gari_bazar_guest_cred", JSON.stringify({ phone: cleanPhone, password: phonePassword }));
+        } catch (e) {}
+      }
 
       setUploadingPhoto(true);
       let profilePicture: string;
