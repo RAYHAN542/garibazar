@@ -1042,6 +1042,7 @@ export default function App() {
     const applyUserRow = (row: any) => {
       if (!row) return;
       const mapped = {
+        uid: row.uid,
         displayName: row.name,
         email: row.email,
         phoneNumber: row.phone,
