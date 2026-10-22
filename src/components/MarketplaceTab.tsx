@@ -1,9 +1,10 @@
 import { Fragment, useMemo, useState } from "react";
-import { Search, SlidersHorizontal, Bell, Plus, X, ShoppingBag, Loader2, LayoutGrid, Car, Wrench, Bike, Truck, Construction, MapPin, Check } from "lucide-react";
+import { Search, SlidersHorizontal, Bell, Plus, X, ShoppingBag, Loader2, LayoutGrid, Car, Wrench, Bike, Truck, Construction, MapPin, Check, Play } from "lucide-react";
 import { ListingCard } from "./ListingCard";
 import { PromotedSlider } from "./PromotedSlider";
 import { PlayStoreStrip, PlayStorePopup } from "./PlayStoreInstall";
 import SearchPage from "./SearchPage";
+import VideoFeed from "./VideoFeed";
 import { CITIES } from "../translations";
 import { PartListing, SupportedLanguage, TranslationSet } from "../types";
 import type { ActiveTab } from "./HeaderNav";
@@ -53,8 +54,8 @@ interface MarketplaceTabProps {
 
 const POPULAR_CITIES = ["Dhaka (ঢাকা)", "Chittagong (চট্টগ্রাম)", "Sylhet (সিলেট)", "Rajshahi (রাজশাহী)", "Khulna (খুলনা)", "Barisal (বরিশাল)"];
 
-// শহরের নাম "Dhaka (ঢাকা)" ফরম্যাটে থাকে -- search bar-এর ভেতরের ছোট্ট
-// pill-এ পুরোটা আঁটবে না, তাই শুধু প্রথম অংশ (bracket-এর আগে পর্যন্ত) দেখানো হয়।
+// শহরের নাম "Dhaka (ঢাকা)" ফরম্যাটে থাকে -- search bar-এর ভেতরের ছোট্টো
+// pill-এ পুরোটা আঁটবে না, তাই শুধু প্রথম অংশ (bracket-এর আগ পর্যন্ত) দেখানো হয়।
 const getShortCityLabel = (selectedCity: string, language: SupportedLanguage): string => {
   if (selectedCity === "all") return language === "bn" ? "সব শহর" : "All City";
   return selectedCity.split(" (")[0];
@@ -119,6 +120,12 @@ export default function MarketplaceTab({
 
   const [isCityPickerOpen, setIsCityPickerOpen] = useState(false);
 const [isSearchOpen, setIsSearchOpen] = useState(false);
+const [isVideoFeedOpen, setIsVideoFeedOpen] = useState(false);
+// 🎬 যেসব লিস্টিংয়ে সেলার ভিডিও দিয়েছে (videoUrl আছে) শুধু সেগুলো -- "ভিডিও দেখুন" ফিডের জন্য।
+const videoListings = useMemo(
+  () => [...adListings, ...listings.filter((l) => !adListings.some((a) => a.id === l.id))].filter((l) => !!l.videoUrl && !l.isSold),
+  [adListings, listings]
+);
 const feedItems = useMemo(() => filteredListings.filter((item) => !spotlightIds.has(item.id)), [filteredListings, spotlightIds]);
 const spotlightFiller = spotlightAds.length % 2 === 1 && feedItems.length > 0 ? feedItems[0] : null;
 const spotlightGridItems = spotlightFiller ? [...spotlightAds, spotlightFiller] : spotlightAds;
@@ -139,6 +146,21 @@ const feedListings = spotlightFiller ? feedItems.slice(1) : feedItems;
     try { logAnalyticsEvent("select_location", { location: city }); } catch (_) {}
     setIsCityPickerOpen(false);
   };
+
+  // 🔧 কুইক ক্যাটাগরি বাটন -- আগে সবগুলো এক লাইনে স্ক্রোল করা ছিল, ফলে শেষের "হেভি ইকুইপমেন্ট"
+  // বাটনটা স্ক্রিনের বাইরে কেটে যেতো, দেখা যেত না। এখন প্রথম ৫টা উপরের সারিতে সমান
+  // চওড়ায়, আর "হেভি ইকুইপমেন্ট" + "গাড়ির ভিডিও দেখুন" নিচের সারিতে।
+  const quickCategories = ([
+    { id: "quick_all", icon: LayoutGrid, bn: "সব", en: "All", active: selectedCategory === "all" && selectedSubCategory === "all", onClick: () => { setSelectedCategory("all"); setSelectedSubCategory("all"); } },
+    { id: "quick_car", icon: Car, bn: "কার", en: "Car", active: selectedCategory === "vehicles" && selectedSubCategory === "car", onClick: () => { setSelectedCategory("vehicles"); setSelectedSubCategory("car"); } },
+    { id: "quick_parts", icon: Wrench, bn: "পার্টস", en: "Part", active: selectedCategory === "spare_parts", onClick: () => { setSelectedCategory("spare_parts"); setSelectedSubCategory("all"); } },
+    { id: "quick_bike", icon: Bike, bn: "বাইক", en: "Bike", active: selectedCategory === "vehicles" && selectedSubCategory === "bike", onClick: () => { setSelectedCategory("vehicles"); setSelectedSubCategory("bike"); } },
+    { id: "quick_truck", icon: Truck, bn: "ট্রাক", en: "Truck", active: selectedCategory === "vehicles" && selectedSubCategory === "truck", onClick: () => { setSelectedCategory("vehicles"); setSelectedSubCategory("truck"); } },
+    { id: "quick_heavy", icon: Construction, bn: "হেভি ইকুইপমেন্ট", en: "Heavy Equipment", active: selectedCategory === "vehicles" && selectedSubCategory === "other_heavy_equipment", onClick: () => { setSelectedCategory("vehicles"); setSelectedSubCategory("other_heavy_equipment"); } },
+  ] as const);
+  const mainQuickCategories = quickCategories.slice(0, 5);
+  const heavyQuickCategory = quickCategories[5];
+  const HeavyIcon = heavyQuickCategory.icon;
 
   return (
               <div>
@@ -194,7 +216,7 @@ const feedListings = spotlightFiller ? feedItems.slice(1) : feedItems;
                     type="button"
                     onClick={() => {
                       if (notificationPermission === "granted") {
-                        alert(language === "bn" ? "নোটিফিকেশন ইতমধ্যে চালু আছে ✅" : "Notifications are already enabled ✅");
+                        alert(language === "bn" ? "নোটিফিকেশন ইতমদ্যে চালু আছে ✅" : "Notifications are already enabled ✅");
                       } else if (notificationPermission === "denied") {
                         alert(language === "bn" ? "নোটিফিকেশন বন্ধ করা আছে। ব্রাউজার/সাইট সেটিংস থেকে চালু করুন।" : "Notifications are blocked. Please allow them from your browser/site settings.");
                       } else {
@@ -305,21 +327,14 @@ const feedListings = spotlightFiller ? feedItems.slice(1) : feedItems;
                   )}
                 </div>
 
-                <div className="flex overflow-x-auto whitespace-nowrap no-scrollbar gap-2.5 mb-3 pb-0.5 animate-[slide-down_0.2s_ease-out]">
-                  {([
-                    { id: "quick_all", icon: LayoutGrid, bn: "সব", en: "All", active: selectedCategory === "all" && selectedSubCategory === "all", onClick: () => { setSelectedCategory("all"); setSelectedSubCategory("all"); } },
-                    { id: "quick_car", icon: Car, bn: "কার", en: "Car", active: selectedCategory === "vehicles" && selectedSubCategory === "car", onClick: () => { setSelectedCategory("vehicles"); setSelectedSubCategory("car"); } },
-                    { id: "quick_parts", icon: Wrench, bn: "পার্টস", en: "Part", active: selectedCategory === "spare_parts", onClick: () => { setSelectedCategory("spare_parts"); setSelectedSubCategory("all"); } },
-                    { id: "quick_bike", icon: Bike, bn: "বাইক", en: "Bike", active: selectedCategory === "vehicles" && selectedSubCategory === "bike", onClick: () => { setSelectedCategory("vehicles"); setSelectedSubCategory("bike"); } },
-                    { id: "quick_truck", icon: Truck, bn: "ট্রাক", en: "Truck", active: selectedCategory === "vehicles" && selectedSubCategory === "truck", onClick: () => { setSelectedCategory("vehicles"); setSelectedSubCategory("truck"); } },
-                    { id: "quick_heavy", icon: Construction, bn: "হেভি ইকুইপ.", en: "Heavy Equip.", active: selectedCategory === "vehicles" && selectedSubCategory === "other_heavy_equipment", onClick: () => { setSelectedCategory("vehicles"); setSelectedSubCategory("other_heavy_equipment"); } },
-                  ] as const).map((item) => {
+                <div className="grid grid-cols-5 gap-2 mb-2 animate-[slide-down_0.2s_ease-out]">
+                  {mainQuickCategories.map((item) => {
                     const ItemIcon = item.icon;
                     return (
                       <button
                         key={item.id}
                         onClick={() => { item.onClick(); try { logAnalyticsEvent("select_category", { category: item.id }); } catch (_) {} }}
-                        className={`shrink-0 flex flex-col items-center justify-center gap-1 w-16 py-2 rounded-2xl border transition-all duration-150 cursor-pointer ${
+                        className={`flex flex-col items-center justify-center gap-1 w-full py-2 rounded-2xl border transition-all duration-150 cursor-pointer ${
                           item.active
                             ? "bg-amber-500 border-amber-500 text-slate-950 shadow-md scale-[0.98]"
                             : "bg-white dark:bg-slate-900 border-slate-150 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:border-amber-400/50"
@@ -330,6 +345,29 @@ const feedListings = spotlightFiller ? feedItems.slice(1) : feedItems;
                       </button>
                     );
                   })}
+                </div>
+
+                <div className="flex gap-2 mb-3 animate-[slide-down_0.2s_ease-out]">
+                  <button
+                    onClick={() => { heavyQuickCategory.onClick(); try { logAnalyticsEvent("select_category", { category: heavyQuickCategory.id }); } catch (_) {} }}
+                    className={`flex-1 min-w-0 flex items-center justify-center gap-1.5 py-2.5 rounded-2xl border transition-all duration-150 cursor-pointer ${
+                      heavyQuickCategory.active
+                        ? "bg-amber-500 border-amber-500 text-slate-950 shadow-md scale-[0.98]"
+                        : "bg-white dark:bg-slate-900 border-slate-150 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:border-amber-400/50"
+                    }`}
+                  >
+                    <HeavyIcon className="w-4 h-4 shrink-0" />
+                    <span className="text-[11px] font-extrabold leading-none whitespace-nowrap">{language === "bn" ? heavyQuickCategory.bn : heavyQuickCategory.en}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setIsVideoFeedOpen(true)}
+                    className="flex-1 min-w-0 flex items-center justify-center gap-1.5 py-2.5 rounded-2xl border border-red-600 bg-red-600 hover:bg-red-700 text-white shadow-md active:scale-[0.98] transition-all duration-150 cursor-pointer"
+                  >
+                    <Play className="w-4 h-4 shrink-0 fill-white" />
+                    <span className="text-[11px] font-extrabold leading-none whitespace-nowrap">{language === "bn" ? "গাড়ির ভিডিও দেখুন" : "Watch Videos"}</span>
+                  </button>
                 </div>
 
                 {showFilters && (
@@ -380,11 +418,10 @@ const feedListings = spotlightFiller ? feedItems.slice(1) : feedItems;
 
                 {/* 🔧 (2026-10-01) আসল, আলাদা "শুধু বুস্ট পোস্ট" গ্রিড -- আগে এই
                     জায়গায় যেই "Premium Sponsored Spotlights" হেডার দেখানো হতো,
-                    সেটা আসলে নিচের সাধারণ মূল গ্রিডেরই (ads + organic মিশানো)
-                    একটা ভুল লেবেল ছিল, তাই বুস্ট-ছাড়া পোস্টও "স্পনসর্ড" হেডারের
+                    সেটা আসলে নিচের সাধারণ মূল গ্রিডেরই (ads + organic মিশানো) একটা ভুল লেবেল ছিল, তাই বুস্ট-ছাড়া পোস্টও "স্পনসর্ড" হেডারের
                     নিচে দেখাত আর কোনো "বিজ্ঞাপন" ব্যাজ থাকত না। এখন এটা সত্যিকারের
                     একটা পৃথক গ্রিড -- শুধু spotlightAds (সর্বোচ্চ MAX_SPOTLIGHT_ADS,
-                    impression-count অনুযায়ী ন্যায্যভাবে ঘোরানো) দেখায়, উপরের
+                    impression-count অনুযায়ী ন্যায়্যভাবে ঘোরানো) দেখায়, উপরের
                     স্লাইডারের মতোই, সবসময় উপরে, মূল ফিডের আগে। নিচের মূল গ্রিড
                     থেকে এই একই পোস্টগুলো বাদ দেওয়া হয় (displayListings), যাতে
                     ডুপ্লিকেট না দেখায়। */}
@@ -501,6 +538,7 @@ const feedListings = spotlightFiller ? feedItems.slice(1) : feedItems;
                 )}
 
 {isSearchOpen && <SearchPage language={language} listings={[...adListings, ...listings.filter((l) => !adListings.some((a) => a.id === l.id))]} searchHistory={searchHistory} onSaveHistory={appendSearchHistory} onClose={() => setIsSearchOpen(false)} onSelect={(l) => { setIsSearchOpen(false); handleViewListingDetails(l); }} />}
+{isVideoFeedOpen && <VideoFeed language={language} videos={videoListings} onClose={() => setIsVideoFeedOpen(false)} onSelect={(l) => { setIsVideoFeedOpen(false); handleViewListingDetails(l); }} />}
                 {isCityPickerOpen && (
                   <div className="fixed inset-0 z-[60] flex items-end justify-center" onClick={() => setIsCityPickerOpen(false)}>
                     <div className="absolute inset-0 bg-black/40 animate-fade-in"></div>
