@@ -1,7 +1,11 @@
 import { useEffect, useRef, useState } from "react";
-import { X, Volume2, VolumeX, Play, MapPin, Plus } from "lucide-react";
+import { X, Volume2, VolumeX, Play, MapPin, Plus, Phone } from "lucide-react";
 import type { PartListing, SupportedLanguage } from "../types";
 import { AddPartForm } from "./AddPartForm";
+import { supabase } from "../supabase";
+import { nativeFetch } from "../utils/nativeFetch";
+import { apiUrl } from "../utils/apiBase";
+import { trackListingClick } from "../utils/counters";
 
 // ------------------------------------------------------------------------
 // YouTube Shorts-style full-screen vertical video feed.
@@ -39,13 +43,47 @@ interface VideoSlideProps {
   onToggleMute: () => void;
   onSelect: (listing: PartListing) => void;
   registerRef: (el: HTMLDivElement | null) => void;
+  currentUser: any;
+  onLoginPrompt: () => void;
 }
 
-function VideoSlide({ listing, index, activeIndex, muted, language, onToggleMute, onSelect, registerRef }: VideoSlideProps) {
+function VideoSlide({ listing, index, activeIndex, muted, language, onToggleMute, registerRef, currentUser, onLoginPrompt }: VideoSlideProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [paused, setPaused] = useState(false);
   const isActive = index === activeIndex;
   const isNear = Math.abs(index - activeIndex) <= 1;
+  const [expanded, setExpanded] = useState(false);
+  const [phone, setPhone] = useState<string | null>(null);
+  const [phoneLoading, setPhoneLoading] = useState(false);
+  const [phoneError, setPhoneError] = useState(false);
+
+  useEffect(() => {
+    if (!isActive) setExpanded(false);
+  }, [isActive]);
+
+  const revealPhone = async () => {
+    if (!currentUser?.uid) { onLoginPrompt(); return; }
+    setPhoneLoading(true);
+    setPhoneError(false);
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData?.session?.access_token;
+      if (!token) throw new Error("no session");
+      const resp = await nativeFetch(apiUrl("/api/get-seller-contact"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ listingId: listing.id }),
+      });
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data?.error || "failed");
+      setPhone((data.contactNumber as string) || null);
+      try { await trackListingClick(listing.id); } catch (_) {}
+    } catch (_) {
+      setPhoneError(true);
+    } finally {
+      setPhoneLoading(false);
+    }
+  };
 
   useEffect(() => {
     const v = videoRef.current;
@@ -115,6 +153,58 @@ function VideoSlide({ listing, index, activeIndex, muted, language, onToggleMute
         {muted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
       </button>
 
+      {expanded && (
+        <div className="absolute inset-0 z-20 flex items-end bg-black/60" onClick={() => setExpanded(false)}>
+          <div
+            className="w-full max-h-[75%] overflow-y-auto rounded-t-3xl bg-white dark:bg-slate-900 text-slate-900 dark:text-white p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <h3 className="text-lg font-extrabold leading-snug">{listing.title}</h3>
+              <button type="button" aria-label="Close" onClick={() => setExpanded(false)} className="p-1 rounded-full bg-slate-200 dark:bg-slate-800 cursor-pointer">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <p className="mt-1 text-xl font-black text-amber-500">{formatPrice(listing.price, language)}</p>
+            {listing.location && (
+              <p className="mt-1 flex items-center gap-1 text-xs font-semibold text-slate-500">
+                <MapPin className="w-3.5 h-3.5 shrink-0" />
+                <span>{listing.location}</span>
+              </p>
+            )}
+            <p className="mt-3 whitespace-pre-line text-sm leading-relaxed">{listing.description}</p>
+            {listing.sellerName && (
+              <p className="mt-3 text-xs font-bold text-slate-500">
+                {language === "bn" ? "বিক্রেতা: " : "Seller: "}{listing.sellerName}
+              </p>
+            )}
+            <div className="mt-4">
+              {phone ? (
+                <a href={`tel:${phone}`} className="flex w-full items-center justify-center gap-2 rounded-xl bg-green-600 py-3 font-black text-white">
+                  <Phone className="w-4 h-4" />
+                  {phone}
+                </a>
+              ) : (
+                <button
+                  type="button"
+                  onClick={revealPhone}
+                  disabled={phoneLoading}
+                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-amber-500 py-3 font-black text-slate-950 cursor-pointer disabled:opacity-60"
+                >
+                  <Phone className="w-4 h-4" />
+                  {phoneLoading ? "..." : language === "bn" ? "নম্বর দেখুন" : "Show number"}
+                </button>
+              )}
+              {phoneError && (
+                <p className="mt-2 text-xs font-semibold text-red-500">
+                  {language === "bn" ? "নম্বর আনা যায়নি, আবার চেষ্টা করুন" : "Could not load the number, try again"}
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="pointer-events-none absolute bottom-0 inset-x-0 px-4 pt-16 pb-[calc(1.25rem+env(safe-area-inset-bottom))] bg-gradient-to-t from-black/85 via-black/45 to-transparent text-white">
         <h3 className="text-base font-extrabold leading-snug line-clamp-2">{listing.title}</h3>
         <p className="mt-1 text-lg font-black text-amber-400">{formatPrice(listing.price, language)}</p>
@@ -126,7 +216,7 @@ function VideoSlide({ listing, index, activeIndex, muted, language, onToggleMute
         )}
         <button
           type="button"
-          onClick={() => onSelect(listing)}
+          onClick={() => setExpanded((v) => !v)}
           className="pointer-events-auto mt-3 w-full py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-sm cursor-pointer"
         >
           {language === "bn" ? "বিস্তারিত দেখুন" : "View details"}
@@ -233,6 +323,8 @@ export default function VideoFeed({ language, videos, currentUser, onLoginPrompt
               muted={muted}
               language={language}
               onToggleMute={() => setMuted((m) => !m)}
+              currentUser={currentUser}
+              onLoginPrompt={onLoginPrompt}
               onSelect={onSelect}
               registerRef={(el) => { slideRefs.current[index] = el; }}
             />
