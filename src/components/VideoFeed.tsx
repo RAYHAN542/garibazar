@@ -5,7 +5,9 @@ import { AddPartForm } from "./AddPartForm";
 import { supabase } from "../supabase";
 import { nativeFetch } from "../utils/nativeFetch";
 import { apiUrl } from "../utils/apiBase";
-import { trackListingClick } from "../utils/counters";
+import { trackListingClick, incrementListingView } from "../utils/counters";
+
+const viewedThisSession = new Set<string>();
 
 // ------------------------------------------------------------------------
 // YouTube Shorts-style full-screen vertical video feed.
@@ -25,6 +27,7 @@ interface VideoFeedProps {
   onLoginPrompt: () => void;
   onClose: () => void;
   onSelect: (listing: PartListing) => void;
+  isAdmin?: boolean;
 }
 
 const formatPrice = (price: number, language: SupportedLanguage): string => {
@@ -45,14 +48,24 @@ interface VideoSlideProps {
   registerRef: (el: HTMLDivElement | null) => void;
   currentUser: any;
   onLoginPrompt: () => void;
+  isAdmin: boolean;
 }
 
-function VideoSlide({ listing, index, activeIndex, muted, language, onToggleMute, registerRef, currentUser, onLoginPrompt }: VideoSlideProps) {
+function VideoSlide({ listing, index, activeIndex, muted, language, onToggleMute, registerRef, currentUser, onLoginPrompt, isAdmin }: VideoSlideProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [paused, setPaused] = useState(false);
   const isActive = index === activeIndex;
   const isNear = Math.abs(index - activeIndex) <= 1;
   const [expanded, setExpanded] = useState(false);
+  const [, setCounted] = useState(false);
+
+  useEffect(() => {
+    if (isActive && !viewedThisSession.has(listing.id)) {
+      viewedThisSession.add(listing.id);
+      setCounted(true);
+      incrementListingView(listing.id);
+    }
+  }, [isActive, listing.id]);
   const [phone, setPhone] = useState<string | null>(null);
   const [phoneLoading, setPhoneLoading] = useState(false);
   const [phoneError, setPhoneError] = useState(false);
@@ -205,6 +218,12 @@ function VideoSlide({ listing, index, activeIndex, muted, language, onToggleMute
         </div>
       )}
 
+      {isAdmin && (
+        <div className="pointer-events-none absolute left-3 top-3 z-10 rounded-full bg-black/55 px-2.5 py-1 text-xs font-bold text-white">
+          👁 {(listing.views || 0) + (viewedThisSession.has(listing.id) ? 1 : 0)} {language === "bn" ? "ভিউ (অ্যাডমিন)" : "views (admin)"}
+        </div>
+      )}
+
       <div className="pointer-events-none absolute bottom-0 inset-x-0 px-4 pt-16 pb-[calc(1.25rem+env(safe-area-inset-bottom))] bg-gradient-to-t from-black/85 via-black/45 to-transparent text-white">
         <h3 className="text-base font-extrabold leading-snug line-clamp-2">{listing.title}</h3>
         <p className="mt-1 text-lg font-black text-amber-400">{formatPrice(listing.price, language)}</p>
@@ -226,7 +245,7 @@ function VideoSlide({ listing, index, activeIndex, muted, language, onToggleMute
   );
 }
 
-export default function VideoFeed({ language, videos, currentUser, onLoginPrompt, onClose, onSelect }: VideoFeedProps) {
+export default function VideoFeed({ language, videos, currentUser, onLoginPrompt, onClose, onSelect, isAdmin }: VideoFeedProps) {
   const [activeIndex, setActiveIndex] = useState(0);
   const [muted, setMuted] = useState(true);
   const [isPostOpen, setIsPostOpen] = useState(false);
@@ -325,6 +344,7 @@ export default function VideoFeed({ language, videos, currentUser, onLoginPrompt
               onToggleMute={() => setMuted((m) => !m)}
               currentUser={currentUser}
               onLoginPrompt={onLoginPrompt}
+              isAdmin={!!isAdmin}
               onSelect={onSelect}
               registerRef={(el) => { slideRefs.current[index] = el; }}
             />
