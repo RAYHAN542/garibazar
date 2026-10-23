@@ -1,5 +1,5 @@
 import { Fragment, useMemo, useState } from "react";
-import { Search, SlidersHorizontal, Bell, Plus, X, ShoppingBag, Loader2, LayoutGrid, Car, Wrench, Bike, Truck, Construction, MapPin, Check, Play } from "lucide-react";
+import { Search, SlidersHorizontal, Bell, Plus, X, ShoppingBag, Loader2, LayoutGrid, Car, Wrench, Bike, Truck, MapPin, Check, Play } from "lucide-react";
 import { ListingCard } from "./ListingCard";
 import { PromotedSlider } from "./PromotedSlider";
 import { PlayStoreStrip, PlayStorePopup } from "./PlayStoreInstall";
@@ -51,6 +51,28 @@ interface MarketplaceTabProps {
   handleRequestNotificationPermission: () => Promise<void>;
   setIsLotteryOpen: (v: boolean) => void;
 }
+
+// Heavy Equipment button icon: excavator (not in lucide, so a custom SVG)
+const ExcavatorIcon = ({ className }: { className?: string }) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className={className}
+    aria-hidden="true"
+  >
+    <rect x="2" y="18" width="13" height="3.5" rx="1.75" />
+    <path d="M4 18v-4.5h9V18" />
+    <path d="M4 13.5v-4h4l2.5 4" />
+    <path d="M11.5 13.5l3-8 5 2" />
+    <path d="M19.5 7.5L21 12.5" />
+    <path d="M18 12.5h4.5l-1 3.5h-3.5z" />
+  </svg>
+);
 
 const POPULAR_CITIES = ["Dhaka (ঢাকা)", "Chittagong (চট্টগ্রাম)", "Sylhet (সিলেট)", "Rajshahi (রাজশাহী)", "Khulna (খুলনা)", "Barisal (বরিশাল)"];
 
@@ -156,7 +178,7 @@ const feedListings = spotlightFiller ? feedItems.slice(1) : feedItems;
     { id: "quick_parts", icon: Wrench, bn: "পার্টস", en: "Part", active: selectedCategory === "spare_parts", onClick: () => { setSelectedCategory("spare_parts"); setSelectedSubCategory("all"); } },
     { id: "quick_bike", icon: Bike, bn: "বাইক", en: "Bike", active: selectedCategory === "vehicles" && selectedSubCategory === "bike", onClick: () => { setSelectedCategory("vehicles"); setSelectedSubCategory("bike"); } },
     { id: "quick_truck", icon: Truck, bn: "ট্রাক", en: "Truck", active: selectedCategory === "vehicles" && selectedSubCategory === "truck", onClick: () => { setSelectedCategory("vehicles"); setSelectedSubCategory("truck"); } },
-    { id: "quick_heavy", icon: Construction, bn: "হেভি ইকুইপমেন্ট", en: "Heavy Equipment", active: selectedCategory === "vehicles" && selectedSubCategory === "other_heavy_equipment", onClick: () => { setSelectedCategory("vehicles"); setSelectedSubCategory("other_heavy_equipment"); } },
+    { id: "quick_heavy", icon: ExcavatorIcon, bn: "হেভি ইকুইপমেন্ট", en: "Heavy Equipment", active: selectedCategory === "vehicles" && selectedSubCategory === "other_heavy_equipment", onClick: () => { setSelectedCategory("vehicles"); setSelectedSubCategory("other_heavy_equipment"); } },
   ] as const);
   const mainQuickCategories = quickCategories.slice(0, 5);
   const heavyQuickCategory = quickCategories[5];
@@ -356,7 +378,7 @@ const feedListings = spotlightFiller ? feedItems.slice(1) : feedItems;
                         : "bg-white dark:bg-slate-900 border-slate-150 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:border-amber-400/50"
                     }`}
                   >
-                    <HeavyIcon className="w-4 h-4 shrink-0" />
+                    <HeavyIcon className="w-5 h-5 shrink-0" />
                     <span className="text-[11px] font-extrabold leading-none whitespace-nowrap">{language === "bn" ? heavyQuickCategory.bn : heavyQuickCategory.en}</span>
                   </button>
 
