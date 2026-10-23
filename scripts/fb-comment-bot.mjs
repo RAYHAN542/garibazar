@@ -5,7 +5,10 @@ const SYSTEM_TOKEN = process.env.FB_SYSTEM_TOKEN;
 const DRY_RUN = process.env.DRY_RUN !== "false";
 const V = process.env.GRAPH_VERSION || "v25.0";
 const MAX_REPLIES = Number(process.env.MAX_REPLIES || 10);
-const MAX_AGE_HOURS = Number(process.env.MAX_AGE_HOURS || 72);
+const MAX_OTHER = Number(process.env.MAX_OTHER || 4);
+const MAX_AGE_HOURS = Number(process.env.MAX_AGE_HOURS || 24);
+const OTHER_MAX_AGE_HOURS = Number(process.env.OTHER_MAX_AGE_HOURS || 3);
+const OTHER_REPLIES = true; // false = comments with no matching words are never answered
 const PLAY = "https://play.google.com/store/apps/details?id=shop.garibazar.twa";
 
 if (!PAGE_ID || !SYSTEM_TOKEN) {
@@ -13,13 +16,29 @@ if (!PAGE_ID || !SYSTEM_TOKEN) {
   process.exit(1);
 }
 
-const KEYWORDS = ["দাম", "প্রাইস", "price", "কত", "নাম্বার", "নম্বর", "number", "মোবাইল",
-  "mobile", "ফোন", "phone", "লিংক", "link", "যোগাযোগ", "contact", "কল"];
-const TEMPLATES = [
-  `ধন্যবাদ! দাম, ছবি ও বিক্রেতার মোবাইল নম্বর সব পাবেন গাড়ি বাজার অ্যাপে। 📲 ডাউনলোড: ${PLAY}`,
-  `আপনার আগ্রহের জন্য ধন্যবাদ। দাম ও বিক্রেতার নম্বর দেখতে গাড়ি বাজার অ্যাপটি নিন 👉 ${PLAY} (অথবা garibazar.shop)`,
-  `বিস্তারিত তথ্য, দাম ও যোগাযোগের নম্বর গাড়ি বাজার অ্যাপেই আছে। এখান থেকে নিন: ${PLAY}`,
+const REPLIES = {
+  price: `পোস্টের বিবরণে (description) দেওয়া নম্বরে কল করে দাম জানতে পারবেন, উনিই আসল মালিক। আরও গাড়ি দেখতে Garibazar app install করুন 👉 ${PLAY}`,
+  number: `নম্বর বিবরণে (description) দেওয়া আছে। আরও গাড়ি দেখতে Garibazar app install করুন 👉 ${PLAY}`,
+  sell: `গাড়ির ছবি আর বিস্তারিত (detail) ইনবক্সে পাঠান। Garibazar app install করুন, সেখানে গাড়ি বেচা-কেনা করতে পারবেন 👉 ${PLAY}`,
+  other: `Garibazar app install করুন। এখানে গাড়ি ও গাড়ির পার্ট বেচা/কেনা করতে পারবেন 👉 ${PLAY}`,
+};
+
+const SELL_RE = [
+  /(বিক্রি|বিক্রী|বিক্রয়)\s*(করব(?!েন)|করবো|করতে\s*চাই|করতে\s*চাচ্ছি|করে\s*দেন|করে\s*দিন)/,
+  /(বেচব|বেচবো|বেচতে\s*চাই|বেচে\s*দেন|বেচে\s*দিন)/,
+  /(want to sell|wanna sell|sell my|bikri\s*(korbo|korte chai|kore den))/,
 ];
+const PRICE_WORDS = ["দাম", "প্রাইস", "price", "মূল্য", "কত", "dam koto"];
+const NUMBER_WORDS = ["নাম্বার", "নম্বর", "নাম্বর", "number", "মোবাইল", "mobile", "ফোন", "phone",
+  "যোগাযোগ", "যোগাজোগ", "jogajog", "jugajog", "jugajok", "jogajok", "contact", "whatsapp", "হোয়াটসঅ্যাপ"];
+
+function classify(msg) {
+  const t = (msg || "").normalize("NFC").toLowerCase();
+  if (SELL_RE.some((re) => re.test(t))) return "sell";
+  if (PRICE_WORDS.some((k) => t.includes(k))) return "price";
+  if (NUMBER_WORDS.some((k) => t.includes(k))) return "number";
+  return "other";
+}
 
 async function graph(path, token, params = {}, method = "GET") {
   const url = new URL(`https://graph.facebook.com/${V}/${path}`);
@@ -41,10 +60,6 @@ async function graph(path, token, params = {}, method = "GET") {
   return json;
 }
 
-const wantsReply = (msg) => {
-  const t = (msg || "").normalize("NFC").toLowerCase();
-  return KEYWORDS.some((k) => t.includes(k));
-};
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // 1) page token from the system-user token
@@ -81,34 +96,41 @@ for (const source of ["feed", "videos", "video_reels"]) {
 }
 
 // 3) decide and reply
-const cutoff = Date.now() - MAX_AGE_HOURS * 3600 * 1000;
 let done = 0;
-const stat = { own: 0, noReply: 0, old: 0, noKeyword: 0, replied: 0 };
+let otherDone = 0;
+const stat = { own: 0, noReply: 0, old: 0, replied: 0, otherSkipped: 0 };
+const kinds = { price: 0, number: 0, sell: 0, other: 0 };
 for (const c of comments) {
   if (done >= MAX_REPLIES) break;
   if (c.from?.id === PAGE_ID) { stat.own++; continue; }
   if (c.can_comment === false) { stat.noReply++; continue; }
-  if (new Date(c.created_time).getTime() < cutoff) { stat.old++; continue; }
-  if (!wantsReply(c.message)) { stat.noKeyword++; continue; }
+  const ageH = (Date.now() - new Date(c.created_time).getTime()) / 3600000;
+  if (ageH > MAX_AGE_HOURS) { stat.old++; continue; }
   const replied = (c.comments?.data || []).some(
     (r) => r.from?.id === PAGE_ID || /garibazar/i.test(r.message || "")
   );
   if (replied) { stat.replied++; continue; }
-  const idx = [...c.id].reduce((s, ch) => s + ch.charCodeAt(0), 0) % TEMPLATES.length;
+  const kind = classify(c.message);
+  if (kind === "other" && (!OTHER_REPLIES || ageH > OTHER_MAX_AGE_HOURS || otherDone >= MAX_OTHER)) {
+    stat.otherSkipped++;
+    continue;
+  }
   if (DRY_RUN) {
-    console.log(`WOULD reply to comment ${c.id} (template ${idx + 1})`);
+    console.log(`WOULD reply (${kind}) to comment ${c.id}`);
   } else {
     try {
-      await graph(`${c.id}/comments`, PAGE_TOKEN, { message: TEMPLATES[idx] }, "POST");
-      console.log(`Replied to comment ${c.id}`);
+      await graph(`${c.id}/comments`, PAGE_TOKEN, { message: REPLIES[kind] }, "POST");
+      console.log(`Replied (${kind}) to comment ${c.id}`);
     } catch (e) {
       console.log(`Reply failed for ${c.id}: ${e.message}`);
     }
     await sleep(2000);
   }
+  kinds[kind]++;
   done++;
+  if (kind === "other") otherDone++;
 }
 const times = comments.map((c) => new Date(c.created_time).getTime()).filter(Number.isFinite);
 const newestH = times.length ? ((Date.now() - Math.max(...times)) / 3600000).toFixed(1) : "n/a";
 console.log(`Filtered: ${JSON.stringify(stat)}; newest comment age (hours): ${newestH}`);
-console.log(`Checked ${comments.length} comments, ${DRY_RUN ? "would reply" : "replied"}: ${done}`);
+console.log(`Checked ${comments.length} comments, ${DRY_RUN ? "would reply" : "replied"}: ${done} ${JSON.stringify(kinds)}`);
