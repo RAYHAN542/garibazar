@@ -1,14 +1,11 @@
 // Facebook Page comment auto-reply bot (runs from GitHub Actions).
-// DRY_RUN != "false" -> only logs what it would do. Never logs tokens, names or comment text.
+// DRY_RUN != "false" -> only logs. Never logs tokens, names or comment text.
 const PAGE_ID = process.env.FB_PAGE_ID;
 const SYSTEM_TOKEN = process.env.FB_SYSTEM_TOKEN;
 const DRY_RUN = process.env.DRY_RUN !== "false";
 const V = process.env.GRAPH_VERSION || "v25.0";
 const MAX_REPLIES = Number(process.env.MAX_REPLIES || 10);
-const MAX_OTHER = Number(process.env.MAX_OTHER || 4);
 const MAX_AGE_HOURS = Number(process.env.MAX_AGE_HOURS || 24);
-const OTHER_MAX_AGE_HOURS = Number(process.env.OTHER_MAX_AGE_HOURS || 3);
-const OTHER_REPLIES = true; // false = comments with no matching words are never answered
 const PLAY = "https://play.google.com/store/apps/details?id=shop.garibazar.twa";
 
 if (!PAGE_ID || !SYSTEM_TOKEN) {
@@ -20,7 +17,7 @@ const REPLIES = {
   price: `পোস্টের বিবরণে (description) দেওয়া নম্বরে কল করে দাম জানতে পারবেন, উনিই আসল মালিক। আরও গাড়ি দেখতে Garibazar app install করুন 👉 ${PLAY}`,
   number: `নম্বর বিবরণে (description) দেওয়া আছে। আরও গাড়ি দেখতে Garibazar app install করুন 👉 ${PLAY}`,
   sell: `গাড়ির ছবি আর বিস্তারিত (detail) ইনবক্সে পাঠান। Garibazar app install করুন, সেখানে গাড়ি বেচা-কেনা করতে পারবেন 👉 ${PLAY}`,
-  other: `Garibazar app install করুন। এখানে গাড়ি ও গাড়ির পার্ট বেচা/কেনা করতে পারবেন 👉 ${PLAY}`,
+  other: `Garibazar app install করুন। সেখানে গাড়ি ও গাড়ির পার্ট বেচা/কেনা করতে পারবেন 👉 ${PLAY}`,
 };
 
 const SELL_RE = [
@@ -72,33 +69,47 @@ if (!PAGE_TOKEN) {
 console.log(`::add-mask::${PAGE_TOKEN}`);
 console.log(`Mode: ${DRY_RUN ? "DRY RUN (nothing is posted)" : "LIVE"}`);
 
-// 2) collect recent comments
-const FIELDS =
-  "id,created_time,comments.limit(50){id,message,created_time,can_comment,from{id},comments.limit(10){id,message,from{id}}}";
-const seen = new Set();
-const comments = [];
-for (const source of ["feed", "videos", "video_reels"]) {
+// 2) collect recent comments (newest first), feed + videos in parallel
+const INNER = "{id,message,created_time,can_comment,from{id},comments.limit(10){id,message,from{id}}}";
+const FIELDS_NEW = `id,created_time,comments.order(reverse_chronological).limit(50)${INNER}`;
+const FIELDS_OLD = `id,created_time,comments.limit(50)${INNER}`;
+
+async function fetchSource(source) {
   try {
-    const data = await graph(`${PAGE_ID}/${source}`, PAGE_TOKEN, { fields: FIELDS, limit: "15" });
-    let n = 0;
-    for (const post of data.data || []) {
-      for (const c of post.comments?.data || []) {
-        if (seen.has(c.id)) continue;
-        seen.add(c.id);
-        comments.push(c);
-        n++;
-      }
-    }
-    console.log(`${source}: ${(data.data || []).length} items, ${n} comments`);
+    return await graph(`${PAGE_ID}/${source}`, PAGE_TOKEN, { fields: FIELDS_NEW, limit: "15" });
   } catch (e) {
-    console.log(`${source}: skipped (${e.message})`);
+    return await graph(`${PAGE_ID}/${source}`, PAGE_TOKEN, { fields: FIELDS_OLD, limit: "15" });
   }
 }
 
-// 3) decide and reply
+const seen = new Set();
+const comments = [];
+const results = await Promise.all(
+  ["feed", "videos"].map(async (source) => {
+    try {
+      return { source, data: (await fetchSource(source)).data || [] };
+    } catch (e) {
+      console.log(`${source}: skipped (${e.message})`);
+      return { source, data: [] };
+    }
+  })
+);
+for (const { source, data } of results) {
+  let n = 0;
+  for (const post of data) {
+    for (const c of post.comments?.data || []) {
+      if (seen.has(c.id)) continue;
+      seen.add(c.id);
+      comments.push(c);
+      n++;
+    }
+  }
+  console.log(`${source}: ${data.length} items, ${n} comments`);
+}
+
+// 3) reply to everything that has no page reply yet
 let done = 0;
-let otherDone = 0;
-const stat = { own: 0, noReply: 0, old: 0, replied: 0, otherSkipped: 0 };
+const stat = { own: 0, noReply: 0, old: 0, replied: 0 };
 const kinds = { price: 0, number: 0, sell: 0, other: 0 };
 for (const c of comments) {
   if (done >= MAX_REPLIES) break;
@@ -111,10 +122,6 @@ for (const c of comments) {
   );
   if (replied) { stat.replied++; continue; }
   const kind = classify(c.message);
-  if (kind === "other" && (!OTHER_REPLIES || ageH > OTHER_MAX_AGE_HOURS || otherDone >= MAX_OTHER)) {
-    stat.otherSkipped++;
-    continue;
-  }
   if (DRY_RUN) {
     console.log(`WOULD reply (${kind}) to comment ${c.id}`);
   } else {
@@ -124,11 +131,10 @@ for (const c of comments) {
     } catch (e) {
       console.log(`Reply failed for ${c.id}: ${e.message}`);
     }
-    await sleep(2000);
+    await sleep(3000);
   }
   kinds[kind]++;
   done++;
-  if (kind === "other") otherDone++;
 }
 const times = comments.map((c) => new Date(c.created_time).getTime()).filter(Number.isFinite);
 const newestH = times.length ? ((Date.now() - Math.max(...times)) / 3600000).toFixed(1) : "n/a";
