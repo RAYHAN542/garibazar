@@ -115,7 +115,7 @@ function VideoSlide({ listing, index, activeIndex, muted, language, onToggleMute
         {muted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
       </button>
 
-      <div className="absolute bottom-0 inset-x-0 px-4 pt-16 pb-[calc(1.25rem+env(safe-area-inset-bottom))] bg-gradient-to-t from-black/85 via-black/45 to-transparent text-white">
+      <div className="pointer-events-none absolute bottom-0 inset-x-0 px-4 pt-16 pb-[calc(1.25rem+env(safe-area-inset-bottom))] bg-gradient-to-t from-black/85 via-black/45 to-transparent text-white">
         <h3 className="text-base font-extrabold leading-snug line-clamp-2">{listing.title}</h3>
         <p className="mt-1 text-lg font-black text-amber-400">{formatPrice(listing.price, language)}</p>
         {listing.location && (
@@ -127,7 +127,7 @@ function VideoSlide({ listing, index, activeIndex, muted, language, onToggleMute
         <button
           type="button"
           onClick={() => onSelect(listing)}
-          className="mt-3 w-full py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-sm cursor-pointer"
+          className="pointer-events-auto mt-3 w-full py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-sm cursor-pointer"
         >
           {language === "bn" ? "বিস্তারিত দেখুন" : "View details"}
         </button>
