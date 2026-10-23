@@ -365,7 +365,7 @@ export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPromp
 
     const cleanPhoneDigits = toEnglishDigits(phone).replace(/\D/g, "");
     if (!validateBanglaPhone(cleanPhoneDigits)) {
-      showError(language === "bn" ? "সঠিক ধ১ ডিজিটের মোবাইল নম্বর দিন" : "Enter a valid 11-digit phone number");
+      showError(language === "bn" ? "সঠিক ১১ ডিজিটের মোবাইল নম্বর দিন" : "Enter a valid 11-digit phone number");
       return;
     }
 
