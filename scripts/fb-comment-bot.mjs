@@ -83,16 +83,17 @@ for (const source of ["feed", "videos", "video_reels"]) {
 // 3) decide and reply
 const cutoff = Date.now() - MAX_AGE_HOURS * 3600 * 1000;
 let done = 0;
+const stat = { own: 0, noReply: 0, old: 0, noKeyword: 0, replied: 0 };
 for (const c of comments) {
   if (done >= MAX_REPLIES) break;
-  if (c.from?.id === PAGE_ID) continue;
-  if (c.can_comment === false) continue;
-  if (new Date(c.created_time).getTime() < cutoff) continue;
-  if (!wantsReply(c.message)) continue;
+  if (c.from?.id === PAGE_ID) { stat.own++; continue; }
+  if (c.can_comment === false) { stat.noReply++; continue; }
+  if (new Date(c.created_time).getTime() < cutoff) { stat.old++; continue; }
+  if (!wantsReply(c.message)) { stat.noKeyword++; continue; }
   const replied = (c.comments?.data || []).some(
     (r) => r.from?.id === PAGE_ID || /garibazar/i.test(r.message || "")
   );
-  if (replied) continue;
+  if (replied) { stat.replied++; continue; }
   const idx = [...c.id].reduce((s, ch) => s + ch.charCodeAt(0), 0) % TEMPLATES.length;
   if (DRY_RUN) {
     console.log(`WOULD reply to comment ${c.id} (template ${idx + 1})`);
@@ -107,4 +108,7 @@ for (const c of comments) {
   }
   done++;
 }
+const times = comments.map((c) => new Date(c.created_time).getTime()).filter(Number.isFinite);
+const newestH = times.length ? ((Date.now() - Math.max(...times)) / 3600000).toFixed(1) : "n/a";
+console.log(`Filtered: ${JSON.stringify(stat)}; newest comment age (hours): ${newestH}`);
 console.log(`Checked ${comments.length} comments, ${DRY_RUN ? "would reply" : "replied"}: ${done}`);
