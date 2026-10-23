@@ -1,9 +1,10 @@
 import React, { useState, useRef } from "react";
 import { SupportedLanguage } from "../types";
-import { Camera, Loader2, AlertTriangle, X } from "lucide-react";
+import { Camera, Loader2, AlertTriangle, X, Video } from "lucide-react";
 import { supabase } from "../supabase";
 import { sanitizeText, validatePriceInput, validateBanglaPhone } from "../utils/sanitizer";
 import { uploadToCloudinary } from "../utils/cloudinary";
+import { prepareVideo, uploadVideoToR2 } from "../utils/videoUpload";
 import { nativeFetch } from "../utils/nativeFetch";
 import { apiUrl } from "../utils/apiBase";
 import { CITIES } from "../translations";
@@ -166,6 +167,15 @@ const toEnglishDigits = (str: string): string => {
   return str.replace(/[০-৯]/g, (d) => String(bnDigits.indexOf(d)));
 };
 
+type VideoState = {
+  preview: string;
+  blob?: Blob;
+  url?: string;
+  status: "processing" | "ready" | "uploading" | "success" | "error";
+  progress: number;
+  errorMessage?: string;
+};
+
 export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPrompt, onViewListing }: AddPartFormProps) {
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [price, setPrice] = useState("");
@@ -175,6 +185,11 @@ export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPromp
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  // 🎬 সেলারের ঐচ্ছিক ভিডিও (সর্বোচ্চ ২০ সেকেন্ড)। videoJobRef শুধু নিশ্চিত করে যে
+  // ভিডিও মুছে নতুন ভিডিও বাছলে পুরনো কাজের ফলাফল নতুনটার ওপর বসে না যায়।
+  const [video, setVideo] = useState<VideoState | null>(null);
+  const videoInputRef = useRef<HTMLInputElement>(null);
+  const videoJobRef = useRef(0);
   // 🔧 (2026-10-01) ফর্মটা বড়, আর submit বাটন একদম নিচে। আগে error শুধু
   // ফর্মের সবার উপরে দেখানো হতো -- ইউজার নিচে scroll করে থেকে submit চাপলে
   // validation fail হলেও error message দেখতে পেত না (স্ক্রিনের বাইরে)।
@@ -289,6 +304,54 @@ export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPromp
     });
   };
 
+  // 🎬 ভিডিও বাছাই: সবার আগে ফোনেই প্রথম ২০ সেকেন্ড রেখে ছোট করা হয়
+  // (prepareVideo), তারপর লগইন থাকলে সঙ্গে সঙ্গে R2-তে আপলোড। অ্যাকাউন্ট ছাড়া
+  // ইউজারের ভিডিও "ready" অবস্থায় থাকে আর ছবির মতোই পোস্ট চাপার সময় আপলোড হয়।
+  const updateVideo = (job: number, patch: Partial<VideoState>) => {
+    if (job !== videoJobRef.current) return;
+    setVideo(prev => (prev ? { ...prev, ...patch } : prev));
+  };
+
+  const handleVideoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    if (!file.type.startsWith("video/")) {
+      showError(language === "bn" ? "শুধু ভিডিও ফাইল দিন" : "Please choose a video file");
+      return;
+    }
+    if (file.size > 500 * 1024 * 1024) {
+      showError(language === "bn" ? "এই ভিডিওটি অনেক বড়। আরও ছোট ভিডিও দিন" : "This video is too large. Please choose a shorter one");
+      return;
+    }
+
+    setError(null);
+    if (video?.preview) URL.revokeObjectURL(video.preview);
+    const job = ++videoJobRef.current;
+    setVideo({ preview: URL.createObjectURL(file), status: "processing", progress: 0 });
+
+    try {
+      const blob = await prepareVideo(file, (p) => updateVideo(job, { progress: p }));
+      if (job !== videoJobRef.current) return;
+      if (currentUser) {
+        updateVideo(job, { blob, status: "uploading", progress: 0 });
+        const url = await uploadVideoToR2(blob, (p) => updateVideo(job, { progress: p }));
+        updateVideo(job, { url, status: "success", progress: 100 });
+      } else {
+        updateVideo(job, { blob, status: "ready", progress: 100 });
+      }
+    } catch (err: any) {
+      console.error("Video failed:", err);
+      updateVideo(job, { status: "error", progress: 0, errorMessage: err?.message || String(err) });
+    }
+  };
+
+  const removeVideo = () => {
+    videoJobRef.current++;
+    if (video?.preview) URL.revokeObjectURL(video.preview);
+    setVideo(null);
+  };
+
   // ফর্ম সাবমিট করলে সরাসরি পোস্ট হয় না -- আগে সব ফিল্ড ভ্যালিডেট করে
   // ক্যাটাগরি বাছাইয়ের মডাল দেখানো হয়। ইউজার গাড়ি/পার্ট বাছাই করলে
   // submitListing() আসল Supabase write টা করে।
@@ -302,7 +365,12 @@ export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPromp
 
     const cleanPhoneDigits = toEnglishDigits(phone).replace(/\D/g, "");
     if (!validateBanglaPhone(cleanPhoneDigits)) {
-      showError(language === "bn" ? "সঠিক ১১ ডিজিটের মোবাইল নম্বর দিন" : "Enter a valid 11-digit phone number");
+      showError(language === "bn" ? "সঠিক ধ১ ডিজিটের মোবাইল নম্বর দিন" : "Enter a valid 11-digit phone number");
+      return;
+    }
+
+    if (video && video.status === "error") {
+      showError(language === "bn" ? "ভিডিও ঠিকমতো তৈরি হয়নি। ভিডিও মুছে আবার দিন, অথবা ভিডিও ছাড়া পোস্ট করুন।" : "The video could not be prepared. Remove it and try again, or post without it.");
       return;
     }
 
@@ -323,6 +391,20 @@ export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPromp
         const pending = images.map((img, idx) => ({ img, idx })).filter(({ img }) => img.status !== "success");
         setImages(prev => prev.map(img => img.status === "success" ? img : { ...img, status: "uploading", progress: 30, errorMessage: undefined }));
         await Promise.all(pending.map(({ img, idx }) => uploadImageToCloudinary(img.file, idx)));
+
+        // 🎬 অ্যাকাউন্ট ছাড়া ইউজারের ভিডিওও এখন, সেশন তৈরি হওয়ার পর, আপলোড হয়।
+        if (video && video.status === "ready" && video.blob) {
+          const job = videoJobRef.current;
+          updateVideo(job, { status: "uploading", progress: 0 });
+          try {
+            const url = await uploadVideoToR2(video.blob, (p) => updateVideo(job, { progress: p }));
+            updateVideo(job, { url, status: "success", progress: 100 });
+          } catch (vErr: any) {
+            console.error("Guest video upload failed:", vErr);
+            updateVideo(job, { status: "error", progress: 0, errorMessage: vErr?.message || String(vErr) });
+            throw new Error(language === "bn" ? "ভিডিও আপলোড হয়নি। ভিডিও মুছে আবার দিন, অথবা ভিডিও ছাড়া পোস্ট করুন।" : "Video upload failed. Remove the video and try again, or post without it.");
+          }
+        }
       } catch (err: any) {
         console.error("Guest account failed:", err);
         showError(err?.message || (language === "bn" ? "অ্যাকাউন্ট খোলা যায়নি, আবার চেষ্টা করুন" : "Could not continue, please try again"));
@@ -348,6 +430,7 @@ export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPromp
     setShowCategoryModal(false);
     const cleanPhoneDigits = toEnglishDigits(phone).replace(/\D/g, "");
     const uploadedUrls = images.filter(img => img.status === "success" && img.url).map(img => img.url as string);
+    const videoUrl = video && video.status === "success" ? video.url : undefined;
     if (uploadedUrls.length === 0) {
       showError(language === "bn" ? "ছবি আপলোড হয়নি। ছবি মুছে আবার দিন।" : "Photo upload failed. Remove the photo and add it again.");
       return;
@@ -392,7 +475,9 @@ export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPromp
           images: uploadedUrls,
           seller_id: sellerUid,
           seller_name: sellerDisplayName,
-          type: selectedType
+          type: selectedType,
+          // 🎬 শুধু ভিডিও থাকলেই এই তিনটা কলাম পাঠানো হয় -- ভিডিওছাড়া পোস্টের কোনো পরিবর্তন নেই।
+          ...(videoUrl ? { video_url: videoUrl, has_video: true, is_video: true } : {})
         })
         .select("id")
         .single();
@@ -431,7 +516,8 @@ export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPromp
           contactNumber: cleanPhone,
           sellerId: sellerUid,
           sellerName: sellerDisplayName,
-          type: selectedType
+          type: selectedType,
+          ...(videoUrl ? { videoUrl, hasVideo: true, isVideo: true } : {})
         });
       }
       window.dispatchEvent(new Event("gari_bazar_refreshed_data"));
@@ -506,6 +592,48 @@ export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPromp
         </div>
 
         <div>
+          <label className="block text-xs font-semibold text-gray-700 mb-2">
+            {language === "bn" ? "ভিডিও যোগ করুন (ঐচ্ছিক, সর্বোচ্চ ২০ সেকেন্ড)" : "Add Video (Optional, max 20 seconds)"}
+          </label>
+          {video ? (
+            <div className="relative rounded-xl overflow-hidden bg-black">
+              <video src={video.preview} muted playsInline controls preload="metadata" className="w-full max-h-64 object-contain" />
+              <button type="button" onClick={removeVideo} className="absolute top-2 right-2 p-1 bg-black/60 rounded-full text-white">
+                <X className="w-4 h-4" />
+              </button>
+              {(video.status === "processing" || video.status === "uploading") && (
+                <div className="absolute inset-0 bg-white/85 flex flex-col items-center justify-center gap-2 text-xs text-gray-700 font-medium">
+                  <Loader2 className="w-5 h-5 animate-spin text-orange-500" />
+                  <span>
+                    {video.status === "processing"
+                      ? (language === "bn" ? "ভিডিও প্রস্তুত হচ্ছে..." : "Preparing video...")
+                      : (language === "bn" ? "ভিডিও আপলোড হচ্ছে..." : "Uploading video...")}{" "}
+                    {video.progress}%
+                  </span>
+                </div>
+              )}
+              {video.status === "error" && (
+                <div className="absolute inset-0 bg-white/90 flex flex-col items-center justify-center gap-1 text-[11px] leading-tight text-red-500 font-medium p-3 text-center overflow-hidden">
+                  <AlertTriangle className="w-5 h-5 text-red-500 shrink-0" />
+                  <span className="break-words">{video.errorMessage || (language === "bn" ? "ব্যর্থ হয়েছে" : "Failed")}</span>
+                </div>
+              )}
+              {(video.status === "success" || video.status === "ready") && (
+                <span className="absolute left-2 bottom-2 px-2 py-0.5 rounded-full bg-green-600 text-white text-[11px] font-bold">
+                  {language === "bn" ? "ভিডিও রেডি" : "Video ready"}
+                </span>
+              )}
+            </div>
+          ) : (
+            <button type="button" onClick={() => videoInputRef.current?.click()} className="w-full py-3 border-2 border-dashed border-red-300 rounded-xl flex items-center justify-center gap-2 bg-red-50 text-red-600 text-sm font-semibold hover:bg-red-100 transition-colors">
+              <Video className="w-5 h-5" />
+              <span>{language === "bn" ? "ভিডিও যোগ করুন (২০ সেকেন্ড)" : "Add Video (20 sec)"}</span>
+            </button>
+          )}
+          <input type="file" ref={videoInputRef} onChange={handleVideoSelect} accept="video/*" className="hidden" />
+        </div>
+
+        <div>
           <label className="block text-xs font-semibold text-gray-700 mb-1">
             {language === "bn" ? "দাম (টাকা) (ঐচ্ছিক)" : "Price (BDT) (Optional)"}
           </label>
@@ -547,7 +675,7 @@ export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPromp
           </div>
         )}
 
-        <button type="submit" disabled={isSubmitting || images.some(img => img.status === "uploading")} className="w-full py-3 bg-orange-500 text-white font-semibold rounded-xl text-sm shadow-sm hover:bg-orange-600 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2">
+        <button type="submit" disabled={isSubmitting || images.some(img => img.status === "uploading") || video?.status === "processing" || video?.status === "uploading"} className="w-full py-3 bg-orange-500 text-white font-semibold rounded-xl text-sm shadow-sm hover:bg-orange-600 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2">
           {isSubmitting ? (
             <>
               <Loader2 className="w-4 h-4 animate-spin" />
