@@ -21,5 +21,7 @@ jobs:
         env:
           FB_PAGE_ID: "1281181228407541"
           OTHER_MAX_AGE_HOURS: "24"
+          MAX_REPLIES: "20"
+          MAX_OTHER: "10"
           FB_SYSTEM_TOKEN: ${{ secrets.FB_SYSTEM_TOKEN }}
           DRY_RUN: ${{ vars.FB_BOT_LIVE == 'true' && 'false' || 'true' }}
