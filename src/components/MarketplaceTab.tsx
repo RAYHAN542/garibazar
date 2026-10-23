@@ -148,7 +148,7 @@ const videoListings = useMemo(
   () => [...adListings, ...listings.filter((l) => !adListings.some((a) => a.id === l.id))].filter((l) => !!l.videoUrl && !l.isSold),
   [adListings, listings]
 );
-const feedItems = useMemo(() => filteredListings.filter((item) => !spotlightIds.has(item.id)), [filteredListings, spotlightIds]);
+const feedItems = useMemo(() => filteredListings.filter((item) => !spotlightIds.has(item.id) && !item.videoUrl), [filteredListings, spotlightIds]);
 const spotlightFiller = spotlightAds.length % 2 === 1 && feedItems.length > 0 ? feedItems[0] : null;
 const spotlightGridItems = spotlightFiller ? [...spotlightAds, spotlightFiller] : spotlightAds;
 const feedListings = spotlightFiller ? feedItems.slice(1) : feedItems;
