@@ -1,7 +1,7 @@
 name: Facebook comment bot
 on:
   schedule:
-    - cron: "15 * * * *"
+    - cron: "*/15 * * * *"
   workflow_dispatch:
 permissions:
   contents: read
@@ -20,5 +20,6 @@ jobs:
       - run: node scripts/fb-comment-bot.mjs
         env:
           FB_PAGE_ID: "1281181228407541"
+          OTHER_MAX_AGE_HOURS: "24"
           FB_SYSTEM_TOKEN: ${{ secrets.FB_SYSTEM_TOKEN }}
           DRY_RUN: ${{ vars.FB_BOT_LIVE == 'true' && 'false' || 'true' }}
