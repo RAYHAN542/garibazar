@@ -101,7 +101,10 @@ const recordFirstSeconds = async (
     captured = capture.call(el) as MediaStream;
     const videoTracks = captured.getVideoTracks();
     if (videoTracks.length === 0) throw new Error("UNSUPPORTED");
-    const stream = new MediaStream([...videoTracks, ...audioTracks]);
+    if (audioTracks.length === 0) {
+    try { audioTracks = captured.getAudioTracks(); } catch (_) {}
+  }
+  const stream = new MediaStream([...videoTracks, ...audioTracks]);
 
     const chunks: Blob[] = [];
     recorder = new MR(stream, {
