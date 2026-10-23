@@ -71,7 +71,7 @@ console.log(`Mode: ${DRY_RUN ? "DRY RUN (nothing is posted)" : "LIVE"}`);
 
 // 2) collect recent comments: list posts, then read each post's newest comments
 const COMMENT_FIELDS = "id,message,created_time,can_comment,from{id},comments.limit(10){id,message,from{id}}";
-const DEEP = new Date().getUTCMinutes() % 15 < 5; // deeper scan about every 15 minutes
+const DEEP = true; // deep scan on every run
 const LIGHT_N = 12;
 const DEEP_N = 60;
 const seen = new Set();
