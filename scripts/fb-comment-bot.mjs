@@ -77,6 +77,12 @@ const DEEP_N = 60;
 const seen = new Set();
 const comments = [];
 const errors = [];
+const SOURCES = [
+  { name: "feed" },
+  { name: "videos" },
+  { name: "video_reels" },
+  { name: "ads_posts", extra: { include_inline_create: "true" } },
+];
 
 async function pool(items, size, fn) {
   const out = [];
@@ -106,9 +112,9 @@ async function newestComments(postId) {
   }
 }
 
-for (const source of ["feed", "videos"]) {
+for (const { name: source, extra } of SOURCES) {
   try {
-    const list = await graph(`${PAGE_ID}/${source}`, PAGE_TOKEN, { fields: "id", limit: String(DEEP ? DEEP_N : LIGHT_N) });
+    const list = await graph(`${PAGE_ID}/${source}`, PAGE_TOKEN, { fields: "id", limit: String(DEEP ? DEEP_N : LIGHT_N), ...(extra || {}) });
     const ids = (list.data || []).map((x) => x.id);
     const lists = await pool(ids, 8, newestComments);
     let n = 0;
