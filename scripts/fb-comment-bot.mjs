@@ -69,43 +69,64 @@ if (!PAGE_TOKEN) {
 console.log(`::add-mask::${PAGE_TOKEN}`);
 console.log(`Mode: ${DRY_RUN ? "DRY RUN (nothing is posted)" : "LIVE"}`);
 
-// 2) collect recent comments (newest first), feed + videos in parallel
-const INNER = "{id,message,created_time,can_comment,from{id},comments.limit(10){id,message,from{id}}}";
-const FIELDS_NEW = `id,created_time,comments.order(reverse_chronological).limit(50)${INNER}`;
-const FIELDS_OLD = `id,created_time,comments.limit(50)${INNER}`;
-
-async function fetchSource(source) {
-  try {
-    return await graph(`${PAGE_ID}/${source}`, PAGE_TOKEN, { fields: FIELDS_NEW, limit: "15" });
-  } catch (e) {
-    return await graph(`${PAGE_ID}/${source}`, PAGE_TOKEN, { fields: FIELDS_OLD, limit: "15" });
-  }
-}
-
+// 2) collect recent comments: list posts, then read each post's newest comments
+const COMMENT_FIELDS = "id,message,created_time,can_comment,from{id},comments.limit(10){id,message,from{id}}";
+const DEEP = new Date().getUTCMinutes() % 15 < 5; // deeper scan about every 15 minutes
+const LIGHT_N = 12;
+const DEEP_N = 60;
 const seen = new Set();
 const comments = [];
-const results = await Promise.all(
-  ["feed", "videos"].map(async (source) => {
+const errors = [];
+
+async function pool(items, size, fn) {
+  const out = [];
+  let i = 0;
+  await Promise.all(
+    Array.from({ length: size }, async () => {
+      while (i < items.length) {
+        const idx = i++;
+        out[idx] = await fn(items[idx]);
+      }
+    })
+  );
+  return out;
+}
+
+async function newestComments(postId) {
+  const base = { fields: COMMENT_FIELDS, limit: "30", filter: "toplevel" };
+  try {
+    return (await graph(`${postId}/comments`, PAGE_TOKEN, { ...base, order: "reverse_chronological" })).data || [];
+  } catch (e) {
     try {
-      return { source, data: (await fetchSource(source)).data || [] };
-    } catch (e) {
-      console.log(`${source}: skipped (${e.message})`);
-      return { source, data: [] };
-    }
-  })
-);
-for (const { source, data } of results) {
-  let n = 0;
-  for (const post of data) {
-    for (const c of post.comments?.data || []) {
-      if (seen.has(c.id)) continue;
-      seen.add(c.id);
-      comments.push(c);
-      n++;
+      return (await graph(`${postId}/comments`, PAGE_TOKEN, base)).data || [];
+    } catch (e2) {
+      errors.push(e2.message.slice(0, 140));
+      return [];
     }
   }
-  console.log(`${source}: ${data.length} items, ${n} comments`);
 }
+
+for (const source of ["feed", "videos"]) {
+  try {
+    const list = await graph(`${PAGE_ID}/${source}`, PAGE_TOKEN, { fields: "id", limit: String(DEEP ? DEEP_N : LIGHT_N) });
+    const ids = (list.data || []).map((x) => x.id);
+    const lists = await pool(ids, 8, newestComments);
+    let n = 0;
+    for (const arr of lists) {
+      for (const c of arr || []) {
+        if (seen.has(c.id)) continue;
+        seen.add(c.id);
+        comments.push(c);
+        n++;
+      }
+    }
+    console.log(`${source}: ${ids.length} posts${DEEP ? " (deep scan)" : ""}, ${n} comments`);
+  } catch (e) {
+    console.log(`${source}: skipped (${e.message})`);
+  }
+}
+if (errors.length) console.log(`comment fetch errors: ${errors.length}, first: ${errors[0]}`);
+comments.sort((a, b) => new Date(b.created_time) - new Date(a.created_time));
 
 // 3) reply to everything that has no page reply yet
 let done = 0;
