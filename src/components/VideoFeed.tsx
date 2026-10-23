@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { X, Volume2, VolumeX, Play, MapPin } from "lucide-react";
+import { X, Volume2, VolumeX, Play, MapPin, Plus } from "lucide-react";
 import type { PartListing, SupportedLanguage } from "../types";
+import { AddPartForm } from "./AddPartForm";
 
 // ------------------------------------------------------------------------
 // YouTube Shorts-style full-screen vertical video feed.
@@ -8,11 +9,16 @@ import type { PartListing, SupportedLanguage } from "../types";
 // (muted until the user taps the speaker), tap the video to pause/resume.
 // Only the current video and its two neighbours load their file, so scrolling
 // does not burn the user's mobile data.
+//
+// The "ভিডিও যোগ করুন" button at the top opens a separate video-post form
+// (AddPartForm in mode="video"), so the normal photo "sell" form stays as is.
 // ------------------------------------------------------------------------
 
 interface VideoFeedProps {
   language: SupportedLanguage;
   videos: PartListing[];
+  currentUser: any;
+  onLoginPrompt: () => void;
   onClose: () => void;
   onSelect: (listing: PartListing) => void;
 }
@@ -130,9 +136,11 @@ function VideoSlide({ listing, index, activeIndex, muted, language, onToggleMute
   );
 }
 
-export default function VideoFeed({ language, videos, onClose, onSelect }: VideoFeedProps) {
+export default function VideoFeed({ language, videos, currentUser, onLoginPrompt, onClose, onSelect }: VideoFeedProps) {
   const [activeIndex, setActiveIndex] = useState(0);
   const [muted, setMuted] = useState(true);
+  const [isPostOpen, setIsPostOpen] = useState(false);
+  const [posted, setPosted] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const slideRefs = useRef<(HTMLDivElement | null)[]>([]);
 
@@ -162,21 +170,45 @@ export default function VideoFeed({ language, videos, onClose, onSelect }: Video
     return () => { document.body.style.overflow = prev; };
   }, []);
 
+  useEffect(() => {
+    if (!posted) return;
+    const t = setTimeout(() => setPosted(false), 3500);
+    return () => clearTimeout(t);
+  }, [posted]);
+
   return (
     <div className="fixed inset-0 z-[80] bg-black">
       <div className="absolute top-0 inset-x-0 z-10 flex items-center justify-between px-3 pt-[calc(0.75rem+env(safe-area-inset-top))] pb-2 bg-gradient-to-b from-black/70 to-transparent">
         <span className="text-white text-base font-black tracking-tight">
           {language === "bn" ? "গাড়ির ভিডিও" : "Car Videos"}
         </span>
-        <button
-          type="button"
-          onClick={onClose}
-          className="w-9 h-9 rounded-full bg-black/55 flex items-center justify-center text-white cursor-pointer"
-          aria-label="Close"
-        >
-          <X className="w-5 h-5" />
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setIsPostOpen(true)}
+            className="h-9 px-3 rounded-full bg-red-600 hover:bg-red-700 text-white text-xs font-extrabold flex items-center gap-1 cursor-pointer shadow-md"
+          >
+            <Plus className="w-4 h-4" />
+            <span className="whitespace-nowrap">{language === "bn" ? "ভিডিও যোগ করুন" : "Add Video"}</span>
+          </button>
+          <button
+            type="button"
+            onClick={onClose}
+            className="w-9 h-9 rounded-full bg-black/55 flex items-center justify-center text-white cursor-pointer"
+            aria-label="Close"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
       </div>
+
+      {posted && (
+        <div className="absolute top-[calc(4rem+env(safe-area-inset-top))] inset-x-0 z-20 flex justify-center pointer-events-none">
+          <span className="px-4 py-2 rounded-full bg-green-600 text-white text-xs font-bold shadow-lg">
+            {language === "bn" ? "ভিডিও পোস্ট হয়েছে ✅" : "Video posted ✅"}
+          </span>
+        </div>
+      )}
 
       {videos.length === 0 ? (
         <div className="h-full w-full flex flex-col items-center justify-center px-8 text-center text-white">
@@ -205,6 +237,33 @@ export default function VideoFeed({ language, videos, onClose, onSelect }: Video
               registerRef={(el) => { slideRefs.current[index] = el; }}
             />
           ))}
+        </div>
+      )}
+
+      {isPostOpen && (
+        <div className="fixed inset-0 z-[90] bg-slate-100 overflow-y-auto">
+          <div className="sticky top-0 z-10 flex items-center justify-between px-4 pt-[calc(0.75rem+env(safe-area-inset-top))] pb-3 bg-white border-b border-slate-200">
+            <span className="text-sm font-black text-slate-800">
+              {language === "bn" ? "ভিডিও পোস্ট করুন" : "Post a Video"}
+            </span>
+            <button
+              type="button"
+              onClick={() => setIsPostOpen(false)}
+              className="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 cursor-pointer"
+              aria-label="Close"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+          <div className="p-3 pb-10">
+            <AddPartForm
+              mode="video"
+              language={language}
+              currentUser={currentUser}
+              onPostSuccess={() => { setIsPostOpen(false); setPosted(true); }}
+              onLoginPrompt={() => { setIsPostOpen(false); onClose(); onLoginPrompt(); }}
+            />
+          </div>
         </div>
       )}
     </div>

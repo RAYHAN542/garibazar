@@ -5,6 +5,7 @@ import { supabase } from "../supabase";
 import { sanitizeText, validatePriceInput, validateBanglaPhone } from "../utils/sanitizer";
 import { uploadToCloudinary } from "../utils/cloudinary";
 import { prepareVideo, uploadVideoToR2 } from "../utils/videoUpload";
+import { captureVideoPoster } from "../utils/videoPoster";
 import { nativeFetch } from "../utils/nativeFetch";
 import { apiUrl } from "../utils/apiBase";
 import { CITIES } from "../translations";
@@ -18,6 +19,11 @@ interface AddPartFormProps {
   onPostSuccess: () => void;
   onLoginPrompt: () => void;
   onViewListing?: (listing: any) => void;
+  // "photo" (default) = the normal sell form with photos only.
+  // "video" = the video-post form opened from the "গাড়ির ভিডিও দেখুন" feed:
+  // a video (max 20 sec) instead of photos; the cover photo is taken from the
+  // video automatically.
+  mode?: "photo" | "video";
 }
 
 const compressImageToBlob = async (file: File, maxWidth = 1200, maxHeight = 1200): Promise<{ blob: Blob; dataUrl: string }> => {
@@ -176,7 +182,7 @@ type VideoState = {
   errorMessage?: string;
 };
 
-export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPrompt, onViewListing }: AddPartFormProps) {
+export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPrompt, onViewListing, mode = "photo" }: AddPartFormProps) {
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [price, setPrice] = useState("");
   const [phone, setPhone] = useState(toEnglishDigits(currentUser?.phoneNumber || ""));
@@ -185,8 +191,9 @@ export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPromp
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  // 🎬 সেলারের ঐচ্ছিক ভিডিও (সর্বোচ্চ ২০ সেকেন্ড)। videoJobRef শুধু নিশ্চিত করে যে
-  // ভিডিও মুছে নতুন ভিডিও বাছলে পুরনো কাজের ফলাফল নতুনটার ওপর বসে না যায়।
+  // 🎬 ভিডিও-মোডে (গাড়ির ভিডিও ফিড থেকে খোলা) সেলারের ভিডিও (সর্বোচ্চ ২০ সেকেন্ড)।
+  // videoJobRef শুধু নিশ্চিত করে যে ভিডিও মুছে নতুন ভিডিও বাছলে পুরনো কাজের ফলাফল
+  // নতুনটার ওপর বসে না যায়।
   const [video, setVideo] = useState<VideoState | null>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
   const videoJobRef = useRef(0);
@@ -267,16 +274,9 @@ export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPromp
     }
   };
 
-  const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!e.target.files) return;
-    const files = Array.from(e.target.files);
-
-    if (images.length + files.length > 5) {
-      showError(language === "bn" ? "সর্বোচ্চ ৫টি ছবি আপলোড করা যাবে" : "Maximum 5 images allowed");
-      return;
-    }
-
-    const currentLength = images.length;
+  // ছবি যোগ করার সাধারণ কাজ -- ফটো-মোডে ছবি বাছাই আর ভিডিও-মোডে ভিডিও থেকে তোলা কভার
+  // ছবি, দুটোই এখান দিয়ে যায়। baseLength হলো এই ফাইলগুলো যোগ হওয়ার আগে তালিকায় কয়টা ছবি ছিল।
+  const addImageFiles = async (files: File[], baseLength: number) => {
     const newImages = files.map(f => ({
       file: f,
       preview: URL.createObjectURL(f),
@@ -291,8 +291,20 @@ export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPromp
     if (!currentUser) return;
 
     await Promise.all(
-      newImages.map((img, i) => uploadImageToCloudinary(img.file, currentLength + i))
+      newImages.map((img, i) => uploadImageToCloudinary(img.file, baseLength + i))
     );
+  };
+
+  const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files) return;
+    const files = Array.from(e.target.files);
+
+    if (images.length + files.length > 5) {
+      showError(language === "bn" ? "সর্বোচ্চ ৫টি ছবি আপলোড করা যাবে" : "Maximum 5 images allowed");
+      return;
+    }
+
+    await addImageFiles(files, images.length);
   };
 
   const removeImage = (index: number) => {
@@ -304,12 +316,19 @@ export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPromp
     });
   };
 
-  // 🎬 ভিডিও বাছাই: সবার আগে ফোনেই প্রথম ২০ সেকেন্ড রেখে ছোট করা হয়
-  // (prepareVideo), তারপর লগইন থাকলে সঙ্গে সঙ্গে R2-তে আপলোড। অ্যাকাউন্ট ছাড়া
+  // 🎬 ভিডিও বাছাই: আগে ভিডিও থেকে কভার ছবি তোলা হয়, তারপর ফোনেই প্রথম ২০ সেকেন্ড রেখে
+  // ছোট করা হয় (prepareVideo), তারপর লগইন থাকলে সঙ্গে সঙ্গে R2-তে আপলোড। অ্যাকাউন্ট ছাড়া
   // ইউজারের ভিডিও "ready" অবস্থায় থাকে আর ছবির মতোই পোস্ট চাপার সময় আপলোড হয়।
   const updateVideo = (job: number, patch: Partial<VideoState>) => {
     if (job !== videoJobRef.current) return;
     setVideo(prev => (prev ? { ...prev, ...patch } : prev));
+  };
+
+  const clearImages = () => {
+    setImages(prev => {
+      prev.forEach(img => URL.revokeObjectURL(img.preview));
+      return [];
+    });
   };
 
   const handleVideoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -327,10 +346,15 @@ export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPromp
 
     setError(null);
     if (video?.preview) URL.revokeObjectURL(video.preview);
+    clearImages();
     const job = ++videoJobRef.current;
     setVideo({ preview: URL.createObjectURL(file), status: "processing", progress: 0 });
 
     try {
+      const poster = await captureVideoPoster(file);
+      if (job !== videoJobRef.current) return;
+      void addImageFiles([poster], 0);
+
       const blob = await prepareVideo(file, (p) => updateVideo(job, { progress: p }));
       if (job !== videoJobRef.current) return;
       if (currentUser) {
@@ -350,6 +374,7 @@ export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPromp
     videoJobRef.current++;
     if (video?.preview) URL.revokeObjectURL(video.preview);
     setVideo(null);
+    clearImages();
   };
 
   // ফর্ম সাবমিট করলে সরাসরি পোস্ট হয় না -- আগে সব ফিল্ড ভ্যালিডেট করে
@@ -369,8 +394,13 @@ export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPromp
       return;
     }
 
+    if (mode === "video" && !video) {
+      showError(language === "bn" ? "অনুগ্রহ করে একটি ভিডিও যোগ করুন" : "Please add a video");
+      return;
+    }
+
     if (video && video.status === "error") {
-      showError(language === "bn" ? "ভিডিও ঠিকমতো তৈরি হয়নি। ভিডিও মুছে আবার দিন, অথবা ভিডিও ছাড়া পোস্ট করুন।" : "The video could not be prepared. Remove it and try again, or post without it.");
+      showError(language === "bn" ? "ভিডিও ঠিকমতো তৈরি হয়নি। ভিডিও মুছে আবার দিন।" : "The video could not be prepared. Remove it and try again.");
       return;
     }
 
@@ -402,7 +432,7 @@ export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPromp
           } catch (vErr: any) {
             console.error("Guest video upload failed:", vErr);
             updateVideo(job, { status: "error", progress: 0, errorMessage: vErr?.message || String(vErr) });
-            throw new Error(language === "bn" ? "ভিডিও আপলোড হয়নি। ভিডিও মুছে আবার দিন, অথবা ভিডিও ছাড়া পোস্ট করুন।" : "Video upload failed. Remove the video and try again, or post without it.");
+            throw new Error(language === "bn" ? "ভিডিও আপলোড হয়নি। ভিডিও মুছে আবার দিন।" : "Video upload failed. Remove the video and try again.");
           }
         }
       } catch (err: any) {
@@ -431,11 +461,16 @@ export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPromp
     const cleanPhoneDigits = toEnglishDigits(phone).replace(/\D/g, "");
     const uploadedUrls = images.filter(img => img.status === "success" && img.url).map(img => img.url as string);
     const videoUrl = video && video.status === "success" ? video.url : undefined;
+    if (mode === "video" && !videoUrl) {
+      showError(language === "bn" ? "ভিডিও আপলোড হয়নি। ভিডিও মুছে আবার দিন।" : "Video upload failed. Remove the video and add it again.");
+      return;
+    }
     if (uploadedUrls.length === 0) {
       showError(language === "bn" ? "ছবি আপলোড হয়নি। ছবি মুছে আবার দিন।" : "Photo upload failed. Remove the photo and add it again.");
       return;
     }
-    const sellerUid = getUid();
+    // ইউজার অবজেক্টে uid না থাকলে (যেমন ভিন্ন ধরনের user অবজেক্ট) সরাসরি Supabase সেশন থেকে নেওয়া হয়।
+    const sellerUid = getUid() || (await supabase.auth.getSession()).data.session?.user?.id;
     if (!sellerUid) {
       showError(language === "bn" ? "অনুগ্রহ করে আবার চেষ্টা করুন" : "Please try again");
       return;
@@ -556,6 +591,7 @@ export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPromp
       )}
 
       <form onSubmit={handleFormSubmit} className="space-y-5">
+        {mode === "photo" && (
         <div>
           <label className="block text-xs font-semibold text-gray-700 mb-2">
             {language === "bn" ? "ছবি যোগ করুন (সর্বোচ্চ ৫টি) *" : "Add Photos (Max 5) *"}
@@ -590,10 +626,12 @@ export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPromp
           </div>
           <input type="file" ref={fileInputRef} onChange={handleImageSelect} multiple accept="image/*" className="hidden" />
         </div>
+        )}
 
+        {mode === "video" && (
         <div>
           <label className="block text-xs font-semibold text-gray-700 mb-2">
-            {language === "bn" ? "ভিডিও যোগ করুন (ঐচ্ছিক, সর্বোচ্চ ২০ সেকেন্ড)" : "Add Video (Optional, max 20 seconds)"}
+            {language === "bn" ? "ভিডিও যোগ করুন (সর্বোচ্চ ২০ সেকেন্ড) *" : "Add Video (max 20 seconds) *"}
           </label>
           {video ? (
             <div className="relative rounded-xl overflow-hidden bg-black">
@@ -625,13 +663,14 @@ export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPromp
               )}
             </div>
           ) : (
-            <button type="button" onClick={() => videoInputRef.current?.click()} className="w-full py-3 border-2 border-dashed border-red-300 rounded-xl flex items-center justify-center gap-2 bg-red-50 text-red-600 text-sm font-semibold hover:bg-red-100 transition-colors">
-              <Video className="w-5 h-5" />
-              <span>{language === "bn" ? "ভিডিও যোগ করুন (২০ সেকেন্ড)" : "Add Video (20 sec)"}</span>
+            <button type="button" onClick={() => videoInputRef.current?.click()} className="w-full py-6 border-2 border-dashed border-red-300 rounded-xl flex flex-col items-center justify-center gap-2 bg-red-50 text-red-600 text-sm font-semibold hover:bg-red-100 transition-colors">
+              <Video className="w-7 h-7" />
+              <span>{language === "bn" ? "ভিডিও বাছাই করুন (২০ সেকেন্ড)" : "Choose Video (20 sec)"}</span>
             </button>
           )}
           <input type="file" ref={videoInputRef} onChange={handleVideoSelect} accept="video/*" className="hidden" />
         </div>
+        )}
 
         <div>
           <label className="block text-xs font-semibold text-gray-700 mb-1">
@@ -688,7 +727,7 @@ export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPromp
       </form>
 
       {showCategoryModal && (
-        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[100] bg-black/50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl p-5 w-full max-w-sm shadow-xl">
             <h3 className="text-sm font-bold text-gray-800 text-center mb-4">
               {language === "bn" ? "এটা কী ধরনের বিজ্ঞাপন?" : "What kind of listing is this?"}
