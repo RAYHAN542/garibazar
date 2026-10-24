@@ -351,8 +351,13 @@ export default function App() {
 
   // Dynamic bookmarks matching
   const savedListings = useMemo(() => {
-    return listings.filter((item) => savedListingIds.includes(item.id));
-  }, [listings, savedListingIds]);
+    const seen = new Set<string>();
+    return [...listings, ...adListings].filter((item) => {
+      if (!savedListingIds.includes(item.id) || seen.has(item.id)) return false;
+      seen.add(item.id);
+      return true;
+    });
+  }, [listings, adListings, savedListingIds]);
 
   // Track a site visit once per browser session (not once per page load --
   // opening/closing a listing now does a real reload, and we don't want that
