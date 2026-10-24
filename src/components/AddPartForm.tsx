@@ -339,10 +339,7 @@ export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPromp
       showError(language === "bn" ? "শুধু ভিডিও ফাইল দিন" : "Please choose a video file");
       return;
     }
-    if (file.size > 500 * 1024 * 1024) {
-      showError(language === "bn" ? "এই ভিডিওটি অনেক বড়। আরও ছোট ভিডিও দিন" : "This video is too large. Please choose a shorter one");
-      return;
-    }
+    // Big files are no longer rejected: prepareVideo shrinks them (first 20s, low bitrate).
 
     setError(null);
     if (video?.preview) URL.revokeObjectURL(video.preview);
