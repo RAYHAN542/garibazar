@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { X, Volume2, VolumeX, Play, MapPin, Plus, Phone } from "lucide-react";
+import { X, Volume2, VolumeX, Play, MapPin, Plus, Phone, Bookmark, Share2, MessageCircle, Eye } from "lucide-react";
 import type { PartListing, SupportedLanguage } from "../types";
 import { AddPartForm } from "./AddPartForm";
 import { supabase } from "../supabase";
@@ -28,6 +28,7 @@ interface VideoFeedProps {
   onClose: () => void;
   onSelect: (listing: PartListing) => void;
   isAdmin?: boolean;
+  onStartChat: (listing: PartListing) => void;
 }
 
 const formatPrice = (price: number, language: SupportedLanguage): string => {
@@ -49,15 +50,65 @@ interface VideoSlideProps {
   currentUser: any;
   onLoginPrompt: () => void;
   isAdmin: boolean;
+  onStartChat: (listing: PartListing) => void;
+  onClose: () => void;
 }
 
-function VideoSlide({ listing, index, activeIndex, muted, language, onToggleMute, registerRef, currentUser, onLoginPrompt, isAdmin }: VideoSlideProps) {
+function VideoSlide({ listing, index, activeIndex, muted, language, onToggleMute, registerRef, currentUser, onLoginPrompt, isAdmin, onStartChat, onClose }: VideoSlideProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [paused, setPaused] = useState(false);
   const isActive = index === activeIndex;
   const isNear = Math.abs(index - activeIndex) <= 1;
   const [expanded, setExpanded] = useState(false);
   const [, setCounted] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [shareCopied, setShareCopied] = useState(false);
+
+  useEffect(() => {
+    try {
+      const f = JSON.parse(localStorage.getItem("gari_bazar_favorites") || "[]");
+      setSaved(Array.isArray(f) && f.includes(listing.id));
+    } catch (_) {}
+  }, [listing.id]);
+
+  const toggleSave = () => {
+    try {
+      let favs = JSON.parse(localStorage.getItem("gari_bazar_favorites") || "[]");
+      if (!Array.isArray(favs)) favs = [];
+      let next: string[];
+      if (favs.includes(listing.id)) {
+        next = favs.filter((id: string) => id !== listing.id);
+        setSaved(false);
+      } else {
+        next = [...favs, listing.id];
+        setSaved(true);
+      }
+      localStorage.setItem("gari_bazar_favorites", JSON.stringify(next));
+      window.dispatchEvent(new Event("storage"));
+    } catch (_) {}
+  };
+
+  const handleShare = async () => {
+    const shareUrl = `https://garibazar.shop/1/${listing.id}`;
+    const shareText = language === "bn" ? `গাড়ি বাজারে দেখুন: ${listing.title}` : `Check this out on Gari Bazar: ${listing.title}`;
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: listing.title, text: shareText, url: shareUrl });
+        return;
+      }
+    } catch (_) {}
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      setShareCopied(true);
+      setTimeout(() => setShareCopied(false), 2000);
+    } catch (_) {}
+  };
+
+  const handleChat = () => {
+    if (!currentUser?.uid) { onLoginPrompt(); return; }
+    onClose();
+    onStartChat(listing);
+  };
 
   useEffect(() => {
     if (isActive && !viewedThisSession.has(listing.id)) {
@@ -218,11 +269,34 @@ function VideoSlide({ listing, index, activeIndex, muted, language, onToggleMute
         </div>
       )}
 
-      {isAdmin && (
-        <div className="pointer-events-none absolute left-3 top-3 z-10 rounded-full bg-black/55 px-2.5 py-1 text-xs font-bold text-white">
-          👁 {(listing.views || 0) + (viewedThisSession.has(listing.id) ? 1 : 0)} {language === "bn" ? "ভিউ (অ্যাডমিন)" : "views (admin)"}
-        </div>
-      )}
+      <div className="absolute right-3 bottom-[15rem] z-10 flex flex-col items-center gap-4">
+        <button type="button" aria-label="Save" onClick={toggleSave} className="flex flex-col items-center gap-1 text-white cursor-pointer">
+          <span className="flex h-11 w-11 items-center justify-center rounded-full bg-black/45">
+            <Bookmark className={`w-6 h-6 ${saved ? "fill-amber-400 text-amber-400" : ""}`} />
+          </span>
+          <span className="text-[11px] font-bold drop-shadow">{saved ? (language === "bn" ? "সেভড" : "Saved") : (language === "bn" ? "সেভ" : "Save")}</span>
+        </button>
+        <button type="button" aria-label="Share" onClick={handleShare} className="flex flex-col items-center gap-1 text-white cursor-pointer">
+          <span className="flex h-11 w-11 items-center justify-center rounded-full bg-black/45">
+            <Share2 className="w-6 h-6" />
+          </span>
+          <span className="text-[11px] font-bold drop-shadow">{shareCopied ? (language === "bn" ? "কপি হয়েছে" : "Copied") : (language === "bn" ? "শেয়ার" : "Share")}</span>
+        </button>
+        <button type="button" aria-label="Chat" onClick={handleChat} className="flex flex-col items-center gap-1 text-white cursor-pointer">
+          <span className="flex h-11 w-11 items-center justify-center rounded-full bg-black/45">
+            <MessageCircle className="w-6 h-6" />
+          </span>
+          <span className="text-[11px] font-bold drop-shadow">{language === "bn" ? "চ্যাট" : "Chat"}</span>
+        </button>
+        {isAdmin && (
+          <div className="pointer-events-none flex flex-col items-center gap-1 text-white">
+            <span className="flex h-11 w-11 items-center justify-center rounded-full bg-black/45">
+              <Eye className="w-6 h-6" />
+            </span>
+            <span className="text-[11px] font-bold drop-shadow">{(listing.views || 0) + (viewedThisSession.has(listing.id) ? 1 : 0)}</span>
+          </div>
+        )}
+      </div>
 
       <div className="pointer-events-none absolute bottom-0 inset-x-0 px-4 pt-16 pb-[calc(1.25rem+env(safe-area-inset-bottom))] bg-gradient-to-t from-black/85 via-black/45 to-transparent text-white">
         <h3 className="text-base font-extrabold leading-snug line-clamp-2">{listing.title}</h3>
@@ -245,7 +319,7 @@ function VideoSlide({ listing, index, activeIndex, muted, language, onToggleMute
   );
 }
 
-export default function VideoFeed({ language, videos, currentUser, onLoginPrompt, onClose, onSelect, isAdmin }: VideoFeedProps) {
+export default function VideoFeed({ language, videos, currentUser, onLoginPrompt, onClose, onSelect, isAdmin, onStartChat }: VideoFeedProps) {
   const [activeIndex, setActiveIndex] = useState(0);
   const [muted, setMuted] = useState(true);
   const [isPostOpen, setIsPostOpen] = useState(false);
@@ -345,6 +419,8 @@ export default function VideoFeed({ language, videos, currentUser, onLoginPrompt
               currentUser={currentUser}
               onLoginPrompt={onLoginPrompt}
               isAdmin={!!isAdmin}
+              onStartChat={onStartChat}
+              onClose={onClose}
               onSelect={onSelect}
               registerRef={(el) => { slideRefs.current[index] = el; }}
             />

@@ -50,6 +50,7 @@ interface MarketplaceTabProps {
   notificationPermission: NotificationPermission;
   handleRequestNotificationPermission: () => Promise<void>;
   setIsLotteryOpen: (v: boolean) => void;
+  onStartChat: (listing: PartListing) => void;
 }
 
 // Heavy Equipment button icon: excavator (not in lucide, so a custom SVG)
@@ -128,6 +129,7 @@ export default function MarketplaceTab({
   notificationPermission,
   handleRequestNotificationPermission,
   setIsLotteryOpen,
+  onStartChat,
 }: MarketplaceTabProps) {
   const spotlightAds = useMemo(() => pickRotatedAds(adListings, MAX_SPOTLIGHT_ADS), [adListings]);
   // 🔧 (2026-10-02) যেগুলো উপরের "Premium Sponsored Spotlights" গ্রিডে
@@ -561,7 +563,7 @@ const feedListings = spotlightFiller ? feedItems.slice(1) : feedItems;
                 )}
 
 {isSearchOpen && <SearchPage language={language} listings={[...adListings, ...listings.filter((l) => !adListings.some((a) => a.id === l.id))]} searchHistory={searchHistory} onSaveHistory={appendSearchHistory} onClose={() => setIsSearchOpen(false)} onSelect={(l) => { setIsSearchOpen(false); handleViewListingDetails(l); }} />}
-{isVideoFeedOpen && <VideoFeed isAdmin={isUserAdmin} language={language} videos={videoListings} currentUser={user} onLoginPrompt={() => setIsAuthOpen(true)} onClose={() => setIsVideoFeedOpen(false)} onSelect={(l) => { setIsVideoFeedOpen(false); handleViewListingDetails(l); }} />}
+{isVideoFeedOpen && <VideoFeed onStartChat={onStartChat} isAdmin={isUserAdmin} language={language} videos={videoListings} currentUser={user} onLoginPrompt={() => setIsAuthOpen(true)} onClose={() => setIsVideoFeedOpen(false)} onSelect={(l) => { setIsVideoFeedOpen(false); handleViewListingDetails(l); }} />}
                 {isCityPickerOpen && (
                   <div className="fixed inset-0 z-[60] flex items-end justify-center" onClick={() => setIsCityPickerOpen(false)}>
                     <div className="absolute inset-0 bg-black/40 animate-fade-in"></div>

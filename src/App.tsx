@@ -2098,7 +2098,7 @@ export default function App() {
             {/* TAB 1: MARKETPLACE */}
             {activeTab === 'market' && (
               <Suspense fallback={<div className="flex items-center justify-center py-16"><Loader2 className="w-6 h-6 animate-spin text-amber-500" /></div>}>
-                <MarketplaceTab
+                <MarketplaceTab onStartChat={(l) => { setInitialListingToChat(l); setSelectedListing(null); setActiveTab("chats"); }}
                   language={language}
                   activeTranslations={activeTranslations}
                   searchQuery={searchQuery}
