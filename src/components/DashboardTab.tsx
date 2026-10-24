@@ -22,6 +22,7 @@ interface DashboardTabProps {
   listings: PartListing[];
   myListings: PartListing[];
   purchases: any[];
+  savedListings: PartListing[];
   hasMorePurchases: boolean;
   loadingMorePurchases: boolean;
   handleLoadMorePurchases: () => Promise<void>;
@@ -79,6 +80,7 @@ export default function DashboardTab({
   adPromoError,
   setAdPromoError,
   handleDashboardPromoSubmit,
+  savedListings,
 }: DashboardTabProps) {
   return (
               <div className="space-y-4 animate-fade-in">
@@ -295,13 +297,28 @@ export default function DashboardTab({
                         {language === "bn" ? "সংরক্ষিত বিজ্ঞাপন" : "Saved Ads"}
                       </h4>
 
-                      {purchases.length === 0 ? (
+                      {purchases.length === 0 && savedListings.length === 0 ? (
                         <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-850 p-4 text-center text-slate-500">
                           <p className="text-xs">{language === "bn" ? "আপনি এখনো কোনো বিজ্ঞাপন সংরক্ষণ করেননি। যেকোনো পণ্যের পেজে 'ড্যাশবোর্ডে সংরক্ষণ করুন' বাটনে চাপুন।" : "You haven't saved any ads yet. Tap 'Save to Dashboard' on any listing to add it here."}</p>
                         </div>
                       ) : (
                         <div className="space-y-3">
-                          {purchases.map((item) => (
+                          {savedListings.filter((l) => !purchases.some((pp: any) => pp.listingId === l.id)).map((item) => (
+                <div
+                  key={`saved-${item.id}`}
+                  onClick={() => handleViewListingDetails(item)}
+                  className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 rounded-xl flex gap-3 items-center cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 transition"
+                >
+                  <img src={(item as any).images?.[0] || item.image} alt="" className="w-10 h-10 rounded-lg object-cover flex-shrink-0" referrerPolicy="no-referrer" loading="lazy" />
+                  <div className="min-w-0">
+                    <h5 className="text-sm font-bold text-slate-900 dark:text-white truncate">{item.title}</h5>
+                    <div className="text-[11px] text-slate-400 mt-0.5">
+                      {language === "bn" ? "বিক্রেতা:" : "Seller:"} <span className="font-semibold">{item.sellerName}</span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+              {purchases.map((item) => (
                             <div 
                               key={item.id}
                   onClick={() => {

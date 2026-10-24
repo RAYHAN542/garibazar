@@ -2166,7 +2166,7 @@ export default function App() {
             {/* TAB 3: USER DASHBOARD & TRACKING DESK */}
             {activeTab === 'my-dashboard' && user && (
               <Suspense fallback={<div className="flex items-center justify-center py-16"><Loader2 className="w-6 h-6 animate-spin text-amber-500" /></div>}>
-                <DashboardTab
+                <DashboardTab savedListings={savedListings}
                   language={language}
                   activeTranslations={activeTranslations}
                   setActiveTab={setActiveTab}
