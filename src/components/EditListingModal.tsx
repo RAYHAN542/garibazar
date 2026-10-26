@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { SupportedLanguage, PartListing } from "../types";
-import { X, Loader2, Save, AlertTriangle } from "lucide-react";
+import { X, Loader2, Save, AlertTriangle, Video } from "lucide-react";
 import { supabase } from "../supabase";
 import { sanitizeText, validatePriceInput } from "../utils/sanitizer";
+import { prepareVideo, uploadVideoToR2 } from "../utils/videoUpload";
 
 interface EditListingModalProps {
   isOpen: boolean;
@@ -27,6 +28,12 @@ export function EditListingModal({
   const [location, setLocation] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [videoUrl, setVideoUrl] = useState("");
+  const [videoBusy, setVideoBusy] = useState(false);
+  const [videoStage, setVideoStage] = useState<"prepare" | "upload">("prepare");
+  const [videoProgress, setVideoProgress] = useState(0);
+  const [videoError, setVideoError] = useState("");
+  const videoInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (listing) {
@@ -36,11 +43,36 @@ export function EditListingModal({
       setCategory(listing.category || "general");
       setDescription(listing.description || "");
       setLocation(listing.location || "");
+      setVideoUrl(listing.videoUrl || "");
+      setVideoError("");
+      setVideoBusy(false);
       setError("");
     }
   }, [listing]);
 
   if (!isOpen || !listing) return null;
+
+  const handleVideoPick = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setVideoError("");
+    setVideoBusy(true);
+    setVideoProgress(0);
+    setVideoStage("prepare");
+    try {
+      // ২০ সেকেন্ডের বেশি হলে এখানেই প্রথম ২০ সেকেন্ড কেটে ছোট করা হয়
+      const blob = await prepareVideo(file, (pct) => setVideoProgress(pct));
+      setVideoStage("upload");
+      setVideoProgress(0);
+      const url = await uploadVideoToR2(blob, (pct) => setVideoProgress(pct));
+      setVideoUrl(url);
+    } catch (err: any) {
+      setVideoError(err?.message || (language === "bn" ? "ভিডিও আপলোড হয়নি, আবার চেষ্টা করুন।" : "Video upload failed. Please try again."));
+    } finally {
+      setVideoBusy(false);
+    }
+  };
 
   const handleUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -72,6 +104,9 @@ export function EditListingModal({
         category: category,
         description: sanitizedDesc,
         location: sanitizedLocation,
+        ...(videoUrl !== (listing.videoUrl || "")
+          ? { video_url: videoUrl || null, has_video: !!videoUrl, is_video: !!videoUrl }
+          : {}),
       };
 
       if (isLocal) {
@@ -253,6 +288,49 @@ export function EditListingModal({
             </div>
           </div>
 
+          {/* Video */}
+          <div className="rounded-xl border border-slate-200 dark:border-slate-800 p-3 space-y-2">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                {language === "bn" ? "ভিডিও (সর্বোচ্চ ২০ সেকেন্ড)" : "Video (max 20 seconds)"}
+              </span>
+              <button
+                type="button"
+                disabled={videoBusy || loading}
+                onClick={() => videoInputRef.current?.click()}
+                className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white font-bold text-[11px] rounded-lg flex items-center gap-1 cursor-pointer disabled:opacity-50"
+              >
+                <Video className="w-3.5 h-3.5" />
+                <span>
+                  {videoUrl
+                    ? (language === "bn" ? "ভিডিও বদলান" : "Replace video")
+                    : (language === "bn" ? "ভিডিও যোগ করুন" : "Add video")}
+                </span>
+              </button>
+            </div>
+            <input ref={videoInputRef} type="file" accept="video/*" className="hidden" onChange={handleVideoPick} />
+            {videoBusy && (
+              <div className="text-[11px] font-bold text-amber-600 dark:text-amber-400 flex items-center gap-1.5">
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                <span>
+                  {videoStage === "prepare"
+                    ? (language === "bn" ? "ভিডিও তৈরি হচ্ছে… " : "Preparing video… ")
+                    : (language === "bn" ? "আপলোড হচ্ছে… " : "Uploading… ")}
+                  {videoProgress}%
+                </span>
+              </div>
+            )}
+            {videoError && <p className="text-[11px] font-bold text-red-500">{videoError}</p>}
+            {videoUrl && !videoBusy && (
+              <video src={videoUrl} controls playsInline preload="metadata" className="w-full max-h-44 rounded-lg bg-black" />
+            )}
+            {videoUrl !== (listing.videoUrl || "") && !videoBusy && (
+              <p className="text-[11px] font-semibold text-slate-500">
+                {language === "bn" ? "নতুন ভিডিও 'পরিবর্তন সংরক্ষণ করুন' চাপলে সেভ হবে।" : "The new video is saved when you press Save Changes."}
+              </p>
+            )}
+          </div>
+
           {/* Actions footer */}
           <div className="flex gap-2.5 justify-end pt-4 border-t border-slate-100 dark:border-slate-850 mt-4">
             <button
@@ -265,7 +343,7 @@ export function EditListingModal({
             </button>
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || videoBusy}
               className="px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-slate-950 font-black text-xs rounded-xl transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
             >
               {loading ? (
