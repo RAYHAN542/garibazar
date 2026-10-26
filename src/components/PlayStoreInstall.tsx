@@ -1,10 +1,21 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { Smartphone, X } from "lucide-react";
+import { X } from "lucide-react";
 import { isAndroidWeb, playStoreUrl } from "../utils/playStore";
 
 const SNOOZE_KEY = "gb_play_popup_until";
 const DAY = 86400000;
+
+// Google Play-style "app listing" look: real app icon, app name, green install
+// button. Tapping it opens the real Google Play page (the install itself
+// happens there, not inside the website).
+function PlayMark({ size = 12 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true">
+      <path fill="#01875f" d="M4 2.5v19l17-9.5z" />
+    </svg>
+  );
+}
 
 export function PlayStoreStrip({ language }: { language: string }) {
   const [show, setShow] = useState(false);
@@ -16,20 +27,19 @@ export function PlayStoreStrip({ language }: { language: string }) {
   return (
     <a
       href={playStoreUrl("banner_strip")}
-      className="mt-3 flex items-center gap-3 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-600 p-3.5 text-white shadow-sm active:scale-[0.98]"
+      className="mt-3 flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm active:scale-[0.98] dark:border-slate-800 dark:bg-slate-900"
     >
-      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/20">
-        <Smartphone className="h-5 w-5" />
-      </div>
+      <img src="/icon-192.png" alt="" className="h-12 w-12 shrink-0 rounded-xl object-cover shadow-sm" />
       <div className="min-w-0 flex-1">
-        <p className="text-sm font-extrabold leading-tight">
-          {bn ? "গাড়ি বাজার অ্যাপ ইনস্টল করুন" : "Install Gari Bazar App"}
+        <p className="text-[15px] font-extrabold leading-tight text-slate-900 dark:text-white">
+          {bn ? "গাড়ি বাজার" : "Gari Bazar"}
         </p>
-        <p className="mt-0.5 text-[11px] font-semibold text-white/80">
-          {bn ? "Google Play থেকে ফ্রি ইনস্টল করুন" : "Free on Google Play"}
+        <p className="mt-0.5 flex items-center gap-1.5 text-[11.5px] font-semibold text-slate-500 dark:text-slate-400">
+          <PlayMark size={11} />
+          {bn ? "Google Play থেকে ফ্রি" : "Free on Google Play"}
         </p>
       </div>
-      <span className="shrink-0 rounded-full bg-white px-3 py-1.5 text-xs font-extrabold text-orange-600">
+      <span className="shrink-0 rounded-full bg-[#01875f] px-4 py-2 text-[13px] font-extrabold text-white">
         {bn ? "ইনস্টল" : "Install"}
       </span>
     </a>
@@ -72,32 +82,36 @@ export function PlayStorePopup({ language }: { language: string }) {
           aria-label="close"
           className="absolute right-3 top-3 text-slate-400"
         >
-          <X className="h-4 w-4" />
+          <X className="h-5 w-5" />
         </button>
-        <p className="pr-6 text-base font-extrabold text-slate-900 dark:text-white">
-          {bn ? "গাড়ি বাজার অ্যাপ ইনস্টল করুন" : "Install the Gari Bazar app"}
-        </p>
-        <p className="mt-1 text-xs font-semibold text-slate-500 dark:text-slate-400">
-          {bn
-            ? "দ্রুত লোড, নোটিফিকেশন আর সহজে বেচাকেনা — Google Play থেকে ফ্রি"
-            : "Faster, with notifications — free on Google Play"}
-        </p>
-        <div className="mt-3 flex gap-2">
-          <a
-            href={playStoreUrl("popup")}
-            onClick={() => snooze(90)}
-            className="flex-1 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-600 py-3 text-center text-sm font-extrabold text-white"
-          >
-            {bn ? "Google Play-তে ইনস্টল করুন" : "Install on Google Play"}
-          </a>
-          <button
-            type="button"
-            onClick={() => snooze(7)}
-            className="rounded-2xl px-4 py-3 text-sm font-bold text-slate-500 dark:text-slate-400"
-          >
-            {bn ? "পরে" : "Later"}
-          </button>
+        <div className="flex items-center gap-3 pr-7">
+          <img src="/icon-192.png" alt="" className="h-14 w-14 shrink-0 rounded-2xl object-cover shadow-sm" />
+          <div className="min-w-0">
+            <p className="text-lg font-extrabold leading-tight text-slate-900 dark:text-white">
+              {bn ? "গাড়ি বাজার" : "Gari Bazar"}
+            </p>
+            <p className="mt-0.5 text-xs font-semibold text-slate-500 dark:text-slate-400">
+              {bn ? "পার্টস ও গাড়ি বেচাকেনা" : "Buy & sell cars and parts"}
+            </p>
+          </div>
         </div>
+        <a
+          href={playStoreUrl("popup")}
+          onClick={() => snooze(90)}
+          className="mt-3 flex w-full items-center justify-center gap-2 rounded-full bg-[#01875f] py-3 text-sm font-extrabold text-white"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true">
+            <path fill="#fff" d="M4 2.5v19l17-9.5z" />
+          </svg>
+          {bn ? "Google Play থেকে ইনস্টল করুন" : "Install from Google Play"}
+        </a>
+        <button
+          type="button"
+          onClick={() => snooze(7)}
+          className="mt-1 w-full py-2 text-center text-sm font-bold text-slate-500 dark:text-slate-400"
+        >
+          {bn ? "পরে" : "Later"}
+        </button>
       </div>
     </div>,
     document.body

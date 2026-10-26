@@ -2308,23 +2308,24 @@ export default function App() {
                 <button
                   type="button"
                   onClick={() => { if (isAndroidWeb()) { window.location.href = playStoreUrl("profile_button"); } else { handleInstallApp(); } }}
-                  className="w-full flex items-center gap-3.5 bg-gradient-to-br from-amber-500 to-orange-600 rounded-3xl p-5 shadow-sm text-white text-left active:scale-[0.99] transition-transform"
+                  className="w-full flex items-center gap-3.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-4 shadow-sm text-left active:scale-[0.99] transition-transform"
                   aria-label={language === "bn" ? "গাড়ি বাজার অ্যাপ ইনস্টল করুন" : "Install Gari Bazar App"}
                 >
-                  <div className="w-11 h-11 rounded-2xl bg-white/20 flex items-center justify-center shrink-0">
-                    <Smartphone className="w-6 h-6" />
+                  <div className="w-14 h-14 rounded-2xl overflow-hidden shrink-0 shadow-sm">
+                    <img src="/icon-192.png" alt="" className="w-full h-full object-cover" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm sm:text-base font-extrabold leading-tight">
-                      {language === "bn" ? "গাড়ি বাজার অ্যাপ ইনস্টল করুন" : "Install Gari Bazar App"}
+                    <p className="text-base font-extrabold leading-tight text-slate-900 dark:text-white">
+                      {language === "bn" ? "গাড়ি বাজার অ্যাপ" : "Gari Bazar App"}
                     </p>
-                    <p className="text-[11px] sm:text-xs text-white/80 font-semibold mt-0.5">
-                      {language === "bn" ? "Google Play থেকে ফ্রি ইনস্টল করুন" : "Install free from Google Play"}
+                    <p className="mt-1 flex items-center gap-1.5 text-xs font-semibold text-slate-500 dark:text-slate-400">
+                      <svg width="12" height="12" viewBox="0 0 24 24" aria-hidden="true"><path fill="#01875f" d="M4 2.5v19l17-9.5z" /></svg>
+                      {language === "bn" ? "Google Play থেকে ফ্রি" : "Free on Google Play"}
                     </p>
                   </div>
-                  <div className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center shrink-0">
-                    <Download className="w-4.5 h-4.5" />
-                  </div>
+                  <span className="shrink-0 rounded-full bg-[#01875f] px-4 py-2 text-sm font-extrabold text-white">
+                    {language === "bn" ? "ইনস্টল" : "Install"}
+                  </span>
                 </button>
                 )}
 
