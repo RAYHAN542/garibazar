@@ -150,6 +150,23 @@ export async function fetchMoreListings(beforeCreatedAt: string, limit = 20, fil
 // floor.
 const AD_POOL_MIN_LIMIT = 300;
 
+// 🎬 "গাড়ির ভিডিও দেখুন" ফিডের জন্য: ডাটাবেস থেকে সরাসরি ভিডিওওয়ালা পোস্ট (নতুন থেকে পুরনো)।
+// আগে ফিড শুধু হোমপেজে লোড হওয়া ২০টা পোস্টের মধ্য থেকে ভিডিও খুঁজত, তাই নতুন পোস্ট এলে পুরনো ভিডিও হারিয়ে যেত।
+export async function fetchVideoListings(limit = 60): Promise<PartListing[]> {
+  const { data, error } = await supabase
+    .from("listings")
+    .select("*")
+    .eq("is_deleted", false)
+    .eq("has_video", true)
+    .not("video_url", "is", null)
+    .neq("video_url", "")
+    .order("created_at", { ascending: false })
+    .limit(limit);
+
+  if (error) throw error;
+  return (data || []).map(mapRowToListing).filter((l) => !l.isSold);
+}
+
 export async function fetchAdListings(limit = 20): Promise<PartListing[]> {
   const { data, error } = await supabase
     .from("listings")

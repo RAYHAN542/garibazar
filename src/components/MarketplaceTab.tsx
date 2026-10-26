@@ -1,4 +1,4 @@
-import { Fragment, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { Search, SlidersHorizontal, Bell, Plus, X, ShoppingBag, Loader2, LayoutGrid, Car, Wrench, Bike, Truck, MapPin, Check, Play } from "lucide-react";
 import { ListingCard } from "./ListingCard";
 import { PromotedSlider } from "./PromotedSlider";
@@ -10,6 +10,7 @@ import { PartListing, SupportedLanguage, TranslationSet } from "../types";
 import type { ActiveTab } from "./HeaderNav";
 import { logAnalyticsEvent } from "../utils/analytics";
 import { pickRotatedAds, MAX_SPOTLIGHT_ADS } from "../utils/adRotation";
+import { fetchVideoListings } from "../utils/listingsApi";
 
 interface MarketplaceTabProps {
   language: SupportedLanguage;
@@ -150,6 +151,20 @@ const videoListings = useMemo(
   () => [...adListings, ...listings.filter((l) => !adListings.some((a) => a.id === l.id))].filter((l) => !!l.videoUrl && !l.isSold),
   [adListings, listings]
 );
+// 🎬 ফিড খুললে ডাটাবেস থেকে সব ভিডিও পোস্ট আনি; লোড না হওয়া পর্যন্ত/ব্যর্থ হলে হোমপেজের লোড হওয়া ভিডিও দেখায়।
+const [dbVideos, setDbVideos] = useState<PartListing[]>([]);
+useEffect(() => {
+  if (!isVideoFeedOpen) return;
+  let cancelled = false;
+  fetchVideoListings().then((v) => { if (!cancelled) setDbVideos(v); }).catch(() => {});
+  return () => { cancelled = true; };
+}, [isVideoFeedOpen]);
+const feedVideos = useMemo(() => {
+  const seen = new Set<string>();
+  return [...dbVideos, ...videoListings]
+    .filter((l) => (seen.has(l.id) ? false : (seen.add(l.id), true)))
+    .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
+}, [dbVideos, videoListings]);
 const feedItems = useMemo(() => filteredListings.filter((item) => !spotlightIds.has(item.id) && !item.videoUrl), [filteredListings, spotlightIds]);
 const spotlightFiller = spotlightAds.length % 2 === 1 && feedItems.length > 0 ? feedItems[0] : null;
 const spotlightGridItems = spotlightFiller ? [...spotlightAds, spotlightFiller] : spotlightAds;
@@ -563,7 +578,7 @@ const feedListings = spotlightFiller ? feedItems.slice(1) : feedItems;
                 )}
 
 {isSearchOpen && <SearchPage language={language} listings={[...adListings, ...listings.filter((l) => !adListings.some((a) => a.id === l.id))]} searchHistory={searchHistory} onSaveHistory={appendSearchHistory} onClose={() => setIsSearchOpen(false)} onSelect={(l) => { setIsSearchOpen(false); handleViewListingDetails(l); }} />}
-{isVideoFeedOpen && <VideoFeed onStartChat={onStartChat} isAdmin={isUserAdmin} language={language} videos={videoListings} currentUser={user} onLoginPrompt={() => setIsAuthOpen(true)} onClose={() => setIsVideoFeedOpen(false)} onSelect={(l) => { setIsVideoFeedOpen(false); handleViewListingDetails(l); }} />}
+{isVideoFeedOpen && <VideoFeed onStartChat={onStartChat} isAdmin={isUserAdmin} language={language} videos={feedVideos} currentUser={user} onLoginPrompt={() => setIsAuthOpen(true)} onClose={() => setIsVideoFeedOpen(false)} onSelect={(l) => { setIsVideoFeedOpen(false); handleViewListingDetails(l); }} />}
                 {isCityPickerOpen && (
                   <div className="fixed inset-0 z-[60] flex items-end justify-center" onClick={() => setIsCityPickerOpen(false)}>
                     <div className="absolute inset-0 bg-black/40 animate-fade-in"></div>
