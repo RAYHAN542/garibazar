@@ -153,7 +153,7 @@ for (const c of comments) {
     console.log(`WOULD reply (${kind}) to comment ${c.id}`);
   } else {
     try {
-      await graph(`${c.id}/comments`, PAGE_TOKEN, { message: (c.from?.id ? `@[${c.from.id}] ` : "") + REPLIES[kind] }, "POST");
+      await graph(`${c.id}/comments`, PAGE_TOKEN, { message: REPLIES[kind] }, "POST");
       console.log(`Replied (${kind}) to comment ${c.id}`);
     } catch (e) {
       console.log(`Reply failed for ${c.id}: ${e.message}`);
