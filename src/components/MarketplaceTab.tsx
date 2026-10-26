@@ -153,12 +153,13 @@ const videoListings = useMemo(
 );
 // 🎬 ফিড খুললে ডাটাবেস থেকে সব ভিডিও পোস্ট আনি; লোড না হওয়া পর্যন্ত/ব্যর্থ হলে হোমপেজের লোড হওয়া ভিডিও দেখায়।
 const [dbVideos, setDbVideos] = useState<PartListing[]>([]);
+const [videoRefresh, setVideoRefresh] = useState(0);
 useEffect(() => {
   if (!isVideoFeedOpen) return;
   let cancelled = false;
   fetchVideoListings().then((v) => { if (!cancelled) setDbVideos(v); }).catch(() => {});
   return () => { cancelled = true; };
-}, [isVideoFeedOpen]);
+}, [isVideoFeedOpen, videoRefresh]);
 const feedVideos = useMemo(() => {
   const seen = new Set<string>();
   return [...dbVideos, ...videoListings]
@@ -578,7 +579,7 @@ const feedListings = spotlightFiller ? feedItems.slice(1) : feedItems;
                 )}
 
 {isSearchOpen && <SearchPage language={language} listings={[...adListings, ...listings.filter((l) => !adListings.some((a) => a.id === l.id))]} searchHistory={searchHistory} onSaveHistory={appendSearchHistory} onClose={() => setIsSearchOpen(false)} onSelect={(l) => { setIsSearchOpen(false); handleViewListingDetails(l); }} />}
-{isVideoFeedOpen && <VideoFeed onStartChat={onStartChat} isAdmin={isUserAdmin} language={language} videos={feedVideos} currentUser={user} onLoginPrompt={() => setIsAuthOpen(true)} onClose={() => setIsVideoFeedOpen(false)} onSelect={(l) => { setIsVideoFeedOpen(false); handleViewListingDetails(l); }} />}
+{isVideoFeedOpen && <VideoFeed onPosted={() => setVideoRefresh((n) => n + 1)} onStartChat={onStartChat} isAdmin={isUserAdmin} language={language} videos={feedVideos} currentUser={user} onLoginPrompt={() => setIsAuthOpen(true)} onClose={() => setIsVideoFeedOpen(false)} onSelect={(l) => { setIsVideoFeedOpen(false); handleViewListingDetails(l); }} />}
                 {isCityPickerOpen && (
                   <div className="fixed inset-0 z-[60] flex items-end justify-center" onClick={() => setIsCityPickerOpen(false)}>
                     <div className="absolute inset-0 bg-black/40 animate-fade-in"></div>

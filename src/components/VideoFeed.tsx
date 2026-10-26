@@ -28,6 +28,7 @@ interface VideoFeedProps {
   onClose: () => void;
   onSelect: (listing: PartListing) => void;
   isAdmin?: boolean;
+  onPosted?: () => void;
   onStartChat: (listing: PartListing) => void;
 }
 
@@ -319,7 +320,7 @@ function VideoSlide({ listing, index, activeIndex, muted, language, onToggleMute
   );
 }
 
-export default function VideoFeed({ language, videos, currentUser, onLoginPrompt, onClose, onSelect, isAdmin, onStartChat }: VideoFeedProps) {
+export default function VideoFeed({ language, videos, currentUser, onLoginPrompt, onClose, onSelect, isAdmin, onStartChat, onPosted }: VideoFeedProps) {
   const [activeIndex, setActiveIndex] = useState(0);
   const [muted, setMuted] = useState(true);
   const [isPostOpen, setIsPostOpen] = useState(false);
@@ -448,7 +449,7 @@ export default function VideoFeed({ language, videos, currentUser, onLoginPrompt
               mode="video"
               language={language}
               currentUser={currentUser}
-              onPostSuccess={() => { setIsPostOpen(false); setPosted(true); }}
+              onPostSuccess={() => { setIsPostOpen(false); setPosted(true); onPosted?.(); try { containerRef.current?.scrollTo({ top: 0 }); } catch (_) {} setActiveIndex(0); }}
               onLoginPrompt={() => { setIsPostOpen(false); onClose(); onLoginPrompt(); }}
             />
           </div>
