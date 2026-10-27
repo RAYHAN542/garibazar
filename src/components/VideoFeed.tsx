@@ -6,6 +6,8 @@ import { supabase } from "../supabase";
 import { nativeFetch } from "../utils/nativeFetch";
 import { apiUrl } from "../utils/apiBase";
 import { trackListingClick, incrementListingView } from "../utils/counters";
+import { isNativeAdsSupported } from "../utils/nativeAds";
+import { useVideoInterstitial } from "../hooks/useVideoInterstitial";
 
 const viewedThisSession = new Set<string>();
 
@@ -44,6 +46,7 @@ interface VideoSlideProps {
   index: number;
   activeIndex: number;
   muted: boolean;
+  adPlaying: boolean;
   language: SupportedLanguage;
   onToggleMute: () => void;
   onSelect: (listing: PartListing) => void;
@@ -55,7 +58,7 @@ interface VideoSlideProps {
   onClose: () => void;
 }
 
-function VideoSlide({ listing, index, activeIndex, muted, language, onToggleMute, registerRef, currentUser, onLoginPrompt, isAdmin, onStartChat, onClose }: VideoSlideProps) {
+function VideoSlide({ listing, index, activeIndex, muted, adPlaying, language, onToggleMute, registerRef, currentUser, onLoginPrompt, isAdmin, onStartChat, onClose }: VideoSlideProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [paused, setPaused] = useState(false);
   const isActive = index === activeIndex;
@@ -154,13 +157,17 @@ function VideoSlide({ listing, index, activeIndex, muted, language, onToggleMute
     const v = videoRef.current;
     if (!v) return;
     if (isActive) {
-      v.play().then(() => setPaused(false)).catch(() => setPaused(true));
+      if (adPlaying) {
+        v.pause();
+      } else {
+        v.play().then(() => setPaused(false)).catch(() => setPaused(true));
+      }
     } else {
       v.pause();
       try { v.currentTime = 0; } catch (_) {}
       setPaused(false);
     }
-  }, [isActive, isNear]);
+  }, [isActive, isNear, adPlaying]);
 
   useEffect(() => {
     if (videoRef.current) videoRef.current.muted = muted;
@@ -327,6 +334,8 @@ export default function VideoFeed({ language, videos, currentUser, onLoginPrompt
   const [posted, setPosted] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const slideRefs = useRef<(HTMLDivElement | null)[]>([]);
+  // প্রতি ৪টা ভিডিও swipe-এর পর Interstitial (video) ad; ad চলার সময় ভিডিও pause
+  const adPlaying = useVideoInterstitial(activeIndex, isNativeAdsSupported());
 
   // The slide that is at least 60% visible becomes the active (playing) one.
   useEffect(() => {
@@ -415,6 +424,7 @@ export default function VideoFeed({ language, videos, currentUser, onLoginPrompt
               index={index}
               activeIndex={activeIndex}
               muted={muted}
+              adPlaying={adPlaying}
               language={language}
               onToggleMute={() => setMuted((m) => !m)}
               currentUser={currentUser}
