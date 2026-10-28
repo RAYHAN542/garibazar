@@ -49,6 +49,7 @@ interface VideoSlideProps {
   adPlaying: boolean;
   language: SupportedLanguage;
   onToggleMute: () => void;
+  onForceMute: () => void;
   onSelect: (listing: PartListing) => void;
   registerRef: (el: HTMLDivElement | null) => void;
   currentUser: any;
@@ -58,7 +59,7 @@ interface VideoSlideProps {
   onClose: () => void;
 }
 
-function VideoSlide({ listing, index, activeIndex, muted, adPlaying, language, onToggleMute, registerRef, currentUser, onLoginPrompt, isAdmin, onStartChat, onClose }: VideoSlideProps) {
+function VideoSlide({ listing, index, activeIndex, muted, adPlaying, language, onToggleMute, onForceMute, registerRef, currentUser, onLoginPrompt, isAdmin, onStartChat, onClose }: VideoSlideProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [paused, setPaused] = useState(false);
   const isActive = index === activeIndex;
@@ -160,7 +161,16 @@ function VideoSlide({ listing, index, activeIndex, muted, adPlaying, language, o
       if (adPlaying) {
         v.pause();
       } else {
-        v.play().then(() => setPaused(false)).catch(() => setPaused(true));
+        v.play().then(() => setPaused(false)).catch(() => {
+          // সাউন্ডসহ অটোপ্লে আটকালে মিউট করে আবার চালাই (ব্যবহারকারী স্পিকারে চাপলে সাউন্ড আসবে)
+          if (!v.muted) {
+            v.muted = true;
+            onForceMute();
+            v.play().then(() => setPaused(false)).catch(() => setPaused(true));
+          } else {
+            setPaused(true);
+          }
+        });
       }
     } else {
       v.pause();
@@ -329,7 +339,7 @@ function VideoSlide({ listing, index, activeIndex, muted, adPlaying, language, o
 
 export default function VideoFeed({ language, videos, currentUser, onLoginPrompt, onClose, onSelect, isAdmin, onStartChat, onPosted }: VideoFeedProps) {
   const [activeIndex, setActiveIndex] = useState(0);
-  const [muted, setMuted] = useState(true);
+  const [muted, setMuted] = useState(false);
   const [isPostOpen, setIsPostOpen] = useState(false);
   const [posted, setPosted] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -427,6 +437,7 @@ export default function VideoFeed({ language, videos, currentUser, onLoginPrompt
               adPlaying={adPlaying}
               language={language}
               onToggleMute={() => setMuted((m) => !m)}
+              onForceMute={() => setMuted(true)}
               currentUser={currentUser}
               onLoginPrompt={onLoginPrompt}
               isAdmin={!!isAdmin}
