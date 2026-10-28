@@ -16,7 +16,7 @@ import { apiUrl } from "./apiBase";
 
 export const MAX_VIDEO_SECONDS = 20;
 
-const SKIP_REENCODE_MAX_BYTES = 4 * 1024 * 1024; // short + small => upload as-is
+const SKIP_REENCODE_MAX_BYTES = 24 * 1024 * 1024; // short (<=20s) => upload the original untouched (server cap is 25 MB)
 const FALLBACK_MAX_BYTES = 20 * 1024 * 1024; // if re-encoding is unsupported
 const UPLOADABLE_TYPES = ["video/mp4", "video/quicktime", "video/webm"];
 
