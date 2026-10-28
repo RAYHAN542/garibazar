@@ -245,18 +245,16 @@ export default function DashboardTab({
                                     {item.adTier} Ad Live
                                   </span>
                                 ) : (
-                                  isUserAdmin && (
-                                    <button
-                                      id={`dash-boost-btn-${item.id}`}
-                                      onClick={() => {
-                                        setDashboardSubTab('ads');
-                                        setAdSelectedListingId(item.id);
-                                      }}
-                                      className="text-[10px] font-bold bg-amber-500 hover:bg-amber-600 text-slate-950 px-2.5 py-1.5 rounded transition cursor-pointer"
-                                    >
-                                      {language === "bn" ? "বিজ্ঞাপন দিন" : "Promote"}
-                                    </button>
-                                  )
+                                  <button
+                                    id={`dash-boost-btn-${item.id}`}
+                                    onClick={() => {
+                                      setDashboardSubTab('ads');
+                                      setAdSelectedListingId(item.id);
+                                    }}
+                                    className="text-[10px] font-bold bg-amber-500 hover:bg-amber-600 text-slate-950 px-2.5 py-1.5 rounded transition cursor-pointer"
+                                  >
+                                    {language === "bn" ? "বিজ্ঞাপন দিন" : "Promote"}
+                                  </button>
                                 )}
 
                                 <button
