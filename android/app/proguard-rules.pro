@@ -50,3 +50,13 @@
 -keepattributes InnerClasses
 -keepattributes EnclosingMethod
 
+
+# Meta Audience Network (AdMob mediation)
+-keep class com.facebook.ads.** { *; }
+-keep class com.google.ads.mediation.facebook.** { *; }
+-dontwarn com.facebook.ads.**
+-dontwarn com.facebook.infer.annotation.**
+-dontwarn com.google.errorprone.annotations.**
+-dontwarn javax.annotation.**
+-dontwarn org.checkerframework.**
+-dontwarn org.jetbrains.annotations.**
