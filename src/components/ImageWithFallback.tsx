@@ -19,7 +19,7 @@ interface ImageWithFallbackProps {
 }
 
 // If an image has not finished loading after this long, give up on it.
-const LOAD_TIMEOUT_MS = 12000;
+const LOAD_TIMEOUT_MS = 25000;
 
 const withCacheBust = (url: string, nonce: number): string =>
   nonce ? `${url}${url.includes("?") ? "&" : "?"}r=${nonce}` : url;
@@ -31,6 +31,7 @@ export function ImageWithFallback({ id, src, alt, className = "", isAd = false, 
   // URLs, routed through Cloudinary fetch delivery.
   const [stage, setStage] = useState<"primary" | "cloudinary">("primary");
   const [retryNonce, setRetryNonce] = useState(0);
+  const [autoRetries, setAutoRetries] = useState(0);
 
   // A reused component instance (list recycling) must start fresh for a new src.
   useEffect(() => {
@@ -38,11 +39,18 @@ export function ImageWithFallback({ id, src, alt, className = "", isAd = false, 
     setError(false);
     setStage("primary");
     setRetryNonce(0);
+    setAutoRetries(0);
   }, [src]);
 
   const onFail = () => {
     if (stage === "primary" && isImgbbUrl(src)) {
       setStage("cloudinary");
+      setLoading(true);
+      return;
+    }
+    if (autoRetries < 1) {
+      setAutoRetries((n) => n + 1);
+      setRetryNonce(Date.now());
       setLoading(true);
       return;
     }
