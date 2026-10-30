@@ -49,3 +49,6 @@ img {
 
 
 
+
+/* Stop Chrome native pull-to-refresh (app has its own, off on sell tab) */
+html, body { overscroll-behavior-y: contain; }
