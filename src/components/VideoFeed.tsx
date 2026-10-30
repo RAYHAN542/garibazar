@@ -344,6 +344,8 @@ export default function VideoFeed({ language, videos, currentUser, onLoginPrompt
   const [posted, setPosted] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const slideRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const jumpPending = useRef(false);
+  const firstIdAtPost = useRef<string | null>(null);
   // প্রতি ৪টা ভিডিও swipe-এর পর Interstitial (video) ad; ad চলার সময় ভিডিও pause
   const adPlaying = useVideoInterstitial(activeIndex, isNativeAdsSupported());
 
@@ -365,6 +367,17 @@ export default function VideoFeed({ language, videos, currentUser, onLoginPrompt
     slideRefs.current.forEach((el) => { if (el) observer.observe(el); });
     return () => observer.disconnect();
   }, [videos.length]);
+
+  // পোস্টের পর নতুন ভিডিও তালিকার মাথায় এলে সেখানে নিয়ে যাই।
+  useEffect(() => {
+    if (!jumpPending.current) return;
+    if (videos[0]?.id === firstIdAtPost.current) return;
+    jumpPending.current = false;
+    requestAnimationFrame(() => {
+      try { containerRef.current?.scrollTo({ top: 0 }); } catch (_) {}
+      setActiveIndex(0);
+    });
+  }, [videos]);
 
   // Stop the page behind the feed from scrolling.
   useEffect(() => {
@@ -426,7 +439,7 @@ export default function VideoFeed({ language, videos, currentUser, onLoginPrompt
           </p>
         </div>
       ) : (
-        <div ref={containerRef} className="h-full w-full overflow-y-scroll snap-y snap-mandatory no-scrollbar">
+        <div ref={containerRef} style={{ overflowAnchor: "none" }} className="h-full w-full overflow-y-scroll snap-y snap-mandatory no-scrollbar">
           {videos.map((listing, index) => (
             <VideoSlide
               key={listing.id}
@@ -470,7 +483,7 @@ export default function VideoFeed({ language, videos, currentUser, onLoginPrompt
               mode="video"
               language={language}
               currentUser={currentUser}
-              onPostSuccess={() => { setIsPostOpen(false); setPosted(true); onPosted?.(); try { containerRef.current?.scrollTo({ top: 0 }); } catch (_) {} setActiveIndex(0); }}
+              onPostSuccess={() => { setIsPostOpen(false); setPosted(true); jumpPending.current = true; firstIdAtPost.current = videos[0]?.id ?? null; setTimeout(() => { jumpPending.current = false; }, 15000); onPosted?.(); try { containerRef.current?.scrollTo({ top: 0 }); } catch (_) {} setActiveIndex(0); }}
               onLoginPrompt={() => { setIsPostOpen(false); onClose(); onLoginPrompt(); }}
             />
           </div>
