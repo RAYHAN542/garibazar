@@ -3,6 +3,7 @@ import { supabase } from "../supabase";
 import { fetchAdminListings } from "../utils/listingsApi";
 import { ShieldAlert, CheckCircle2, XCircle, Coins, Loader2, Save, Check, Smartphone, User, Clock, Mail, Trash2, Search, TrendingUp, Grid, Inbox, Flag, Activity, Globe, Users, MapPin, Eye, RefreshCw } from "lucide-react";
 import { SupportedLanguage } from "../types";
+import { ImgbbMigrationCard } from "./ImgbbMigrationCard";
 
 interface AdminPanelProps {
   language: SupportedLanguage;
@@ -956,6 +957,8 @@ export function AdminPanel({ language, currentUser, listings: listingsProp, isUs
               </div>
             </div>
           </div>
+
+          <ImgbbMigrationCard language={language} />
 
           {/* Filtered Posts Grid */}
           {(() => {
