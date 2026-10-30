@@ -57,6 +57,36 @@ const resizeAndCompressImage = (file: File): Promise<Blob> => {
   });
 };
 
+// Upload to Cloudflare R2 via presigned PUT (server: api/_lib/r2-video.ts handleImageUpload).
+const uploadImageToR2 = async (blob: Blob, accessToken: string): Promise<string> => {
+  const contentType = ["image/jpeg", "image/png", "image/webp"].includes(blob.type) ? blob.type : "image/jpeg";
+  const signRes = await nativeFetch(apiUrl("/api/cloudinary-sign"), {
+    method: "POST",
+    headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ kind: "image", contentType, size: blob.size }),
+  });
+  if (!signRes.ok) {
+    const e = await signRes.json().catch(() => ({}));
+    throw new Error(`[R2 SIGN ${signRes.status}] ${e?.error || "failed"}`);
+  }
+  const { uploadUrl, publicUrl } = await signRes.json();
+  if (!uploadUrl || !publicUrl) throw new Error("[R2 SIGN] bad response");
+  await new Promise<void>((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("PUT", uploadUrl);
+    xhr.setRequestHeader("Content-Type", contentType);
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) resolve();
+      else reject(new Error(`[R2 PUT ${xhr.status}] ${xhr.responseText?.slice(0, 120) || "rejected"}`));
+    };
+    xhr.onerror = () => reject(new Error("[R2 PUT] network error"));
+    xhr.ontimeout = () => reject(new Error("[R2 PUT] timeout"));
+    xhr.timeout = 60000;
+    xhr.send(blob);
+  });
+  return publicUrl as string;
+};
+
 export const uploadToCloudinary = async (file: File | Blob): Promise<string> => {
   // Was: browser uploaded straight to Cloudinary with a public unsigned
   // preset. The preset name + cloud name are visible in the bundled JS, so
@@ -110,6 +140,13 @@ export const uploadToCloudinary = async (file: File | Blob): Promise<string> => 
 
   if (uploadBody.size > MAX_UPLOAD_BYTES) {
     throw new Error("ছবির সাইজ 5MB-এর বেশি হতে পারবে না। / Image size must be under 5MB.");
+  }
+
+  // Try R2 first; if anything fails, fall back to Cloudinary below.
+  try {
+    return await uploadImageToR2(uploadBody, accessToken);
+  } catch (r2Err: any) {
+    console.error("[R2 image] failed, falling back to Cloudinary:", r2Err);
   }
 
   // Ask our server for a signature. This also doubles as the auth check --
