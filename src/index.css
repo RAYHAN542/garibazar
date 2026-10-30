@@ -49,3 +49,8 @@ img {
 
 
 
+
+/* ফর্ম লেখার সময় উপর থেকে নিচে টানলে পেজ রিলোড (pull-to-refresh) বন্ধ */
+html, body {
+  overscroll-behavior-y: none;
+}
