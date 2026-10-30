@@ -208,7 +208,17 @@ export async function handleImageUpload(req: any, res: any, uid: string) {
     if (!Number.isFinite(size) || size <= 0 || size > MAX_IMAGE_BYTES) {
       return res.status(400).json({ error: "ছবিটি অনেক বড়।" });
     }
-    const key = `images/${uid}/${crypto.randomUUID()}.${ext}`;
+    let key = `images/${uid}/${crypto.randomUUID()}.${ext}`;
+    // Thumbnail of an existing main image of THIS user: stored next to it as <name>-t.webp
+    const thumbFor = req.body?.thumbFor;
+    if (thumbFor !== undefined) {
+      const mainKey = String(thumbFor).replace(publicUrl.replace(/\/$/, "") + "/", "");
+      const okName = new RegExp("^images/" + uid + "/[0-9a-f-]{36}\\.webp$");
+      if (contentType !== "image/webp" || size > 300 * 1024 || !okName.test(mainKey)) {
+        return res.status(400).json({ error: "থাম্বনেইল সাপোর্ট করে না।" });
+      }
+      key = mainKey.replace(/\.webp$/, "-t.webp");
+    }
     const uploadUrl = presignPut({
       accountId,
       bucket,

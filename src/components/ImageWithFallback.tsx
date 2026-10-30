@@ -21,6 +21,21 @@ interface ImageWithFallbackProps {
 // If an image has not finished loading after this long, give up on it.
 const LOAD_TIMEOUT_MS = 25000;
 
+// New R2 images have a small copy next to them (<name>-t.webp). Only small
+// cards (width <= 600) use it; old images have none, so a 404 just falls back.
+const getThumbUrl = (src: string, width: number): string | null => {
+  if (width > 600) return null;
+  try {
+    const u = new URL(src);
+    if (u.hostname !== "img.garibazar.shop") return null;
+    if (!/^\/images\/.+\.webp$/.test(u.pathname) || /-t\.webp$/.test(u.pathname)) return null;
+    u.pathname = u.pathname.replace(/\.webp$/, "-t.webp");
+    return u.toString();
+  } catch {
+    return null;
+  }
+};
+
 const withCacheBust = (url: string, nonce: number): string =>
   nonce ? `${url}${url.includes("?") ? "&" : "?"}r=${nonce}` : url;
 
@@ -29,7 +44,9 @@ export function ImageWithFallback({ id, src, alt, className = "", isAd = false, 
   const [error, setError] = useState(false);
   // "primary" = the normal URL; "cloudinary" = second attempt for ibb.co
   // URLs, routed through Cloudinary fetch delivery.
-  const [stage, setStage] = useState<"primary" | "cloudinary">("primary");
+  const [stage, setStage] = useState<"thumb" | "primary" | "cloudinary">(() =>
+    getThumbUrl(src, width) ? "thumb" : "primary"
+  );
   const [retryNonce, setRetryNonce] = useState(0);
   const [autoRetries, setAutoRetries] = useState(0);
 
@@ -37,12 +54,17 @@ export function ImageWithFallback({ id, src, alt, className = "", isAd = false, 
   useEffect(() => {
     setLoading(true);
     setError(false);
-    setStage("primary");
+    setStage(getThumbUrl(src, width) ? "thumb" : "primary");
     setRetryNonce(0);
     setAutoRetries(0);
   }, [src]);
 
   const onFail = () => {
+    if (stage === "thumb") {
+      setStage("primary");
+      setLoading(true);
+      return;
+    }
     if (stage === "primary" && isImgbbUrl(src)) {
       setStage("cloudinary");
       setLoading(true);
@@ -105,9 +127,11 @@ export function ImageWithFallback({ id, src, alt, className = "", isAd = false, 
   }
 
   const baseUrl =
-    stage === "cloudinary"
-      ? getCloudinaryFetchUrl(src, Math.max(width, 1000))
-      : getOptimizedImageUrl(src, width);
+    stage === "thumb"
+      ? getThumbUrl(src, width) || src
+      : stage === "cloudinary"
+        ? getCloudinaryFetchUrl(src, Math.max(width, 1000))
+        : getOptimizedImageUrl(src, width);
 
   return (
     <div className="relative w-full h-full overflow-hidden bg-slate-100 dark:bg-slate-900">

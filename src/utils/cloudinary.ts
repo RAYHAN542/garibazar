@@ -57,6 +57,51 @@ const resizeAndCompressImage = (file: File): Promise<Blob> => {
   });
 };
 
+// Small thumbnail (480px wide) so the feed loads ~30KB instead of the full image.
+const THUMB_WIDTH = 480;
+const makeThumb = (blob: Blob): Promise<Blob> =>
+  new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(blob);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const scale = Math.min(1, THUMB_WIDTH / img.width);
+      const w = Math.max(1, Math.round(img.width * scale));
+      const h = Math.max(1, Math.round(img.height * scale));
+      const canvas = document.createElement("canvas");
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        reject(new Error("no canvas"));
+        return;
+      }
+      ctx.drawImage(img, 0, 0, w, h);
+      canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("thumb failed"))), "image/webp", 0.7);
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error("thumb read failed"));
+    };
+    img.src = url;
+  });
+
+// Best effort, runs in the background: never blocks or fails the post.
+// Old/failed thumbnails are fine -- the feed falls back to the full image.
+const uploadThumbToR2 = async (mainBlob: Blob, mainUrl: string, accessToken: string): Promise<void> => {
+  const thumb = await makeThumb(mainBlob);
+  if (thumb.type !== "image/webp") return;
+  const signRes = await nativeFetch(apiUrl("/api/cloudinary-sign"), {
+    method: "POST",
+    headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ kind: "image", contentType: "image/webp", size: thumb.size, thumbFor: mainUrl }),
+  });
+  if (!signRes.ok) return;
+  const { uploadUrl } = await signRes.json();
+  if (!uploadUrl) return;
+  await fetch(uploadUrl, { method: "PUT", headers: { "Content-Type": "image/webp" }, body: thumb });
+};
+
 // Upload to Cloudflare R2 via presigned PUT (server: api/_lib/r2-video.ts handleImageUpload).
 const uploadImageToR2 = async (blob: Blob, accessToken: string): Promise<string> => {
   const contentType = ["image/jpeg", "image/png", "image/webp"].includes(blob.type) ? blob.type : "image/jpeg";
@@ -84,6 +129,9 @@ const uploadImageToR2 = async (blob: Blob, accessToken: string): Promise<string>
     xhr.timeout = 60000;
     xhr.send(blob);
   });
+  if (contentType === "image/webp") {
+    void uploadThumbToR2(blob, publicUrl as string, accessToken).catch(() => {});
+  }
   return publicUrl as string;
 };
 

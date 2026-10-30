@@ -39,7 +39,7 @@ const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
 });
 
 const RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000; // 1 hour
-const RATE_LIMIT_MAX = 40; // signatures per user per hour -- generous for
+const RATE_LIMIT_MAX = 80; // signatures per user per hour -- generous for
 // normal listing/photo uploads, but stops a compromised/scripted account
 // from hammering Cloudinary storage quota.
 
