@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { SupportedLanguage } from "../types";
 import { Camera, Loader2, AlertTriangle, X, Video, Car, Bike, Truck, Wrench } from "lucide-react";
 import { supabase } from "../supabase";
@@ -206,6 +206,22 @@ export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPromp
   // যায়, আর submit বাটনের ঠিক উপরেও একই বার্তা দেখানো হয় (duplicate), যাতে
   // scroll কোনো কারণে কাজ না করলেও ইউজার কারণটা দেখতে পায়।
   const errorBannerRef = useRef<HTMLDivElement>(null);
+
+  // Chrome-এর নিজের pull-to-refresh ফর্মের ছবি/লেখা মুছে দিত -- পেজের একদম
+  // উপরে নিচের দিকে টান আটকানো হয়। ফর্ম বন্ধ হলে listener সরে যায়।
+  useEffect(() => {
+    let startY = 0;
+    const onStart = (e: TouchEvent) => { startY = e.touches[0].clientY; };
+    const onMove = (e: TouchEvent) => {
+      if (window.scrollY <= 0 && e.touches[0].clientY > startY && e.cancelable) e.preventDefault();
+    };
+    window.addEventListener("touchstart", onStart, { passive: true });
+    window.addEventListener("touchmove", onMove, { passive: false });
+    return () => {
+      window.removeEventListener("touchstart", onStart);
+      window.removeEventListener("touchmove", onMove);
+    };
+  }, []);
 
   // অ্যাকাউন্ট ছাড়া পোস্ট: ব্যবহারকারী শুধু ফোন নম্বর দেয়, ভেতরে ভেতরে সেই নম্বরে অ্যাকাউন্ট
   // খুলে নেওয়া হয় (এলোমেলো পাসওয়ার্ড এই ফোনেই সেভ থাকে)। নম্বরে আগে থেকে অ্যাকাউন্ট থাকলে
