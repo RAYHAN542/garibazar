@@ -312,6 +312,9 @@ export default function App() {
   const [firebaseListings, setFirebaseListings] = useState<PartListing[]>([]);
   const [moreListings, setMoreListings] = useState<PartListing[]>([]);
   const [lastListingDoc, setLastListingDoc] = useState<string | null>(null);
+  // ক্যাটাগরি বদলালে পুরনো ক্যাটাগরির cursor দিয়ে "আরো" আনা আটকাতে: cursor কোন ক্যাটাগরির, আর এখন কোনটা বাছা।
+  const listingsKeyRef = useRef<string>("");
+  const currentKeyRef = useRef<string>("");
   const [hasMoreListings, setHasMoreListings] = useState(false);
   const [loadingMoreListings, setLoadingMoreListings] = useState(false);
   // 🔧 Surfaced instead of silently showing "no listings" -- set when the
@@ -1228,6 +1231,7 @@ export default function App() {
         });
 
         setFirebaseListings(list);
+        listingsKeyRef.current = selectedCategory + "|" + selectedSubCategory;
         setLastListingDoc(page.nextCursor);
         setHasMoreListings(page.hasMore);
       }
@@ -1271,6 +1275,7 @@ export default function App() {
   // previous filter.
   useEffect(() => {
     setMoreListings([]);
+    currentKeyRef.current = selectedCategory + "|" + selectedSubCategory;
     fetchInitialListings();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedCategory, selectedSubCategory]);
@@ -1362,6 +1367,8 @@ export default function App() {
   // through up to 6 unfiltered batches hunting for a handful of matches.
   const handleLoadMoreListings = async () => {
     if (!lastListingDoc || loadingMoreListings) return;
+    const reqKey = selectedCategory + "|" + selectedSubCategory;
+    if (listingsKeyRef.current !== reqKey) return;
     setLoadingMoreListings(true);
     try {
       const page = await withTimeout(
@@ -1370,6 +1377,7 @@ export default function App() {
         "loadMoreListings"
       );
 
+      if (currentKeyRef.current !== reqKey) return;
       setMoreListings(prev => {
         const combined = [...prev];
         page.listings.forEach(item => {
