@@ -1,6 +1,6 @@
 import React, { useState, useRef } from "react";
 import { SupportedLanguage } from "../types";
-import { Camera, Loader2, AlertTriangle, X, Video } from "lucide-react";
+import { Camera, Loader2, AlertTriangle, X, Video, Car, Bike, Truck, Wrench } from "lucide-react";
 import { supabase } from "../supabase";
 import { sanitizeText, validatePriceInput, validateBanglaPhone } from "../utils/sanitizer";
 import { uploadToCloudinary } from "../utils/cloudinary";
@@ -10,8 +10,6 @@ import { nativeFetch } from "../utils/nativeFetch";
 import { apiUrl } from "../utils/apiBase";
 import { CITIES } from "../translations";
 import { detectDistrictFromArea } from "../data/areaMap";
-import vehicleCardImg from "../assets/images/vehicle-card-new.webp";
-import partsCardImg from "../assets/images/parts-card-new.webp";
 
 interface AddPartFormProps {
   language: SupportedLanguage;
@@ -129,35 +127,39 @@ const detectLocationFromText = (text: string): string => {
   return "";
 };
 
-// 🔧 (2026-09-26) আগে "vehicle" টাইপের প্রতিটা পোস্টই hardcode করে
-// sub_category="other_heavy_equipment" পেত -- আসলে গাড়ি/বাইক/ট্রাক যা-ই হোক
-// না কেন। ফলে হোমপেজের "Car"/"Bike"/"Truck" quick-filter icon-গুলো এই
-// পোস্টগুলো subCategory ফিল্ডে কখনো খুঁজে পেত না (শুধু বিবরণে keyword থাকলে
-// text-fallback দিয়ে ধরা পড়ত), আর "Heavy Equip." ফিল্টারে ক্লিক করলে
-// আসলে-heavy-machinery-না এমন সব গাড়ি/বাইকও দেখাত (matchesSubCategoryFilter-এ
-// subCategory মিলে গেলে সরাসরি true হয়ে যায়, বিবরণ না দেখেই)। এই ফাংশনটা
-// listingFilters.ts-এর matchesSubCategoryFilter-এ যে একই কীওয়ার্ড ব্যবহার হয়
-// সেগুলো দিয়েই বিবরণ থেকে সঠিক sub-category অনুমান করে, যাতে পোস্ট করার
-// সময়েই ঠিকভাবে ট্যাগ হয়ে যায়।
-//
-// 🔧 (2026-09-26, second fix) ডিফল্ট fallback আগে ছিল "other_heavy_equipment"
-// -- কিন্তু অনেক গাড়ির পোস্টে শুধু মডেলের নাম থাকে ("COROLLA 110", "Premio",
-// "Axio"), "car"/"toyota" শব্দ literally থাকে না, তাই ভুলভাবে heavy equipment
-// হিসেবে ট্যাগ হয়ে যেত। Heavy equipment পোস্টে প্রায় সবসময়ই স্পষ্ট শব্দ
-// (excavator/crane/bulldozer) থাকে, কিন্তু সাধারণ গাড়িতে না-ও থাকতে পারে --
-// তাই ডিফল্ট এখন "car" (সংখ্যায় সবচেয়ে বেশি এবং misclassify হলে কম ক্ষতিকর)।
-const detectVehicleSubCategory = (text: string): string => {
-  const t = (text || "").toLowerCase();
-  if (/excavator|এক্সক্যাভেটর|এক্সকাভেটর/.test(t)) return "excavator";
-  if (/crane|ক্রেন/.test(t)) return "crane";
-  if (/bulldozer|বুলডোজার|dozer/.test(t)) return "bulldozer";
-  if (/forklift|ফর্কলিফ্ট|forkclip/.test(t)) return "forklift";
-  if (/microbus|মাইক্রোবাস|hiace|হাইয়েস/.test(t)) return "microbus";
-  if (/(^|[^a-z])bus([^a-z]|$)|বাস/.test(t)) return "bus";
-  if (/truck|ট্রাক|lorry|লরি|covered van|কাভার্ড ভ্যান/.test(t)) return "truck";
-  if (/bike|বাইক|motorcycle|মোটরসাইকেল|scooter|স্কুটার|yamaha|bajaj/.test(t)) return "bike";
-  return "car";
-};
+// 🔧 (2026-10-30) ক্যাটাগরি এখন শুধু মডালে ইউজার যে বাটন চাপে সেটা থেকেই আসে --
+// বিবরণ থেকে keyword দিয়ে অনুমান পুরোপুরি বাদ। প্রতিটা বাটন হোমপেজের
+// quick-filter chip-এর সাথে হুবহু মেলে (listings টেবিলের category / sub_category / type)।
+type PostKind = "car" | "bike" | "truck" | "heavy" | "parts";
+const POST_KINDS = {
+  car: { category: "vehicles", sub_category: "car", type: "vehicle" },
+  bike: { category: "vehicles", sub_category: "bike", type: "vehicle" },
+  truck: { category: "vehicles", sub_category: "truck", type: "vehicle" },
+  heavy: { category: "vehicles", sub_category: "other_heavy_equipment", type: "vehicle" },
+  parts: { category: "general", sub_category: "general", type: "part" },
+} as const;
+
+// Heavy Equipment icon: excavator (not in lucide, so a custom SVG)
+const ExcavatorIcon = ({ className }: { className?: string }) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className={className}
+    aria-hidden="true"
+  >
+    <rect x="2" y="18" width="13" height="3.5" rx="1.75" />
+    <path d="M4 18v-4.5h9V18" />
+    <path d="M4 13.5v-4h4l2.5 4" />
+    <path d="M11.5 13.5l3-8 5 2" />
+    <path d="M19.5 7.5L21 12.5" />
+    <path d="M18 12.5h4.5l-1 3.5h-3.5z" />
+  </svg>
+);
 
 // বিবরণের প্রথম অংশ থেকে একটা সংক্ষিপ্ত শিরোনাম বানায় (কার্ডে দেখানোর জন্য)।
 const deriveTitleFromDescription = (text: string): string => {
@@ -453,7 +455,8 @@ export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPromp
     setShowCategoryModal(true);
   };
 
-  const submitListing = async (selectedType: "part" | "vehicle") => {
+  const submitListing = async (kind: PostKind) => {
+    const picked = POST_KINDS[kind];
     setShowCategoryModal(false);
     const cleanPhoneDigits = toEnglishDigits(phone).replace(/\D/g, "");
     const uploadedUrls = images.filter(img => img.status === "success" && img.url).map(img => img.url as string);
@@ -483,11 +486,10 @@ export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPromp
       const detectedLocation = detectLocationFromText(description) || "Bangladesh";
       const cleanPhone = sanitizeText(cleanPhoneDigits);
 
-      const parentCategory = selectedType === "vehicle" ? "vehicles" : "general";
-      // 🔧 আগে এখানে সবসময় "other_heavy_equipment" hardcode করা হতো -- এখন
-      // বিবরণ থেকে আসল ধরন (car/bike/truck/bus/excavator ইত্যাদি) অনুমান করা
-      // হয়, যাতে হোমপেজের quick-filter icon-গুলো সঠিকভাবে কাজ করে।
-      const normalizedSubCategory = selectedType === "vehicle" ? detectVehicleSubCategory(description) : "general";
+      // ইউজার যে বাটন চেপেছে সেটাই একমাত্র সত্য -- বিবরণ থেকে কোনো অনুমান নেই।
+      const parentCategory: string = picked.category;
+      const normalizedSubCategory: string = picked.sub_category;
+      const selectedType: string = picked.type;
 
       // Written to Supabase now (App.tsx reads listings from Supabase -
       // USE_SUPABASE_LISTINGS = true). The 30s cooldown is enforced by a
@@ -727,31 +729,32 @@ export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPromp
         <div className="fixed inset-0 z-[100] bg-black/50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl p-5 w-full max-w-sm shadow-xl">
             <h3 className="text-sm font-bold text-gray-800 text-center mb-4">
-              {language === "bn" ? "এটা কী ধরনের বিজ্ঞাপন?" : "What kind of listing is this?"}
+              {language === "bn" ? "কোনটা বেচছেন?" : "What are you selling?"}
             </h3>
-            <div className="grid grid-cols-2 gap-3">
-              <button
-                type="button"
-                onClick={() => submitListing("vehicle")}
-                disabled={isSubmitting}
-                className="rounded-2xl border-2 border-gray-200 px-3 py-3.5 flex flex-col items-center gap-1.5 hover:border-amber-500 hover:bg-amber-50 transition-all disabled:opacity-50"
-              >
-                <img src={vehicleCardImg} alt="" className="w-full h-14 object-contain" />
-                <span className="text-xs font-bold text-center leading-tight text-gray-600">
-                  {language === "bn" ? "গাড়ি বেচা/কেনা" : "Vehicle Buy & Sell"}
-                </span>
-              </button>
-              <button
-                type="button"
-                onClick={() => submitListing("part")}
-                disabled={isSubmitting}
-                className="rounded-2xl border-2 border-gray-200 px-3 py-3.5 flex flex-col items-center gap-1.5 hover:border-sky-500 hover:bg-sky-50 transition-all disabled:opacity-50"
-              >
-                <img src={partsCardImg} alt="" className="w-full h-14 object-contain" />
-                <span className="text-xs font-bold text-center leading-tight text-gray-600">
-                  {language === "bn" ? "গাড়ির পাট" : "Vehicle Parts"}
-                </span>
-              </button>
+            <div className="grid grid-cols-6 gap-2.5">
+              {([
+                { kind: "car", icon: Car, bn: "কার", en: "Car", span: "col-span-2" },
+                { kind: "bike", icon: Bike, bn: "বাইক", en: "Bike", span: "col-span-2" },
+                { kind: "truck", icon: Truck, bn: "ট্রাক", en: "Truck", span: "col-span-2" },
+                { kind: "heavy", icon: ExcavatorIcon, bn: "হেভি ইকুইপমেন্ট", en: "Heavy Equipment", span: "col-span-3" },
+                { kind: "parts", icon: Wrench, bn: "পার্টস", en: "Parts", span: "col-span-3" },
+              ] as const).map((opt) => {
+                const OptIcon = opt.icon;
+                return (
+                  <button
+                    key={opt.kind}
+                    type="button"
+                    onClick={() => submitListing(opt.kind)}
+                    disabled={isSubmitting}
+                    className={`${opt.span} rounded-2xl border-2 border-gray-200 px-2 py-3.5 flex flex-col items-center gap-1.5 hover:border-amber-500 hover:bg-amber-50 transition-all disabled:opacity-50`}
+                  >
+                    <OptIcon className="w-7 h-7 text-gray-600" />
+                    <span className="text-xs font-bold text-center leading-tight text-gray-600">
+                      {language === "bn" ? opt.bn : opt.en}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
             {isSubmitting && (
               <div className="mt-4 flex items-center justify-center gap-2 text-xs text-gray-500">

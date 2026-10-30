@@ -13,6 +13,14 @@ interface EditListingModalProps {
   onSaveSuccess: () => void;
 }
 
+// Vehicle sub-category choices -- same values the post form writes.
+const VEHICLE_SUB_OPTIONS = [
+  { value: "car", bn: "কার", en: "Car" },
+  { value: "bike", bn: "বাইক", en: "Bike" },
+  { value: "truck", bn: "ট্রাক", en: "Truck" },
+  { value: "other_heavy_equipment", bn: "হেভি ইকুইপমেন্ট", en: "Heavy Equipment" },
+];
+
 export function EditListingModal({
   isOpen,
   onClose,
@@ -24,6 +32,7 @@ export function EditListingModal({
   const [model, setModel] = useState("");
   const [title, setTitle] = useState("");
   const [category, setCategory] = useState("general");
+  const [subCategory, setSubCategory] = useState("");
   const [description, setDescription] = useState("");
   const [location, setLocation] = useState("");
   const [loading, setLoading] = useState(false);
@@ -41,6 +50,7 @@ export function EditListingModal({
       setModel(listing.model || "");
       setTitle(listing.title || "");
       setCategory(listing.category || "general");
+      setSubCategory(listing.subCategory || "");
       setDescription(listing.description || "");
       setLocation(listing.location || "");
       setVideoUrl(listing.videoUrl || "");
@@ -51,6 +61,8 @@ export function EditListingModal({
   }, [listing]);
 
   if (!isOpen || !listing) return null;
+
+  const isVehicleListing = listing.type === "vehicle" || listing.category === "vehicles";
 
   const handleVideoPick = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -101,7 +113,8 @@ export function EditListingModal({
         price: validatedPrice,
         model: sanitizedModel,
         title: sanitizedTitle,
-        category: category,
+        category: isVehicleListing ? "vehicles" : category,
+        ...(isVehicleListing && subCategory ? { sub_category: subCategory } : {}),
         description: sanitizedDesc,
         location: sanitizedLocation,
         ...(videoUrl !== (listing.videoUrl || "")
@@ -205,6 +218,20 @@ export function EditListingModal({
                 <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block mb-1">
                   {language === "bn" ? "ক্যাটাগরি" : "Category"}
                 </label>
+                {isVehicleListing ? (
+                  <select
+                    value={subCategory}
+                    onChange={(e) => setSubCategory(e.target.value)}
+                    className="w-full px-3 py-2.5 border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 rounded-xl text-xs text-slate-900 dark:text-white font-bold focus:outline-none"
+                  >
+                    {!VEHICLE_SUB_OPTIONS.some((o) => o.value === subCategory) && (
+                      <option value={subCategory}>{subCategory || "—"}</option>
+                    )}
+                    {VEHICLE_SUB_OPTIONS.map((o) => (
+                      <option key={o.value} value={o.value}>{language === "bn" ? o.bn : o.en}</option>
+                    ))}
+                  </select>
+                ) : (
                 <select
                   value={category}
                   onChange={(e) => setCategory(e.target.value)}
@@ -222,6 +249,7 @@ export function EditListingModal({
                     </>
                   )}
                 </select>
+                )}
               </div>
 
               <div>

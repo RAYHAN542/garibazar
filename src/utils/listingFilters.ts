@@ -25,6 +25,11 @@ export const checkIsProduction = (): boolean => {
 
 export const isItemVehicle = (item: PartListing): boolean => {
   if (!item) return false;
+  // type is set at post time from the button the seller tapped -- it is the
+  // source of truth, so it wins before any category/keyword guessing.
+  if (item.type === "part") return false;
+  if (item.type === "vehicle") return true;
+  // Old rows with no type fall through to the original logic below.
   if (item.category === "vehicles") return true;
   if (item.category === "spare_parts") return false;
 
