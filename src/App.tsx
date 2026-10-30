@@ -2047,7 +2047,7 @@ export default function App() {
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-100 flex flex-col font-sans transition-colors duration-300" style={{ paddingTop: "env(safe-area-inset-top)" }}>
 
-      <PullToRefresh />
+      {activeTab !== 'sell' && <PullToRefresh />}
       <UpdateBanner language={language} />
 
       {/* Offline Alert Banner in Bengali */}
