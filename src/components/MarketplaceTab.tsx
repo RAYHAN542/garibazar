@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { Search, SlidersHorizontal, Bell, Plus, X, ShoppingBag, Loader2, LayoutGrid, Car, Wrench, Bike, Truck, MapPin, Check, Play } from "lucide-react";
 import { ListingCard } from "./ListingCard";
 import { PromotedSlider } from "./PromotedSlider";
@@ -167,6 +167,17 @@ const feedVideos = useMemo(() => {
     .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
 }, [dbVideos, videoListings]);
 const feedItems = useMemo(() => filteredListings.filter((item) => !spotlightIds.has(item.id) && !item.videoUrl), [filteredListings, spotlightIds]);
+// প্রতি পাতায় ২০টা আসে, কিন্তু ভিডিও/স্পনসরড পোস্ট গ্রিডে লুকানো থাকে; দৃশ্যমান পোস্ট কম হলে নিজে থেকে আরো আনি (সর্বোচ্চ ৩ বার)।
+const autoFillTries = useRef(0);
+useEffect(() => { autoFillTries.current = 0; }, [selectedCategory, selectedSubCategory]);
+useEffect(() => {
+  if (searchQuery.trim().length > 0) return;
+  if (loadingMoreListings || !hasMoreListings) return;
+  if (feedItems.length >= 16) return;
+  if (autoFillTries.current >= 3) return;
+  autoFillTries.current += 1;
+  void handleLoadMoreListings();
+}, [feedItems.length, hasMoreListings, loadingMoreListings, searchQuery]);
 const spotlightFiller = spotlightAds.length % 2 === 1 && feedItems.length > 0 ? feedItems[0] : null;
 const spotlightGridItems = spotlightFiller ? [...spotlightAds, spotlightFiller] : spotlightAds;
 const feedListings = spotlightFiller ? feedItems.slice(1) : feedItems;
