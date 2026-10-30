@@ -1,6 +1,6 @@
 import React, { useState, useRef } from "react";
 import { SupportedLanguage } from "../types";
-import { Camera, Loader2, AlertTriangle, X, Video, Car, Bike, Truck, Wrench } from "lucide-react";
+import { Camera, Loader2, AlertTriangle, X, Video } from "lucide-react";
 import { supabase } from "../supabase";
 import { sanitizeText, validatePriceInput, validateBanglaPhone } from "../utils/sanitizer";
 import { uploadToCloudinary } from "../utils/cloudinary";
@@ -10,6 +10,8 @@ import { nativeFetch } from "../utils/nativeFetch";
 import { apiUrl } from "../utils/apiBase";
 import { CITIES } from "../translations";
 import { detectDistrictFromArea } from "../data/areaMap";
+import vehicleCardImg from "../assets/images/vehicle-card-new.webp";
+import partsCardImg from "../assets/images/parts-card-new.webp";
 
 interface AddPartFormProps {
   language: SupportedLanguage;
@@ -127,48 +129,35 @@ const detectLocationFromText = (text: string): string => {
   return "";
 };
 
-// 🔧 (2026-10-30) ক্যাটাগরি এখন পুরোপুরি সেলারের চাপা বাটন থেকে আসে -- বিবরণ বা
-// টাইটেলের কীওয়ার্ড দেখে আর কিছু অনুমান করা হয় না (আগের অনুমান-করা ফাংশনটা
-// মুছে ফেলা হয়েছে)। প্রতিটা বাটন হোমপেজের একটা চিপের (কার/বাইক/ট্রাক/হেভি
-// ইকুইপমেন্ট/পার্টস) সাথে হুবহু মেলে, আর নিজের category / sub_category / type
-// মান নিজেই বহন করে। সেই মানগুলোই সরাসরি Supabase insert আর onViewListing-এ যায়।
-type ListingChoice = {
-  category: "vehicles" | "general";
-  sub_category: string;
-  type: "vehicle" | "part";
+// 🔧 (2026-09-26) আগে "vehicle" টাইপের প্রতিটা পোস্টই hardcode করে
+// sub_category="other_heavy_equipment" পেত -- আসলে গাড়ি/বাইক/ট্রাক যা-ই হোক
+// না কেন। ফলে হোমপেজের "Car"/"Bike"/"Truck" quick-filter icon-গুলো এই
+// পোস্টগুলো subCategory ফিল্ডে কখনো খুঁজে পেত না (শুধু বিবরণে keyword থাকলে
+// text-fallback দিয়ে ধরা পড়ত), আর "Heavy Equip." ফিল্টারে ক্লিক করলে
+// আসলে-heavy-machinery-না এমন সব গাড়ি/বাইকও দেখাত (matchesSubCategoryFilter-এ
+// subCategory মিলে গেলে সরাসরি true হয়ে যায়, বিবরণ না দেখেই)। এই ফাংশনটা
+// listingFilters.ts-এর matchesSubCategoryFilter-এ যে একই কীওয়ার্ড ব্যবহার হয়
+// সেগুলো দিয়েই বিবরণ থেকে সঠিক sub-category অনুমান করে, যাতে পোস্ট করার
+// সময়েই ঠিকভাবে ট্যাগ হয়ে যায়।
+//
+// 🔧 (2026-09-26, second fix) ডিফল্ট fallback আগে ছিল "other_heavy_equipment"
+// -- কিন্তু অনেক গাড়ির পোস্টে শুধু মডেলের নাম থাকে ("COROLLA 110", "Premio",
+// "Axio"), "car"/"toyota" শব্দ literally থাকে না, তাই ভুলভাবে heavy equipment
+// হিসেবে ট্যাগ হয়ে যেত। Heavy equipment পোস্টে প্রায় সবসময়ই স্পষ্ট শব্দ
+// (excavator/crane/bulldozer) থাকে, কিন্তু সাধারণ গাড়িতে না-ও থাকতে পারে --
+// তাই ডিফল্ট এখন "car" (সংখ্যায় সবচেয়ে বেশি এবং misclassify হলে কম ক্ষতিকর)।
+const detectVehicleSubCategory = (text: string): string => {
+  const t = (text || "").toLowerCase();
+  if (/excavator|এক্সক্যাভেটর|এক্সকাভেটর/.test(t)) return "excavator";
+  if (/crane|ক্রেন/.test(t)) return "crane";
+  if (/bulldozer|বুলডোজার|dozer/.test(t)) return "bulldozer";
+  if (/forklift|ফর্কলিফ্ট|forkclip/.test(t)) return "forklift";
+  if (/microbus|মাইক্রোবাস|hiace|হাইয়েস/.test(t)) return "microbus";
+  if (/(^|[^a-z])bus([^a-z]|$)|বাস/.test(t)) return "bus";
+  if (/truck|ট্রাক|lorry|লরি|covered van|কাভার্ড ভ্যান/.test(t)) return "truck";
+  if (/bike|বাইক|motorcycle|মোটরসাইকেল|scooter|স্কুটার|yamaha|bajaj/.test(t)) return "bike";
+  return "car";
 };
-
-type IconComponent = React.ComponentType<{ className?: string }>;
-
-// হেভি ইকুইপমেন্ট আইকন (lucide-এ নেই, তাই কাস্টম SVG -- MarketplaceTab-এর আইকনের মতোই)
-const ExcavatorIcon: IconComponent = ({ className }) => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className={className}
-    aria-hidden="true"
-  >
-    <rect x="2" y="18" width="13" height="3.5" rx="1.75" />
-    <path d="M4 18v-4.5h9V18" />
-    <path d="M4 13.5v-4h4l2.5 4" />
-    <path d="M11.5 13.5l3-8 5 2" />
-    <path d="M19.5 7.5L21 12.5" />
-    <path d="M18 12.5h4.5l-1 3.5h-3.5z" />
-  </svg>
-);
-
-const LISTING_OPTIONS: { key: string; bn: string; en: string; icon: IconComponent; choice: ListingChoice }[] = [
-  { key: "car", bn: "কার", en: "Car", icon: Car, choice: { category: "vehicles", sub_category: "car", type: "vehicle" } },
-  { key: "bike", bn: "বাইক", en: "Bike", icon: Bike, choice: { category: "vehicles", sub_category: "bike", type: "vehicle" } },
-  { key: "truck", bn: "ট্রাক", en: "Truck", icon: Truck, choice: { category: "vehicles", sub_category: "truck", type: "vehicle" } },
-  { key: "heavy", bn: "হেভি ইকুইপমেন্ট", en: "Heavy Equipment", icon: ExcavatorIcon, choice: { category: "vehicles", sub_category: "other_heavy_equipment", type: "vehicle" } },
-  { key: "parts", bn: "পার্টস", en: "Parts", icon: Wrench, choice: { category: "general", sub_category: "general", type: "part" } },
-];
 
 // বিবরণের প্রথম অংশ থেকে একটা সংক্ষিপ্ত শিরোনাম বানায় (কার্ডে দেখানোর জন্য)।
 const deriveTitleFromDescription = (text: string): string => {
@@ -386,7 +375,7 @@ export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPromp
   };
 
   // ফর্ম সাবমিট করলে সরাসরি পোস্ট হয় না -- আগে সব ফিল্ড ভ্যালিডেট করে
-  // ক্যাটাগরি বাছাইয়ের মডাল দেখানো হয়। ইউজার ৫টা বাটনের একটা বাছলে
+  // ক্যাটাগরি বাছাইয়ের মডাল দেখানো হয়। ইউজার গাড়ি/পার্ট বাছাই করলে
   // submitListing() আসল Supabase write টা করে।
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -464,7 +453,7 @@ export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPromp
     setShowCategoryModal(true);
   };
 
-  const submitListing = async (choice: ListingChoice) => {
+  const submitListing = async (selectedType: "part" | "vehicle") => {
     setShowCategoryModal(false);
     const cleanPhoneDigits = toEnglishDigits(phone).replace(/\D/g, "");
     const uploadedUrls = images.filter(img => img.status === "success" && img.url).map(img => img.url as string);
@@ -494,21 +483,23 @@ export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPromp
       const detectedLocation = detectLocationFromText(description) || "Bangladesh";
       const cleanPhone = sanitizeText(cleanPhoneDigits);
 
+      const parentCategory = selectedType === "vehicle" ? "vehicles" : "general";
+      // 🔧 আগে এখানে সবসময় "other_heavy_equipment" hardcode করা হতো -- এখন
+      // বিবরণ থেকে আসল ধরন (car/bike/truck/bus/excavator ইত্যাদি) অনুমান করা
+      // হয়, যাতে হোমপেজের quick-filter icon-গুলো সঠিকভাবে কাজ করে।
+      const normalizedSubCategory = selectedType === "vehicle" ? detectVehicleSubCategory(description) : "general";
+
       // Written to Supabase now (App.tsx reads listings from Supabase -
       // USE_SUPABASE_LISTINGS = true). The 30s cooldown is enforced by a
       // Postgres trigger on the listings table, so no separate write for
       // it is needed here - it fires automatically as part of the insert.
-      //
-      // category / sub_category / type come straight from the button the
-      // seller tapped (see LISTING_OPTIONS) -- nothing is guessed from the
-      // title or description.
       const { data: insertedListing, error: insertError } = await supabase
         .from("listings")
         .insert({
           title: cleanTitle,
           model: cleanTitle,
-          category: choice.category,
-          sub_category: choice.sub_category,
+          category: parentCategory,
+          sub_category: normalizedSubCategory,
           brand: "",
           price: parseFloat(cleanPrice) || 0,
           description: cleanDesc,
@@ -516,7 +507,7 @@ export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPromp
           images: uploadedUrls,
           seller_id: sellerUid,
           seller_name: sellerDisplayName,
-          type: choice.type,
+          type: selectedType,
           // 🎬 শুধু ভিডিও থাকলেই এই তিনটা কলাম পাঠানো হয় -- ভিডিওছাড়া পোস্টের কোনো পরিবর্তন নেই।
           ...(videoUrl ? { video_url: videoUrl, has_video: true, is_video: true } : {})
         })
@@ -551,13 +542,13 @@ export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPromp
           price: parseFloat(cleanPrice) || 0,
           images: uploadedUrls,
           location: detectedLocation,
-          category: choice.category,
-          subCategory: choice.sub_category,
+          category: parentCategory,
+          subCategory: normalizedSubCategory,
           description: cleanDesc,
           contactNumber: cleanPhone,
           sellerId: sellerUid,
           sellerName: sellerDisplayName,
-          type: choice.type,
+          type: selectedType,
           ...(videoUrl ? { videoUrl, hasVideo: true, isVideo: true } : {})
         });
       }
@@ -736,29 +727,31 @@ export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPromp
         <div className="fixed inset-0 z-[100] bg-black/50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl p-5 w-full max-w-sm shadow-xl">
             <h3 className="text-sm font-bold text-gray-800 text-center mb-4">
-              {language === "bn" ? "কোনটা বেচছেন?" : "What are you selling?"}
+              {language === "bn" ? "এটা কী ধরনের বিজ্ঞাপন?" : "What kind of listing is this?"}
             </h3>
             <div className="grid grid-cols-2 gap-3">
-              {LISTING_OPTIONS.map((opt) => {
-                const OptIcon = opt.icon;
-                const isParts = opt.choice.type === "part";
-                return (
-                  <button
-                    key={opt.key}
-                    type="button"
-                    onClick={() => submitListing(opt.choice)}
-                    disabled={isSubmitting}
-                    className={`rounded-2xl border-2 border-gray-200 px-3 py-3.5 flex flex-col items-center gap-1.5 transition-all disabled:opacity-50 ${
-                      isParts ? "col-span-2 hover:border-sky-500 hover:bg-sky-50" : "hover:border-amber-500 hover:bg-amber-50"
-                    }`}
-                  >
-                    <OptIcon className="w-9 h-9 text-gray-500" />
-                    <span className="text-xs font-bold text-center leading-tight text-gray-600">
-                      {language === "bn" ? opt.bn : opt.en}
-                    </span>
-                  </button>
-                );
-              })}
+              <button
+                type="button"
+                onClick={() => submitListing("vehicle")}
+                disabled={isSubmitting}
+                className="rounded-2xl border-2 border-gray-200 px-3 py-3.5 flex flex-col items-center gap-1.5 hover:border-amber-500 hover:bg-amber-50 transition-all disabled:opacity-50"
+              >
+                <img src={vehicleCardImg} alt="" className="w-full h-14 object-contain" />
+                <span className="text-xs font-bold text-center leading-tight text-gray-600">
+                  {language === "bn" ? "গাড়ি বেচা/কেনা" : "Vehicle Buy & Sell"}
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => submitListing("part")}
+                disabled={isSubmitting}
+                className="rounded-2xl border-2 border-gray-200 px-3 py-3.5 flex flex-col items-center gap-1.5 hover:border-sky-500 hover:bg-sky-50 transition-all disabled:opacity-50"
+              >
+                <img src={partsCardImg} alt="" className="w-full h-14 object-contain" />
+                <span className="text-xs font-bold text-center leading-tight text-gray-600">
+                  {language === "bn" ? "গাড়ির পাট" : "Vehicle Parts"}
+                </span>
+              </button>
             </div>
             {isSubmitting && (
               <div className="mt-4 flex items-center justify-center gap-2 text-xs text-gray-500">

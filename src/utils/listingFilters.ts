@@ -25,16 +25,6 @@ export const checkIsProduction = (): boolean => {
 
 export const isItemVehicle = (item: PartListing): boolean => {
   if (!item) return false;
-
-  // 🔧 (2026-10-30) `type` is set by the button the seller tapped when posting
-  // ("part" or "vehicle"), so it is the only source of truth. It is checked
-  // BEFORE any category/keyword guessing -- otherwise a part with a car brand
-  // in its title (e.g. "Toyota Noah engine part") could be guessed as a
-  // vehicle and vanish from the পার্টস tab. Only old rows with no `type` fall
-  // through to the legacy logic below.
-  if (item.type === "part") return false;
-  if (item.type === "vehicle") return true;
-
   if (item.category === "vehicles") return true;
   if (item.category === "spare_parts") return false;
 
