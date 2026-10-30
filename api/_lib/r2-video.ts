@@ -179,3 +179,54 @@ export async function handleVideoUpload(
     return res.status(500).json({ error: "ভিডিও আপলোডের প্রস্তুতি ব্যর্থ হয়েছে।" });
   }
 }
+
+// Image upload to R2 (same presigned PUT as video).
+const ALLOWED_IMAGE_TYPES: Record<string, string> = {
+  "image/jpeg": "jpg",
+  "image/png": "png",
+  "image/webp": "webp",
+};
+const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
+
+// Called by api/cloudinary-sign.ts AFTER user + photo rate limit are checked.
+export async function handleImageUpload(req: any, res: any, uid: string) {
+  try {
+    const accountId = process.env.R2_ACCOUNT_ID;
+    const bucket = process.env.R2_BUCKET;
+    const publicUrl = process.env.R2_PUBLIC_URL;
+    const accessKeyId = process.env.R2_ACCESS_KEY_ID;
+    const secretAccessKey = process.env.R2_SECRET_ACCESS_KEY;
+    if (!accountId || !bucket || !publicUrl || !accessKeyId || !secretAccessKey) {
+      return res.status(500).json({ error: "R2 কনফিগার করা নেই (env var missing)।" });
+    }
+    const contentType = String(req.body?.contentType || "").toLowerCase();
+    const size = Number(req.body?.size);
+    const ext = ALLOWED_IMAGE_TYPES[contentType];
+    if (!ext) {
+      return res.status(400).json({ error: "এই ধরনের ছবি সাপোর্ট করে না।" });
+    }
+    if (!Number.isFinite(size) || size <= 0 || size > MAX_IMAGE_BYTES) {
+      return res.status(400).json({ error: "ছবিটি অনেক বড়।" });
+    }
+    const key = `images/${uid}/${crypto.randomUUID()}.${ext}`;
+    const uploadUrl = presignPut({
+      accountId,
+      bucket,
+      key,
+      accessKeyId,
+      secretAccessKey,
+      contentType,
+      contentLength: Math.floor(size),
+      expiresSeconds: 300,
+    });
+    return res.status(200).json({
+      uploadUrl,
+      publicUrl: `${publicUrl.replace(/\/$/, "")}/${key}`,
+      key,
+      contentType,
+    });
+  } catch (err: any) {
+    console.error("[r2-image] error:", err?.message || err);
+    return res.status(500).json({ error: "ছবি আপলোডের প্রস্তুতি ব্যর্থ হয়েছে।" });
+  }
+}

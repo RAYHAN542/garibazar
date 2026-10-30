@@ -1,7 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 import crypto from "crypto";
 import { applyCors } from "./_lib/cors.js";
-import { handleVideoUpload } from "./_lib/r2-video.js";
+import { handleVideoUpload, handleImageUpload } from "./_lib/r2-video.js";
 
 // ------------------------------------------------------------------------
 // Signs Cloudinary uploads server-side so the browser never uploads
@@ -111,7 +111,12 @@ export default async function handler(req: any, res: any) {
     // folder: every user's uploads land in their own folder instead of the
     // account root, so storage is attributable per user and one user's
     // upload can never collide with / overwrite another's by name.
-    const timestamp = Math.floor(Date.now() / 1000);
+    // Image upload to R2 (after rate limit check above)
+  if (req.body?.kind === "image") {
+    return handleImageUpload(req, res, uid);
+  }
+
+  const timestamp = Math.floor(Date.now() / 1000);
     const paramsToSign: Record<string, string | number> = {
       timestamp,
       upload_preset: "gari_bazar_preset",
