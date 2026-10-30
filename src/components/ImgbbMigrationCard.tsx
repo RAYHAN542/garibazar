@@ -96,9 +96,12 @@ function probeUrlSize(url: string): Promise<[number, number] | null> {
 // app's normal upload path (uploadToCloudinary: resize/compress, then R2 with
 // Cloudinary fallback) and return the new URL.
 async function migrateOne(url: string): Promise<string> {
-  const sources = [url, getCloudinaryFetchUrl(url, 2000)];
-  let lastErr: unknown = new Error("no source");
-  for (const src of sources) {
+  const sources: Array<[string, string]> = [
+    ["direct", url],
+    ["cloudinary", getCloudinaryFetchUrl(url, 2000)],
+  ];
+  const errs: string[] = [];
+  for (const [label, src] of sources) {
     try {
       const blob = await fetchBlob(src);
       const [w, h] = await blobSize(blob);
@@ -106,11 +109,11 @@ async function migrateOne(url: string): Promise<string> {
       const ext = blob.type === "image/png" ? "png" : blob.type === "image/webp" ? "webp" : "jpg";
       const file = new File([blob], `migrated.${ext}`, { type: blob.type });
       return await uploadToCloudinary(file);
-    } catch (e) {
-      lastErr = e;
+    } catch (e: any) {
+      errs.push(`${label}: ${e?.message || e}`);
     }
   }
-  throw lastErr instanceof Error ? lastErr : new Error(String(lastErr));
+  throw new Error(errs.join(" | "));
 }
 
 export function ImgbbMigrationCard({ language }: Props) {
