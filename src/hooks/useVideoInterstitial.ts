@@ -4,7 +4,7 @@ import { preloadInterstitial, showInterstitial } from "../utils/interstitialAds"
 // প্রতি এতগুলো ভিডিও swipe করার পর একটা ad
 const AD_EVERY = 4;
 // দুই ad-এর মাঝে সর্বনিম্ন বিরতি
-const MIN_GAP_MS = 60_000;
+const MIN_GAP_MS = 30_000;
 
 /**
  * ভিডিও ফিডে swipe গুনে Interstitial ad দেখায়।
