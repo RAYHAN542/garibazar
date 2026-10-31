@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { ShieldAlert, Loader2, RefreshCw } from "lucide-react";
 import { getOptimizedImageUrl } from "../utils/cloudinary";
 import { isImgbbUrl, isImgbbPlaceholderSize, getCloudinaryFetchUrl } from "../utils/imgbb";
@@ -51,7 +51,9 @@ export function ImageWithFallback({ id, src, alt, className = "", isAd = false, 
   const [autoRetries, setAutoRetries] = useState(0);
 
   // A reused component instance (list recycling) must start fresh for a new src.
+  const mountedRef = useRef(false);
   useEffect(() => {
+    if (!mountedRef.current) { mountedRef.current = true; return; }
     setLoading(true);
     setError(false);
     setStage(getThumbUrl(src, width) ? "thumb" : "primary");
