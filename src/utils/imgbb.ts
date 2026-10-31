@@ -13,7 +13,7 @@ export const isImgbbUrl = (url?: string | null): boolean =>
 // Pixel sizes [width, height] of the imgbb placeholder image.
 // Fill this in once you know it (Admin panel > Manage Listings > "ছবির সাইজ
 // পরীক্ষা" shows it). 0x0 (undecodable) is always treated as a placeholder.
-export const IMGBB_PLACEHOLDER_SIZES: Array<[number, number]> = [];
+export const IMGBB_PLACEHOLDER_SIZES: Array<[number, number]> = [[180, 180]];
 
 const LS_KEY = "gb_imgbb_placeholder_sizes";
 
