@@ -1,12 +1,15 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { NativeAds, IS_TEST_UNIT, resolveNativeUnit, initNativeAds, isNativeAdsSupported } from "../utils/nativeAds";
+import { claimPreloadedAd, kickPreload, loadAdWithRetry } from "../utils/nativeAdPool";
 
 type Status = "loading" | "ready" | "failed";
 type Payload =
   | { visible: false }
   | { visible: true; x: number; y: number; width: number; height: number; clipBottom: number };
 
-function NativeAdSlotInner({ slotId }: { slotId: string }) {
+function NativeAdSlotInner({ slotId: propSlotId }: { slotId: string }) {
+  const [slotId, setSlotId] = useState(propSlotId);
+  const idRef = useRef(propSlotId);
   const hostRef = useRef<HTMLDivElement | null>(null);
   const [status, setStatus] = useState<Status>("loading");
   const [height, setHeight] = useState(320);
@@ -16,29 +19,27 @@ function NativeAdSlotInner({ slotId }: { slotId: string }) {
   // ১) ad লোড
   useEffect(() => {
     let cancelled = false;
+    idRef.current = propSlotId;
     (async () => {
       try {
         await initNativeAds();
         const unit = await resolveNativeUnit();
-        if (!cancelled) setIsTest(IS_TEST_UNIT(unit));
-        // No fill হলে দ্রুত আবার চেষ্টা (১.২ সেকেন্ড, তারপর ৩ সেকেন্ড)
-        let loadErr: unknown = null;
-        const waits = [0, 1200, 3000];
-        for (const w of waits) {
-          if (w) {
-            await new Promise((res) => setTimeout(res, w));
-            if (cancelled) return;
-            await NativeAds.destroy({ id: slotId }).catch(() => {});
-          }
-          try {
-            await NativeAds.load({ id: slotId, adUnitId: unit });
-            loadErr = null;
-            break;
-          } catch (e) {
-            loadErr = e;
-          }
+        if (cancelled) return;
+        setIsTest(IS_TEST_UNIT(unit));
+        // আগে থেকে লোড করা ad থাকলে সাথে সাথে সেটাই দেখাও
+        const pre = await claimPreloadedAd();
+        if (cancelled) {
+          if (pre) NativeAds.destroy({ id: pre }).catch(() => {});
+          return;
         }
-        if (loadErr) throw loadErr;
+        if (pre) {
+          idRef.current = pre;
+          setSlotId(pre);
+          setStatus("ready");
+          kickPreload();
+          return;
+        }
+        await loadAdWithRetry(propSlotId, unit, () => cancelled);
         if (!cancelled) setStatus("ready");
       } catch (e) {
         if (!cancelled) {
@@ -49,9 +50,10 @@ function NativeAdSlotInner({ slotId }: { slotId: string }) {
     })();
     return () => {
       cancelled = true;
-      NativeAds.destroy({ id: slotId }).catch(() => {});
+      NativeAds.destroy({ id: idRef.current }).catch(() => {});
+      kickPreload();
     };
-  }, [slotId]);
+  }, [propSlotId]);
 
   // ২) কার্ডের উচ্চতা (মিডিয়া >= ১২০dp রাখতে ২৮০-৩৬০dp)
   useLayoutEffect(() => {
