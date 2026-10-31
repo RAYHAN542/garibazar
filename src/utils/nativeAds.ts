@@ -39,9 +39,9 @@ export function resolveNativeUnit(): Promise<string> {
     unitPromise = (async () => {
       try {
         const r = await NativeAds.installSource();
-        void r; return LIVE_NATIVE_UNIT; // TEMP-DEBUG
+        return r.fromPlayStore ? LIVE_NATIVE_UNIT : TEST_NATIVE_UNIT;
       } catch {
-        return LIVE_NATIVE_UNIT; // TEMP-DEBUG
+        return TEST_NATIVE_UNIT;
       }
     })();
   }

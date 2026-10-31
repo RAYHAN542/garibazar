@@ -136,7 +136,7 @@ function NativeAdSlotInner({ slotId }: { slotId: string }) {
 
   if (status !== "ready") {
     // টেস্ট বিল্ডে (VITE_ADMOB_LIVE != true) ad না এলে কারণ দেখাও
-    void isTest; // TEMP-DEBUG
+    if (!isTest) return null;
     return (
       <div className="col-span-full rounded-lg bg-amber-50 px-3 py-2 text-[11px] text-amber-800">
         Ad debug: {status}{errMsg ? " - " + errMsg : ""}
