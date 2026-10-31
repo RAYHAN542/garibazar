@@ -21,7 +21,24 @@ function NativeAdSlotInner({ slotId }: { slotId: string }) {
         await initNativeAds();
         const unit = await resolveNativeUnit();
         if (!cancelled) setIsTest(IS_TEST_UNIT(unit));
-        await NativeAds.load({ id: slotId, adUnitId: unit });
+        // No fill হলে দ্রুত আবার চেষ্টা (১.২ সেকেন্ড, তারপর ৩ সেকেন্ড)
+        let loadErr: unknown = null;
+        const waits = [0, 1200, 3000];
+        for (const w of waits) {
+          if (w) {
+            await new Promise((res) => setTimeout(res, w));
+            if (cancelled) return;
+            await NativeAds.destroy({ id: slotId }).catch(() => {});
+          }
+          try {
+            await NativeAds.load({ id: slotId, adUnitId: unit });
+            loadErr = null;
+            break;
+          } catch (e) {
+            loadErr = e;
+          }
+        }
+        if (loadErr) throw loadErr;
         if (!cancelled) setStatus("ready");
       } catch (e) {
         if (!cancelled) {
