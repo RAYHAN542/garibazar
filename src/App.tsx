@@ -2627,15 +2627,6 @@ export default function App() {
                     {isTeamOpen && (
                       <div className="p-5 bg-slate-50/55 dark:bg-slate-950/35 border-t border-slate-100 dark:border-slate-800/60 animate-slide-down space-y-4">
                         <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-150 dark:border-slate-800/80 shadow-xs space-y-3">
-                          <div className="flex items-center gap-3">
-                            <div className="w-12 h-12 rounded-full bg-gradient-to-tr from-amber-500 to-orange-550 flex items-center justify-center font-black text-slate-950 text-base">
-                              MR
-                            </div>
-                            <div>
-                              <h5 className="font-extrabold text-sm text-slate-800 dark:text-slate-100">MD RAYHAN</h5>
-                              <p className="text-[10px] text-amber-600 dark:text-amber-400 font-bold">Lead Developer & Founder</p>
-                            </div>
-                          </div>
                           <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed font-semibold">
                             {language === "bn"
                               ? "গাড়ি বাজার অ্যাপটি বাংলাদেশে অটো পার্টস ও খুচরা যন্ত্রাংশের বেচাকেনাকে সহজ এবং ডিজিটাল করতে তৈরি করা হয়েছে। আমাদের মূল লক্ষ্য গ্রাহকদের নিরাপদ ও বিশ্বস্ত সেবা প্রদান করা।"
