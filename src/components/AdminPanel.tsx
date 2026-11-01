@@ -177,6 +177,9 @@ export function AdminPanel({ language, currentUser, listings: listingsProp, isUs
   const [visitEvents, setVisitEvents] = useState<any[]>([]);
   const [loadingVisits, setLoadingVisits] = useState(true);
   const [analyticsStats, setAnalyticsStats] = useState<{ totalVisits?: number; totalLogins?: number; totalSignups?: number; totalInstalls?: number; totalAppInstalls?: number; appInstallsToday?: number; appInstallsYesterday?: number; appInstalls7d?: number }>({});
+  const [dailySeries, setDailySeries] = useState<any[]>([]);
+  const [analyticsPeriod, setAnalyticsPeriod] = useState<"today" | "yesterday" | "d7" | "d30" | "total">("today");
+  const [chartMetric, setChartMetric] = useState<"visits" | "logins" | "appInstalls">("visits");
   // Per-period counts (today / yesterday / 7 days / 30 days / total) for the analytics table
   const [periodStats, setPeriodStats] = useState<Record<string, { today: number; yesterday: number; d7: number; d30: number; total: number }>>({});
   // Where Play Store app installs came from (website / facebook / organic ...)
@@ -395,6 +398,7 @@ export function AdminPanel({ language, currentUser, listings: listingsProp, isUs
         return o;
       };
       setPeriodStats({ visits: mk("total_visits"), logins: mk("total_logins"), signups: mk("total_signups"), appInstalls: mk("total_app_installs") });
+      setDailySeries(dailyRows || []);
 
       // Per-source breakdown of Play Store app installs (website / facebook /
       // organic ...). Separate try so a failure here never hides the totals above.
@@ -1293,109 +1297,150 @@ export function AdminPanel({ language, currentUser, listings: listingsProp, isUs
             </button>
           </h5>
 
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <div className="p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl text-center">
-              <Globe className="w-5 h-5 text-blue-500 mx-auto mb-1" />
-              <p className="text-lg font-black text-slate-850 dark:text-white">{(analyticsStats.totalVisits || 0).toLocaleString()}</p>
-              <p className="text-[9px] text-slate-400 font-bold uppercase">{language === "bn" ? "মোট ভিজিট" : "Total Visits"}</p>
-            </div>
-            <div className="p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl text-center">
-              <User className="w-5 h-5 text-emerald-500 mx-auto mb-1" />
-              <p className="text-lg font-black text-slate-850 dark:text-white">{(analyticsStats.totalLogins || 0).toLocaleString()}</p>
-              <p className="text-[9px] text-slate-400 font-bold uppercase">{language === "bn" ? "মোট লগইন" : "Total Logins"}</p>
-            </div>
-            <div className="p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl text-center">
-              <Users className="w-5 h-5 text-amber-500 mx-auto mb-1" />
-              <p className="text-lg font-black text-slate-850 dark:text-white">{(analyticsStats.totalSignups || 0).toLocaleString()}</p>
-              <p className="text-[9px] text-slate-400 font-bold uppercase">{language === "bn" ? "নতুন ইউজার" : "New Signups"}</p>
-            </div>
-            <div className="p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl text-center">
-              <Smartphone className="w-5 h-5 text-purple-500 mx-auto mb-1" />
-              <p className="text-lg font-black text-slate-850 dark:text-white">{(analyticsStats.totalInstalls || 0).toLocaleString()}</p>
-              <p className="text-[9px] text-slate-400 font-bold uppercase">{language === "bn" ? "অ্যাপ ইনস্টল" : "App Installs"}</p>
-            </div>
-          </div>
-
-          <div className="p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl">
-          <p className="text-[9px] text-slate-400 font-bold uppercase mb-2">{language === "bn" ? "প্লে স্টোর অ্যাপ ইনস্টল (নতুন)" : "Play Store app installs (new)"}</p>
-          <div className="grid grid-cols-4 gap-2 text-center">
-            {[
-              { l: language === "bn" ? "আজ" : "Today", n: analyticsStats.appInstallsToday },
-              { l: language === "bn" ? "গতকাল" : "Yesterday", n: analyticsStats.appInstallsYesterday },
-              { l: language === "bn" ? "৭ দিন" : "7 days", n: analyticsStats.appInstalls7d },
-              { l: language === "bn" ? "মোট" : "Total", n: analyticsStats.totalAppInstalls },
-            ].map((it) => (
-              <div key={it.l}>
-                <p className="text-lg font-black text-slate-850 dark:text-white">{(it.n || 0).toLocaleString()}</p>
-                <p className="text-[9px] text-slate-400 font-bold uppercase">{it.l}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-
-          {/* Visits / logins / signups / app installs by period */}
-          <div className="p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl">
-            <p className="text-[9px] text-slate-400 font-bold uppercase mb-2">
-              {language === "bn" ? "দিন অনুযায়ী পরিসংখ্যান" : "Stats by period"}
-            </p>
-            <div className="grid grid-cols-[1.4fr_1fr_1fr_1fr_1fr_1fr] gap-1 text-[9px] text-slate-400 font-bold uppercase text-center">
-              <span />
-              <span>{language === "bn" ? "আজ" : "Today"}</span>
-              <span>{language === "bn" ? "গতকাল" : "Yesterday"}</span>
-              <span>{language === "bn" ? "৭ দিন" : "7 days"}</span>
-              <span>{language === "bn" ? "৩০ দিন" : "30 days"}</span>
-              <span>{language === "bn" ? "মোট" : "Total"}</span>
-            </div>
-            {[
-              { k: "visits", l: language === "bn" ? "ভিজিট" : "Visits" },
-              { k: "logins", l: language === "bn" ? "লগইন" : "Logins" },
-              { k: "signups", l: language === "bn" ? "নতুন ইউজার" : "Signups" },
-              { k: "appInstalls", l: language === "bn" ? "অ্যাপ ইনস্টল" : "App installs" },
-            ].map((r) => {
-              const p = periodStats[r.k] || { today: 0, yesterday: 0, d7: 0, d30: 0, total: 0 };
-              return (
-                <div key={r.k} className="grid grid-cols-[1.4fr_1fr_1fr_1fr_1fr_1fr] gap-1 items-center text-center border-t border-slate-100 dark:border-slate-800 pt-2 mt-2">
-                  <span className="text-left text-[11px] font-bold text-slate-700 dark:text-slate-200">{r.l}</span>
-                  {[p.today, p.yesterday, p.d7, p.d30, p.total].map((n, i) => (
-                    <span key={i} className="text-xs font-black text-slate-850 dark:text-white">{n.toLocaleString()}</span>
+          {(() => {
+            const bn = language === "bn";
+            const keyMap: Record<string, string> = { visits: "total_visits", logins: "total_logins", signups: "total_signups", appInstalls: "total_app_installs" };
+            const dayStr = (off: number) => new Date(Date.now() - off * 86400000).toISOString().slice(0, 10);
+            const sumDays = (metric: string, fromOff: number, toOff: number) => {
+              const a = dayStr(fromOff), b = dayStr(toOff);
+              return dailySeries.reduce((t: number, r: any) => (r.day >= a && r.day <= b ? t + (r[keyMap[metric]] || 0) : t), 0);
+            };
+            const periods = [
+              { id: "today", label: bn ? "আজ" : "Today", pf: 1, pt: 1 },
+              { id: "yesterday", label: bn ? "গতকাল" : "Yesterday", pf: 2, pt: 2 },
+              { id: "d7", label: bn ? "৭ দিন" : "7 days", pf: 13, pt: 7 },
+              { id: "d30", label: bn ? "৩০ দিন" : "30 days", pf: 59, pt: 30 },
+              { id: "total", label: bn ? "মোট" : "All time", pf: 0, pt: 0 },
+            ];
+            const per = periods.find((p) => p.id === analyticsPeriod) || periods[0];
+            const zero = { today: 0, yesterday: 0, d7: 0, d30: 0, total: 0 };
+            const cards = [
+              { k: "visits", label: bn ? "ভিজিটর" : "Visitors", Icon: Globe, color: "text-blue-500", bg: "bg-blue-500/10" },
+              { k: "appInstalls", label: bn ? "অ্যাপ ইনস্টল" : "App installs", Icon: Smartphone, color: "text-purple-500", bg: "bg-purple-500/10" },
+              { k: "logins", label: bn ? "লগইন" : "Logins", Icon: User, color: "text-emerald-500", bg: "bg-emerald-500/10" },
+              { k: "signups", label: bn ? "নতুন ইউজার" : "New signups", Icon: Users, color: "text-amber-500", bg: "bg-amber-500/10" },
+            ];
+            const chartTabs = [
+              { k: "visits", l: bn ? "ভিজিটর" : "Visitors" },
+              { k: "appInstalls", l: bn ? "ইনস্টল" : "Installs" },
+              { k: "logins", l: bn ? "লগইন" : "Logins" },
+            ];
+            const chartDays = Array.from({ length: 14 }, (_, i) => {
+              const off = 13 - i;
+              const d = dayStr(off);
+              const row = dailySeries.find((r: any) => r.day === d);
+              return { d, off, v: row ? (row[keyMap[chartMetric]] || 0) : 0 };
+            });
+            const chartMax = Math.max(1, ...chartDays.map((x) => x.v));
+            const srcMax = Math.max(1, ...installSources.map((x) => x.total));
+            return (
+              <>
+                <div className="flex gap-1.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                  {periods.map((p) => (
+                    <button
+                      key={p.id}
+                      onClick={() => setAnalyticsPeriod(p.id as any)}
+                      className={"shrink-0 px-3.5 py-1.5 rounded-full text-xs font-black transition cursor-pointer " + (analyticsPeriod === p.id ? "bg-amber-500 text-slate-950" : "bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-300")}
+                    >
+                      {p.label}
+                    </button>
                   ))}
                 </div>
-              );
-            })}
-            <p className="text-[9px] text-slate-400 mt-2">
-              {language === "bn" ? "দিন গণনা UTC অনুযায়ী (বাংলাদেশ সময় সকাল ৬টায় নতুন দিন শুরু)" : "Days are counted in UTC"}
-            </p>
-          </div>
-          {/* Where the Play Store installs came from (website / facebook / organic ...) */}
-          <div className="p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl">
-            <p className="text-[9px] text-slate-400 font-bold uppercase mb-2">
-              {language === "bn" ? "ইনস্টলের সোর্স (কোথা থেকে এল)" : "Install sources (where from)"}
-            </p>
-            {installSources.length === 0 ? (
-              <p className="text-xs text-slate-400 font-semibold">
-                {language === "bn" ? "এখনো কোনো ডেটা নেই" : "No data yet"}
-              </p>
-            ) : (
-              <div className="space-y-2">
-                <div className="grid grid-cols-4 gap-2 text-[9px] text-slate-400 font-bold uppercase text-center">
-                  <span className="text-left">{language === "bn" ? "সোর্স" : "Source"}</span>
-                  <span>{language === "bn" ? "আজ" : "Today"}</span>
-                  <span>{language === "bn" ? "৭ দিন" : "7 days"}</span>
-                  <span>{language === "bn" ? "মোট" : "Total"}</span>
+
+                <div className="grid grid-cols-2 gap-3">
+                  {cards.map((c) => {
+                    const stat = periodStats[c.k] || zero;
+                    const cur = stat[analyticsPeriod];
+                    let sub = "";
+                    let subColor = "text-slate-400";
+                    if (analyticsPeriod === "today") {
+                      sub = (bn ? "গতকাল " : "Yesterday ") + stat.yesterday.toLocaleString();
+                    } else if (analyticsPeriod === "total") {
+                      sub = bn ? "শুরু থেকে এ পর্যন্ত" : "Since launch";
+                    } else {
+                      const prev = sumDays(c.k, per.pf, per.pt);
+                      if (prev > 0) {
+                        const d = Math.round(((cur - prev) / prev) * 100);
+                        sub = (d >= 0 ? "▲ " : "▼ ") + Math.abs(d) + "% " + (bn ? "আগের তুলনায়" : "vs previous");
+                        subColor = d >= 0 ? "text-emerald-500" : "text-red-500";
+                      } else {
+                        sub = bn ? "আগের ডেটা নেই" : "No earlier data";
+                      }
+                    }
+                    return (
+                      <div key={c.k} className="p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] font-bold text-slate-400 uppercase">{c.label}</span>
+                          <span className={"p-1.5 rounded-lg " + c.bg}>
+                            <c.Icon className={"w-4 h-4 " + c.color} />
+                          </span>
+                        </div>
+                        <p className="text-2xl font-black text-slate-850 dark:text-white mt-2">{cur.toLocaleString()}</p>
+                        <p className={"text-[10px] font-bold mt-0.5 " + subColor}>{sub}</p>
+                      </div>
+                    );
+                  })}
                 </div>
-                {installSources.map((s) => (
-                  <div key={s.source} className="grid grid-cols-4 gap-2 items-center text-center border-t border-slate-100 dark:border-slate-800 pt-2">
-                    <span className="text-left text-[11px] font-bold text-slate-700 dark:text-slate-200">
-                      {getInstallSourceLabel(s.source, language)}
-                    </span>
-                    <span className="text-sm font-black text-slate-850 dark:text-white">{s.today.toLocaleString()}</span>
-                    <span className="text-sm font-black text-slate-850 dark:text-white">{s.last7d.toLocaleString()}</span>
-                    <span className="text-sm font-black text-slate-850 dark:text-white">{s.total.toLocaleString()}</span>
+
+                <div className="p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-xs font-black text-slate-700 dark:text-slate-200">{bn ? "গত ১৪ দিন" : "Last 14 days"}</p>
+                    <div className="flex gap-1">
+                      {chartTabs.map((t) => (
+                        <button
+                          key={t.k}
+                          onClick={() => setChartMetric(t.k as any)}
+                          className={"px-2.5 py-1 rounded-full text-[10px] font-black cursor-pointer " + (chartMetric === t.k ? "bg-slate-800 text-white dark:bg-white dark:text-slate-900" : "bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-300")}
+                        >
+                          {t.l}
+                        </button>
+                      ))}
+                    </div>
                   </div>
-                ))}
-              </div>
-            )}
-          </div>
+                  <div className="flex items-end gap-1 h-32 mt-3">
+                    {chartDays.map((x) => (
+                      <div key={x.d} className="flex-1 flex flex-col items-center justify-end h-full">
+                        <span className="text-[8px] font-bold text-slate-400 leading-none mb-0.5">{x.v}</span>
+                        <div
+                          className={"w-full rounded-t " + (x.off === 0 ? "bg-amber-500" : "bg-blue-500/70")}
+                          style={{ height: Math.max(2, Math.round((x.v / chartMax) * 80)) + "%" }}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                  <div className="flex gap-1 mt-1">
+                    {chartDays.map((x) => (
+                      <span key={x.d} className="flex-1 text-center text-[8px] text-slate-400">{Number(x.d.slice(8, 10))}</span>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl">
+                  <p className="text-xs font-black text-slate-700 dark:text-slate-200 mb-3">{bn ? "ইনস্টল কোথা থেকে আসছে" : "Where installs come from"}</p>
+                  {installSources.length === 0 ? (
+                    <p className="text-xs text-slate-400 font-semibold">{bn ? "এখনো কোনো ডেটা নেই" : "No data yet"}</p>
+                  ) : (
+                    <div className="space-y-3">
+                      {installSources.map((sr) => (
+                        <div key={sr.source}>
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-[11px] font-bold text-slate-700 dark:text-slate-200">{getInstallSourceLabel(sr.source, language)}</span>
+                            <span className="text-sm font-black text-slate-850 dark:text-white">{sr.total.toLocaleString()}</span>
+                          </div>
+                          <div className="h-1.5 rounded-full bg-slate-100 dark:bg-slate-800 mt-1 overflow-hidden">
+                            <div className="h-full rounded-full bg-amber-500" style={{ width: Math.round((sr.total / srcMax) * 100) + "%" }} />
+                          </div>
+                          <p className="text-[9px] text-slate-400 mt-1">{(bn ? "আজ " : "Today ") + sr.today.toLocaleString() + "  ·  " + (bn ? "৭ দিন " : "7 days ") + sr.last7d.toLocaleString()}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <p className="text-[9px] text-slate-400">{bn ? "দিন গণনা UTC অনুযায়ী (বাংলাদেশ সময় সকাল ৬টায় নতুন দিন শুরু)" : "Days are counted in UTC"}</p>
+              </>
+            );
+          })()}
 
         <h6 className="text-xs font-black text-slate-500 uppercase tracking-wider pt-2">
             {language === "bn" ? "সাম্প্রতিক ভিজিট লগ" : "Recent Visit Log"}
