@@ -82,6 +82,10 @@ const mapTicketRow = (row: any) => ({
   status: row.status,
   createdAt: row.created_at,
   resolvedAt: row.resolved_at,
+  category: row.category,
+  contactPhone: row.contact_phone,
+  adminReply: row.admin_reply,
+  repliedAt: row.replied_at,
 });
 
 export function AdminPanel({ language, currentUser, listings: listingsProp, isUserAdmin }: AdminPanelProps) {
@@ -180,6 +184,7 @@ export function AdminPanel({ language, currentUser, listings: listingsProp, isUs
   const [ticketsList, setTicketsList] = useState<any[]>([]);
   const [loadingTickets, setLoadingTickets] = useState(true);
   const [ticketActionLoadingId, setTicketActionLoadingId] = useState<string | null>(null);
+  const [replyDrafts, setReplyDrafts] = useState<Record<string, string>>({});
 
   // Listings search and action states
   const [listingsSearch, setListingsSearch] = useState("");
@@ -453,6 +458,26 @@ export function AdminPanel({ language, currentUser, listings: listingsProp, isUs
   // TODO (Jesmin): refill_requests-এর তালিকা যেখানে JSX-এ রেন্ডার হয়, তার নিচে
   // {refillHasMore && <button onClick={loadMoreRefillRequests}>আরও দেখুন</button>}
   // বসিয়ে দিন - state/handler এখানে রেডি করে রাখা হলো, শুধু বাটনটা UI-তে বসানো বাকি।
+
+  const handleReplyTicket = async (ticketId: string) => {
+    const text = (replyDrafts[ticketId] || "").trim();
+    if (!text) return;
+    setTicketActionLoadingId(ticketId);
+    try {
+      const now = new Date().toISOString();
+      const { error } = await supabase
+        .from("support_tickets")
+        .update({ admin_reply: text, replied_at: now, status: "resolved", resolved_at: now })
+        .eq("id", ticketId);
+      if (error) throw error;
+      setReplyDrafts((prev) => ({ ...prev, [ticketId]: "" }));
+      await fetchTickets();
+    } catch (err) {
+      console.error("Could not reply to ticket:", err);
+    } finally {
+      setTicketActionLoadingId(null);
+    }
+  };
 
   const handleResolveTicket = async (ticketId: string) => {
     setTicketActionLoadingId(ticketId);
@@ -1148,6 +1173,45 @@ export function AdminPanel({ language, currentUser, listings: listingsProp, isUs
                       <p className="text-xs text-slate-700 dark:text-slate-300 font-medium mt-2 whitespace-pre-wrap">
                         {ticket.message}
                       </p>
+                      {(ticket.category || ticket.contactPhone) && (
+                        <div className="flex items-center gap-2 flex-wrap mt-1.5">
+                          {ticket.category && (
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+                              {({ login: "লগইন", payment: "পেমেন্ট", listing: "লিস্টিং", other: "অন্যান্য" } as Record<string, string>)[ticket.category] || ticket.category}
+                            </span>
+                          )}
+                          {ticket.contactPhone && (
+                            <a href={`tel:${ticket.contactPhone}`} className="text-[11px] font-bold font-mono text-blue-500 underline">
+                              {ticket.contactPhone}
+                            </a>
+                          )}
+                        </div>
+                      )}
+
+                      {ticket.adminReply && (
+                        <div className="mt-2 p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-700 dark:text-emerald-400 font-medium whitespace-pre-wrap">
+                          {ticket.adminReply}
+                        </div>
+                      )}
+
+                      <div className="mt-2 flex gap-2 items-end">
+                        <textarea
+                          rows={2}
+                          value={replyDrafts[ticket.id] || ""}
+                          onChange={(e) => setReplyDrafts((prev) => ({ ...prev, [ticket.id]: e.target.value }))}
+                          placeholder={language === "bn" ? "রিপ্লাই লিখুন..." : "Write a reply..."}
+                          className="flex-1 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 py-1.5 px-3 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-amber-500 dark:text-white font-semibold"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleReplyTicket(ticket.id)}
+                          disabled={ticketActionLoadingId !== null || !(replyDrafts[ticket.id] || "").trim()}
+                          className="shrink-0 px-3 py-2 text-[10px] font-black text-slate-950 bg-amber-500 hover:bg-amber-600 rounded-xl disabled:opacity-40 cursor-pointer"
+                        >
+                          {language === "bn" ? "রিপ্লাই" : "Reply"}
+                        </button>
+                      </div>
+
                       {ticket.createdAt && (
                         <div className="flex items-center gap-1 text-[10px] text-slate-400 mt-2">
                           <Clock className="w-3 h-3" />
