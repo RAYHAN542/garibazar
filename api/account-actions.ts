@@ -210,7 +210,7 @@ const USER_WINDOW_MS = 60 * 60 * 1000;
 const USER_MAX = 10; // per signed-in uid
 
 async function handleSubmitSupportTicket(req: any, res: any) {
-  const { name, email, message } = req.body || {};
+  const { name, email, message, category, contactPhone } = req.body || {};
   if (!message || typeof message !== "string" || !message.trim()) {
     return res.status(400).json({ error: "বার্তা লিখুন।" });
   }
@@ -239,6 +239,8 @@ async function handleSubmitSupportTicket(req: any, res: any) {
     email: (email || "").toString().slice(0, 200) || "anonymous@garibazar.com",
     message: message.trim().slice(0, 2000),
     user_id: uid || "guest",
+    category: ["login", "payment", "listing", "other"].includes(category) ? category : null,
+    contact_phone: (contactPhone || "").toString().replace(/[^0-9+]/g, "").slice(0, 20) || null,
     status: "open",
   });
 

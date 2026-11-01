@@ -168,6 +168,8 @@ export default function App() {
   const [supportName, setSupportName] = useState("");
   const [supportEmail, setSupportEmail] = useState("");
   const [supportMessage, setSupportMessage] = useState("");
+  const [supportCategory, setSupportCategory] = useState("other");
+  const [supportPhone, setSupportPhone] = useState("");
   const [isSupportSubmitting, setIsSupportSubmitting] = useState(false);
   const [supportSuccess, setSupportSuccess] = useState(false);
   const [supportError, setSupportError] = useState<string | null>(null);
@@ -1654,7 +1656,12 @@ export default function App() {
   const handleSupportSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!supportMessage.trim()) return;
+    if (!user?.uid && !supportPhone.trim()) {
+      setSupportError(language === "bn" ? "যোগাযোগের জন্য ফোন নম্বর দিন।" : "Please add a phone number so we can contact you.");
+      return;
+    }
 
+    setSupportError(null);
     setIsSupportSubmitting(true);
     try {
       // 🔧 সরাসরি Firestore write-এর বদলে rate-limited API ব্যবহার করা হচ্ছে
@@ -1674,6 +1681,8 @@ export default function App() {
           name: supportName || (user?.displayName || "Anonymous"),
           email: supportEmail || (user?.email || "anonymous@garibazar.com"),
           message: supportMessage,
+          category: supportCategory,
+          contactPhone: supportPhone,
         }),
       });
       const data = await resp.json();
@@ -1683,6 +1692,8 @@ export default function App() {
 
       setSupportSuccess(true);
       setSupportMessage("");
+      setSupportCategory("other");
+      setSupportPhone("");
       setTimeout(() => {
         setSupportSuccess(false);
       }, 5000);
@@ -2711,6 +2722,53 @@ export default function App() {
                                   {supportError}
                                 </div>
                               )}
+                              <div>
+                                <label className="text-[10px] text-slate-400 font-bold block mb-1">
+                                  {language === "bn" ? "সমস্যার ধরন" : "Issue Type"}
+                                </label>
+                                <div className="flex flex-wrap gap-1.5">
+                                  {([
+                                    ["login", "লগইন", "Login"],
+                                    ["payment", "পেমেন্ট", "Payment"],
+                                    ["listing", "লিস্টিং", "Listing"],
+                                    ["other", "অন্যান্য", "Other"],
+                                  ] as const).map(([id, bn, en]) => (
+                                    <button
+                                      key={id}
+                                      type="button"
+                                      onClick={() => setSupportCategory(id)}
+                                      className={`px-3 py-1.5 rounded-full text-xs font-black border transition cursor-pointer ${supportCategory === id ? "bg-amber-500 text-slate-950 border-amber-500" : "bg-slate-50 dark:bg-slate-950 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-800"}`}
+                                    >
+                                      {language === "bn" ? bn : en}
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+
+                              {supportCategory === "login" && (
+                                <div className="p-2.5 bg-amber-500/10 border border-amber-500/20 rounded-xl text-amber-700 dark:text-amber-400 text-xs font-semibold leading-relaxed">
+                                  {language === "bn"
+                                    ? "লগইন করতে রেজিস্ট্রেশন করা ফোন নম্বর আর পাসওয়ার্ড লাগবে। তবু সমস্যা হলে নিচে সমস্যাটা আর আপনার ফোন নম্বর লিখুন, আমরা যোগাযোগ করব।"
+                                    : "Login needs your registered phone number and password. If it still fails, describe the problem and add your phone number below."}
+                                </div>
+                              )}
+
+                              <div>
+                                <label className="text-[10px] text-slate-400 font-bold block mb-1">
+                                  {language === "bn"
+                                    ? (user?.uid ? "ফোন নম্বর (ঐচ্ছিক)" : "ফোন নম্বর (এই নম্বরে যোগাযোগ করা হবে)")
+                                    : (user?.uid ? "Phone number (optional)" : "Phone number (we will contact you here)")}
+                                </label>
+                                <input
+                                  type="tel"
+                                  inputMode="tel"
+                                  value={supportPhone}
+                                  onChange={(e) => setSupportPhone(e.target.value)}
+                                  placeholder="01XXXXXXXXX"
+                                  className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 py-1.5 px-3 rounded-xl text-xs focus:ring-1 focus:ring-amber-500 focus:outline-none dark:text-white font-semibold"
+                                />
+                              </div>
+
                               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                                 <div>
                                   <label className="text-[10px] text-slate-400 font-bold block mb-1">
