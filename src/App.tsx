@@ -2790,7 +2790,7 @@ export default function App() {
                                     type="text"
                                     value={supportName}
                                     onChange={(e) => setSupportName(e.target.value)}
-                                    placeholder={user?.displayName || (language === "bn" ? "যেমন: রায়হান" : "e.g. Rayhan")}
+                                    placeholder={user?.displayName || (language === "bn" ? "আপনার নাম" : "Your name")}
                                     className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 py-1.5 px-3 rounded-xl text-xs focus:ring-1 focus:ring-amber-500 focus:outline-none dark:text-white font-semibold"
                                   />
                                 </div>
