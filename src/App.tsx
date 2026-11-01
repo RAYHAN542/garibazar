@@ -170,6 +170,7 @@ export default function App() {
   const [supportMessage, setSupportMessage] = useState("");
   const [supportCategory, setSupportCategory] = useState("other");
   const [supportPhone, setSupportPhone] = useState("");
+  const [myTickets, setMyTickets] = useState<any[]>([]);
   const [isSupportSubmitting, setIsSupportSubmitting] = useState(false);
   const [supportSuccess, setSupportSuccess] = useState(false);
   const [supportError, setSupportError] = useState<string | null>(null);
@@ -1653,6 +1654,25 @@ export default function App() {
     setActiveTab("market");
   };
 
+  const fetchMyTickets = async () => {
+    if (!user?.uid) {
+      setMyTickets([]);
+      return;
+    }
+    const { data, error } = await supabase
+      .from("support_tickets")
+      .select("id,category,message,status,admin_reply,replied_at,created_at")
+      .eq("user_id", user.uid)
+      .order("created_at", { ascending: false })
+      .limit(10);
+    if (!error) setMyTickets(data || []);
+  };
+
+  useEffect(() => {
+    if (isSupportOpen) fetchMyTickets();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isSupportOpen, user?.uid]);
+
   const handleSupportSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!supportMessage.trim()) return;
@@ -1691,6 +1711,7 @@ export default function App() {
       }
 
       setSupportSuccess(true);
+      fetchMyTickets();
       setSupportMessage("");
       setSupportCategory("other");
       setSupportPhone("");
@@ -2830,6 +2851,36 @@ export default function App() {
                             </>
                           )}
                         </form>
+
+                        {user?.uid && myTickets.length > 0 && (
+                          <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-150 dark:border-slate-800/80 shadow-xs space-y-3">
+                            <h5 className="font-extrabold text-xs text-slate-800 dark:text-slate-100 uppercase tracking-wide">
+                              {language === "bn" ? "আমার টিকেট" : "My Tickets"}
+                            </h5>
+                            {myTickets.map((t) => (
+                              <div key={t.id} className="p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 space-y-1.5">
+                                <div className="flex items-center justify-between gap-2">
+                                  <span className="text-[10px] text-slate-400 font-semibold">
+                                    {new Date(t.created_at).toLocaleDateString(language === "bn" ? "bn-BD" : "en-US")}
+                                  </span>
+                                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${t.admin_reply ? "bg-emerald-500/15 text-emerald-600" : t.status === "resolved" ? "bg-slate-500/15 text-slate-500" : "bg-amber-500/15 text-amber-600"}`}>
+                                    {t.admin_reply
+                                      ? (language === "bn" ? "উত্তর এসেছে" : "Replied")
+                                      : t.status === "resolved"
+                                      ? (language === "bn" ? "সমাধান হয়েছে" : "Resolved")
+                                      : (language === "bn" ? "অপেক্ষমান" : "Pending")}
+                                  </span>
+                                </div>
+                                <p className="text-xs text-slate-700 dark:text-slate-300 font-medium whitespace-pre-wrap">{t.message}</p>
+                                {t.admin_reply && (
+                                  <div className="p-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-700 dark:text-emerald-400 font-medium whitespace-pre-wrap">
+                                    {t.admin_reply}
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
