@@ -15,11 +15,32 @@ if (!PAGE_ID || !SYSTEM_TOKEN) {
 }
 
 const REPLIES = {
-  price: `পোস্টের বিবরণে (description) দেওয়া নম্বরে কল করে দাম জানতে পারবেন, উনিই আসল মালিক। আরও গাড়ি দেখতে Garibazar app install করুন 👉 ${PLAY}`,
-  number: `নম্বর বিবরণে (description) দেওয়া আছে। আরও গাড়ি দেখতে Garibazar app install করুন 👉 ${PLAY}`,
-  sell: `গাড়ির ছবি আর বিস্তারিত (detail) ইনবক্সে পাঠান। Garibazar app install করুন, সেখানে গাড়ি বেচা-কেনা করতে পারবেন 👉 ${PLAY}`,
-  other: `Garibazar app install করুন। সেখানে গাড়ি ও গাড়ির পার্ট বেচা/কেনা করতে পারবেন 👉 ${PLAY}`,
+  price: [
+    `পোস্টের বিবরণে (description) দেওয়া নম্বরে কল করে দাম জানতে পারবেন, উনিই আসল মালিক। আরও গাড়ি দেখতে Garibazar app install করুন 👉 ${PLAY}`,
+    `দামের জন্য পোস্টের বিবরণে (description) দেওয়া নম্বরে সরাসরি মালিকের সাথে কথা বলুন। আরও গাড়ির জন্য Garibazar app দেখুন 👉 ${PLAY}`,
+    `দাম জানতে বিবরণে (description) দেওয়া নম্বরে কল করুন, উনিই মালিক। Garibazar app-এ আরও গাড়ি পাবেন 👉 ${PLAY}`,
+    `মালিকের নম্বর পোস্টের বিবরণে (description) আছে, কল করে দাম জেনে নিন। আরও গাড়ি দেখতে Garibazar app install করুন 👉 ${PLAY}`,
+  ],
+  number: [
+    `নম্বর বিবরণে (description) দেওয়া আছে। আরও গাড়ি দেখতে Garibazar app install করুন 👉 ${PLAY}`,
+    `যোগাযোগের নম্বর পোস্টের বিবরণে (description) দেওয়া আছে। Garibazar app-এ আরও গাড়ি দেখুন 👉 ${PLAY}`,
+    `বিবরণে (description) নম্বর দেওয়া আছে, দেখে নিন। আরও গাড়ির জন্য Garibazar app install করুন 👉 ${PLAY}`,
+    `মালিকের নম্বর বিবরণে (description) পাবেন। আরও গাড়ি দেখতে Garibazar app ইনস্টল করুন 👉 ${PLAY}`,
+  ],
+  sell: [
+    `গাড়ির ছবি আর বিস্তারিত (detail) ইনবক্সে পাঠান। Garibazar app install করুন, সেখানে গাড়ি বেচা-কেনা করতে পারবেন 👉 ${PLAY}`,
+    `গাড়ির ছবি ও বিস্তারিত (detail) ইনবক্সে পাঠিয়ে দিন। Garibazar app-এ গাড়ি বেচা-কেনা করা যায় 👉 ${PLAY}`,
+    `বিক্রির জন্য ছবি আর বিস্তারিত (detail) ইনবক্সে দিন। চাইলে Garibazar app install করে সেখানেও দিতে পারেন 👉 ${PLAY}`,
+    `ইনবক্সে গাড়ির ছবি ও বিস্তারিত (detail) পাঠান। Garibazar app-এ গাড়ি বেচা-কেনার সুযোগ আছে 👉 ${PLAY}`,
+  ],
+  other: [
+    `Garibazar app install করুন। সেখানে গাড়ি ও গাড়ির পার্ট বেচা/কেনা করতে পারবেন 👉 ${PLAY}`,
+    `ধন্যবাদ! আরও গাড়ি ও পার্টস দেখতে Garibazar app install করুন 👉 ${PLAY}`,
+    `পাশে থাকার জন্য ধন্যবাদ 🙏 Garibazar app-এ গাড়ি ও গাড়ির পার্ট বেচা/কেনা করতে পারবেন 👉 ${PLAY}`,
+    `Garibazar app-এ আরও গাড়ি ও পার্টস পাবেন, install করে দেখুন 👉 ${PLAY}`,
+  ],
 };
+const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
 
 const SELL_RE = [
   /(বিক্রি|বিক্রী|বিক্রয়)\s*(করব(?!েন)|করবো|করতে\s*চাই|করতে\s*চাচ্ছি|করে\s*দেন|করে\s*দিন)/,
@@ -178,7 +199,7 @@ for (const c of comments) {
     console.log(`WOULD reply (${kind}) to comment ${c.id}`);
   } else {
     try {
-      await graph(`${c.id}/comments`, PAGE_TOKEN, { message: REPLIES[kind] }, "POST");
+      await graph(`${c.id}/comments`, PAGE_TOKEN, { message: pick(REPLIES[kind]) }, "POST");
       console.log(`Replied (${kind}) to comment ${c.id}`);
     } catch (e) {
       console.log(`Reply failed for ${c.id}: ${e.message}`);
