@@ -10,6 +10,7 @@ import { nativeFetch } from "../utils/nativeFetch";
 import { apiUrl } from "../utils/apiBase";
 import { CITIES } from "../translations";
 import { detectDistrictFromArea } from "../data/areaMap";
+import { buildListingTitle } from "../utils/listingTitle";
 
 interface AddPartFormProps {
   language: SupportedLanguage;
@@ -497,7 +498,8 @@ export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPromp
 
     try {
       const cleanDesc = sanitizeText(description);
-      const cleanTitle = sanitizeText(deriveTitleFromDescription(description));
+      // শিরোনাম: বিবরণ থেকে ব্র্যান্ড/মডেল/সাল খুঁজে (যেমন "Toyota Axio 2008"); না পেলে আগের মতো প্রথম লাইন।
+      const cleanTitle = sanitizeText(buildListingTitle(description, kind) || deriveTitleFromDescription(description));
       const cleanPrice = price ? String(validatePriceInput(price)) : "0";
       const detectedLocation = detectLocationFromText(description) || "Bangladesh";
       const cleanPhone = sanitizeText(cleanPhoneDigits);
