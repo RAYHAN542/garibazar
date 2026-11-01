@@ -6,6 +6,7 @@ const DRY_RUN = process.env.DRY_RUN !== "false";
 const V = process.env.GRAPH_VERSION || "v25.0";
 const MAX_REPLIES = Number(process.env.MAX_REPLIES || 10);
 const MAX_AGE_HOURS = Number(process.env.MAX_AGE_HOURS || 24);
+const MAX_LIKES = Number(process.env.MAX_LIKES || 30);
 const PLAY = "https://play.google.com/store/apps/details?id=shop.garibazar.twa";
 
 if (!PAGE_ID || !SYSTEM_TOKEN) {
@@ -70,7 +71,7 @@ console.log(`::add-mask::${PAGE_TOKEN}`);
 console.log(`Mode: ${DRY_RUN ? "DRY RUN (nothing is posted)" : "LIVE"}`);
 
 // 2) collect recent comments: list posts, then read each post's newest comments
-const COMMENT_FIELDS = "id,message,created_time,can_comment,from{id},comments.limit(10){id,message,from{id}}";
+const COMMENT_FIELDS = "id,message,created_time,can_comment,user_likes,from{id},comments.limit(10){id,message,from{id}}";
 const DEEP = true; // deep scan on every run
 const LIGHT_N = 12;
 const DEEP_N = 60;
@@ -133,6 +134,30 @@ for (const { name: source, extra } of SOURCES) {
 }
 if (errors.length) console.log(`comment fetch errors: ${errors.length}, first: ${errors[0]}`);
 comments.sort((a, b) => new Date(b.created_time) - new Date(a.created_time));
+
+// 3a) like every recent comment the page has not liked yet
+let liked = 0;
+let likeFails = 0;
+for (const c of comments) {
+  if (liked >= MAX_LIKES) break;
+  if (c.from?.id === PAGE_ID || c.user_likes) continue;
+  const likeAgeH = (Date.now() - new Date(c.created_time).getTime()) / 3600000;
+  if (likeAgeH > MAX_AGE_HOURS) continue;
+  if (DRY_RUN) {
+    console.log(`WOULD like comment ${c.id}`);
+  } else {
+    try {
+      await graph(`${c.id}/likes`, PAGE_TOKEN, {}, "POST");
+    } catch (e) {
+      console.log(`Like failed for ${c.id}: ${e.message}`);
+      if (++likeFails >= 3) break;
+      continue;
+    }
+    await sleep(1000);
+  }
+  liked++;
+}
+console.log(`Likes: ${DRY_RUN ? "would like" : "liked"} ${liked}`);
 
 // 3) reply to everything that has no page reply yet
 let done = 0;
