@@ -3,6 +3,7 @@
 // ব্র্যান্ড/মডেল/সাল বিবরণ থেকেই খুঁজে নেওয়া হয়। কিছু না পেলে শুরুর
 // "সালাম / বিক্রি হবে / জরুরি" ধরনের অংশ বাদ দিয়ে বিবরণের প্রথম অর্থবহ কথা নেওয়া হয়।
 
+const nfc = (s: string): string => s.normalize("NFC");
 const BN_DIGITS = "০১২৩৪৫৬৭৮৯";
 const toEn = (s: string): string => s.replace(/[০-৯]/g, (d) => String(BN_DIGITS.indexOf(d)));
 
@@ -71,21 +72,21 @@ const ENTRIES: Entry[] = [
 ];
 
 // ব্র্যান্ডের পরের যে শব্দে থামতে হবে (এগুলো মডেলের অংশ না)
-const STOP = new Set([
+const STOP = new Set<string>([
   "model", "মডেল", "for", "sale", "sell", "বিক্রি", "বিক্রয়", "বিক্রী", "হবে", "হইবে",
   "বাইক", "গাড়ি", "গাড়ী", "car", "bike", "truck", "ট্রাক", "এর", "কার", "বাইকটি", "গাড়িটি",
   "owner", "post", "urgent", "জরুরি", "জরুরী", "আছে", "ভালো", "ভাল", "fresh",
-]);
+].map(nfc));
 
 // শিরোনামের শুরুতে থাকলে বাদ যাবে: বিক্রির ঘোষণা + সালাম
-const FILLER = new Set([
+const FILLER = new Set<string>([
   "বিক্রি", "বিক্রয়", "বিক্রী", "বিক্রির", "হবে", "হইবে", "করা", "করতে", "দিবো", "দিব", "দিবেন",
   "সেল", "sale", "sell", "for", "urgent", "emergency", "জরুরি", "জরুরী", "ইমারজেন্সি",
   "এমারজেন্সি", "ভিত্তিতে", "ভিত্তিতেই", "আছে",
   "আস", "আসসালামু", "সালামু", "সালাম", "আলাইকুম", "ওয়া", "ওয়ারাহমাতুল্লাহ", "রহমাতুল্লাহ",
   "রহমাতুল্লাহি", "রহমতুল্লাহ", "বারাকাতুহু", "ওয়াবারাকাতুহ", "assalamu", "assalamualaikum",
   "alaikum", "walaikum", "salam",
-]);
+].map(nfc));
 
 const CATEGORY_LABEL: Record<string, string> = {
   car: "গাড়ি",
@@ -103,7 +104,8 @@ function findFirst(text: string): { entry: Entry; start: number; end: number } |
   const lower = text.toLowerCase();
   let best: { entry: Entry; start: number; end: number; len: number } | null = null;
   for (const entry of ENTRIES) {
-    for (const alias of entry.aliases) {
+    for (const rawAlias of entry.aliases) {
+      const alias = nfc(rawAlias);
       let idx = -1;
       if (/^[a-z0-9 +\-]+$/.test(alias)) {
         const m = new RegExp("(^|[^a-z0-9])" + escapeRe(alias) + "(?![a-z0-9])", "i").exec(lower);
@@ -166,7 +168,7 @@ function fallbackTitle(original: string, kind: string, year: string): string {
 }
 
 export function buildListingTitle(description: string, kind: string): string {
-  const original = (description || "").trim();
+  const original = nfc((description || "").trim());
   if (!original) return "";
   const text = toEn(original);
   const year = findYear(text);
