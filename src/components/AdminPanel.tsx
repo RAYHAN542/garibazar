@@ -177,6 +177,8 @@ export function AdminPanel({ language, currentUser, listings: listingsProp, isUs
   const [visitEvents, setVisitEvents] = useState<any[]>([]);
   const [loadingVisits, setLoadingVisits] = useState(true);
   const [analyticsStats, setAnalyticsStats] = useState<{ totalVisits?: number; totalLogins?: number; totalSignups?: number; totalInstalls?: number; totalAppInstalls?: number; appInstallsToday?: number; appInstallsYesterday?: number; appInstalls7d?: number }>({});
+  // Per-period counts (today / yesterday / 7 days / 30 days / total) for the analytics table
+  const [periodStats, setPeriodStats] = useState<Record<string, { today: number; yesterday: number; d7: number; d30: number; total: number }>>({});
   // Where Play Store app installs came from (website / facebook / organic ...)
   const [installSources, setInstallSources] = useState<{ source: string; total: number; today: number; last7d: number }[]>([]);
 
@@ -378,6 +380,21 @@ export function AdminPanel({ language, currentUser, listings: listingsProp, isUs
       });
 
       setAnalyticsStats(totals);
+
+      const monthAgoUtc = dayStr(29);
+      const mk = (key: string) => {
+        const o = { today: 0, yesterday: 0, d7: 0, d30: 0, total: 0 };
+        (dailyRows || []).forEach((r: any) => {
+          const n = r[key] || 0;
+          o.total += n;
+          if (r.day === todayUtc) o.today += n;
+          if (r.day === yesterdayUtc) o.yesterday += n;
+          if (r.day >= weekAgoUtc) o.d7 += n;
+          if (r.day >= monthAgoUtc) o.d30 += n;
+        });
+        return o;
+      };
+      setPeriodStats({ visits: mk("total_visits"), logins: mk("total_logins"), signups: mk("total_signups"), appInstalls: mk("total_app_installs") });
 
       // Per-source breakdown of Play Store app installs (website / facebook /
       // organic ...). Separate try so a failure here never hides the totals above.
@@ -1316,6 +1333,39 @@ export function AdminPanel({ language, currentUser, listings: listingsProp, isUs
           </div>
         </div>
 
+          {/* Visits / logins / signups / app installs by period */}
+          <div className="p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl">
+            <p className="text-[9px] text-slate-400 font-bold uppercase mb-2">
+              {language === "bn" ? "দিন অনুযায়ী পরিসংখ্যান" : "Stats by period"}
+            </p>
+            <div className="grid grid-cols-[1.4fr_1fr_1fr_1fr_1fr_1fr] gap-1 text-[9px] text-slate-400 font-bold uppercase text-center">
+              <span />
+              <span>{language === "bn" ? "আজ" : "Today"}</span>
+              <span>{language === "bn" ? "গতকাল" : "Yesterday"}</span>
+              <span>{language === "bn" ? "৭ দিন" : "7 days"}</span>
+              <span>{language === "bn" ? "৩০ দিন" : "30 days"}</span>
+              <span>{language === "bn" ? "মোট" : "Total"}</span>
+            </div>
+            {[
+              { k: "visits", l: language === "bn" ? "ভিজিট" : "Visits" },
+              { k: "logins", l: language === "bn" ? "লগইন" : "Logins" },
+              { k: "signups", l: language === "bn" ? "নতুন ইউজার" : "Signups" },
+              { k: "appInstalls", l: language === "bn" ? "অ্যাপ ইনস্টল" : "App installs" },
+            ].map((r) => {
+              const p = periodStats[r.k] || { today: 0, yesterday: 0, d7: 0, d30: 0, total: 0 };
+              return (
+                <div key={r.k} className="grid grid-cols-[1.4fr_1fr_1fr_1fr_1fr_1fr] gap-1 items-center text-center border-t border-slate-100 dark:border-slate-800 pt-2 mt-2">
+                  <span className="text-left text-[11px] font-bold text-slate-700 dark:text-slate-200">{r.l}</span>
+                  {[p.today, p.yesterday, p.d7, p.d30, p.total].map((n, i) => (
+                    <span key={i} className="text-xs font-black text-slate-850 dark:text-white">{n.toLocaleString()}</span>
+                  ))}
+                </div>
+              );
+            })}
+            <p className="text-[9px] text-slate-400 mt-2">
+              {language === "bn" ? "দিন গণনা UTC অনুযায়ী (বাংলাদেশ সময় সকাল ৬টায় নতুন দিন শুরু)" : "Days are counted in UTC"}
+            </p>
+          </div>
           {/* Where the Play Store installs came from (website / facebook / organic ...) */}
           <div className="p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl">
             <p className="text-[9px] text-slate-400 font-bold uppercase mb-2">
