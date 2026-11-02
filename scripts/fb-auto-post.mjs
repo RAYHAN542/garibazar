@@ -67,7 +67,7 @@ for (let i = 0; i < 3; i++) {
   if (after) params.after = after;
   const data = await graph(`${PAGE_ID}/posts`, PAGE_TOKEN, params);
   for (const p of data.data || []) {
-    const m = (p.message || "").match(/garibazar\.shop\/l\/([0-9a-f-]{36})/i);
+    const m = (p.message || "").match(/গাড়ির কোড: ([0-9a-f]{8})/i);
     if (!m) continue;
     posted.add(m[1].toLowerCase());
     const t = new Date(p.created_time).getTime();
@@ -108,7 +108,7 @@ const candidates = rows.filter(
     Array.isArray(l.images) &&
     typeof l.images[0] === "string" &&
     l.images[0].startsWith("https://") &&
-    !posted.has(String(l.id).toLowerCase())
+    !posted.has(String(l.id).slice(0, 8).toLowerCase())
 );
 console.log(`Car listings (7 days): ${rows.length}, eligible: ${candidates.length}`);
 if (!candidates.length) {
@@ -121,14 +121,15 @@ const l = candidates[0];
 const imgs = l.images
   .filter((u) => typeof u === "string" && u.startsWith("https://"))
   .slice(0, MAX_IMAGES);
-const parts = [`🚗 ${l.title}`, "💰 দাম: আলোচনা সাপেক্ষ"];
 const desc = (l.description || "").trim().slice(0, 1500);
+const titleWords = l.title.trim().toLowerCase().split(/\s+/).slice(0, 2).join(" ");
+const titleInDesc = titleWords && desc.slice(0, 200).toLowerCase().includes(titleWords);
+const parts = [];
+if (!titleInDesc) parts.push(`🚗 ${l.title}`);
+parts.push("💰 দাম: আলোচনা সাপেক্ষ");
 if (desc) parts.push("", desc);
 if (l.location && l.location !== "Bangladesh" && !desc.includes(l.location)) parts.push("", `📍 ${l.location}`);
-const caption =
-  parts.join("\n") +
-  `\n\n👉 বিস্তারিত দেখুন: ${SITE}/l/${l.id}` +
-  `\n📲 আরও গাড়ি দেখতে Garibazar app install করুন: ${PLAY}`;
+const caption = parts.join("\n") + `\n\nগাড়ির কোড: ${String(l.id).slice(0, 8)}`;
 
 if (DRY_RUN) {
   console.log(`WOULD post listing ${l.id} with ${imgs.length} photos:\n${caption}\nimages: ${imgs.join(" , ")}`);
