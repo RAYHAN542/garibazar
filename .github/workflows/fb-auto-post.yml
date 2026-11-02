@@ -1,0 +1,28 @@
+name: Facebook auto post
+on:
+  schedule:
+    - cron: "30 2,5,8,11 * * *"
+    - cron: "0 13 * * *"
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: fb-auto-post
+  cancel-in-progress: false
+jobs:
+  post:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: node scripts/fb-auto-post.mjs
+        env:
+          FB_PAGE_ID: "1281181228407541"
+          FB_SYSTEM_TOKEN: ${{ secrets.FB_SYSTEM_TOKEN }}
+          SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
+          IGNORE_WINDOW: ${{ github.event_name == 'workflow_dispatch' && 'true' || 'false' }}
+          DRY_RUN: ${{ vars.FB_POST_LIVE == 'true' && 'false' || 'true' }}
