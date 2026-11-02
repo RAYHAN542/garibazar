@@ -126,10 +126,9 @@ const titleWords = l.title.trim().toLowerCase().split(/\s+/).slice(0, 2).join(" 
 const titleInDesc = titleWords && desc.slice(0, 200).toLowerCase().includes(titleWords);
 const parts = [];
 if (!titleInDesc) parts.push(`🚗 ${l.title}`);
-parts.push("💰 দাম: আলোচনা সাপেক্ষ");
-if (desc) parts.push("", desc);
+if (desc) parts.push(desc);
 if (l.location && l.location !== "Bangladesh" && !desc.includes(l.location)) parts.push("", `📍 ${l.location}`);
-const caption = parts.join("\n") + `\n\nগাড়ির কোড: ${String(l.id).slice(0, 8)}`;
+const caption = parts.join("\n") + `\n\n💰 দাম: আলোচনা সাপেক্ষ\n\nগাড়ির কোড: ${String(l.id).slice(0, 8)}`;
 
 if (DRY_RUN) {
   console.log(`WOULD post listing ${l.id} with ${imgs.length} photos:\n${caption}\nimages: ${imgs.join(" , ")}`);
