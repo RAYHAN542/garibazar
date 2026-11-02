@@ -7,7 +7,8 @@ const V = process.env.GRAPH_VERSION || "v25.0";
 const MAX_REPLIES = Number(process.env.MAX_REPLIES || 10);
 const MAX_AGE_HOURS = Number(process.env.MAX_AGE_HOURS || 24);
 const MAX_LIKES = Number(process.env.MAX_LIKES || 30);
-const PLAY = "https://play.google.com/store/apps/details?id=shop.garibazar.twa";
+// referrer=utm_source=fb_comment -> installs from comment links are recorded as source "fb_comment" in app_installs
+const PLAY = "https://play.google.com/store/apps/details?id=shop.garibazar.twa&referrer=utm_source%3Dfb_comment";
 
 if (!PAGE_ID || !SYSTEM_TOKEN) {
   console.error("FB_PAGE_ID or FB_SYSTEM_TOKEN missing");
