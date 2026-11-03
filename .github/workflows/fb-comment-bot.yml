@@ -11,7 +11,7 @@ concurrency:
 jobs:
   reply:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -25,3 +25,13 @@ jobs:
           MAX_OTHER: "10"
           FB_SYSTEM_TOKEN: ${{ secrets.FB_SYSTEM_TOKEN }}
           DRY_RUN: ${{ vars.FB_BOT_LIVE == 'true' && 'false' || 'true' }}
+      - name: Auto post car listing
+        if: always()
+        run: node scripts/fb-auto-post.mjs
+        env:
+          FB_PAGE_ID: "1281181228407541"
+          FB_SYSTEM_TOKEN: ${{ secrets.FB_SYSTEM_TOKEN }}
+          SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
+          IGNORE_WINDOW: "false"
+          DRY_RUN: ${{ vars.FB_POST_LIVE == 'true' && 'false' || 'true' }}
