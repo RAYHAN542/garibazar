@@ -294,6 +294,30 @@ export const SAMPLE_LISTINGS = [
   }
 ];
 
+// 🧪 শুধু অ্যাডমিনের পেমেন্ট-ফ্লো টেস্টের জন্য ৳২০ / ১ দিনের প্যাকেজ।
+// সাধারণ ইউজারকে এটা দেখায় না (সেশনে isAdmin না থাকলে তালিকায় ঢোকেই না), আর
+// সার্ভারের api/payment/create-charge.ts-ও admins টেবিলের বাইরের কারো কাছ থেকে এই
+// দাম নেয় না। টেস্ট শেষ হলে এই প্যাকেজ আর নিচের spread মুছে ফেলা যায়।
+const isAdminSession = (): boolean => {
+  try {
+    const raw = typeof localStorage !== "undefined" ? localStorage.getItem("gari_bazar_session_user") : null;
+    return !!raw && JSON.parse(raw)?.isAdmin === true;
+  } catch {
+    return false;
+  }
+};
+
+const ADMIN_TEST_PACKAGE: AdPackage = {
+  id: "pkg-admin-test",
+  nameEn: "Admin Payment Test",
+  nameBn: "টেস্ট বুস্ট (শুধু অ্যাডমিন)",
+  price: 20,
+  durationDays: 1,
+  benefitsEn: ["Payment-flow test, 1 day", "Visible to admin only"],
+  benefitsBn: ["পেমেন্ট টেস্ট, ১ দিনের বুস্ট", "শুধু অ্যাডমিনকে দেখায়"],
+  tier: "basic"
+};
+
 export const AD_PACKAGES: AdPackage[] = [
   {
     id: "pkg-basic",
@@ -354,5 +378,6 @@ export const AD_PACKAGES: AdPackage[] = [
       "৭ দিনে ভিউ প্রায় ১০ গুণ বাড়বে"
     ],
     tier: "featured"
-  }
+  },
+  ...(isAdminSession() ? [ADMIN_TEST_PACKAGE] : [])
 ];
