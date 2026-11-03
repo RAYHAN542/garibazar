@@ -61,6 +61,7 @@ const dayAgo = Date.now() - 24 * 3600 * 1000;
 const posted = new Set();
 let weekCount = 0;
 let dayCount = 0;
+let lastPostAt = 0;
 let after;
 for (let i = 0; i < 3; i++) {
   const params = { fields: "message,created_time", limit: "100" };
@@ -73,6 +74,7 @@ for (let i = 0; i < 3; i++) {
     const t = new Date(p.created_time).getTime();
     if (t >= weekAgo) weekCount++;
     if (t >= dayAgo) dayCount++;
+    if (t > lastPostAt) lastPostAt = t;
   }
   after = data.paging?.cursors?.after;
   if (!data.paging?.next || !after) break;
@@ -80,6 +82,11 @@ for (let i = 0; i < 3; i++) {
 console.log(`Auto-posts: last 7 days ${weekCount}/${MAX_PER_WEEK}, last 24h ${dayCount}/${MAX_PER_DAY}`);
 if (weekCount >= MAX_PER_WEEK || dayCount >= MAX_PER_DAY) {
   console.log("Cap reached, skipping.");
+  process.exit(0);
+}
+const MIN_GAP_MIN = Number(process.env.MIN_GAP_MIN || 150);
+if (!IGNORE_WINDOW && lastPostAt && Date.now() - lastPostAt < MIN_GAP_MIN * 60000) {
+  console.log(`Last auto-post was ${Math.round((Date.now() - lastPostAt) / 60000)} min ago (< ${MIN_GAP_MIN}), skipping.`);
   process.exit(0);
 }
 
