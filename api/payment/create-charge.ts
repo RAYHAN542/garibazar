@@ -25,6 +25,12 @@ const AD_PACKAGE_PRICES: Record<string, { durationDays: number; price: number }>
   featured: { durationDays: 7, price: 300 },
 };
 
+// 🧪 শুধু অ্যাডমিনের পেমেন্ট-ফ্লো টেস্টের জন্য ৳২০ / ১ দিনের প্যাকেজ (tier "basic")।
+// এটা সাধারণ ইউজারের কাছে নেই -- ক্লায়েন্টে শুধু অ্যাডমিন সেশনে দেখায়, আর এখানে
+// সার্ভারেও admins টেবিলে uid না থাকলে এই দাম গ্রহণই করা হয় না (কনসোল থেকে
+// বানানো রিকোয়েস্টও আটকাবে)।
+const ADMIN_TEST_PACKAGE = { tier: "basic", durationDays: 1, price: 20 };
+
 export default async function handler(req: any, res: any) {
   if (applyCors(req, res)) return;
   if (req.method !== "POST") {
@@ -91,7 +97,29 @@ export default async function handler(req: any, res: any) {
     // top-up amount is legitimately user-chosen.
     if (request.type === "ad_promotion") {
       const canonical = AD_PACKAGE_PRICES[request.ad_tier];
-      if (!canonical || canonical.durationDays !== Number(request.duration_days) || canonical.price !== amount) {
+      let packageOk =
+        !!canonical && canonical.durationDays === Number(request.duration_days) && canonical.price === amount;
+
+      // 🧪 অ্যাডমিন-টেস্ট প্যাকেজ: দাম/মেয়াদ মিললেও শুধু admins টেবিলের ইউজার পারবে।
+      if (
+        !packageOk &&
+        request.ad_tier === ADMIN_TEST_PACKAGE.tier &&
+        Number(request.duration_days) === ADMIN_TEST_PACKAGE.durationDays &&
+        amount === ADMIN_TEST_PACKAGE.price
+      ) {
+        const { data: adminRow, error: adminErr } = await supabase
+          .from("admins")
+          .select("uid")
+          .eq("uid", uid)
+          .maybeSingle();
+        if (adminErr) {
+          console.error("create-charge: admins lookup error:", adminErr.message);
+          return res.status(500).json({ error: "সার্ভারে সমস্যা হয়েছে।" });
+        }
+        packageOk = !!adminRow;
+      }
+
+      if (!packageOk) {
         console.error("create-charge: ad_promotion price/duration mismatch", {
           requestId, adTier: request.ad_tier, durationDays: request.duration_days, amount,
         });
