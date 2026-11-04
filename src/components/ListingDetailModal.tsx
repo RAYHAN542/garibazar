@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { nativeFetch } from "../utils/nativeFetch";
 import { PartListing, SupportedLanguage } from "../types";
-import { X, MapPin, Sparkles, Play, SquarePlay, Flag, ShieldAlert, CheckCircle2, ChevronLeft, ChevronRight, Loader2, ShoppingBag, MessageSquare, Share2 } from "lucide-react";
+import { X, MapPin, Sparkles, Play, Flag, ShieldAlert, CheckCircle2, ChevronLeft, ChevronRight, Loader2, ShoppingBag, MessageSquare, Share2 } from "lucide-react";
 import { logAnalyticsEvent } from "../utils/analytics";
 import { supabase } from "../supabase";
 import { trackListingClick } from "../utils/counters";
@@ -41,6 +41,23 @@ interface ListingDetailModalProps {
 
 export function ListingDetailModal({ listing, language, currentUser, onClose, onPurchaseAdded, onLoginPrompt, onInitiateSellerChat, onViewSellerShop, isAdmin = false }: ListingDetailModalProps) {
   const [isPlayingVideo, setIsPlayingVideo] = useState(false);
+  // 🔧 (2026-11-04) আগে "ভিডিও দেখুন" চাপলে আসল ভিডিও না চালিয়ে একটা নকল প্লেয়ার
+  // (ভুয়া "0:14 / 2:30", "HDR 1080p") দেখাত, তাই বুস্ট করা ভিডিও লিস্টিংয়ে ভিডিও চলত
+  // না। এখন listing-এর আসল video_url দিয়ে <video> চলে। কোনো পথে videoUrl না এলে
+  // (যেমন অন্য mapper) প্লে চাপার সময় Supabase থেকে সরাসরি এনে নেওয়া হয়।
+  const [videoSrc, setVideoSrc] = useState<string | undefined>(listing.videoUrl);
+  const [videoMissing, setVideoMissing] = useState(false);
+  const handlePlayVideo = async () => {
+    setIsPlayingVideo(true);
+    if (videoSrc) return;
+    try {
+      const { data } = await supabase.from("listings").select("video_url").eq("id", listing.id).maybeSingle();
+      if (data?.video_url) setVideoSrc(data.video_url as string);
+      else setVideoMissing(true);
+    } catch {
+      setVideoMissing(true);
+    }
+  };
   const [showPhoneNumber, setShowPhoneNumber] = useState(false);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   // ফোন নম্বর আর listing ডকে থাকে না (প্রাইভেসি ফিক্স) — দরকার হলে
@@ -539,39 +556,31 @@ export function ListingDetailModal({ listing, language, currentUser, onClose, on
           <div className="relative w-full h-72 sm:h-96 bg-slate-950 flex items-center justify-center overflow-hidden">
             {isPlayingVideo ? (
               <div className="relative w-full h-full bg-black flex flex-col justify-center items-center">
-                {/* Elegant simulated media component */}
-                <div className="absolute inset-0 bg-gradient-to-tr from-slate-900 to-slate-800 flex flex-col justify-center items-center">
-                  <div className="text-center p-6 flex flex-col items-center">
-                    <div className="w-12 h-12 bg-amber-500/15 text-amber-500 rounded-full flex items-center justify-center mb-3 animate-bounce">
-                      <SquarePlay className="w-6 h-6" />
-                    </div>
-                    <span className="text-amber-400 font-mono text-xs uppercase tracking-widest block mb-1">
-                      [ {language === "bn" ? "পার্টস রিভিউ ভিডিও চলমান" : "PLAYING CAR PART DEMO"} ]
-                    </span>
-                    <p className="text-slate-300 text-sm font-semibold italic max-w-sm">
-                      {language === "bn" 
-                        ? `${listing.title} এর ফিটিং ও কন্ডিশন ভিডিও রিভিউ` 
-                        : `Live walkthrough of ${listing.title} performance condition`}
-                    </p>
-                    
-                    {/* Media state visuals */}
-                    <div className="mt-6 flex items-center gap-2">
-                      <span className="w-2.5 h-2.5 bg-red-500 rounded-full animate-ping"></span>
-                      <span className="text-slate-100 text-[11px] font-mono">0:14 / 2:30</span>
-                    </div>
-                  </div>
-                </div>
-                
-                {/* Controls overlay */}
-                <div className="absolute bottom-4 left-4 right-4 flex justify-between items-center bg-black/60 p-2.5 rounded-lg border border-slate-800 text-white text-xs">
-                  <button 
-                    onClick={() => setIsPlayingVideo(false)}
-                    className="text-amber-400 font-bold hover:underline"
-                  >
-                    {language === "bn" ? "ছবি দেখুন" : "Back to Photo"}
-                  </button>
-                  <span className="font-mono text-xs">HDR 1080p • 60 FPS</span>
-                </div>
+                {videoSrc ? (
+                  <video
+                    key={videoSrc}
+                    src={videoSrc}
+                    controls
+                    autoPlay
+                    playsInline
+                    preload="auto"
+                    poster={modalImages[0] ? getOptimizedImageUrl(modalImages[0], 1000) : undefined}
+                    className="w-full h-full object-contain bg-black"
+                  />
+                ) : videoMissing ? (
+                  <p className="text-slate-300 text-sm font-semibold px-6 text-center">
+                    {language === "bn" ? "ভিডিওটি লোড করা যায়নি।" : "Could not load the video."}
+                  </p>
+                ) : (
+                  <Loader2 className="w-7 h-7 text-white animate-spin" />
+                )}
+
+                <button
+                  onClick={() => setIsPlayingVideo(false)}
+                  className="absolute top-3 left-3 bg-black/60 text-amber-400 font-bold text-xs px-3 py-1.5 rounded-lg hover:underline"
+                >
+                  {language === "bn" ? "ছবি দেখুন" : "Back to Photo"}
+                </button>
               </div>
             ) : (
               <>
@@ -634,7 +643,7 @@ export function ListingDetailModal({ listing, language, currentUser, onClose, on
                 {listing.hasVideo && (
                   /* Floating Action Button inside photo to play video walkthrough */
                   <button
-                    onClick={() => setIsPlayingVideo(true)}
+                    onClick={handlePlayVideo}
                     className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-amber-500 hover:bg-amber-600 text-slate-950 px-5 py-3 rounded-full font-bold text-xs flex items-center gap-2 transition-all shadow-xl shadow-amber-500/20 active:scale-95 cursor-pointer"
                   >
                     <Play className="w-4 h-4 fill-slate-950" />
