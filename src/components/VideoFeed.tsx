@@ -198,14 +198,14 @@ function VideoSlide({ listing, index, activeIndex, muted, adPlaying, language, o
     <div
       data-index={index}
       ref={registerRef}
-      className="h-full w-full snap-start snap-always relative bg-black flex items-center justify-center overflow-hidden"
+      className="h-1/2 w-full snap-start snap-always relative bg-black flex items-center justify-center overflow-hidden border-b border-white/10"
     >
       {isNear && listing.videoUrl ? (
         <video
           ref={videoRef}
           src={listing.videoUrl}
           poster={listing.image || undefined}
-          className="h-full w-full object-contain"
+          className="h-full w-full object-cover"
           loop
           playsInline
           muted={muted}
@@ -213,7 +213,7 @@ function VideoSlide({ listing, index, activeIndex, muted, adPlaying, language, o
           onClick={togglePause}
         />
       ) : listing.image ? (
-        <img src={listing.image} alt="" className="h-full w-full object-contain opacity-60" />
+        <img src={listing.image} alt="" className="h-full w-full object-cover opacity-60" />
       ) : null}
 
       {paused && isActive && (
@@ -229,14 +229,14 @@ function VideoSlide({ listing, index, activeIndex, muted, adPlaying, language, o
       <button
         type="button"
         onClick={onToggleMute}
-        className="absolute right-3 bottom-44 w-10 h-10 rounded-full bg-black/55 flex items-center justify-center text-white cursor-pointer"
+        className="absolute right-2 bottom-[6.5rem] z-10 w-9 h-9 rounded-full bg-black/55 flex items-center justify-center text-white cursor-pointer"
         aria-label={muted ? "Unmute" : "Mute"}
       >
         {muted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
       </button>
 
       {expanded && (
-        <div className="absolute inset-0 z-20 flex items-end bg-black/60" onClick={() => setExpanded(false)}>
+        <div className="fixed inset-0 z-[95] flex items-end bg-black/60" onClick={() => setExpanded(false)}>
           <div
             className="w-full max-h-[75%] overflow-y-auto rounded-t-3xl bg-white dark:bg-slate-900 text-slate-900 dark:text-white p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))]"
             onClick={(e) => e.stopPropagation()}
@@ -287,38 +287,38 @@ function VideoSlide({ listing, index, activeIndex, muted, adPlaying, language, o
         </div>
       )}
 
-      <div className="absolute right-3 bottom-[15rem] z-10 flex flex-col items-center gap-4">
+      <div className="absolute right-2 top-2 z-10 flex flex-col items-center gap-1.5">
         <button type="button" aria-label="Save" onClick={toggleSave} className="flex flex-col items-center gap-1 text-white cursor-pointer">
-          <span className="flex h-11 w-11 items-center justify-center rounded-full bg-black/45">
-            <Bookmark className={`w-6 h-6 ${saved ? "fill-amber-400 text-amber-400" : ""}`} />
+          <span className="flex h-9 w-9 items-center justify-center rounded-full bg-black/45">
+            <Bookmark className={`w-5 h-5 ${saved ? "fill-amber-400 text-amber-400" : ""}`} />
           </span>
-          <span className="text-[11px] font-bold drop-shadow">{saved ? (language === "bn" ? "সেভড" : "Saved") : (language === "bn" ? "সেভ" : "Save")}</span>
+          <span className="text-[9px] font-bold drop-shadow leading-none">{saved ? (language === "bn" ? "সেভড" : "Saved") : (language === "bn" ? "সেভ" : "Save")}</span>
         </button>
         <button type="button" aria-label="Share" onClick={handleShare} className="flex flex-col items-center gap-1 text-white cursor-pointer">
-          <span className="flex h-11 w-11 items-center justify-center rounded-full bg-black/45">
-            <Share2 className="w-6 h-6" />
+          <span className="flex h-9 w-9 items-center justify-center rounded-full bg-black/45">
+            <Share2 className="w-5 h-5" />
           </span>
-          <span className="text-[11px] font-bold drop-shadow">{shareCopied ? (language === "bn" ? "কপি হয়েছে" : "Copied") : (language === "bn" ? "শেয়ার" : "Share")}</span>
+          <span className="text-[9px] font-bold drop-shadow leading-none">{shareCopied ? (language === "bn" ? "কপি হয়েছে" : "Copied") : (language === "bn" ? "শেয়ার" : "Share")}</span>
         </button>
         <button type="button" aria-label="Chat" onClick={handleChat} className="flex flex-col items-center gap-1 text-white cursor-pointer">
-          <span className="flex h-11 w-11 items-center justify-center rounded-full bg-black/45">
-            <MessageCircle className="w-6 h-6" />
+          <span className="flex h-9 w-9 items-center justify-center rounded-full bg-black/45">
+            <MessageCircle className="w-5 h-5" />
           </span>
-          <span className="text-[11px] font-bold drop-shadow">{language === "bn" ? "চ্যাট" : "Chat"}</span>
+          <span className="text-[9px] font-bold drop-shadow leading-none">{language === "bn" ? "চ্যাট" : "Chat"}</span>
         </button>
         {isAdmin && (
           <div className="pointer-events-none flex flex-col items-center gap-1 text-white">
-            <span className="flex h-11 w-11 items-center justify-center rounded-full bg-black/45">
-              <Eye className="w-6 h-6" />
+            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-black/45">
+              <Eye className="w-5 h-5" />
             </span>
-            <span className="text-[11px] font-bold drop-shadow">{(listing.views || 0) + (viewedThisSession.has(listing.id) ? 1 : 0)}</span>
+            <span className="text-[9px] font-bold drop-shadow leading-none">{(listing.views || 0) + (viewedThisSession.has(listing.id) ? 1 : 0)}</span>
           </div>
         )}
       </div>
 
-      <div className="pointer-events-none absolute bottom-0 inset-x-0 px-4 pt-16 pb-[calc(1.25rem+env(safe-area-inset-bottom))] bg-gradient-to-t from-black/85 via-black/45 to-transparent text-white">
-        <h3 className="text-base font-extrabold leading-snug line-clamp-2">{listing.title}</h3>
-        <p className="mt-1 text-lg font-black text-amber-400">{formatPrice(listing.price, language)}</p>
+      <div className="pointer-events-none absolute bottom-0 inset-x-0 px-3 pt-10 pb-2 bg-gradient-to-t from-black/85 via-black/45 to-transparent text-white">
+        <h3 className="text-sm font-extrabold leading-snug line-clamp-1">{listing.title}</h3>
+        <p className="text-base font-black text-amber-400">{formatPrice(listing.price, language)}</p>
         {listing.location && (
           <p className="mt-0.5 flex items-center gap-1 text-xs font-semibold text-white/80">
             <MapPin className="w-3.5 h-3.5 shrink-0" />
@@ -328,7 +328,7 @@ function VideoSlide({ listing, index, activeIndex, muted, adPlaying, language, o
         <button
           type="button"
           onClick={() => setExpanded((v) => !v)}
-          className="pointer-events-auto mt-3 w-full py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-sm cursor-pointer"
+          className="pointer-events-auto mt-1.5 w-full py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-xs cursor-pointer"
         >
           {language === "bn" ? "বিস্তারিত দেখুন" : "View details"}
         </button>
@@ -353,14 +353,15 @@ export default function VideoFeed({ language, videos, currentUser, onLoginPrompt
   useEffect(() => {
     const root = containerRef.current;
     if (!root || videos.length === 0) return;
+    const visible = new Set<number>();
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
-          if (entry.isIntersecting && entry.intersectionRatio >= 0.6) {
-            const idx = Number((entry.target as HTMLElement).dataset.index);
-            if (!Number.isNaN(idx)) setActiveIndex(idx);
-          }
+          const idx = Number((entry.target as HTMLElement).dataset.index);
+          if (Number.isNaN(idx)) return;
+          if (entry.isIntersecting && entry.intersectionRatio >= 0.6) visible.add(idx); else visible.delete(idx);
         });
+        if (visible.size > 0) setActiveIndex(Math.min(...Array.from(visible)));
       },
       { root, threshold: [0.6] }
     );
@@ -439,7 +440,7 @@ export default function VideoFeed({ language, videos, currentUser, onLoginPrompt
           </p>
         </div>
       ) : (
-        <div ref={containerRef} style={{ overflowAnchor: "none" }} className="h-full w-full overflow-y-scroll snap-y snap-mandatory no-scrollbar">
+        <div ref={containerRef} style={{ overflowAnchor: "none", paddingTop: "calc(3.5rem + env(safe-area-inset-top))", scrollPaddingTop: "calc(3.5rem + env(safe-area-inset-top))" }} className="h-full w-full overflow-y-scroll snap-y snap-mandatory no-scrollbar">
           {videos.map((listing, index) => (
             <VideoSlide
               key={listing.id}
