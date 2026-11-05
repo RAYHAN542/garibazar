@@ -149,7 +149,7 @@ export function ImageWithFallback({ id, src, alt, className = "", isAd = false, 
         width={width}
         height={height}
         alt={alt}
-        className={`w-full h-full object-cover transition-opacity duration-200 ${loading ? "opacity-0 absolute inset-0" : "opacity-100"} ${className}`}
+        className={`w-full h-full ${className.includes("object-") ? "" : "object-cover"} transition-opacity duration-200 ${loading ? "opacity-0 absolute inset-0" : "opacity-100"} ${className}`}
         onLoad={handleLoad}
         onError={onFail}
         loading={priority ? "eager" : "lazy"}
