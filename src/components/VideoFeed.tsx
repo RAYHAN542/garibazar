@@ -62,7 +62,7 @@ function VideoSlideImpl({ listing, index, rel, muted, adPlaying, language, onTog
   const videoRef = useRef<HTMLVideoElement>(null);
   const [paused, setPaused] = useState(false);
   const isActive = rel === 0;
-  const isNear = Math.abs(rel) <= 1;
+  const isNear = rel >= -1 && rel <= 2;
   const [expanded, setExpanded] = useState(false);
   const [, setCounted] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -173,7 +173,7 @@ function VideoSlideImpl({ listing, index, rel, muted, adPlaying, language, onTog
       }
     } else {
       v.pause();
-      try { v.currentTime = 0; } catch (_) {}
+      if (!isNear) { try { v.currentTime = 0; } catch (_) {} }
       setPaused(false);
     }
   }, [isActive, isNear, adPlaying]);
@@ -203,7 +203,7 @@ function VideoSlideImpl({ listing, index, rel, muted, adPlaying, language, onTog
           ref={videoRef}
           src={listing.videoUrl + "#t=0.1"}
           poster={listing.image || undefined}
-          className="h-full w-full object-cover"
+          className="h-full w-full object-cover [transform:translateZ(0)]"
           loop
           playsInline
           muted={muted}
@@ -355,6 +355,7 @@ export default function VideoFeed({ language, videos, currentUser, onLoginPrompt
     const root = containerRef.current;
     if (!root || videos.length === 0) return;
     const visible = new Set<number>();
+    let timer: any = null;
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
@@ -362,12 +363,16 @@ export default function VideoFeed({ language, videos, currentUser, onLoginPrompt
           if (Number.isNaN(idx)) return;
           if (entry.isIntersecting && entry.intersectionRatio >= 0.6) visible.add(idx); else visible.delete(idx);
         });
-        if (visible.size > 0) setActiveIndex(Math.min(...Array.from(visible)));
+        if (visible.size > 0) {
+          const next = Math.min(...Array.from(visible));
+          if (timer) clearTimeout(timer);
+          timer = setTimeout(() => setActiveIndex(next), 140);
+        }
       },
       { root, threshold: [0.6] }
     );
     root.querySelectorAll("[data-index]").forEach((el) => observer.observe(el));
-    return () => observer.disconnect();
+    return () => { if (timer) clearTimeout(timer); observer.disconnect(); };
   }, [videos.length]);
 
   // পোস্টের পর নতুন ভিডিও তালিকার মাথায় এলে সেখানে নিয়ে যাই।
