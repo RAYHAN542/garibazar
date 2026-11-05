@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { X, Volume2, VolumeX, Play, MapPin, Plus, Phone, Bookmark, Share2, MessageCircle, Eye } from "lucide-react";
 import type { PartListing, SupportedLanguage } from "../types";
 import { AddPartForm } from "./AddPartForm";
@@ -44,14 +44,13 @@ const formatPrice = (price: number, language: SupportedLanguage): string => {
 interface VideoSlideProps {
   listing: PartListing;
   index: number;
-  activeIndex: number;
+  rel: number;
   muted: boolean;
   adPlaying: boolean;
   language: SupportedLanguage;
   onToggleMute: () => void;
   onForceMute: () => void;
   onSelect: (listing: PartListing) => void;
-  registerRef: (el: HTMLDivElement | null) => void;
   currentUser: any;
   onLoginPrompt: () => void;
   isAdmin: boolean;
@@ -59,11 +58,11 @@ interface VideoSlideProps {
   onClose: () => void;
 }
 
-function VideoSlide({ listing, index, activeIndex, muted, adPlaying, language, onToggleMute, onForceMute, registerRef, currentUser, onLoginPrompt, isAdmin, onStartChat, onClose }: VideoSlideProps) {
+function VideoSlideImpl({ listing, index, rel, muted, adPlaying, language, onToggleMute, onForceMute, currentUser, onLoginPrompt, isAdmin, onStartChat, onClose }: VideoSlideProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [paused, setPaused] = useState(false);
-  const isActive = index === activeIndex;
-  const isNear = Math.abs(index - activeIndex) <= 1;
+  const isActive = rel === 0;
+  const isNear = Math.abs(rel) <= 1;
   const [expanded, setExpanded] = useState(false);
   const [, setCounted] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -197,19 +196,18 @@ function VideoSlide({ listing, index, activeIndex, muted, adPlaying, language, o
   return (
     <div
       data-index={index}
-      ref={registerRef}
-      className="h-1/2 w-full snap-start snap-always relative bg-black flex items-center justify-center overflow-hidden border-b border-white/10"
+      className="h-1/2 w-full snap-start relative bg-black flex items-center justify-center overflow-hidden border-b border-white/10"
     >
       {isNear && listing.videoUrl ? (
         <video
           ref={videoRef}
-          src={listing.videoUrl}
+          src={listing.videoUrl + "#t=0.1"}
           poster={listing.image || undefined}
           className="h-full w-full object-cover"
           loop
           playsInline
           muted={muted}
-          preload={isActive ? "auto" : "metadata"}
+          preload={rel === 0 || rel === 1 ? "auto" : "metadata"}
           onClick={togglePause}
         />
       ) : listing.image ? (
@@ -337,13 +335,16 @@ function VideoSlide({ listing, index, activeIndex, muted, adPlaying, language, o
   );
 }
 
+const VideoSlide = memo(VideoSlideImpl);
+
 export default function VideoFeed({ language, videos, currentUser, onLoginPrompt, onClose, onSelect, isAdmin, onStartChat, onPosted }: VideoFeedProps) {
   const [activeIndex, setActiveIndex] = useState(0);
   const [muted, setMuted] = useState(false);
+  const toggleMute = useCallback(() => setMuted((m) => !m), []);
+  const forceMute = useCallback(() => setMuted(true), []);
   const [isPostOpen, setIsPostOpen] = useState(false);
   const [posted, setPosted] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
-  const slideRefs = useRef<(HTMLDivElement | null)[]>([]);
   const jumpPending = useRef(false);
   const firstIdAtPost = useRef<string | null>(null);
   // প্রতি ৪টা ভিডিও swipe-এর পর Interstitial (video) ad; ad চলার সময় ভিডিও pause
@@ -365,7 +366,7 @@ export default function VideoFeed({ language, videos, currentUser, onLoginPrompt
       },
       { root, threshold: [0.6] }
     );
-    slideRefs.current.forEach((el) => { if (el) observer.observe(el); });
+    root.querySelectorAll("[data-index]").forEach((el) => observer.observe(el));
     return () => observer.disconnect();
   }, [videos.length]);
 
@@ -440,25 +441,24 @@ export default function VideoFeed({ language, videos, currentUser, onLoginPrompt
           </p>
         </div>
       ) : (
-        <div ref={containerRef} style={{ overflowAnchor: "none", paddingTop: "calc(3.5rem + env(safe-area-inset-top))", scrollPaddingTop: "calc(3.5rem + env(safe-area-inset-top))" }} className="h-full w-full overflow-y-scroll snap-y snap-mandatory no-scrollbar">
+        <div ref={containerRef} style={{ overflowAnchor: "none", paddingTop: "calc(3.5rem + env(safe-area-inset-top))", scrollPaddingTop: "calc(3.5rem + env(safe-area-inset-top))" }} className="h-full w-full overflow-y-scroll snap-y snap-mandatory no-scrollbar overscroll-contain">
           {videos.map((listing, index) => (
             <VideoSlide
               key={listing.id}
               listing={listing}
               index={index}
-              activeIndex={activeIndex}
+              rel={Math.max(-2, Math.min(3, index - activeIndex))}
               muted={muted}
               adPlaying={adPlaying}
               language={language}
-              onToggleMute={() => setMuted((m) => !m)}
-              onForceMute={() => setMuted(true)}
+              onToggleMute={toggleMute}
+              onForceMute={forceMute}
               currentUser={currentUser}
               onLoginPrompt={onLoginPrompt}
               isAdmin={!!isAdmin}
               onStartChat={onStartChat}
               onClose={onClose}
               onSelect={onSelect}
-              registerRef={(el) => { slideRefs.current[index] = el; }}
             />
           ))}
         </div>
