@@ -136,7 +136,7 @@ export function ImageWithFallback({ id, src, alt, className = "", isAd = false, 
         : getOptimizedImageUrl(src, width);
 
   return (
-    <div className="relative w-full h-full overflow-hidden bg-slate-100 dark:bg-slate-900">
+    <div className={`relative w-full h-full overflow-hidden ${className.includes("object-contain") ? "" : "bg-slate-100 dark:bg-slate-900"}`}>
       {loading && (
         <div className="absolute inset-0 bg-slate-200 dark:bg-slate-800 animate-pulse flex items-center justify-center">
           <Loader2 className="w-6 h-6 text-slate-400/60 animate-spin" />

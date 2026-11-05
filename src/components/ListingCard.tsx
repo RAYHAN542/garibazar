@@ -135,22 +135,25 @@ function ListingCardImpl({ listing, language, onViewDetails, onPromoteClick, isA
         onViewDetails(listing);
       }}
     >
-      {/* IMAGE */}
-      <div className="relative aspect-[16/9] w-full bg-slate-50 dark:bg-slate-950 overflow-hidden">
-        <ImageWithFallback
-          src={listing.images && listing.images[0]}
-          alt={listing.title}
-          className="w-full h-full object-contain transition-transform duration-500 group-hover:scale-105"
-          priority={priority}
-          width={500}
-          height={340}
-        />
+      {/* IMAGE + TEXT OVERLAY */}
+      <div className="relative aspect-square w-full bg-slate-900 overflow-hidden">
+        <div className="absolute inset-0 scale-125 blur-2xl opacity-70" aria-hidden="true">
+          <ImageWithFallback src={listing.images && listing.images[0]} alt="" width={120} />
+        </div>
+        <div className="absolute inset-0">
+          <ImageWithFallback
+            src={listing.images && listing.images[0]}
+            alt={listing.title}
+            className="w-full h-full object-contain transition-transform duration-500 group-hover:scale-105"
+            priority={priority}
+            width={500}
+            height={340}
+          />
+        </div>
 
         <span
           className={`absolute top-1.5 left-1.5 font-black text-[8.5px] uppercase tracking-wide px-1.5 py-0.5 rounded shadow-sm z-10 ${
-            isVehicle
-              ? "bg-amber-500 text-white"
-              : "bg-sky-600 text-white"
+            isVehicle ? "bg-amber-500 text-white" : "bg-sky-600 text-white"
           }`}
         >
           {categoryLabel}
@@ -162,38 +165,35 @@ function ListingCardImpl({ listing, language, onViewDetails, onPromoteClick, isA
             {language === "bn" ? "বিজ্ঞাপন" : "AD"}
           </span>
         )}
-      </div>
 
-      {/* DETAILS */}
-      <div className="p-1.5 sm:p-2 flex flex-col gap-0.5">
-        <h3 className="text-[12px] font-extrabold text-slate-850 dark:text-white leading-snug truncate">
-          {listing.title}
-        </h3>
-
-        <div className="flex items-center gap-1 text-[9.5px] text-slate-500 dark:text-slate-400 font-semibold truncate">
-          <MapPin className="w-2.5 h-2.5 text-amber-500 shrink-0" />
-          <span className="truncate">{listing.location}</span>
-          {isAdmin && (
-            <>
-              <span className="mx-1 text-slate-300 dark:text-slate-700">•</span>
-              <span className="whitespace-nowrap">{getTimeAgo(listing.createdAt, language)}</span>
-            </>
-          )}
-        </div>
-
-        <div className="flex items-center justify-between mt-0.5">
-          <span className="text-[12.5px] font-black text-amber-600 dark:text-amber-400 tracking-tight">
-            {listing.price
-              ? `৳${listing.price.toLocaleString("en-IN")}`
-              : (language === "bn" ? "মূল্য জানতে যোগাযোগ করুন" : "Price on Request")}
-          </span>
-          {(() => {
-            const result = getStarTier(listing.views || 0);
-            if (!result) return <span />;
-            return (
-              <EyeStarBadge tier={result.tier} starCount={result.tierIndex + 1} size={15 + result.tierIndex * 1.5} />
-            );
-          })()}
+        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/50 to-transparent px-2 pb-1.5 pt-10 flex flex-col gap-0.5">
+          <h3 className="text-[12px] font-extrabold text-white leading-snug truncate">
+            {listing.title}
+          </h3>
+          <div className="flex items-center gap-1 text-[9.5px] text-white/80 font-semibold truncate">
+            <MapPin className="w-2.5 h-2.5 text-amber-400 shrink-0" />
+            <span className="truncate">{listing.location}</span>
+            {isAdmin && (
+              <>
+                <span className="mx-1 text-white/40">•</span>
+                <span className="whitespace-nowrap">{getTimeAgo(listing.createdAt, language)}</span>
+              </>
+            )}
+          </div>
+          <div className="flex items-center justify-between mt-0.5">
+            <span className="text-[12.5px] font-black text-amber-300 tracking-tight">
+              {listing.price
+                ? `৳${listing.price.toLocaleString("en-IN")}`
+                : (language === "bn" ? "মূল্য জানতে যোগাযোগ করুন" : "Price on Request")}
+            </span>
+            {(() => {
+              const result = getStarTier(listing.views || 0);
+              if (!result) return <span />;
+              return (
+                <EyeStarBadge tier={result.tier} starCount={result.tierIndex + 1} size={15 + result.tierIndex * 1.5} />
+              );
+            })()}
+          </div>
         </div>
       </div>
     </a>
