@@ -136,7 +136,7 @@ function ListingCardImpl({ listing, language, onViewDetails, onPromoteClick, isA
       }}
     >
       {/* IMAGE + TEXT OVERLAY */}
-      <div className="relative aspect-[4/3] w-full bg-slate-200 dark:bg-slate-800 overflow-hidden">
+      <div className="relative aspect-square w-full bg-slate-200 dark:bg-slate-800 overflow-hidden">
         <ImageWithFallback
           src={listing.images && listing.images[0]}
           alt={listing.title}
