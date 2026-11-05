@@ -2,6 +2,7 @@ import React from "react";
 import { PartListing, SupportedLanguage } from "../types";
 import { MapPin, Sparkles } from "lucide-react";
 import { ImageWithFallback } from "./ImageWithFallback";
+import { getOptimizedImageUrl } from "../utils/cloudinary";
 
 interface ListingCardProps {
   key?: string | number;
@@ -137,9 +138,16 @@ function ListingCardImpl({ listing, language, onViewDetails, onPromoteClick, isA
     >
       {/* IMAGE + TEXT OVERLAY */}
       <div className="relative aspect-square w-full bg-slate-900 overflow-hidden">
-        <div className="absolute inset-0 scale-125 blur-2xl opacity-70" aria-hidden="true">
-          <ImageWithFallback src={listing.images && listing.images[0]} alt="" width={120} />
-        </div>
+        {listing.images && listing.images[0] && (
+          <img
+            src={getOptimizedImageUrl(listing.images[0], 500)}
+            alt=""
+            aria-hidden="true"
+            loading="lazy"
+            decoding="async"
+            className="absolute inset-0 w-full h-full object-cover scale-125 blur-2xl opacity-80"
+          />
+        )}
         <div className="absolute inset-0">
           <ImageWithFallback
             src={listing.images && listing.images[0]}
