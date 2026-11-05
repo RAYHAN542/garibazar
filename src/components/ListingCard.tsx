@@ -2,7 +2,6 @@ import React from "react";
 import { PartListing, SupportedLanguage } from "../types";
 import { MapPin, Sparkles } from "lucide-react";
 import { ImageWithFallback } from "./ImageWithFallback";
-import { getOptimizedImageUrl } from "../utils/cloudinary";
 
 interface ListingCardProps {
   key?: string | number;
@@ -114,6 +113,7 @@ function getTimeAgo(createdAt: any, language: SupportedLanguage): string {
 
 function ListingCardImpl({ listing, language, onViewDetails, onPromoteClick, isAdmin, priority = false }: ListingCardProps) {
   const isAd = listing.isAd;
+  const [ratio, setRatio] = React.useState(4 / 3);
   const isVehicle = (listing as any).type === "vehicle"
     ? true
     : (listing as any).type === "part"
@@ -126,7 +126,7 @@ function ListingCardImpl({ listing, language, onViewDetails, onPromoteClick, isA
   return (
     <a
       href={`/l/${listing.id}`}
-      className={`relative rounded-2xl overflow-hidden bg-white dark:bg-slate-900 transition-all duration-300 flex flex-col hover:shadow-lg cursor-pointer group border ${
+      className={`relative self-start w-full rounded-2xl overflow-hidden bg-white dark:bg-slate-900 transition-all duration-300 flex flex-col hover:shadow-lg cursor-pointer group border ${
         isAd
           ? "border-2 border-amber-400 shadow-sm shadow-amber-500/10"
           : "border-slate-200 hover:border-amber-300 dark:border-slate-800 dark:hover:border-slate-700"
@@ -137,23 +137,14 @@ function ListingCardImpl({ listing, language, onViewDetails, onPromoteClick, isA
       }}
     >
       {/* IMAGE + TEXT OVERLAY */}
-      <div className="relative aspect-square w-full bg-slate-900 overflow-hidden">
-        {listing.images && listing.images[0] && (
-          <img
-            src={getOptimizedImageUrl(listing.images[0], 500)}
-            alt=""
-            aria-hidden="true"
-            loading="lazy"
-            decoding="async"
-            className="absolute inset-0 w-full h-full object-cover scale-125 blur-2xl opacity-80"
-          />
-        )}
+      <div className="relative w-full bg-slate-900 overflow-hidden" style={{ aspectRatio: String(Math.min(1.78, Math.max(0.75, ratio))) }}>
         <div className="absolute inset-0">
           <ImageWithFallback
             src={listing.images && listing.images[0]}
             alt={listing.title}
-            className="w-full h-full object-contain transition-transform duration-500 group-hover:scale-105"
+            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
             priority={priority}
+            onRatio={setRatio}
             width={500}
             height={340}
           />

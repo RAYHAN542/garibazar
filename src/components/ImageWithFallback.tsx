@@ -16,6 +16,7 @@ interface ImageWithFallbackProps {
   // it immediately instead of waiting to discover it lazily, and treats it
   // as higher priority than the rest of the (lazy) images below the fold.
   priority?: boolean;
+  onRatio?: (ratio: number) => void;
 }
 
 // If an image has not finished loading after this long, give up on it.
@@ -39,7 +40,7 @@ const getThumbUrl = (src: string, width: number): string | null => {
 const withCacheBust = (url: string, nonce: number): string =>
   nonce ? `${url}${url.includes("?") ? "&" : "?"}r=${nonce}` : url;
 
-export function ImageWithFallback({ id, src, alt, className = "", isAd = false, width = 500, height, priority = false }: ImageWithFallbackProps) {
+export function ImageWithFallback({ id, src, alt, className = "", isAd = false, width = 500, height, priority = false, onRatio }: ImageWithFallbackProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   // "primary" = the normal URL; "cloudinary" = second attempt for ibb.co
@@ -97,6 +98,7 @@ export function ImageWithFallback({ id, src, alt, className = "", isAd = false, 
       onFail();
       return;
     }
+    if (onRatio && img.naturalWidth && img.naturalHeight) onRatio(img.naturalWidth / img.naturalHeight);
     setLoading(false);
   };
 
