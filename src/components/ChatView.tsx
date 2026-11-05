@@ -102,6 +102,7 @@ export function ChatView({ currentUser, language, onLoginPrompt, initialListingT
   // firing handleSendMessage multiple times before the first send finishes,
   // which was causing the same message to appear 2-3 times in a row.
   const sendLockRef = useRef(false);
+  const handledChatRef = useRef<string | null>(null);
 
   const [msgLimit, setMsgLimit] = useState(20);
   const [hasMoreMessages, setHasMoreMessages] = useState(false);
@@ -292,6 +293,8 @@ export function ChatView({ currentUser, language, onLoginPrompt, initialListingT
 
   const presets = language === "bn" ? BANGLA_PRESETS : ENGLISH_PRESETS;
 
+  useEffect(() => { if (!initialListingToChat) handledChatRef.current = null; }, [initialListingToChat]);
+
   // 1. Fetch chat threads for current user, then keep them live via Realtime.
   // The `current_uid() = participant_a OR participant_b` RLS check can't be
   // expressed as a single Realtime filter, so two channels are used (one per
@@ -305,6 +308,7 @@ export function ChatView({ currentUser, language, onLoginPrompt, initialListingT
     }
 
     let active = true;
+    let retries = 0;
 
     const fetchThreads = async () => {
       const { data, error } = await supabase
@@ -317,6 +321,7 @@ export function ChatView({ currentUser, language, onLoginPrompt, initialListingT
       if (error) {
         console.error("Error fetching chats:", error);
         setLoadingThreads(false);
+        if (initialListingToChat && retries < 3) { retries += 1; setTimeout(() => { if (active) fetchThreads(); }, 1500); }
         return;
       }
       const list = (data || []).map(mapThreadRow);
@@ -461,6 +466,8 @@ export function ChatView({ currentUser, language, onLoginPrompt, initialListingT
   // Helper to trigger thread creation on first interaction
   const initiateOrOpenChatThread = async (currentThreads: ChatThread[]) => {
     if (!initialListingToChat || !currentUser) return;
+    if (handledChatRef.current === initialListingToChat.id) return;
+    handledChatRef.current = initialListingToChat.id;
 
     // Check if we are chatting with ourselves
     if (initialListingToChat.sellerId === currentUser.uid) {
@@ -480,7 +487,28 @@ export function ChatView({ currentUser, language, onLoginPrompt, initialListingT
       return;
     }
 
-    const sellerId = initialListingToChat.sellerId || "unknown_seller";
+    let sellerId = initialListingToChat.sellerId || "";
+    let sellerNameResolved = initialListingToChat.sellerName || "";
+    if (!sellerId) {
+      try {
+        const { data: row } = await supabase.from("listings").select("seller_id, seller_name").eq("id", initialListingToChat.id).maybeSingle();
+        if ((row as any)?.seller_id) {
+          sellerId = (row as any).seller_id as string;
+          if (!sellerNameResolved) sellerNameResolved = ((row as any).seller_name as string) || "";
+        }
+      } catch (_) {}
+    }
+    if (!sellerId) {
+      handledChatRef.current = null;
+      alert(language === "bn" ? "চ্যাট শুরু করা যায়নি, আবার চেষ্টা করুন।" : "Could not start the chat, please try again.");
+      if (onClearInitialListing) onClearInitialListing();
+      return;
+    }
+    if (sellerId === currentUser.uid) {
+      alert(language === "bn" ? "আপনি নিজের বিজ্ঞাপনে চ্যাট করতে পারবেন না!" : "You cannot chat on your own listings!");
+      if (onClearInitialListing) onClearInitialListing();
+      return;
+    }
     // `chats.listing_id` is a uuid column -- listings created before the
     // Supabase migration may still carry a legacy Firestore string id here,
     // which can't be stored in that column. The chat still works fine
@@ -495,7 +523,7 @@ export function ChatView({ currentUser, language, onLoginPrompt, initialListingT
       buyer_id: currentUser.uid,
       seller_id: sellerId,
       buyer_name: currentUser.displayName || "Buyer",
-      seller_name: initialListingToChat.sellerName || "Anonymous Seller",
+      seller_name: sellerNameResolved || "Anonymous Seller",
       listing_id: listingIdForRow,
       listing_title: initialListingToChat.title || "Untitled Listing",
       listing_image: initialListingToChat.image || (initialListingToChat as any).images?.[0] || "",
@@ -514,6 +542,8 @@ export function ChatView({ currentUser, language, onLoginPrompt, initialListingT
       setActiveThread(mapThreadRow(inserted));
     } catch (e) {
       console.error("Error creating chat thread:", e);
+      handledChatRef.current = null;
+      alert(language === "bn" ? "চ্যাট শুরু করা যায়নি, আবার চেষ্টা করুন।" : "Could not start the chat, please try again.");
     }
 
     if (onClearInitialListing) onClearInitialListing();
