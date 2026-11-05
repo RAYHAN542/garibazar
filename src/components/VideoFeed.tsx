@@ -384,8 +384,16 @@ export default function VideoFeed({ language, videos, currentUser, onLoginPrompt
   // Stop the page behind the feed from scrolling.
   useEffect(() => {
     const prev = document.body.style.overflow;
+    const prevHtml = document.documentElement.style.overscrollBehaviorY;
+    const prevBody = document.body.style.overscrollBehaviorY;
     document.body.style.overflow = "hidden";
-    return () => { document.body.style.overflow = prev; };
+    document.documentElement.style.overscrollBehaviorY = "none";
+    document.body.style.overscrollBehaviorY = "none";
+    return () => {
+      document.body.style.overflow = prev;
+      document.documentElement.style.overscrollBehaviorY = prevHtml;
+      document.body.style.overscrollBehaviorY = prevBody;
+    };
   }, []);
 
   useEffect(() => {
@@ -395,7 +403,7 @@ export default function VideoFeed({ language, videos, currentUser, onLoginPrompt
   }, [posted]);
 
   return (
-    <div className="fixed inset-0 z-[80] bg-black">
+    <div className="fixed inset-0 z-[80] bg-black overscroll-none">
       <div className="absolute top-0 inset-x-0 z-10 flex items-center justify-between px-3 pt-[calc(0.75rem+env(safe-area-inset-top))] pb-2 bg-gradient-to-b from-black/70 to-transparent">
         <span className="text-white text-base font-black tracking-tight">
           {language === "bn" ? "গাড়ির ভিডিও" : "Car Videos"}
