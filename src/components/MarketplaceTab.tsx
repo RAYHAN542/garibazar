@@ -54,6 +54,28 @@ interface MarketplaceTabProps {
   onStartChat: (listing: PartListing) => void;
 }
 
+const calcCols = () =>
+  typeof window === "undefined" ? 2 : window.innerWidth >= 1024 ? 6 : window.innerWidth >= 768 ? 4 : window.innerWidth >= 640 ? 3 : 2;
+
+// Pinterest-style: প্রতিটা কার্ড নিজের ছবির মাপে, ফাঁকা জায়গা থাকে না। পোস্ট বাঁ-ডান পর্যায়ক্রমে বসে।
+function Masonry<T extends { id: string }>({ items, children }: { items: T[]; children: (item: T, index: number) => any }) {
+  const [cols, setCols] = useState(calcCols);
+  useEffect(() => {
+    const on = () => setCols(calcCols());
+    window.addEventListener("resize", on);
+    return () => window.removeEventListener("resize", on);
+  }, []);
+  return (
+    <div className="flex gap-2.5 sm:gap-4 items-start">
+      {Array.from({ length: cols }, (_, c) => (
+        <div key={c} className="flex-1 min-w-0 flex flex-col gap-2.5 sm:gap-4">
+          {items.map((item, i) => (i % cols === c ? <Fragment key={item.id}>{children(item, i)}</Fragment> : null))}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // Heavy Equipment button icon: excavator (not in lucide, so a custom SVG)
 const ExcavatorIcon = ({ className }: { className?: string }) => (
   <svg
@@ -483,8 +505,8 @@ const feedListings = spotlightFiller ? feedItems.slice(1) : feedItems;
                       <span className="w-2.5 h-2.5 bg-amber-500 rounded-full animate-ping"></span>
                       <h3 className="text-sm font-extrabold font-sans text-amber-600 dark:text-amber-400 uppercase tracking-widest">{activeTranslations.adsTitle}</h3>
                     </div>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2 sm:gap-4">
-                      {spotlightGridItems.map((listing) => (
+                    <Masonry items={spotlightGridItems}>
+                      {(listing) => (
                         <ListingCard
                           key={`spotlight-${listing.id}`}
                           listing={listing}
@@ -493,8 +515,8 @@ const feedListings = spotlightFiller ? feedItems.slice(1) : feedItems;
                           onViewDetails={handleViewListingDetails}
                           onPromoteClick={(item) => { if (!user) { setIsAuthOpen(true); } else { setPromotingListing(item); } }}
                         />
-                      ))}
-                    </div>
+                      )}
+                    </Masonry>
                   </div>
                 )}
 
@@ -555,8 +577,8 @@ const feedListings = spotlightFiller ? feedItems.slice(1) : feedItems;
                     </p>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2 sm:gap-4">
-  {feedListings.map((listing, index) => (<Fragment key={listing.id}>
+                  <Masonry items={feedListings}>
+  {(listing, index) => (<Fragment key={listing.id}>
     <ListingCard
       key={listing.id}
       listing={listing}
@@ -566,8 +588,8 @@ const feedListings = spotlightFiller ? feedItems.slice(1) : feedItems;
       onViewDetails={handleViewListingDetails}
       onPromoteClick={(item) => { if (!user) { setIsAuthOpen(true); } else { setPromotingListing(item); } }}
     /></Fragment>
-  ))}
-</div>
+  )}
+</Masonry>
 )}
                
                 {hasMoreListings && (
