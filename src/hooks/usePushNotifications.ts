@@ -45,6 +45,16 @@ export function usePushNotifications(uid: string | null | undefined) {
           })
         );
 
+        handles.push(
+          await PushNotifications.addListener(
+            "pushNotificationActionPerformed",
+            (action: any) => {
+              const data = action?.notification?.data || {};
+              window.dispatchEvent(new CustomEvent("gari_push_open", { detail: data }));
+            }
+          )
+        );
+
         await PushNotifications.register();
       } catch (e) {
         console.warn("Push notifications error:", e);

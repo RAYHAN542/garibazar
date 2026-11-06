@@ -397,6 +397,28 @@ export default function App() {
   //   2. A direct single-listing fetch by ID (one small request, instead of
   //      syncing the whole marketplace).
   // The full `listings` collection still loads in the background as normal.
+  useEffect(() => {
+    const onPushOpen = async (ev: any) => {
+      const d = ev?.detail || {};
+      try {
+        if (d.listingId) {
+          const found = await fetchListingById(String(d.listingId));
+          if (found) {
+            setActiveTab("market");
+            setSelectedListing(found);
+          }
+        } else if (d.chatId) {
+          setSelectedListing(null);
+          setActiveTab("chats");
+        }
+      } catch (e) {
+        console.warn("push open failed:", e);
+      }
+    };
+    window.addEventListener("gari_push_open", onPushOpen);
+    return () => window.removeEventListener("gari_push_open", onPushOpen);
+  }, []);
+
   const [hasOpenedSharedListing, setHasOpenedSharedListing] = useState(false);
   useEffect(() => {
     if (hasOpenedSharedListing) return;
