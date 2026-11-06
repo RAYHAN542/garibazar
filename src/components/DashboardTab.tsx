@@ -242,11 +242,9 @@ export default function DashboardTab({
                                 <img src={item.images && item.images[0]} alt="" className="w-12 h-12 rounded-lg object-cover flex-shrink-0" referrerPolicy="no-referrer" loading="lazy" />
                                 <div className="min-w-0">
                                   <h5 className="text-sm font-bold text-slate-850 dark:text-white truncate">{item.title}</h5>
-                                  <div className="text-[11px] text-slate-400 mt-0.5 flex flex-wrap gap-x-2 gap-y-0.5">
+                                  <div className="text-[11px] text-slate-400 mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5">
                                     <span>{item.price ? `৳${item.price.toLocaleString("en-IN")}` : (language === "bn" ? "মূল্য জানতে যোগাযোগ করুন" : "Price on Request")}</span>
-                                    <span>•</span>
                                     <span>👁️ {item.views || 0} {language === "bn" ? "ভিউ" : "views"}</span>
-                                    <span>•</span>
                                     <span className={(item.clicks || 0) > 0 ? "text-emerald-500 font-bold" : ""}>📞 {item.clicks || 0} {language === "bn" ? "কল" : "calls"}</span>
                                   </div>
                                 </div>
@@ -813,11 +811,9 @@ export default function DashboardTab({
                                 <img src={item.images && item.images[0]} alt="" className="w-12 h-12 rounded-xl object-cover flex-shrink-0 border" referrerPolicy="no-referrer" loading="lazy" />
                                 <div className="min-w-0">
                                   <h5 className="text-xs font-bold text-slate-850 dark:text-white truncate">{item.title}</h5>
-                                  <div className="text-[10px] text-slate-400 mt-1 flex flex-wrap gap-x-2 gap-y-0.5">
+                                  <div className="text-[10px] text-slate-400 mt-1 flex flex-wrap gap-x-3 gap-y-0.5">
                                     <span className="font-semibold text-amber-500">{item.price ? `৳${item.price.toLocaleString()}` : (language === "bn" ? "মূল্য জানতে যোগাযোগ করুন" : "Price on Request")}</span>
-                                    <span>•</span>
                                     <span>👀 {item.views || 0} {language === "bn" ? "ভিউ" : "views"}</span>
-                                    <span>•</span>
                                     <span className={(item.clicks || 0) > 0 ? "text-emerald-500 font-bold" : ""}>📞 {item.clicks || 0} {language === "bn" ? "কল" : "calls"}</span>
                                   </div>
                                 </div>
