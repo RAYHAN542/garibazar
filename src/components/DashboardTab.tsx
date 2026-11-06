@@ -1,7 +1,7 @@
 import { Suspense, lazy } from "react";
 import {
   Grid, ShoppingBag, Eye, Sparkles, ShieldAlert, ShieldCheck, Loader2,
-  ChevronDown, Cpu, CreditCard, Lock, MapPin, Zap,
+  ChevronDown, Cpu, CreditCard, Lock, MapPin, Zap, Phone,
 } from "lucide-react";
 import { ListingCard } from "./ListingCard";
 import { AD_PACKAGES } from "../translations";
@@ -86,7 +86,7 @@ export default function DashboardTab({
               <div className="space-y-4 animate-fade-in">
 
                 {/* 2. Marketing Analytics cards */}
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-3 gap-2">
                   <div className="bg-white dark:bg-slate-900 rounded-xl p-2.5 border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col items-center text-center gap-1">
                     <div className="p-1.5 bg-blue-500/10 text-blue-500 rounded-lg">
                       <Grid className="w-3.5 h-3.5" />
@@ -102,6 +102,17 @@ export default function DashboardTab({
                     <span className="text-[8px] sm:text-[9px] uppercase font-bold text-slate-400 leading-tight">{language === "bn" ? "মার্কেট ভিউস" : "Shop Views"}</span>
                     <span className="text-sm font-black text-slate-800 dark:text-white">
                       {myListings.filter(item => item.sellerId === user.uid).reduce((sum, current) => sum + (current.views ?? 0), 0)}
+                    </span>
+                  </div>
+
+                  {/* 📞 আপনার সব পোস্টে মোট কতবার কল বাটন চাপা হয়েছে -- বিক্রেতা বুঝবে আসল আগ্রহ কত */}
+                  <div className="bg-white dark:bg-slate-900 rounded-xl p-2.5 border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col items-center text-center gap-1">
+                    <div className="p-1.5 bg-emerald-500/10 text-emerald-500 rounded-lg">
+                      <Phone className="w-3.5 h-3.5" />
+                    </div>
+                    <span className="text-[8px] sm:text-[9px] uppercase font-bold text-slate-400 leading-tight">{language === "bn" ? "কল / যোগাযোগ" : "Calls"}</span>
+                    <span className="text-sm font-black text-slate-800 dark:text-white">
+                      {myListings.filter(item => item.sellerId === user.uid).reduce((sum, current) => sum + (current.clicks ?? 0), 0)}
                     </span>
                   </div>
                 </div>
@@ -231,10 +242,12 @@ export default function DashboardTab({
                                 <img src={item.images && item.images[0]} alt="" className="w-12 h-12 rounded-lg object-cover flex-shrink-0" referrerPolicy="no-referrer" loading="lazy" />
                                 <div className="min-w-0">
                                   <h5 className="text-sm font-bold text-slate-850 dark:text-white truncate">{item.title}</h5>
-                                  <div className="text-[11px] text-slate-400 mt-0.5 flex gap-2">
+                                  <div className="text-[11px] text-slate-400 mt-0.5 flex flex-wrap gap-x-2 gap-y-0.5">
                                     <span>{item.price ? `৳${item.price.toLocaleString("en-IN")}` : (language === "bn" ? "মূল্য জানতে যোগাযোগ করুন" : "Price on Request")}</span>
                                     <span>•</span>
-                                    <span>👁️ {item.views || 0} views</span>
+                                    <span>👁️ {item.views || 0} {language === "bn" ? "ভিউ" : "views"}</span>
+                                    <span>•</span>
+                                    <span className={(item.clicks || 0) > 0 ? "text-emerald-500 font-bold" : ""}>📞 {item.clicks || 0} {language === "bn" ? "কল" : "calls"}</span>
                                   </div>
                                 </div>
                               </div>
@@ -800,10 +813,12 @@ export default function DashboardTab({
                                 <img src={item.images && item.images[0]} alt="" className="w-12 h-12 rounded-xl object-cover flex-shrink-0 border" referrerPolicy="no-referrer" loading="lazy" />
                                 <div className="min-w-0">
                                   <h5 className="text-xs font-bold text-slate-850 dark:text-white truncate">{item.title}</h5>
-                                  <div className="text-[10px] text-slate-400 mt-1 flex gap-2">
+                                  <div className="text-[10px] text-slate-400 mt-1 flex flex-wrap gap-x-2 gap-y-0.5">
                                     <span className="font-semibold text-amber-500">{item.price ? `৳${item.price.toLocaleString()}` : (language === "bn" ? "মূল্য জানতে যোগাযোগ করুন" : "Price on Request")}</span>
                                     <span>•</span>
-                                    <span>👀 {item.views || 0} views</span>
+                                    <span>👀 {item.views || 0} {language === "bn" ? "ভিউ" : "views"}</span>
+                                    <span>•</span>
+                                    <span className={(item.clicks || 0) > 0 ? "text-emerald-500 font-bold" : ""}>📞 {item.clicks || 0} {language === "bn" ? "কল" : "calls"}</span>
                                   </div>
                                 </div>
                               </div>
