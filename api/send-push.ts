@@ -85,7 +85,26 @@ export default async function handler(req: any, res: any) {
       return res.status(400).json({ error: "title ও body পাঠাতে হবে।" });
     }
 
-    const sent = await sendPushToUid(supabase, uid, title, body);
+    const { chatId } = req.body || {};
+    let targetUid = uid;
+    if (chatId) {
+      const { data: chat } = await supabase
+        .from("chats")
+        .select("buyer_id, seller_id")
+        .eq("id", chatId)
+        .maybeSingle();
+      if (!chat || (chat.buyer_id !== uid && chat.seller_id !== uid)) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+      targetUid = chat.buyer_id === uid ? chat.seller_id : chat.buyer_id;
+    }
+    const sent = await sendPushToUid(
+      supabase,
+      targetUid,
+      String(title).slice(0, 60),
+      String(body).slice(0, 120),
+      chatId ? { chatId: String(chatId) } : undefined
+    );
     if (!sent) {
       return res.status(404).json({ error: "এই ডিভাইসে পুশ নোটিফিকেশন রেজিস্টার্ড করা নেই।" });
     }

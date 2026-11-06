@@ -1,3 +1,4 @@
+import { apiUrl } from "../utils/apiBase";
 import React, { useState, useEffect, useRef } from "react";
 import { supabase } from "../supabase";
 import { SupportedLanguage, PartListing } from "../types";
@@ -601,6 +602,29 @@ export function ChatView({ currentUser, language, onLoginPrompt, initialListingT
         })
         .eq("id", activeThread.id);
       if (updateErr) console.error("Failed to update chat preview:", updateErr);
+
+      // push to the other person (fire-and-forget)
+      (async () => {
+        try {
+          const { data: sess } = await supabase.auth.getSession();
+          const idToken = sess.session?.access_token;
+          if (!idToken) return;
+          await fetch(apiUrl("/api/send-push"), {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${idToken}`,
+            },
+            body: JSON.stringify({
+              chatId: activeThread.id,
+              title: currentUser.displayName || "GariBazar",
+              body: finalMsg,
+            }),
+          });
+        } catch (e) {
+          console.warn("push send failed:", e);
+        }
+      })();
 
     } catch (e: any) {
       console.error("Error sending message:", e);
