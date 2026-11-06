@@ -14,7 +14,7 @@ function esc(str: unknown) {
 // Plain, link-only HTML list of every active listing, split into pages of 50,
 // so search-engine crawlers can reach every /l/<id> page without running JS
 // or pressing "load more". Only public columns are read (no phone numbers).
-export default async function handler(req: any, res: any) {
+export async function browseHandler(req: any, res: any) {
   const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   const rawPage = parseInt(String(req.query?.page ?? "1"), 10);
