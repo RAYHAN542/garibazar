@@ -553,7 +553,26 @@ export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPromp
         console.error("Failed to save contact number:", contactError);
       }
 
-      const docRef = { id: insertedListing.id };
+      // notify other app users (server allows 1 broadcast per 30 min)
+    (async () => {
+      try {
+        const { data: sess } = await supabase.auth.getSession();
+        const idToken = sess.session?.access_token;
+        if (!idToken) return;
+        await fetch(apiUrl("/api/send-push"), {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${idToken}`,
+          },
+          body: JSON.stringify({ listingId: insertedListing.id }),
+        });
+      } catch (e) {
+        console.warn("push broadcast failed:", e);
+      }
+    })();
+
+    const docRef = { id: insertedListing.id };
 
       if (onViewListing) {
         onViewListing({

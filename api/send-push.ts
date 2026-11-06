@@ -80,6 +80,58 @@ export default async function handler(req: any, res: any) {
       return res.status(401).json({ error: "অননুমোদিত অনুরোধ।" });
     }
 
+    const { listingId } = req.body || {};
+    if (listingId) {
+      const { data: l } = await supabase
+        .from("listings")
+        .select("id, title, price, seller_id")
+        .eq("id", listingId)
+        .maybeSingle();
+      if (!l || l.seller_id !== uid) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+      const cutoff = new Date(Date.now() - 30 * 60 * 1000).toISOString();
+      const { data: claimed } = await supabase
+        .from("push_throttle")
+        .update({ last_sent: new Date().toISOString() })
+        .eq("key", "new_listing")
+        .lt("last_sent", cutoff)
+        .select("key");
+      if (!claimed || claimed.length === 0) {
+        return res.status(200).json({ success: true, skipped: true });
+      }
+      const tokens = new Set<string>();
+      for (let from = 0; from < 5000; from += 1000) {
+        const { data: rows } = await supabase
+          .from("users")
+          .select("fcm_token")
+          .not("fcm_token", "is", null)
+          .neq("uid", uid)
+          .range(from, from + 999);
+        (rows || []).forEach((r: any) => {
+          if (r.fcm_token) tokens.add(r.fcm_token);
+        });
+        if (!rows || rows.length < 1000) break;
+      }
+      const list = Array.from(tokens);
+      const priceTxt =
+        Number(l.price) > 0 ? " - ৳" + Number(l.price).toLocaleString("en-IN") : "";
+      let sentCount = 0;
+      for (let i = 0; i < list.length; i += 500) {
+        const r = await getMessaging().sendEachForMulticast({
+          tokens: list.slice(i, i + 500),
+          notification: {
+            title: "নতুন বিজ্ঞাপন",
+            body: String(l.title || "").slice(0, 80) + priceTxt,
+          },
+          data: { listingId: String(l.id) },
+          android: { notification: { tag: "new_listing" } },
+        });
+        sentCount += r.successCount;
+      }
+      return res.status(200).json({ success: true, sent: sentCount });
+    }
+
     const { title, body } = req.body || {};
     if (!title || !body) {
       return res.status(400).json({ error: "title ও body পাঠাতে হবে।" });
