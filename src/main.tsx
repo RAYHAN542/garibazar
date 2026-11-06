@@ -12,6 +12,9 @@ import { SplashScreen } from "@capacitor/splash-screen";
 
 if (Capacitor.isNativePlatform()) {
   CapacitorApp.addListener("backButton", () => {
+    const ev = new CustomEvent("gari_native_back", { cancelable: true });
+    window.dispatchEvent(ev);
+    if (ev.defaultPrevented) return;
     if (window.history.length > 1) {
       window.history.back();
     } else {

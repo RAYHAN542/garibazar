@@ -550,6 +550,16 @@ export function ChatView({ currentUser, language, onLoginPrompt, initialListingT
     if (onClearInitialListing) onClearInitialListing();
   };
 
+  useEffect(() => {
+    if (!activeThread) return;
+    const onNativeBack = (e: Event) => {
+      e.preventDefault();
+      setActiveThread(null);
+    };
+    window.addEventListener("gari_native_back", onNativeBack);
+    return () => window.removeEventListener("gari_native_back", onNativeBack);
+  }, [activeThread]);
+
   const handleSendMessage = async (textToSend?: string) => {
     const finalMsg = (textToSend || newMessage).trim();
     if (!finalMsg || !activeThread || !currentUser) return;
