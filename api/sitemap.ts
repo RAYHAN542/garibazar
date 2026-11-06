@@ -37,6 +37,7 @@ export default async function handler(req: any, res: any) {
     { loc: `${SITE_URL}/contact`, changefreq: "monthly", priority: "0.6" },
     { loc: `${SITE_URL}/faq`, changefreq: "monthly", priority: "0.6" },
     { loc: `${SITE_URL}/data-deletion`, changefreq: "monthly", priority: "0.5" },
+    { loc: `${SITE_URL}/browse`, changefreq: "daily", priority: "0.7" },
   ];
 
   let listingUrls: { loc: string; changefreq: string; priority: string; lastmod?: string }[] = [];
