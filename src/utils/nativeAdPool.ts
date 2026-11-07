@@ -7,11 +7,20 @@ let readyAt = 0;
 let inflight: Promise<void> | null = null;
 let counter = 0;
 
+// No-fill backoff: after a failed load, don't send new ad requests for a while
+// (2 -> 5 -> 15 -> 30 min). Resets on the first successful load.
+const BACKOFF_MINUTES = [2, 5, 15, 30];
+let failStreak = 0;
+let blockedUntil = 0;
+
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
 /** No fill হলে দ্রুত আবার চেষ্টা (০, ১.২ সেকেন্ড, ৩ সেকেন্ড)। সবগুলো ব্যর্থ হলে error ছোড়ে। */
 export async function loadAdWithRetry(id: string, unit: string, isCancelled: () => boolean = () => false): Promise<void> {
-  const waits = [0, 1200, 3000];
+  // Recent no-fill: skip the request entirely so AdMob isn't hammered.
+  if (Date.now() < blockedUntil) throw new Error("ad-backoff");
+  // Healthy: one quick retry. After failures: a single attempt only.
+  const waits = failStreak === 0 ? [0, 1200] : [0];
   let lastErr: unknown = null;
   for (const w of waits) {
     if (w) {
@@ -21,11 +30,15 @@ export async function loadAdWithRetry(id: string, unit: string, isCancelled: () 
     }
     try {
       await NativeAds.load({ id, adUnitId: unit });
+      failStreak = 0;
+      blockedUntil = 0;
       return;
     } catch (e) {
       lastErr = e;
     }
   }
+  failStreak++;
+  blockedUntil = Date.now() + BACKOFF_MINUTES[Math.min(failStreak - 1, BACKOFF_MINUTES.length - 1)] * 60 * 1000;
   throw lastErr;
 }
 
