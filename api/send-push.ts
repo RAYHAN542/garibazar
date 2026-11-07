@@ -83,6 +83,39 @@ export default async function handler(req: any, res: any) {
     }
     const supabase: any = createClient(supabaseUrl, supabaseServiceKey);
 
+    // 🔔 (2026-11-08) ডেটাবেস থেকে আসা অভ্যন্তরীণ কল: কেউ কোনো লিস্টিংয়ের কল বাটনে চাপলে
+    // Supabase (pg_net) এখানে একটা গোপন চাবিসহ অনুরোধ পাঠায় আর শুধু ওই বিক্রেতার ফোনে
+    // পুশ যায়। চাবিটা শুধু Supabase Vault-এ আছে; এখানে সেটা check_push_secret() দিয়ে যাচাই
+    // হয়, তাই কোডে বা Vercel env-এ আলাদা কপি রাখতে হয়নি। ব্রাউজার থেকে এই পথ খোলা যায় না।
+    const internalSecret = req.headers["x-internal-secret"];
+    if (internalSecret) {
+      const { data: secretOk } = await supabase.rpc("check_push_secret", { s: String(internalSecret) });
+      if (secretOk !== true) {
+        return res.status(401).json({ error: "অননুমোদিত অনুরোধ।" });
+      }
+      const call = (req.body || {}).internalSellerCall;
+      if (!call?.uid || !call?.listingId) {
+        return res.status(400).json({ error: "তথ্য অসম্পূর্ণ।" });
+      }
+      const { data: lst } = await supabase
+        .from("listings")
+        .select("id, title, seller_id")
+        .eq("id", call.listingId)
+        .maybeSingle();
+      if (!lst || lst.seller_id !== call.uid) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+      const titleTxt = String(lst.title || "").slice(0, 60);
+      const sentToSeller = await sendPushToUid(
+        supabase,
+        lst.seller_id,
+        "কেউ আপনার পোস্টে আগ্রহী! 📞",
+        `"${titleTxt}" দেখে একজন কল বাটনে চেপেছেন। ফোন ধরার জন্য তৈরি থাকুন।`,
+        { listingId: String(lst.id) }
+      );
+      return res.status(200).json({ success: true, sent: sentToSeller });
+    }
+
     const authHeader = req.headers.authorization || "";
     const idToken = authHeader.replace("Bearer ", "");
     const uid = await verifySupabaseToken(idToken);
