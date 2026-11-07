@@ -26,6 +26,16 @@ if (!getApps().length) {
   }
 }
 
+// 🔧 (2026-11-08) "নতুন বিজ্ঞাপন" ব্রডকাস্ট সব ইউজারের কাছে যায়, তাই বিরক্তি এড়াতে দুটো সীমা:
+//  ১) রাত ১০টা থেকে সকাল ৮টা (বাংলাদেশ সময়) কোনো ব্রডকাস্ট নয়।
+//  ২) দুই ব্রডকাস্টের মাঝে কমপক্ষে ৫ ঘণ্টা (আগে ছিল ৩০ মিনিট)। সকাল ৮টা–রাত ১০টার ১৪
+//     ঘণ্টায় এতে দিনে সর্বোচ্চ ৩টার বেশি ব্রডকাস্ট হতে পারে না।
+// চ্যাট মেসেজের পুশে এই সীমা নেই -- ওটা একজনের কাছে যাওয়া সরাসরি বার্তা।
+const BD_UTC_OFFSET_HOURS = 6;
+const QUIET_START_HOUR_BD = 22;
+const QUIET_END_HOUR_BD = 8;
+const NEW_LISTING_MIN_GAP_MS = 5 * 60 * 60 * 1000;
+
 // 🔧 (2026-09-30) `supabase: any` here (was `ReturnType<typeof createClient>`)
 // -- a newer @supabase/supabase-js got pulled in by an unrelated npm install
 // and now infers `never` row/arg types for any client created without an
@@ -90,7 +100,14 @@ export default async function handler(req: any, res: any) {
       if (!l || l.seller_id !== uid) {
         return res.status(403).json({ error: "Forbidden" });
       }
-      const cutoff = new Date(Date.now() - 30 * 60 * 1000).toISOString();
+
+      // রাতে ঘুমের সময় কোনো ব্রডকাস্ট নয় -- এখানে থেমে গেলে ৫ ঘণ্টার ঘড়ি ছোঁয়া হয় না।
+      const bdHour = (new Date().getUTCHours() + BD_UTC_OFFSET_HOURS) % 24;
+      if (bdHour >= QUIET_START_HOUR_BD || bdHour < QUIET_END_HOUR_BD) {
+        return res.status(200).json({ success: true, skipped: "quiet_hours" });
+      }
+
+      const cutoff = new Date(Date.now() - NEW_LISTING_MIN_GAP_MS).toISOString();
       const { data: claimed } = await supabase
         .from("push_throttle")
         .update({ last_sent: new Date().toISOString() })
