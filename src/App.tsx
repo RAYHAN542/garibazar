@@ -1669,7 +1669,7 @@ export default function App() {
 
   // 6. Sign out trigger
   const handleLogout = () => {
-    supabase.auth.signOut().catch((err) => console.warn("Supabase signOut failed:", err));
+    supabase.auth.signOut({ scope: "local" }).catch((err) => console.warn("Supabase signOut failed:", err));
     localStorage.removeItem("gari_bazar_session_user");
     setUser(null);
     setUserMetadata(null);
