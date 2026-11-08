@@ -25,7 +25,19 @@ function escapeHtml(str: string) {
     .replace(/"/g, "&quot;");
 }
 
-async function lookupListingFromSupabase(id: string): Promise<{ title: string; price?: number; location?: string; images?: string[]; description?: string; brand?: string; model?: string } | null> {
+type ListingPreview = {
+  title: string;
+  price?: number;
+  location?: string;
+  images?: string[];
+  description?: string;
+  brand?: string;
+  model?: string;
+  isSold?: boolean;
+  isDeleted?: boolean;
+};
+
+async function lookupListingFromSupabase(id: string): Promise<ListingPreview | null> {
   const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
   const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!supabaseUrl || !supabaseServiceKey) return null;
@@ -44,7 +56,7 @@ async function lookupListingFromSupabase(id: string): Promise<{ title: string; p
 
   const { data, error } = await supabase
     .from("listings")
-    .select("title, brand, model, price, location, images, description")
+    .select("title, brand, model, price, location, images, description, is_sold, is_deleted")
     .or(isUuid ? `legacy_firestore_id.eq.${id},id.eq.${id}` : `legacy_firestore_id.eq.${id}`)
     .maybeSingle();
 
@@ -62,6 +74,8 @@ async function lookupListingFromSupabase(id: string): Promise<{ title: string; p
     description: data.description || undefined,
     brand: data.brand || undefined,
     model: data.model || undefined,
+    isSold: data.is_sold === true,
+    isDeleted: data.is_deleted === true,
   };
 }
 
@@ -86,25 +100,59 @@ export default async function handler(req: any, res: any) {
   let description = "খুব সহজেই এবং নিরাপদে গাড়ি ও বাইকের জেনুইন স্পেয়ার পার্টস কেনা-বেচা করুন গাড়ি বাজার-এ।";
   let image = DEFAULT_IMAGE;
   let bodyHtml = "";
+  let jsonLd = "";
+  let removed = false;
 
   try {
     if (id) {
       const supabaseListing = await lookupListingFromSupabase(id);
-      if (supabaseListing) {
-        const priceText = supabaseListing.price ? `৳${Number(supabaseListing.price).toLocaleString("en-BD")}` : "মূল্য জানতে যোগাযোগ করুন";
-        title = `${supabaseListing.title} - গাড়ি বাজার`;
+      if (supabaseListing && supabaseListing.isDeleted) {
+        // Deleted listings: tell search engines the page is gone.
+        removed = true;
+        title = "বিজ্ঞাপনটি আর নেই - গাড়ি বাজার";
+        description = "এই বিজ্ঞাপনটি মুছে ফেলা হয়েছে।";
+      } else if (supabaseListing) {
+        const hasPrice = typeof supabaseListing.price === "number" && supabaseListing.price > 0;
+        const priceText = hasPrice ? `৳${Number(supabaseListing.price).toLocaleString("en-BD")}` : "মূল্য জানতে যোগাযোগ করুন";
+        // Search-result title: name + price + place, only the parts that really exist.
+        const loc = supabaseListing.location ? supabaseListing.location.trim() : "";
+        title = `${supabaseListing.title} - ${hasPrice ? priceText : "যোগাযোগ করুন"}${loc ? `, ${loc}` : ""} | গাড়ি বাজার`;
         const esc = escapeHtml;
-        const imgs = (supabaseListing.images || []).slice(0, 4);
+        const imgs = (supabaseListing.images || []).filter((s) => typeof s === "string" && /^https?:\/\//.test(s)).slice(0, 4);
         const specs = [supabaseListing.brand, supabaseListing.model].filter(Boolean).join(" ");
         bodyHtml = `<h1>${esc(supabaseListing.title)}</h1>
 <p><strong>${esc(priceText)}</strong>${supabaseListing.location ? " | " + esc(supabaseListing.location) : ""}</p>
 ${specs ? `<p>ব্র্যান্ড/মডেল: ${esc(specs)}</p>` : ""}
 ${supabaseListing.description ? `<h2>বিবরণ</h2><p>${esc(supabaseListing.description).replace(/\n/g, "<br>")}</p>` : ""}
 ${imgs.map((src) => `<img src="${esc(src)}" alt="${esc(supabaseListing.title)}" width="480" loading="lazy" />`).join("\n")}`;
+        const descSnippet = (supabaseListing.description || "").replace(/\s+/g, " ").trim().slice(0, 140);
         description = [priceText, supabaseListing.location].filter(Boolean).join(" | ");
-        if (supabaseListing.images && supabaseListing.images[0]) {
-          image = supabaseListing.images[0];
+        if (descSnippet) description += ` - ${descSnippet}`;
+        if (imgs[0]) {
+          image = imgs[0];
         }
+
+        // Product structured data -- only real fields, never invented values.
+        const product: Record<string, unknown> = {
+          "@context": "https://schema.org",
+          "@type": "Product",
+          name: supabaseListing.title,
+          description: (supabaseListing.description || "").replace(/\s+/g, " ").trim().slice(0, 500) || supabaseListing.title,
+          url: shareUrl,
+        };
+        if (imgs.length) product.image = imgs;
+        if (supabaseListing.brand) product.brand = { "@type": "Brand", name: supabaseListing.brand };
+        if (supabaseListing.model) product.model = supabaseListing.model;
+        if (hasPrice) {
+          product.offers = {
+            "@type": "Offer",
+            url: shareUrl,
+            priceCurrency: "BDT",
+            price: String(supabaseListing.price),
+            availability: supabaseListing.isSold ? "https://schema.org/OutOfStock" : "https://schema.org/InStock",
+          };
+        }
+        jsonLd = JSON.stringify(product).replace(/</g, "\\u003c");
       }
     }
   } catch (err) {
@@ -118,7 +166,7 @@ ${imgs.map((src) => `<img src="${esc(src)}" alt="${esc(supabaseListing.title)}" 
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>${escapeHtml(title)}</title>
 <meta name="description" content="${escapeHtml(description)}" />
-<link rel="canonical" href="${escapeHtml(shareUrl)}" />
+${removed ? '<meta name="robots" content="noindex" />\n' : ""}<link rel="canonical" href="${escapeHtml(shareUrl)}" />
 <meta property="og:title" content="${escapeHtml(title)}" />
 <meta property="og:description" content="${escapeHtml(description)}" />
 <meta property="og:type" content="website" />
@@ -128,7 +176,7 @@ ${imgs.map((src) => `<img src="${esc(src)}" alt="${esc(supabaseListing.title)}" 
 <meta name="twitter:title" content="${escapeHtml(title)}" />
 <meta name="twitter:description" content="${escapeHtml(description)}" />
 <meta name="twitter:image" content="${escapeHtml(image)}" />
-</head>
+${jsonLd ? `<script type="application/ld+json">${jsonLd}</script>\n` : ""}</head>
 <body>
 <header><a href="${SITE_URL}/">গাড়ি বাজার</a></header>
 <main>
@@ -141,5 +189,5 @@ ${bodyHtml || `<h1>${escapeHtml(title)}</h1><p>${escapeHtml(description)}</p>`}
 
   res.setHeader("Content-Type", "text/html; charset=utf-8");
   res.setHeader("Cache-Control", "public, max-age=300");
-  res.status(200).send(html);
+  res.status(removed ? 410 : 200).send(html);
 }
