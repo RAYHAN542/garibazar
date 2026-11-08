@@ -32,7 +32,7 @@ if (!getApps().length) {
 //     ঘণ্টায় এতে দিনে সর্বোচ্চ ৩টার বেশি ব্রডকাস্ট হতে পারে না।
 // চ্যাট মেসেজের পুশে এই সীমা নেই -- ওটা একজনের কাছে যাওয়া সরাসরি বার্তা।
 const BD_UTC_OFFSET_HOURS = 6;
-const QUIET_START_HOUR_BD = 22;
+const QUIET_START_HOUR_BD = 24; // 24 = starts at 12:00 AM
 const QUIET_END_HOUR_BD = 8;
 const NEW_LISTING_MIN_GAP_MS = 5 * 60 * 60 * 1000;
 
