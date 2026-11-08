@@ -27,9 +27,9 @@ if (!getApps().length) {
 }
 
 // 🔧 (2026-11-08) "নতুন বিজ্ঞাপন" ব্রডকাস্ট সব ইউজারের কাছে যায়, তাই বিরক্তি এড়াতে দুটো সীমা:
-//  ১) রাত ১০টা থেকে সকাল ৮টা (বাংলাদেশ সময়) কোনো ব্রডকাস্ট নয়।
-//  ২) দুই ব্রডকাস্টের মাঝে কমপক্ষে ৫ ঘণ্টা (আগে ছিল ৩০ মিনিট)। সকাল ৮টা–রাত ১০টার ১৪
-//     ঘণ্টায় এতে দিনে সর্বোচ্চ ৩টার বেশি ব্রডকাস্ট হতে পারে না।
+//  ১) রাত ১২টা থেকে সকাল ৮টা (বাংলাদেশ সময়) কোনো ব্রডকাস্ট নয়।
+//  ২) দুই ব্রডকাস্টের মাঝে কমপক্ষে ৫ ঘণ্টা (আগে ছিল ৩০ মিনিট)। সকাল ৮টা–রাত ১২টার ১৬
+//     ঘণ্টায় এতে দিনে সর্বোচ্চ ৪টার বেশি ব্রডকাস্ট হতে পারে না।
 // চ্যাট মেসেজের পুশে এই সীমা নেই -- ওটা একজনের কাছে যাওয়া সরাসরি বার্তা।
 const BD_UTC_OFFSET_HOURS = 6;
 const QUIET_START_HOUR_BD = 24; // 24 = starts at 12:00 AM
@@ -83,16 +83,46 @@ export default async function handler(req: any, res: any) {
     }
     const supabase: any = createClient(supabaseUrl, supabaseServiceKey);
 
-    // 🔔 (2026-11-08) ডেটাবেস থেকে আসা অভ্যন্তরীণ কল: কেউ কোনো লিস্টিংয়ের কল বাটনে চাপলে
-    // Supabase (pg_net) এখানে একটা গোপন চাবিসহ অনুরোধ পাঠায় আর শুধু ওই বিক্রেতার ফোনে
-    // পুশ যায়। চাবিটা শুধু Supabase Vault-এ আছে; এখানে সেটা check_push_secret() দিয়ে যাচাই
-    // হয়, তাই কোডে বা Vercel env-এ আলাদা কপি রাখতে হয়নি। ব্রাউজার থেকে এই পথ খোলা যায় না।
+    // 🔔 (2026-11-08) ডেটাবেস থেকে আসা অভ্যন্তরীণ কল (Supabase pg_net + গোপন চাবি):
+    //  ক) কেউ কোনো লিস্টিংয়ের কল বাটনে চাপলে শুধু ওই বিক্রেতার ফোনে পুশ।
+    //  খ) চ্যাটে নতুন মেসেজ ঢুকলেই (chat_messages-এ insert হলেই) অপর পক্ষের ফোনে পুশ --
+    //     সেন্ডারের অ্যাপের ভার্সন বা নেটওয়ার্কের ওপর নির্ভর না করে।
+    // চাবিটা শুধু Supabase Vault-এ আছে; এখানে সেটা check_push_secret() দিয়ে যাচাই হয়, তাই
+    // কোডে বা Vercel env-এ আলাদা কপি রাখতে হয়নি। ব্রাউজার থেকে এই পথ খোলা যায় না।
     const internalSecret = req.headers["x-internal-secret"];
     if (internalSecret) {
       const { data: secretOk } = await supabase.rpc("check_push_secret", { s: String(internalSecret) });
       if (secretOk !== true) {
         return res.status(401).json({ error: "অননুমোদিত অনুরোধ।" });
       }
+
+      const chatPush = (req.body || {}).internalChatPush;
+      if (chatPush) {
+        const c = chatPush;
+        if (!c.chatId || !c.toUid || !c.fromUid || c.toUid === c.fromUid) {
+          return res.status(400).json({ error: "তথ্য অসম্পূর্ণ।" });
+        }
+        const { data: chat } = await supabase
+          .from("chats")
+          .select("buyer_id, seller_id, participant_a, participant_b")
+          .eq("id", c.chatId)
+          .maybeSingle();
+        const members = chat
+          ? [chat.buyer_id, chat.seller_id, chat.participant_a, chat.participant_b].filter(Boolean)
+          : [];
+        if (!chat || !members.includes(c.toUid) || !members.includes(c.fromUid)) {
+          return res.status(403).json({ error: "Forbidden" });
+        }
+        const sentChat = await sendPushToUid(
+          supabase,
+          String(c.toUid),
+          String(c.senderName || "নতুন মেসেজ").slice(0, 60),
+          String(c.text || "").trim().slice(0, 120) || "আপনাকে একটি মেসেজ পাঠানো হয়েছে",
+          { chatId: String(c.chatId) }
+        );
+        return res.status(200).json({ success: true, sent: sentChat });
+      }
+
       const call = (req.body || {}).internalSellerCall;
       if (!call?.uid || !call?.listingId) {
         return res.status(400).json({ error: "তথ্য অসম্পূর্ণ।" });
@@ -182,30 +212,24 @@ export default async function handler(req: any, res: any) {
       return res.status(200).json({ success: true, sent: sentCount });
     }
 
+    // 💬 (2026-11-08) চ্যাট মেসেজের পুশ এখন ডেটাবেস নিজেই পাঠায় (chat_messages-এ insert হলেই,
+    // উপরের internalChatPush পথে)। অ্যাপ (সেন্ডার) এখনো এই পথে কল করে, তাই একই মেসেজের জন্য
+    // দ্বিতীয় নোটিফিকেশন যেন না যায় সেজন্য এখানে চুপচাপ থামানো হলো।
+    const { chatId: legacyChatId } = req.body || {};
+    if (legacyChatId) {
+      return res.status(200).json({ success: true, skipped: "handled_by_database" });
+    }
+
     const { title, body } = req.body || {};
     if (!title || !body) {
       return res.status(400).json({ error: "title ও body পাঠাতে হবে।" });
     }
 
-    const { chatId } = req.body || {};
-    let targetUid = uid;
-    if (chatId) {
-      const { data: chat } = await supabase
-        .from("chats")
-        .select("buyer_id, seller_id")
-        .eq("id", chatId)
-        .maybeSingle();
-      if (!chat || (chat.buyer_id !== uid && chat.seller_id !== uid)) {
-        return res.status(403).json({ error: "Forbidden" });
-      }
-      targetUid = chat.buyer_id === uid ? chat.seller_id : chat.buyer_id;
-    }
     const sent = await sendPushToUid(
       supabase,
-      targetUid,
+      uid,
       String(title).slice(0, 60),
-      String(body).slice(0, 120),
-      chatId ? { chatId: String(chatId) } : undefined
+      String(body).slice(0, 120)
     );
     if (!sent) {
       return res.status(404).json({ error: "এই ডিভাইসে পুশ নোটিফিকেশন রেজিস্টার্ড করা নেই।" });
