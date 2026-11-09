@@ -200,7 +200,10 @@ export function PromotedSlider({ listings, language, onViewListing, onOpenLotter
             </div>
           )}
           <div className="text-base sm:text-lg font-black text-amber-400 font-mono drop-shadow-xs">
-            {language === "bn" ? "৳" + toBanglaNumber(currentItem.price) : "৳" + currentItem.price.toLocaleString("en-IN")}
+            {/* দাম ০ বা ফাঁকা হলে "৳০" না দেখিয়ে "মূল্য জানতে যোগাযোগ করুন" দেখানো হয় */}
+            {Number(currentItem.price) > 0
+              ? (language === "bn" ? "৳" + toBanglaNumber(currentItem.price) : "৳" + currentItem.price.toLocaleString("en-IN"))
+              : (language === "bn" ? "মূল্য জানতে যোগাযোগ করুন" : "Price on Request")}
           </div>
         </div>
       </div>
