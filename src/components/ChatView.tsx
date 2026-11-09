@@ -10,6 +10,10 @@ const ANON_NAMES = ["", "user", "seller", "buyer", "anonymous seller", "বি�
 const partnerLabel = (name: string | null | undefined, language: string): string =>
   ANON_NAMES.includes((name || "").trim().toLowerCase()) ? (language === "bn" ? "বেনামী" : "Anonymous") : (name as string);
 
+// দাম ০ বা ফাঁকা হলে "৳0" না দেখিয়ে "আলোচনা সাপেক্ষ" দেখানো হয় (ListingDetailModal এর মতোই)।
+const priceLabel = (price: number, language: string): string =>
+  price > 0 ? `৳${price.toLocaleString("en-IN")}` : language === "bn" ? "আলোচনা সাপেক্ষ" : "Negotiable";
+
 interface ChatViewProps {
   currentUser: any;
   language: SupportedLanguage;
@@ -736,7 +740,7 @@ export function ChatView({ currentUser, language, onLoginPrompt, initialListingT
                         {partnerLabel(chatPartner, language)}
                       </span>
                       <span className="text-[10px] text-amber-500 font-extrabold font-mono">
-                        ৳{thread.listingPrice.toLocaleString("en-IN")}
+                        {priceLabel(thread.listingPrice, language)}
                       </span>
                     </div>
                     <p className="text-[11px] text-slate-300 font-medium truncate mb-0.5">
@@ -782,7 +786,7 @@ export function ChatView({ currentUser, language, onLoginPrompt, initialListingT
                     </span>
                     <span className="shrink-0">•</span>
                     <span className="font-black text-amber-500 font-mono shrink-0">
-                      ৳{activeThread.listingPrice.toLocaleString("en-IN")}
+                      {priceLabel(activeThread.listingPrice, language)}
                     </span>
                   </div>
                 </div>
