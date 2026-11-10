@@ -11,6 +11,7 @@ import type { ActiveTab } from "./HeaderNav";
 import { logAnalyticsEvent } from "../utils/analytics";
 import { pickRotatedAds, MAX_SPOTLIGHT_ADS } from "../utils/adRotation";
 import { fetchVideoListings } from "../utils/listingsApi";
+import { mixFeed, trackInterest } from "../utils/feedRanker";
 
 interface MarketplaceTabProps {
   language: SupportedLanguage;
@@ -143,6 +144,13 @@ export default function MarketplaceTab({
     [filteredListings, spotlightIds]
   );
 
+  // 🎯 কেউ লিস্টিং/ভিডিও খুললে তার ব্র্যান্ড-মডেল পছন্দের ইতিহাসে জমা হয় (ফোনে, লগইন ছাড়াই)।
+  // এই ইতিহাস দিয়েই নিচের মূল ফিড নতুন + পছন্দের + পুরনো মিলিয়ে সাজানো হয় (utils/feedRanker.ts)।
+  const viewListing = (l: PartListing) => {
+    trackInterest(l, 1);
+    return handleViewListingDetails(l);
+  };
+
   const [isCityPickerOpen, setIsCityPickerOpen] = useState(false);
 const [isSearchOpen, setIsSearchOpen] = useState(false);
 const [isVideoFeedOpen, setIsVideoFeedOpen] = useState(false);
@@ -166,7 +174,11 @@ const feedVideos = useMemo(() => {
     .filter((l) => (seen.has(l.id) ? false : (seen.add(l.id), true)))
     .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
 }, [dbVideos, videoListings]);
-const feedItems = useMemo(() => filteredListings.filter((item) => !spotlightIds.has(item.id) && !item.videoUrl), [filteredListings, spotlightIds]);
+// 🎯 "সর্বশেষ" সাজানো আর সার্চ ফাঁকা থাকলে ফিড মিশ্র হয় (নতুন + পছন্দের + পুরনো); ইতিহাস না থাকলে আগের মতোই নতুন থেকে পুরনো।
+const feedItems = useMemo(() => {
+  const base = filteredListings.filter((item) => !spotlightIds.has(item.id) && !item.videoUrl);
+  return sortBy === "latest" && searchQuery.trim().length === 0 ? mixFeed(base) : base;
+}, [filteredListings, spotlightIds, sortBy, searchQuery]);
 // প্রতি পাতায় ২০টা আসে, কিন্তু ভিডিও/স্পনসরড পোস্ট গ্রিডে লুকানো থাকে; দৃশ্যমান পোস্ট কম হলে নিজে থেকে আরো আনি (সর্বোচ্চ ৩ বার)।
 const autoFillTries = useRef(0);
 useEffect(() => { autoFillTries.current = 0; }, [selectedCategory, selectedSubCategory]);
@@ -455,7 +467,7 @@ const feedListings = spotlightFiller ? feedItems.slice(1) : feedItems;
                 <PromotedSlider
                   listings={spotlightAds}
                   language={language}
-                  onViewListing={handleViewListingDetails}
+                  onViewListing={viewListing}
                   onOpenLottery={() => setIsLotteryOpen(true)}
                   onGoToAdsPage={() => {
                     if (!user) { setIsAuthOpen(true); return; }
@@ -490,7 +502,7 @@ const feedListings = spotlightFiller ? feedItems.slice(1) : feedItems;
                           listing={listing}
                           language={language}
                           isAdmin={isUserAdmin}
-                          onViewDetails={handleViewListingDetails}
+                          onViewDetails={viewListing}
                           onPromoteClick={(item) => { if (!user) { setIsAuthOpen(true); } else { setPromotingListing(item); } }}
                         />
                       ))}
@@ -563,7 +575,7 @@ const feedListings = spotlightFiller ? feedItems.slice(1) : feedItems;
       language={language}
       isAdmin={isUserAdmin}
       priority={index === 0}
-      onViewDetails={handleViewListingDetails}
+      onViewDetails={viewListing}
       onPromoteClick={(item) => { if (!user) { setIsAuthOpen(true); } else { setPromotingListing(item); } }}
     /></Fragment>
   ))}
@@ -589,8 +601,8 @@ const feedListings = spotlightFiller ? feedItems.slice(1) : feedItems;
                   </div>
                 )}
 
-{isSearchOpen && <SearchPage language={language} listings={[...adListings, ...listings.filter((l) => !adListings.some((a) => a.id === l.id))]} searchHistory={searchHistory} onSaveHistory={appendSearchHistory} onClose={() => setIsSearchOpen(false)} onSelect={(l) => { setIsSearchOpen(false); handleViewListingDetails(l); }} />}
-{isVideoFeedOpen && <VideoFeed onPosted={() => setVideoRefresh((n) => n + 1)} onStartChat={onStartChat} isAdmin={isUserAdmin} language={language} videos={feedVideos} currentUser={user} onLoginPrompt={() => setIsAuthOpen(true)} onClose={() => setIsVideoFeedOpen(false)} onSelect={(l) => { setIsVideoFeedOpen(false); handleViewListingDetails(l); }} />}
+{isSearchOpen && <SearchPage language={language} listings={[...adListings, ...listings.filter((l) => !adListings.some((a) => a.id === l.id))]} searchHistory={searchHistory} onSaveHistory={appendSearchHistory} onClose={() => setIsSearchOpen(false)} onSelect={(l) => { setIsSearchOpen(false); viewListing(l); }} />}
+{isVideoFeedOpen && <VideoFeed onPosted={() => setVideoRefresh((n) => n + 1)} onStartChat={onStartChat} isAdmin={isUserAdmin} language={language} videos={feedVideos} currentUser={user} onLoginPrompt={() => setIsAuthOpen(true)} onClose={() => setIsVideoFeedOpen(false)} onSelect={(l) => { setIsVideoFeedOpen(false); viewListing(l); }} />}
                 {isCityPickerOpen && (
                   <div className="fixed inset-0 z-[60] flex items-end justify-center" onClick={() => setIsCityPickerOpen(false)}>
                     <div className="absolute inset-0 bg-black/40 animate-fade-in"></div>
