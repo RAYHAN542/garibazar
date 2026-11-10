@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { X, Volume2, VolumeX, Play, MapPin, Plus, Phone, Bookmark, Share2, MessageCircle, Eye } from "lucide-react";
 import type { PartListing, SupportedLanguage } from "../types";
 import { AddPartForm } from "./AddPartForm";
@@ -8,6 +8,7 @@ import { apiUrl } from "../utils/apiBase";
 import { trackListingClick, incrementListingView } from "../utils/counters";
 import { isNativeAdsSupported } from "../utils/nativeAds";
 import { useVideoInterstitial } from "../hooks/useVideoInterstitial";
+import { mixFeed, trackInterest } from "../utils/feedRanker";
 
 const viewedThisSession = new Set<string>();
 
@@ -86,6 +87,7 @@ function VideoSlideImpl({ listing, index, rel, muted, adPlaying, language, onTog
       } else {
         next = [...favs, listing.id];
         setSaved(true);
+        trackInterest(listing, 2);
       }
       localStorage.setItem("gari_bazar_favorites", JSON.stringify(next));
       window.dispatchEvent(new Event("storage"));
@@ -110,6 +112,7 @@ function VideoSlideImpl({ listing, index, rel, muted, adPlaying, language, onTog
 
   const handleChat = () => {
     if (!currentUser?.uid) { onLoginPrompt(); return; }
+    trackInterest(listing, 3);
     onClose();
     onStartChat(listing);
   };
@@ -121,6 +124,14 @@ function VideoSlideImpl({ listing, index, rel, muted, adPlaying, language, onTog
       incrementListingView(listing.id);
     }
   }, [isActive, listing.id]);
+
+  // 🎯 ভিডিও ৩ সেকেন্ড বা বেশি দেখলে পছন্দের ইতিহাসে জমা হয় (দ্রুত স্ক্রল করে পেরিয়ে গেলে গোনা হয় না)।
+  // এই ইতিহাস দিয়েই ফিড নতুন + পছন্দের + পুরনো মিলিয়ে সাজানো হয় (utils/feedRanker.ts)।
+  useEffect(() => {
+    if (!isActive || adPlaying) return;
+    const t = setTimeout(() => { trackInterest(listing, 1); }, 3000);
+    return () => clearTimeout(t);
+  }, [isActive, adPlaying, listing.id]);
   const [phone, setPhone] = useState<string | null>(null);
   const [phoneLoading, setPhoneLoading] = useState(false);
   const [phoneError, setPhoneError] = useState(false);
@@ -145,6 +156,7 @@ function VideoSlideImpl({ listing, index, rel, muted, adPlaying, language, onTog
       const data = await resp.json();
       if (!resp.ok) throw new Error(data?.error || "failed");
       setPhone((data.contactNumber as string) || null);
+      trackInterest(listing, 3);
       try { await trackListingClick(listing.id); } catch (_) {}
     } catch (_) {
       setPhoneError(true);
@@ -347,6 +359,9 @@ export default function VideoFeed({ language, videos, currentUser, onLoginPrompt
   const containerRef = useRef<HTMLDivElement>(null);
   const jumpPending = useRef(false);
   const firstIdAtPost = useRef<string | null>(null);
+  // 🎯 ভিডিও ফিডও মিশ্র: নতুন + পছন্দের + পুরনো (ইতিহাস না থাকলে আগের মতোই নতুন থেকে পুরনো)।
+  // তালিকা বদলালেই (নতুন ভিডিও লোড/পোস্ট) শুধু নতুন করে সাজে, ভিডিও দেখার সময় ক্রম লাফায় না।
+  const ordered = useMemo(() => mixFeed(videos), [videos]);
   // প্রতি ৪টা ভিডিও swipe-এর পর Interstitial (video) ad; ad চলার সময় ভিডিও pause
   const adPlaying = useVideoInterstitial(activeIndex, isNativeAdsSupported());
 
@@ -441,7 +456,7 @@ export default function VideoFeed({ language, videos, currentUser, onLoginPrompt
         </div>
       )}
 
-      {videos.length === 0 ? (
+      {ordered.length === 0 ? (
         <div className="h-full w-full flex flex-col items-center justify-center px-8 text-center text-white">
           <div className="w-16 h-16 rounded-full bg-white/10 flex items-center justify-center mb-4">
             <Play className="w-8 h-8 fill-white" />
@@ -455,7 +470,7 @@ export default function VideoFeed({ language, videos, currentUser, onLoginPrompt
         </div>
       ) : (
         <div ref={containerRef} style={{ overflowAnchor: "none", paddingTop: "calc(3.5rem + env(safe-area-inset-top))", scrollPaddingTop: "calc(3.5rem + env(safe-area-inset-top))" }} className="h-full w-full overflow-y-scroll snap-y snap-mandatory no-scrollbar overscroll-contain">
-          {videos.map((listing, index) => (
+          {ordered.map((listing, index) => (
             <VideoSlide
               key={listing.id}
               listing={listing}
