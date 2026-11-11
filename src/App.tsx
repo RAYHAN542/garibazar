@@ -741,6 +741,10 @@ export default function App() {
   }, [searchQuery]);
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [selectedSubCategory, setSelectedSubCategory] = useState("all");
+  const [selectedBrand, setSelectedBrand] = useState("all");
+  useEffect(() => {
+    setSelectedBrand("all");
+  }, [selectedCategory, selectedSubCategory]);
   const [selectedCity, setSelectedCity] = useState("all");
   const [sortBy, setSortBy] = useState("latest");
   const [searchHistory, setSearchHistory] = useState<string[]>(() => {
@@ -1234,7 +1238,7 @@ export default function App() {
     const isProduction = checkIsProduction();
     try {
       const page = await withTimeout(
-        fetchInitialListingsFromSupabase(INITIAL_FETCH_LIMIT, { category: selectedCategory, subCategory: selectedSubCategory }),
+        fetchInitialListingsFromSupabase(INITIAL_FETCH_LIMIT, { category: selectedCategory, subCategory: selectedSubCategory, brand: selectedBrand }),
         12000,
         "fetchInitialListings"
       );
@@ -1256,7 +1260,7 @@ export default function App() {
         });
 
         setFirebaseListings(list);
-        listingsKeyRef.current = selectedCategory + "|" + selectedSubCategory;
+        listingsKeyRef.current = selectedCategory + "|" + selectedSubCategory + "|" + selectedBrand;
         setLastListingDoc(page.nextCursor);
         setHasMoreListings(page.hasMore);
       }
@@ -1300,10 +1304,10 @@ export default function App() {
   // previous filter.
   useEffect(() => {
     setMoreListings([]);
-    currentKeyRef.current = selectedCategory + "|" + selectedSubCategory;
+    currentKeyRef.current = selectedCategory + "|" + selectedSubCategory + "|" + selectedBrand;
     fetchInitialListings();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedCategory, selectedSubCategory]);
+  }, [selectedCategory, selectedSubCategory, selectedBrand]);
 
   useEffect(() => {
     const handleRefresh = () => {
@@ -1392,12 +1396,12 @@ export default function App() {
   // through up to 6 unfiltered batches hunting for a handful of matches.
   const handleLoadMoreListings = async () => {
     if (!lastListingDoc || loadingMoreListings) return;
-    const reqKey = selectedCategory + "|" + selectedSubCategory;
+    const reqKey = selectedCategory + "|" + selectedSubCategory + "|" + selectedBrand;
     if (listingsKeyRef.current !== reqKey) return;
     setLoadingMoreListings(true);
     try {
       const page = await withTimeout(
-        fetchMoreListingsFromSupabase(lastListingDoc, 20, { category: selectedCategory, subCategory: selectedSubCategory }),
+        fetchMoreListingsFromSupabase(lastListingDoc, 20, { category: selectedCategory, subCategory: selectedSubCategory, brand: selectedBrand }),
         12000,
         "loadMoreListings"
       );

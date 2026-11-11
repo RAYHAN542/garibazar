@@ -73,6 +73,8 @@ export interface CategoryFilters {
   category?: string;
   /** e.g. "car" | "bike" | "truck" | "excavator" | "other_heavy_equipment" | "all" */
   subCategory?: string;
+  /** brand name, "all", or "__other" (brand not known) */
+  brand?: string;
 }
 
 // 🔧 (2026-09-26) Applies the category/sub-category filter AT THE DATABASE,
@@ -102,6 +104,12 @@ function applyCategoryFilters(query: any, filters?: CategoryFilters) {
       const g = groups[filters.subCategory];
       query = g ? query.in("sub_category", g) : query.eq("sub_category", filters.subCategory);
     }
+  }
+  if (filters.brand && filters.brand !== "all") {
+    query =
+      filters.brand === "__other"
+        ? query.or("brand.is.null,brand.eq.")
+        : query.eq("brand", filters.brand);
   }
   return query;
 }
