@@ -2014,10 +2014,11 @@ export default function App() {
         if (selectedCategory === "vehicles") matchesCategory = isVehicle;
         else if (selectedCategory === "spare_parts") matchesCategory = !isVehicle;
         const matchesSub = matchesSubCategoryFilter(item, selectedSubCategory);
-        return matchesCategory && matchesSub;
+        const matchesBrand = selectedBrand === "all" || (selectedBrand === "__other" ? !item.brand : item.brand === selectedBrand);
+        return matchesCategory && matchesSub && matchesBrand;
       })
       .slice(0, MAX_SPOTLIGHT_ADS);
-  }, [shuffledAds, selectedCategory, selectedSubCategory]);
+  }, [shuffledAds, selectedCategory, selectedSubCategory, selectedBrand]);
 
   // 8. Stats counting
   const statsSummary = useMemo(() => {
@@ -2178,6 +2179,8 @@ export default function App() {
                   searchHistory={searchHistory}
                   setSearchHistory={setSearchHistory}
                   selectedCategory={selectedCategory}
+              selectedBrand={selectedBrand}
+              setSelectedBrand={setSelectedBrand}
                   setSelectedCategory={setSelectedCategory}
                   selectedSubCategory={selectedSubCategory}
                   setSelectedSubCategory={setSelectedSubCategory}

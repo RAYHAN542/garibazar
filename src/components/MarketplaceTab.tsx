@@ -25,6 +25,8 @@ interface MarketplaceTabProps {
   setSelectedCategory: (v: string) => void;
   selectedSubCategory: string;
   setSelectedSubCategory: (v: string) => void;
+  selectedBrand: string;
+  setSelectedBrand: (v: string) => void;
   selectedCity: string;
   setSelectedCity: (v: string) => void;
   sortBy: string;
@@ -104,6 +106,8 @@ export default function MarketplaceTab({
   setSelectedCategory,
   selectedSubCategory,
   setSelectedSubCategory,
+  selectedBrand,
+  setSelectedBrand,
   selectedCity,
   setSelectedCity,
   sortBy,
@@ -224,6 +228,14 @@ const feedListings = spotlightFiller ? feedItems.slice(1) : feedItems;
   const mainQuickCategories = quickCategories.slice(0, 5);
   const heavyQuickCategory = quickCategories[5];
   const HeavyIcon = heavyQuickCategory.icon;
+  const BRAND_OPTIONS: Record<string, string[]> = {
+    quick_car: ["Toyota", "Honda", "Nissan", "Suzuki", "Mitsubishi", "Mazda", "Hyundai", "Subaru"],
+    quick_bike: ["Yamaha", "Suzuki", "Honda", "Bajaj", "TVS", "Hero", "Runner", "Lifan"],
+    quick_truck: ["Tata", "Isuzu", "Hino", "Eicher", "Toyota", "Foton", "JAC", "Ashok Leyland", "Mahindra"],
+    quick_heavy: ["Caterpillar", "Sumitomo", "Hitachi", "Komatsu", "Kobelco", "Kato", "JCB"],
+  };
+  const activeBrandCat = quickCategories.find((q) => q.id !== "quick_all" && q.id !== "quick_parts" && q.active);
+  const ActiveBrandIcon = activeBrandCat ? activeBrandCat.icon : null;
 
   return (
               <div>
@@ -390,7 +402,39 @@ const feedListings = spotlightFiller ? feedItems.slice(1) : feedItems;
                   )}
                 </div>
 
-                <div className="grid grid-cols-5 gap-2 mb-2 animate-[slide-down_0.2s_ease-out]">
+                {activeBrandCat && ActiveBrandIcon && (
+        <div className="mb-3 animate-[slide-down_0.2s_ease-out]">
+          <button
+            type="button"
+            onClick={() => { setSelectedCategory("all"); setSelectedSubCategory("all"); }}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-2xl border bg-amber-500 border-amber-500 text-slate-950 shadow-md cursor-pointer"
+          >
+            <ActiveBrandIcon className="w-5 h-5 shrink-0" />
+            <span className="text-sm font-extrabold">{language === "bn" ? activeBrandCat.bn : activeBrandCat.en}</span>
+            <X className="w-4 h-4 stroke-[2.5]" />
+          </button>
+          <div className="mt-3 mb-1.5 text-[11px] font-black text-slate-500 dark:text-slate-400">
+            {language === "bn" ? "ব্র্যান্ড বাছুন" : "Choose brand"}
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {["all", ...(BRAND_OPTIONS[activeBrandCat.id] || []), "__other"].map((b) => (
+              <button
+                key={b}
+                type="button"
+                onClick={() => setSelectedBrand(selectedBrand === b ? "all" : b)}
+                className={`px-3.5 py-2 rounded-full border text-xs font-extrabold transition-all duration-150 cursor-pointer ${
+                  selectedBrand === b
+                    ? "bg-amber-500 border-amber-500 text-slate-950 shadow-md"
+                    : "bg-white dark:bg-slate-900 border-slate-150 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:border-amber-400/50"
+                }`}
+              >
+                {b === "all" ? (language === "bn" ? "সব ব্র্যান্ড" : "All brands") : b === "__other" ? (language === "bn" ? "অন্যান্য" : "Others") : b}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+      <div className={`grid grid-cols-5 gap-2 mb-2 animate-[slide-down_0.2s_ease-out] ${activeBrandCat ? "hidden" : ""}`}>
                   {mainQuickCategories.map((item) => {
                     const ItemIcon = item.icon;
                     return (
@@ -410,7 +454,7 @@ const feedListings = spotlightFiller ? feedItems.slice(1) : feedItems;
                   })}
                 </div>
 
-                <div className="flex gap-2 mb-3 animate-[slide-down_0.2s_ease-out]">
+                <div className={`flex gap-2 mb-3 animate-[slide-down_0.2s_ease-out] ${activeBrandCat ? "hidden" : ""}`}>
                   <button
                     onClick={() => { heavyQuickCategory.onClick(); try { logAnalyticsEvent("select_category", { category: heavyQuickCategory.id }); } catch (_) {} }}
                     className={`flex-1 min-w-0 flex items-center justify-center gap-1.5 py-2.5 rounded-2xl border transition-all duration-150 cursor-pointer ${
