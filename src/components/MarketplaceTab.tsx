@@ -12,6 +12,8 @@ import { logAnalyticsEvent } from "../utils/analytics";
 import { pickRotatedAds, MAX_SPOTLIGHT_ADS } from "../utils/adRotation";
 import { fetchVideoListings } from "../utils/listingsApi";
 import { mixFeed, trackInterest } from "../utils/feedRanker";
+import { isNativeDevice, checkPushPerm, syncDeviceToken, requestDevicePush, shouldAutoAsk, recordAsked } from "../utils/devicePush";
+import type { PushPerm } from "../utils/devicePush";
 
 interface MarketplaceTabProps {
   language: SupportedLanguage;
@@ -148,10 +150,50 @@ export default function MarketplaceTab({
     [filteredListings, spotlightIds]
   );
 
+  // 🔔 নেটিভ অ্যাপে ঘণ্টার আসল অবস্থা (ফোনের অনুমতি থেকে সরাসরি, লগইন লাগে না)।
+  // নোটিফিকেশন চালু না থাকলে (নতুন ইনস্টল বা "না" বলা) ঘণ্টায় লাল দাগ থাকে; চাপলে চালু করার পপআপ আসে।
+  // চালু থাকলে ঘণ্টা সাধারণ। অনুমতি পেলে ডিভাইসের টোকেন + পছন্দ সার্ভারে জমা হয় (utils/devicePush.ts)।
+  const [nativePerm, setNativePerm] = useState<PushPerm | "checking">(isNativeDevice() ? "checking" : "unsupported");
+  const [isNotifModalOpen, setIsNotifModalOpen] = useState(false);
+  const [notifBusy, setNotifBusy] = useState(false);
+  const notifAskTimer = useRef<number | null>(null);
+  useEffect(() => {
+    if (!isNativeDevice()) return;
+    let alive = true;
+    checkPushPerm().then((p) => { if (alive) setNativePerm(p); });
+    void syncDeviceToken();
+    return () => {
+      alive = false;
+      if (notifAskTimer.current) window.clearTimeout(notifAskTimer.current);
+    };
+  }, []);
+  const notifOff = isNativeDevice()
+    ? nativePerm === "default" || nativePerm === "denied"
+    : notificationPermission === "default";
+
+  // প্রথম গাড়ি খোলার ৬ সেকেন্ড পর নরম পপআপ; "পরে" বললে ২/৫/১০ দিন পর আবার (সর্বোচ্চ ৩ বার)।
+  const maybeAskNotif = () => {
+    if (!isNativeDevice() || nativePerm !== "default" || notifAskTimer.current) return;
+    if (!shouldAutoAsk()) return;
+    notifAskTimer.current = window.setTimeout(() => {
+      notifAskTimer.current = null;
+      setIsNotifModalOpen(true);
+      recordAsked();
+    }, 6000);
+  };
+
+  const handleEnableNotif = async () => {
+    setNotifBusy(true);
+    const res = await requestDevicePush();
+    setNotifBusy(false);
+    if (res === "granted" || res === "denied") setNativePerm(res);
+  };
+
   // 🎯 কেউ লিস্টিং/ভিডিও খুললে তার ব্র্যান্ড-মডেল পছন্দের ইতিহাসে জমা হয় (ফোনে, লগইন ছাড়াই)।
   // এই ইতিহাস দিয়েই নিচের মূল ফিড নতুন + পছন্দের + পুরনো মিলিয়ে সাজানো হয় (utils/feedRanker.ts)।
   const viewListing = (l: PartListing) => {
     trackInterest(l, 1);
+    maybeAskNotif();
     return handleViewListingDetails(l);
   };
 
@@ -290,6 +332,10 @@ const feedListings = spotlightFiller ? feedItems.slice(1) : feedItems;
                   <button
                     type="button"
                     onClick={() => {
+                      if (isNativeDevice()) {
+                        setIsNotifModalOpen(true);
+                        return;
+                      }
                       if (notificationPermission === "granted") {
                         alert(language === "bn" ? "নোটিফিকেশন ইতিমধ্যে চালু আছে ✅" : "Notifications are already enabled ✅");
                       } else if (notificationPermission === "denied") {
@@ -302,8 +348,8 @@ const feedListings = spotlightFiller ? feedItems.slice(1) : feedItems;
                     title={language === "bn" ? "নোটিফিকেশন" : "Notifications"}
                   >
                     <Bell className="w-4 h-4" />
-                    {notificationPermission === "default" && (
-                      <span className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-orange-500 border border-white dark:border-slate-900"></span>
+                    {notifOff && (
+                      <span className="absolute top-0.5 right-0.5 w-2.5 h-2.5 rounded-full bg-red-500 border-2 border-white dark:border-slate-900 animate-pulse"></span>
                     )}
                   </button>
                 </div>
@@ -649,6 +695,67 @@ const feedListings = spotlightFiller ? feedItems.slice(1) : feedItems;
 
 {isSearchOpen && <SearchPage language={language} listings={[...adListings, ...listings.filter((l) => !adListings.some((a) => a.id === l.id))]} searchHistory={searchHistory} onSaveHistory={appendSearchHistory} onClose={() => setIsSearchOpen(false)} onSelect={(l) => { setIsSearchOpen(false); viewListing(l); }} />}
 {isVideoFeedOpen && <VideoFeed onPosted={() => setVideoRefresh((n) => n + 1)} onStartChat={onStartChat} isAdmin={isUserAdmin} language={language} videos={feedVideos} currentUser={user} onLoginPrompt={() => setIsAuthOpen(true)} onClose={() => setIsVideoFeedOpen(false)} onSelect={(l) => { setIsVideoFeedOpen(false); viewListing(l); }} />}
+                {isNotifModalOpen && isNativeDevice() && (
+                  <div className="fixed inset-0 z-[120] flex items-end sm:items-center justify-center" onClick={() => setIsNotifModalOpen(false)}>
+                    <div className="absolute inset-0 bg-black/50 animate-fade-in"></div>
+                    <div
+                      className="relative w-full max-w-md bg-white dark:bg-slate-900 rounded-t-3xl sm:rounded-3xl shadow-2xl p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] animate-slide-down"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className="w-11 h-11 rounded-2xl bg-amber-500/15 text-amber-500 flex items-center justify-center shrink-0">
+                          <Bell className="w-6 h-6" />
+                        </div>
+                        <div className="min-w-0">
+                          <h3 className="text-base font-black text-slate-850 dark:text-white leading-snug">
+                            {nativePerm === "granted"
+                              ? (language === "bn" ? "নোটিফিকেশন চালু আছে ✅" : "Notifications are on ✅")
+                              : nativePerm === "denied"
+                              ? (language === "bn" ? "নোটিফিকেশন বন্ধ আছে" : "Notifications are off")
+                              : (language === "bn" ? "পছন্দের গাড়ির নোটিফিকেশন পান" : "Get alerts for cars you like")}
+                          </h3>
+                          <p className="mt-1 text-xs sm:text-sm text-slate-500 dark:text-slate-400 font-semibold leading-relaxed">
+                            {nativePerm === "granted"
+                              ? (language === "bn" ? "আপনার পছন্দের গাড়ির নতুন পোস্ট এলে সাথে সাথে জানানো হবে।" : "You'll be alerted as soon as a car you like is posted.")
+                              : nativePerm === "denied"
+                              ? (language === "bn" ? "ফোনের সেটিংস > অ্যাপস > Gari Bazar > নোটিফিকেশন থেকে চালু করুন। চালু করলে পছন্দের গাড়ির নতুন পোস্টের খবর পাবেন।" : "Turn them on from Phone Settings > Apps > Gari Bazar > Notifications to get alerts for new cars you like.")
+                              : (language === "bn" ? "আপনি যে গাড়ি খুঁজছেন, তেমন নতুন গাড়ি পোস্ট হলেই সাথে সাথে জানাব। অন্য কেউ নিয়ে নেওয়ার আগে আপনিই প্রথমে দেখতে পাবেন।" : "As soon as a car like the ones you're looking at is posted, we'll tell you, so you see it before anyone else.")}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="mt-4 flex gap-2">
+                        {nativePerm === "default" || nativePerm === "checking" ? (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => setIsNotifModalOpen(false)}
+                              className="px-4 py-3 rounded-xl text-sm font-bold text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
+                            >
+                              {language === "bn" ? "পরে" : "Later"}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={handleEnableNotif}
+                              disabled={notifBusy}
+                              className="flex-1 py-3 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-sm cursor-pointer disabled:opacity-60 flex items-center justify-center gap-2"
+                            >
+                              {notifBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Bell className="w-4 h-4" />}
+                              <span>{language === "bn" ? "চালু করুন" : "Turn on"}</span>
+                            </button>
+                          </>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => setIsNotifModalOpen(false)}
+                            className="flex-1 py-3 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-sm cursor-pointer"
+                          >
+                            {language === "bn" ? "ঠিক আছে" : "OK"}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
                 {isCityPickerOpen && (
                   <div className="fixed inset-0 z-[60] flex items-end justify-center" onClick={() => setIsCityPickerOpen(false)}>
                     <div className="absolute inset-0 bg-black/40 animate-fade-in"></div>
