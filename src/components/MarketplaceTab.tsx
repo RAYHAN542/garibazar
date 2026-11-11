@@ -309,7 +309,7 @@ const feedListings = spotlightFiller ? feedItems.slice(1) : feedItems;
                 </div>
 
                 {(selectedCategory !== "all" || selectedSubCategory !== "all" || selectedCity !== "all") && (
-                  <div className="md:hidden mb-2 -mt-1">
+                  <div className={`md:hidden mb-2 -mt-1 ${activeBrandCat && selectedCity === "all" ? "hidden" : ""}`}>
                     <button
                       onClick={() => { setSelectedCategory("all"); setSelectedSubCategory("all"); setSelectedCity("all"); }}
                       className="px-3 py-1 bg-rose-500/10 hover:bg-rose-500/15 border border-rose-500/20 dark:border-rose-500/35 text-rose-600 dark:text-rose-450 rounded-full inline-flex items-center gap-1 cursor-pointer font-bold duration-200 transition-all select-none animate-fade-in"
@@ -403,32 +403,34 @@ const feedListings = spotlightFiller ? feedItems.slice(1) : feedItems;
                 </div>
 
                 {activeBrandCat && ActiveBrandIcon && (
-        <div className="mb-3 animate-[slide-down_0.2s_ease-out]">
-          <button
-            type="button"
-            onClick={() => { setSelectedCategory("all"); setSelectedSubCategory("all"); }}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-2xl border bg-amber-500 border-amber-500 text-slate-950 shadow-md cursor-pointer"
-          >
-            <ActiveBrandIcon className="w-5 h-5 shrink-0" />
-            <span className="text-sm font-extrabold">{language === "bn" ? activeBrandCat.bn : activeBrandCat.en}</span>
-            <X className="w-4 h-4 stroke-[2.5]" />
-          </button>
-          <div className="mt-3 mb-1.5 text-[11px] font-black text-slate-500 dark:text-slate-400">
-            {language === "bn" ? "ব্র্যান্ড বাছুন" : "Choose brand"}
+        <div className="mb-2 rounded-2xl border border-amber-500/30 bg-amber-50/60 dark:bg-slate-900/60 p-2 animate-[slide-down_0.2s_ease-out]">
+          <div className="flex items-center gap-2 mb-1.5">
+            <button
+              type="button"
+              onClick={() => { setSelectedCategory("all"); setSelectedSubCategory("all"); }}
+              className="flex items-center gap-1.5 pl-2.5 pr-2 py-1 rounded-full bg-amber-500 text-slate-950 shadow-sm cursor-pointer"
+            >
+              <ActiveBrandIcon className="w-3.5 h-3.5 shrink-0" />
+              <span className="text-xs font-extrabold">{language === "bn" ? activeBrandCat.bn : activeBrandCat.en}</span>
+              <X className="w-3.5 h-3.5 stroke-[2.5]" />
+            </button>
+            <span className="text-[10px] font-black text-slate-500 dark:text-slate-400">
+              {language === "bn" ? "ব্র্যান্ড বাছুন" : "Choose brand"}
+            </span>
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-1.5">
             {["all", ...(BRAND_OPTIONS[activeBrandCat.id] || []), "__other"].map((b) => (
               <button
                 key={b}
                 type="button"
                 onClick={() => setSelectedBrand(selectedBrand === b ? "all" : b)}
-                className={`px-3.5 py-2 rounded-full border text-xs font-extrabold transition-all duration-150 cursor-pointer ${
+                className={`px-2.5 py-1 rounded-full border text-[11px] font-extrabold transition-all duration-150 cursor-pointer ${
                   selectedBrand === b
-                    ? "bg-amber-500 border-amber-500 text-slate-950 shadow-md"
-                    : "bg-white dark:bg-slate-900 border-slate-150 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:border-amber-400/50"
+                    ? "bg-amber-500 border-amber-500 text-slate-950 shadow-sm"
+                    : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-amber-400/50"
                 }`}
               >
-                {b === "all" ? (language === "bn" ? "সব ব্র্যান্ড" : "All brands") : b === "__other" ? (language === "bn" ? "অন্যান্য" : "Others") : b}
+                {b === "all" ? (language === "bn" ? "সব" : "All") : b === "__other" ? (language === "bn" ? "অন্যান্য" : "Others") : b}
               </button>
             ))}
           </div>
