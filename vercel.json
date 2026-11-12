@@ -5,7 +5,7 @@
   "rewrites": [
     { "source": "/l/:id", "destination": "/api/share-listing?id=:id" },
     { "source": "/browse", "destination": "/api/share-listing?mode=browse" },
-    { "source": "/sitemap.xml", "destination": "/api/sitemap" },
+    { "source": "/sitemap.xml", "destination": "/api/share-listing?mode=sitemap" },
     { "source": "/ads.txt", "destination": "/ads.txt" },
     { "source": "/delete-account", "destination": "/delete-account.html" },
     { "source": "/about", "destination": "/about.html" },
