@@ -242,16 +242,6 @@ export default function TipsFeed({ language }: TipsFeedProps) {
                 <div className="px-3 py-2.5">
                   <h3 className="text-sm font-extrabold leading-snug line-clamp-2 text-black">{v.title}</h3>
                   <p className="mt-0.5 text-xs font-semibold text-neutral-600 line-clamp-1">{v.channel}</p>
-                  {playing && (
-                    <a
-                      href={`https://www.youtube.com/watch?v=${v.id}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="mt-1.5 inline-block text-xs font-bold text-black underline"
-                    >
-                      {bn ? "চলছে না? YouTube-এ খুলুন" : "Not playing? Open on YouTube"}
-                    </a>
-                  )}
                 </div>
               </div>
             );
