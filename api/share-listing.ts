@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { browseHandler } from "./_lib/browse.js";
+import { sitemapHandler } from "./_lib/sitemap.js";
 
 // 🔧 (2026-09-26) Migrated primary lookup off Firestore -- listings have
 // lived in Supabase since the migration (see src/utils/listingsApi.ts).
@@ -80,9 +81,10 @@ async function lookupListingFromSupabase(id: string): Promise<ListingPreview | n
 }
 
 export default async function handler(req: any, res: any) {
-  // /browse is rewritten here (see vercel.json) so the project stays within
-  // Vercel's 12-function limit.
+  // /browse and /sitemap.xml are rewritten here (see vercel.json) so the
+  // project stays within Vercel's 12-function limit.
   if (req.query?.mode === "browse") return browseHandler(req, res);
+  if (req.query?.mode === "sitemap") return sitemapHandler(req, res);
   const id = (req.query?.id || "").toString();
   const appUrl = id ? `${SITE_URL}/?listing=${id}` : SITE_URL;
   const shareUrl = id ? `${SITE_URL}/l/${id}` : SITE_URL;
