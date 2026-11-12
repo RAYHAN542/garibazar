@@ -85,7 +85,9 @@ export async function syncDeviceToken(force = false): Promise<void> {
   try {
     const perm = await PushNotifications.checkPermissions();
     if (perm.receive !== "granted") return;
-    const handle = await PushNotifications.addListener("registration", async (token) => {
+    // handle আলাদা ভেরিয়েবলে রাখা হলো, যাতে নিজের ইনিশিয়ালাইজারে নিজেকে ডাকার টাইপ-সমস্যা না হয়
+    let handle: { remove: () => Promise<void> } | null = null;
+    handle = await PushNotifications.addListener("registration", async (token) => {
       try {
         if (token?.value) {
           await supabase.rpc("register_device_push", {
@@ -98,7 +100,7 @@ export async function syncDeviceToken(force = false): Promise<void> {
       } catch (_) {
         // নেটওয়ার্ক না থাকলে চুপচাপ বাদ, পরের বার খুললে আবার চেষ্টা হবে
       }
-      try { handle.remove(); } catch (_) {}
+      try { await handle?.remove(); } catch (_) {}
     });
     await PushNotifications.register();
   } catch (_) {
