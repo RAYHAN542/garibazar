@@ -2,6 +2,7 @@ import { createClient } from "@supabase/supabase-js";
 import { applyCors } from "./_lib/cors.js";
 import { checkAndBumpRateLimit, getClientIp } from "./_lib/rateLimit.js";
 import { verifySupabaseToken } from "./_lib/verifyJwt.js";
+import { handleYoutubeSearch } from "./_lib/youtubeSearch.js";
 
 // ============================================================================
 // api/account-actions.ts
@@ -16,6 +17,10 @@ import { verifySupabaseToken } from "./_lib/verifyJwt.js";
 // longer use delete_account/report_listing/toggle_sold/submit_support_ticket
 // until AuthModal.tsx's social login is also migrated to Supabase Auth
 // (final step of this migration).
+//
+// 🔧 (youtube-tips) "youtube_search" action added (logic lives in
+// _lib/youtubeSearch.ts) -- it had to go here and not in its own api/ file,
+// because the project is already at the 12-function limit.
 // ============================================================================
 
 const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
@@ -273,6 +278,8 @@ export default async function handler(req: any, res: any) {
         return await handleToggleSold(req, res);
       case "submit_support_ticket":
         return await handleSubmitSupportTicket(req, res);
+      case "youtube_search":
+        return await handleYoutubeSearch(req, res);
       default:
         return res.status(400).json({ error: "Invalid action." });
     }
