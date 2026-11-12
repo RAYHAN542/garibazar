@@ -45,6 +45,9 @@ export default function TipsFeed({ language }: TipsFeedProps) {
   const [error, setError] = useState<string | null>(null);
   const [playingId, setPlayingId] = useState<string | null>(null);
   const reqId = useRef(0);
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const playingRef = useRef<string | null>(null);
+  const [autoPlayed, setAutoPlayed] = useState(false);
 
   const runSearch = useCallback(
     async (raw: string) => {
@@ -88,10 +91,48 @@ export default function TipsFeed({ language }: TipsFeedProps) {
     runSearch(input);
   };
 
+  playingRef.current = playingId;
+
+  // Auto-play: only the card that is >=60% visible and stays put ~0.7s plays,
+  // one at a time (YouTube policy). Auto-started videos begin muted.
+  useEffect(() => {
+    const root = scrollRef.current;
+    if (!root || loading || items.length === 0 || typeof IntersectionObserver === "undefined") return;
+    let timer: number | undefined;
+    const obs = new IntersectionObserver(
+      (entries) => {
+        const best = entries
+          .filter((e) => e.isIntersecting && e.intersectionRatio >= 0.6)
+          .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
+        if (!best) return;
+        const el = best.target as HTMLElement;
+        const id = el.dataset.vid;
+        if (!id) return;
+        window.clearTimeout(timer);
+        timer = window.setTimeout(() => {
+          const r = el.getBoundingClientRect();
+          const c = root.getBoundingClientRect();
+          const vis = Math.min(r.bottom, c.bottom) - Math.max(r.top, c.top);
+          if (r.height <= 0 || vis / r.height < 0.6) return;
+          if (playingRef.current === id) return;
+          setAutoPlayed(true);
+          setPlayingId(id);
+        }, 700);
+      },
+      { root, threshold: [0, 0.6, 1] }
+    );
+    root.querySelectorAll("[data-vid]").forEach((n) => obs.observe(n));
+    return () => {
+      window.clearTimeout(timer);
+      obs.disconnect();
+    };
+  }, [items, loading]);
+
   const origin = typeof window !== "undefined" ? window.location.origin : "";
 
   return (
     <div
+      ref={scrollRef}
       className="h-full w-full overflow-y-auto overscroll-contain bg-black text-white no-scrollbar"
       style={{ paddingTop: "calc(3.5rem + env(safe-area-inset-top))" }}
     >
@@ -156,12 +197,12 @@ export default function TipsFeed({ language }: TipsFeedProps) {
           {items.map((v) => {
             const playing = playingId === v.id;
             return (
-              <div key={v.id} className="rounded-2xl overflow-hidden bg-white text-black">
+              <div key={v.id} data-vid={v.id} className="rounded-2xl overflow-hidden bg-white text-black">
                 <div className="relative w-full aspect-video bg-black">
                   {playing ? (
                     <iframe
                       className="absolute inset-0 h-full w-full border-0"
-                      src={`https://www.youtube.com/embed/${v.id}?autoplay=1&playsinline=1&rel=0&origin=${encodeURIComponent(origin)}`}
+                      src={`https://www.youtube.com/embed/${v.id}?autoplay=1&mute=${autoPlayed ? 1 : 0}&playsinline=1&rel=0&origin=${encodeURIComponent(origin)}`}
                       title={v.title}
                       allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
                       allowFullScreen
@@ -170,7 +211,10 @@ export default function TipsFeed({ language }: TipsFeedProps) {
                   ) : (
                     <button
                       type="button"
-                      onClick={() => setPlayingId(v.id)}
+                      onClick={() => {
+                        setAutoPlayed(false);
+                        setPlayingId(v.id);
+                      }}
                       aria-label={bn ? "ভিডিও চালান" : "Play video"}
                       className="absolute inset-0 h-full w-full cursor-pointer"
                     >
