@@ -96,6 +96,59 @@ export default async function handler(req: any, res: any) {
         return res.status(401).json({ error: "অননুমোদিত অনুরোধ।" });
       }
 
+      // 🔔 (2026-11-11) গ) নতুন লিস্টিং এলে, যেসব লগইনহীন ডিভাইসের পছন্দের (ব্র্যান্ড/মডেল) সাথে মেলে
+      //    (ডেটাবেসের notify_matching_devices ট্রিগার বেছে দেয়, দিনে ৩টা ও দুই পুশের মাঝে ২ ঘণ্টার সীমাসহ)
+      //    শুধু তাদের টোকেনে পুশ। টোকেন device_push_tokens টেবিলে (register_device_push দিয়ে জমা)।
+      const deviceAlert = (req.body || {}).internalDeviceAlert;
+      if (deviceAlert) {
+        const ids: string[] = Array.isArray(deviceAlert.deviceIds)
+          ? deviceAlert.deviceIds.map((x: any) => String(x)).filter(Boolean).slice(0, 200)
+          : [];
+        if (!deviceAlert.listingId || ids.length === 0) {
+          return res.status(400).json({ error: "তথ্য অসম্পূর্ণ।" });
+        }
+        const { data: lst } = await supabase
+          .from("listings")
+          .select("id, title, price, is_deleted, is_sold")
+          .eq("id", deviceAlert.listingId)
+          .maybeSingle();
+        if (!lst || lst.is_deleted || lst.is_sold) {
+          return res.status(200).json({ success: true, skipped: "listing_unavailable" });
+        }
+        const { data: devs } = await supabase
+          .from("device_push_tokens")
+          .select("device_id, fcm_token")
+          .in("device_id", ids);
+        const rows = (devs || []).filter((r: any) => r.fcm_token);
+        const priceTxt = Number(lst.price) > 0 ? " - ৳" + Number(lst.price).toLocaleString("en-IN") : "";
+        let sentCount = 0;
+        const deadDevices: string[] = [];
+        for (let i = 0; i < rows.length; i += 500) {
+          const batch = rows.slice(i, i + 500);
+          const r = await getMessaging().sendEachForMulticast({
+            tokens: batch.map((x: any) => x.fcm_token as string),
+            notification: {
+              title: "আপনার পছন্দের গাড়ি এসেছে 🚗",
+              body: String(lst.title || "").slice(0, 80) + priceTxt,
+            },
+            data: { listingId: String(lst.id) },
+            android: { notification: { tag: "device_alert" } },
+          });
+          sentCount += r.successCount;
+          r.responses.forEach((resp: any, idx: number) => {
+            const code = String(resp?.error?.code || "");
+            if (!resp.success && /registration-token-not-registered|invalid-registration-token|invalid-argument/.test(code)) {
+              deadDevices.push(batch[idx].device_id);
+            }
+          });
+        }
+        // অ্যাপ মুছে ফেলা/মেয়াদ শেষ টোকেন পরিষ্কার
+        if (deadDevices.length > 0) {
+          await supabase.from("device_push_tokens").delete().in("device_id", deadDevices);
+        }
+        return res.status(200).json({ success: true, sent: sentCount });
+      }
+
       const chatPush = (req.body || {}).internalChatPush;
       if (chatPush) {
         const c = chatPush;
