@@ -99,27 +99,31 @@ export default function TipsFeed({ language }: TipsFeedProps) {
     const root = scrollRef.current;
     if (!root || loading || items.length === 0 || typeof IntersectionObserver === "undefined") return;
     let timer: number | undefined;
+    const share = (el: HTMLElement) => {
+      const r = el.getBoundingClientRect();
+      const c = root.getBoundingClientRect();
+      const vis = Math.min(r.bottom, c.bottom) - Math.max(r.top, c.top);
+      return r.height > 0 ? vis / r.height : 0;
+    };
+    const pick = () => {
+      const cards = Array.from(root.querySelectorAll<HTMLElement>("[data-vid]"));
+      const cur = playingRef.current;
+      if (cur) {
+        const curEl = cards.find((el) => el.dataset.vid === cur);
+        if (curEl && share(curEl) >= 0.6) return;
+      }
+      const next = cards.find((el) => share(el) >= 0.6);
+      const id = next?.dataset.vid;
+      if (!id || id === cur) return;
+      setAutoPlayed(true);
+      setPlayingId(id);
+    };
     const obs = new IntersectionObserver(
-      (entries) => {
-        const best = entries
-          .filter((e) => e.isIntersecting && e.intersectionRatio >= 0.6)
-          .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
-        if (!best) return;
-        const el = best.target as HTMLElement;
-        const id = el.dataset.vid;
-        if (!id) return;
+      () => {
         window.clearTimeout(timer);
-        timer = window.setTimeout(() => {
-          const r = el.getBoundingClientRect();
-          const c = root.getBoundingClientRect();
-          const vis = Math.min(r.bottom, c.bottom) - Math.max(r.top, c.top);
-          if (r.height <= 0 || vis / r.height < 0.6) return;
-          if (playingRef.current === id) return;
-          setAutoPlayed(true);
-          setPlayingId(id);
-        }, 700);
+        timer = window.setTimeout(pick, 700);
       },
-      { root, threshold: [0, 0.6, 1] }
+      { root, threshold: [0, 0.2, 0.4, 0.6, 0.8, 1] }
     );
     root.querySelectorAll("[data-vid]").forEach((n) => obs.observe(n));
     return () => {
