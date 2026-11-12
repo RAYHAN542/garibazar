@@ -47,6 +47,7 @@ export default function TipsFeed({ language }: TipsFeedProps) {
   const reqId = useRef(0);
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const playingRef = useRef<string | null>(null);
+  const soundRef = useRef(false);
   const [autoPlayed, setAutoPlayed] = useState(false);
 
   const runSearch = useCallback(
@@ -115,7 +116,7 @@ export default function TipsFeed({ language }: TipsFeedProps) {
       const next = cards.find((el) => share(el) >= 0.6);
       const id = next?.dataset.vid;
       if (!id || id === cur) return;
-      setAutoPlayed(true);
+      setAutoPlayed(!soundRef.current);
       setPlayingId(id);
     };
     const obs = new IntersectionObserver(
@@ -137,6 +138,9 @@ export default function TipsFeed({ language }: TipsFeedProps) {
   return (
     <div
       ref={scrollRef}
+      onClick={() => {
+        soundRef.current = true;
+      }}
       className="h-full w-full overflow-y-auto overscroll-contain bg-black text-white no-scrollbar"
       style={{ paddingTop: "calc(3.5rem + env(safe-area-inset-top))" }}
     >
@@ -217,6 +221,7 @@ export default function TipsFeed({ language }: TipsFeedProps) {
                       type="button"
                       onClick={() => {
                         setAutoPlayed(false);
+                        soundRef.current = true;
                         setPlayingId(v.id);
                       }}
                       aria-label={bn ? "ভিডিও চালান" : "Play video"}
