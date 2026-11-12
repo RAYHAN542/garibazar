@@ -92,7 +92,7 @@ export default function TipsFeed({ language }: TipsFeedProps) {
 
   return (
     <div
-      className="h-full w-full overflow-y-auto overscroll-contain bg-slate-950 text-white no-scrollbar"
+      className="h-full w-full overflow-y-auto overscroll-contain bg-black text-white no-scrollbar"
       style={{ paddingTop: "calc(3.5rem + env(safe-area-inset-top))" }}
     >
       <div className="px-3 pt-2 pb-3">
@@ -112,7 +112,7 @@ export default function TipsFeed({ language }: TipsFeedProps) {
           <button
             type="submit"
             aria-label={bn ? "সার্চ" : "Search"}
-            className="h-10 w-10 shrink-0 rounded-full bg-amber-500 flex items-center justify-center text-slate-950 cursor-pointer"
+            className="h-10 w-10 shrink-0 rounded-full bg-white flex items-center justify-center text-black cursor-pointer"
           >
             <Search className="w-5 h-5" />
           </button>
@@ -156,7 +156,7 @@ export default function TipsFeed({ language }: TipsFeedProps) {
           {items.map((v) => {
             const playing = playingId === v.id;
             return (
-              <div key={v.id} className="rounded-2xl overflow-hidden bg-white/5">
+              <div key={v.id} className="rounded-2xl overflow-hidden bg-white/10">
                 <div className="relative w-full aspect-video bg-black">
                   {playing ? (
                     <iframe
@@ -194,7 +194,7 @@ export default function TipsFeed({ language }: TipsFeedProps) {
                       href={`https://www.youtube.com/watch?v=${v.id}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="mt-1.5 inline-block text-xs font-bold text-amber-400 underline"
+                      className="mt-1.5 inline-block text-xs font-bold text-white underline"
                     >
                       {bn ? "চলছে না? YouTube-এ খুলুন" : "Not playing? Open on YouTube"}
                     </a>
