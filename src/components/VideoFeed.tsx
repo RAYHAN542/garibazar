@@ -2,6 +2,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { X, Volume2, VolumeX, Play, MapPin, Plus, Phone, Bookmark, Share2, MessageCircle, Eye } from "lucide-react";
 import type { PartListing, SupportedLanguage } from "../types";
 import { AddPartForm } from "./AddPartForm";
+import TipsFeed from "./TipsFeed";
 import { supabase } from "../supabase";
 import { nativeFetch } from "../utils/nativeFetch";
 import { apiUrl } from "../utils/apiBase";
@@ -21,6 +22,12 @@ const viewedThisSession = new Set<string>();
 //
 // The "ভিডিও যোগ করুন" button at the top opens a separate video-post form
 // (AddPartForm in mode="video"), so the normal photo "sell" form stays as is.
+//
+// 🔧 (youtube-tips) Two tabs at the top: "ভিডিও" (the seller videos above,
+// unchanged) and "টিপস" (TipsFeed: YouTube search for car-repair how-to
+// videos). Each seller video now fills the whole screen -- before, two
+// half-height videos were on screen at once, which made scrolling stutter on
+// phones. Also only the current + next + previous video are loaded now.
 // ------------------------------------------------------------------------
 
 interface VideoFeedProps {
@@ -63,7 +70,8 @@ function VideoSlideImpl({ listing, index, rel, muted, adPlaying, language, onTog
   const videoRef = useRef<HTMLVideoElement>(null);
   const [paused, setPaused] = useState(false);
   const isActive = rel === 0;
-  const isNear = rel >= -1 && rel <= 2;
+  // 🔧 (youtube-tips) was rel -1..2 (4 videos loaded at once); now previous, current, next only.
+  const isNear = rel >= -1 && rel <= 1;
   const [expanded, setExpanded] = useState(false);
   const [, setCounted] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -208,7 +216,7 @@ function VideoSlideImpl({ listing, index, rel, muted, adPlaying, language, onTog
   return (
     <div
       data-index={index}
-      className="h-1/2 w-full snap-start relative bg-black flex items-center justify-center overflow-hidden border-b border-white/10"
+      className="h-full w-full snap-start snap-always relative bg-black flex items-center justify-center overflow-hidden"
     >
       {isNear && listing.videoUrl ? (
         <video
@@ -326,7 +334,7 @@ function VideoSlideImpl({ listing, index, rel, muted, adPlaying, language, onTog
         )}
       </div>
 
-      <div className="pointer-events-none absolute bottom-0 inset-x-0 px-3 pt-10 pb-2 bg-gradient-to-t from-black/85 via-black/45 to-transparent text-white">
+      <div className="pointer-events-none absolute bottom-0 inset-x-0 px-3 pt-10 pb-[calc(0.5rem+env(safe-area-inset-bottom))] bg-gradient-to-t from-black/85 via-black/45 to-transparent text-white">
         <h3 className="text-sm font-extrabold leading-snug line-clamp-1">{listing.title}</h3>
         <p className="text-base font-black text-amber-400">{formatPrice(listing.price, language)}</p>
         {listing.location && (
@@ -356,6 +364,8 @@ export default function VideoFeed({ language, videos, currentUser, onLoginPrompt
   const forceMute = useCallback(() => setMuted(true), []);
   const [isPostOpen, setIsPostOpen] = useState(false);
   const [posted, setPosted] = useState(false);
+  // 🔧 (youtube-tips) "sale" = seller videos (as before), "tips" = YouTube mechanic tips.
+  const [tab, setTab] = useState<"sale" | "tips">("sale");
   const containerRef = useRef<HTMLDivElement>(null);
   const jumpPending = useRef(false);
   const firstIdAtPost = useRef<string | null>(null);
@@ -365,8 +375,16 @@ export default function VideoFeed({ language, videos, currentUser, onLoginPrompt
   // প্রতি ৪টা ভিডিও swipe-এর পর Interstitial (video) ad; ad চলার সময় ভিডিও pause
   const adPlaying = useVideoInterstitial(activeIndex, isNativeAdsSupported());
 
+  const switchTab = (next: "sale" | "tips") => {
+    if (next === tab) return;
+    setTab(next);
+    // The seller-video list is re-created when coming back to it (starts at the top).
+    setActiveIndex(0);
+  };
+
   // The slide that is at least 60% visible becomes the active (playing) one.
   useEffect(() => {
+    if (tab !== "sale") return;
     const root = containerRef.current;
     if (!root || videos.length === 0) return;
     const visible = new Set<number>();
@@ -388,7 +406,7 @@ export default function VideoFeed({ language, videos, currentUser, onLoginPrompt
     );
     root.querySelectorAll("[data-index]").forEach((el) => observer.observe(el));
     return () => { if (timer) clearTimeout(timer); observer.disconnect(); };
-  }, [videos.length]);
+  }, [videos.length, tab]);
 
   // পোস্টের পর নতুন ভিডিও তালিকার মাথায় এলে সেখানে নিয়ে যাই।
   useEffect(() => {
@@ -422,21 +440,37 @@ export default function VideoFeed({ language, videos, currentUser, onLoginPrompt
     return () => clearTimeout(t);
   }, [posted]);
 
+  const tabBtn = (id: "sale" | "tips", label: string) => (
+    <button
+      key={id}
+      type="button"
+      onClick={() => switchTab(id)}
+      className={`h-8 px-3 rounded-full text-sm font-black cursor-pointer whitespace-nowrap ${
+        tab === id ? "bg-white text-black" : "bg-white/15 text-white"
+      }`}
+    >
+      {label}
+    </button>
+  );
+
   return (
     <div className="fixed inset-0 z-[80] bg-black overscroll-none">
       <div className="absolute top-0 inset-x-0 z-10 flex items-center justify-between px-3 pt-[calc(0.75rem+env(safe-area-inset-top))] pb-2 bg-gradient-to-b from-black/70 to-transparent">
-        <span className="text-white text-base font-black tracking-tight">
-          {language === "bn" ? "গাড়ির ভিডিও" : "Car Videos"}
-        </span>
+        <div className="flex items-center gap-1.5">
+          {tabBtn("sale", language === "bn" ? "ভিডিও" : "Videos")}
+          {tabBtn("tips", language === "bn" ? "টিপস" : "Tips")}
+        </div>
         <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setIsPostOpen(true)}
-            className="h-9 px-3 rounded-full bg-red-600 hover:bg-red-700 text-white text-xs font-extrabold flex items-center gap-1 cursor-pointer shadow-md"
-          >
-            <Plus className="w-4 h-4" />
-            <span className="whitespace-nowrap">{language === "bn" ? "ভিডিও যোগ করুন" : "Add Video"}</span>
-          </button>
+          {tab === "sale" && (
+            <button
+              type="button"
+              onClick={() => setIsPostOpen(true)}
+              className="h-9 px-3 rounded-full bg-red-600 hover:bg-red-700 text-white text-xs font-extrabold flex items-center gap-1 cursor-pointer shadow-md"
+            >
+              <Plus className="w-4 h-4" />
+              <span className="whitespace-nowrap">{language === "bn" ? "ভিডিও যোগ করুন" : "Add Video"}</span>
+            </button>
+          )}
           <button
             type="button"
             onClick={onClose}
@@ -456,7 +490,9 @@ export default function VideoFeed({ language, videos, currentUser, onLoginPrompt
         </div>
       )}
 
-      {ordered.length === 0 ? (
+      {tab === "tips" ? (
+        <TipsFeed language={language} />
+      ) : ordered.length === 0 ? (
         <div className="h-full w-full flex flex-col items-center justify-center px-8 text-center text-white">
           <div className="w-16 h-16 rounded-full bg-white/10 flex items-center justify-center mb-4">
             <Play className="w-8 h-8 fill-white" />
