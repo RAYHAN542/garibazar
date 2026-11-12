@@ -156,7 +156,7 @@ export default function TipsFeed({ language }: TipsFeedProps) {
           {items.map((v) => {
             const playing = playingId === v.id;
             return (
-              <div key={v.id} className="rounded-2xl overflow-hidden bg-white/10">
+              <div key={v.id} className="rounded-2xl overflow-hidden bg-white text-black">
                 <div className="relative w-full aspect-video bg-black">
                   {playing ? (
                     <iframe
@@ -187,14 +187,14 @@ export default function TipsFeed({ language }: TipsFeedProps) {
                   )}
                 </div>
                 <div className="px-3 py-2.5">
-                  <h3 className="text-sm font-extrabold leading-snug line-clamp-2">{v.title}</h3>
-                  <p className="mt-0.5 text-xs font-semibold text-white/60 line-clamp-1">{v.channel}</p>
+                  <h3 className="text-sm font-extrabold leading-snug line-clamp-2 text-black">{v.title}</h3>
+                  <p className="mt-0.5 text-xs font-semibold text-neutral-600 line-clamp-1">{v.channel}</p>
                   {playing && (
                     <a
                       href={`https://www.youtube.com/watch?v=${v.id}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="mt-1.5 inline-block text-xs font-bold text-white underline"
+                      className="mt-1.5 inline-block text-xs font-bold text-black underline"
                     >
                       {bn ? "চলছে না? YouTube-এ খুলুন" : "Not playing? Open on YouTube"}
                     </a>
