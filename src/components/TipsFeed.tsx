@@ -8,7 +8,8 @@ import { apiUrl } from "../utils/apiBase";
 // ------------------------------------------------------------------------
 // "মেকানিক টিপস" tab inside the video feed.
 // People search a car problem; results come from YouTube through our own
-// /api/youtube-search route (cached, key hidden). Videos are shown as a list:
+// server (api/account-actions.ts, action "youtube_search" -- cached, key
+// hidden). Videos are shown as a list:
 // a thumbnail first, and the official YouTube player only loads when the
 // person taps a video (one player at a time), so the phone stays fast.
 // Nothing is ever placed on top of the YouTube player (YouTube policy) --
@@ -54,10 +55,10 @@ export default function TipsFeed({ language }: TipsFeedProps) {
       setError(null);
       setPlayingId(null);
       try {
-        const resp = await nativeFetch(apiUrl("/api/youtube-search"), {
+        const resp = await nativeFetch(apiUrl("/api/account-actions"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ q }),
+          body: JSON.stringify({ action: "youtube_search", q }),
         });
         const data = await resp.json().catch(() => null);
         if (my !== reqId.current) return;
