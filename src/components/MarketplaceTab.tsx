@@ -1,3 +1,4 @@
+import { supabase } from "../supabase";
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { Search, SlidersHorizontal, Bell, Plus, X, ShoppingBag, Loader2, LayoutGrid, Car, Wrench, Bike, Truck, MapPin, Check, Play } from "lucide-react";
 import { ListingCard } from "./ListingCard";
@@ -278,6 +279,30 @@ const feedListings = spotlightFiller ? feedItems.slice(1) : feedItems;
   };
   const activeBrandCat = quickCategories.find((q) => q.id !== "quick_all" && q.id !== "quick_parts" && q.active);
   const ActiveBrandIcon = activeBrandCat ? activeBrandCat.icon : null;
+  const [brandData, setBrandData] = useState<{ sub: string; m: Record<string, number> } | null>(null);
+  const brandSub = activeBrandCat
+    ? ({ quick_car: "car", quick_bike: "bike", quick_truck: "truck", quick_heavy: "other_heavy_equipment" } as Record<string, string>)[activeBrandCat.id]
+    : null;
+  const brandCounts = brandData && brandData.sub === brandSub ? brandData.m : null;
+  useEffect(() => {
+    if (!brandSub) return;
+    let off = false;
+    (async () => {
+      try {
+        const { data, error } = await supabase.rpc("brand_counts", { p_sub: brandSub });
+        if (error || !data || off) return;
+        const m: Record<string, number> = {};
+        for (const r of data as any[]) m[r.brand] = Number(r.n);
+        setBrandData({ sub: brandSub, m });
+      } catch (_) {}
+    })();
+    return () => { off = true; };
+  }, [brandSub]);
+  const brandButtons: string[] = !activeBrandCat
+    ? []
+    : !brandCounts
+      ? (BRAND_OPTIONS[activeBrandCat.id] || [])
+      : Object.keys(brandCounts).filter((k) => k !== "__other" && brandCounts[k] > 0).sort((x, y) => brandCounts[y] - brandCounts[x]).slice(0, 14);
 
   return (
               <div>
@@ -465,7 +490,7 @@ const feedListings = spotlightFiller ? feedItems.slice(1) : feedItems;
             </span>
           </div>
           <div className="flex flex-wrap gap-1.5">
-            {["all", ...(BRAND_OPTIONS[activeBrandCat.id] || []), "__other"].map((b) => (
+            {["all", ...brandButtons, ...(!brandCounts || (brandCounts["__other"] || 0) > 0 ? ["__other"] : [])].map((b) => (
               <button
                 key={b}
                 type="button"
@@ -476,7 +501,7 @@ const feedListings = spotlightFiller ? feedItems.slice(1) : feedItems;
                     : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-amber-400/50"
                 }`}
               >
-                {b === "all" ? (language === "bn" ? "সব" : "All") : b === "__other" ? (language === "bn" ? "অন্যান্য" : "Others") : b}
+                {b === "all" ? (language === "bn" ? "সব" : "All") : (b === "__other" ? (language === "bn" ? "অন্যান্য" : "Others") : b) + (brandCounts && brandCounts[b] ? " (" + brandCounts[b] + ")" : "")}
               </button>
             ))}
           </div>
