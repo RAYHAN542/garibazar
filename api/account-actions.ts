@@ -113,7 +113,7 @@ async function handleReportListing(req: any, res: any) {
     return res.status(401).json({ error: "লগইন করা প্রয়োজন।" });
   }
 
-  const { listingId } = req.body || {};
+  const { listingId, reason } = req.body || {};
   if (!listingId || typeof listingId !== "string") {
     return res.status(400).json({ error: "listingId প্রয়োজন।" });
   }
@@ -157,6 +157,18 @@ async function handleReportListing(req: any, res: any) {
   if (updateErr) {
     console.error("[account-actions/report_listing] update error:", updateErr.message);
     return res.status(500).json({ error: "রিপোর্ট সাবমিট করা যায়নি।" });
+  }
+
+  // best-effort: কে রিপোর্ট করল ও কেন -- অ্যাডমিন প্যানেলে দেখানোর জন্য
+  try {
+    const reasonKey = ["spam", "abusive", "wrong_model", "out_of_service"].includes(reason) ? reason : "other";
+    const { data: who } = await supabaseAdmin.from("users").select("name").eq("uid", uid).maybeSingle();
+    await supabaseAdmin.from("listing_reports").upsert(
+      { listing_id: listingId, reporter_id: uid, reporter_name: (who as any)?.name || null, reason: reasonKey },
+      { onConflict: "listing_id,reporter_id" },
+    );
+  } catch (e) {
+    console.error("[account-actions/report_listing] report detail save failed:", e);
   }
 
   return res.status(200).json({ reported: true });

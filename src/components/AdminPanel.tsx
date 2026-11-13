@@ -168,6 +168,29 @@ export function AdminPanel({ language, currentUser, listings: listingsProp, isUs
   // Sub-tabs for the Admin Panel itself to make it exceptionally organized and professional
   const [adminSubTab, setAdminSubTab] = useState<"requests" | "listings" | "tickets" | "analytics">("requests");
 
+  // কে কোন বিজ্ঞাপন রিপোর্ট করেছে ও কেন (listing_reports -- RLS-এ শুধু অ্যাডমিন দেখতে পায়)
+  const [reportsByListing, setReportsByListing] = useState<Record<string, any[]>>({});
+  useEffect(() => {
+    if (adminSubTab !== "listings") return;
+    let active = true;
+    (async () => {
+      try {
+        const { data, error } = await supabase
+          .from("listing_reports")
+          .select("listing_id, reporter_name, reason, created_at")
+          .order("created_at", { ascending: false })
+          .limit(1000);
+        if (error || !data || !active) return;
+        const grouped: Record<string, any[]> = {};
+        for (const r of data as any[]) (grouped[r.listing_id] = grouped[r.listing_id] || []).push(r);
+        setReportsByListing(grouped);
+      } catch (_) {}
+    })();
+    return () => {
+      active = false;
+    };
+  }, [adminSubTab]);
+
   // Visitor / login / signup analytics states
   const [visitEvents, setVisitEvents] = useState<any[]>([]);
   const [loadingVisits, setLoadingVisits] = useState(true);
@@ -915,7 +938,7 @@ export function AdminPanel({ language, currentUser, listings: listingsProp, isUs
                         </span>
                       )}
                       {(item.reportCount || 0) > 0 && (
-                        <span className="bg-red-650 text-white px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-wider flex items-center gap-1 shadow-md">
+                        <span className="bg-red-600 text-white px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-wider flex items-center gap-1 shadow-md">
                           <Flag className="w-2.5 h-2.5" />
                           <span>
                             {language === "bn" ? `${item.reportCount}টি অভিযোগ` : `${item.reportCount} Reports`}
@@ -980,6 +1003,37 @@ export function AdminPanel({ language, currentUser, listings: listingsProp, isUs
                         </div>
                       </div>
                     </div>
+
+                    {(item.reportCount || 0) > 0 && (
+                      <div className="mx-4 mb-3 p-3 rounded-xl bg-red-500/5 border border-red-500/20 space-y-1.5">
+                        <p className="text-[10px] font-black uppercase tracking-wider text-red-500">
+                          {language === "bn" ? "যারা রিপোর্ট করেছেন" : "Reported by"}
+                        </p>
+                        {(reportsByListing[item.id] || []).length === 0 ? (
+                          <p className="text-[11px] font-semibold text-slate-500">
+                            {language === "bn" ? "বিস্তারিত পাওয়া যায়নি" : "No details recorded"}
+                          </p>
+                        ) : (
+                          (reportsByListing[item.id] || []).map((r: any, i: number) => {
+                            const labels: Record<string, [string, string]> = {
+                              spam: ["ভুয়া বা স্প্যাম পোস্ট", "Fake Price / Spam"],
+                              abusive: ["অনুপযুক্ত বা গালিগালাজ", "Abusive detail"],
+                              wrong_model: ["ভুল মডেল ফিটিং", "Wrong car compatibility"],
+                              out_of_service: ["মোবাইল বন্ধ / সংযোগহীন", "Seller unreachable"],
+                              other: ["অন্যান্য", "Other"],
+                            };
+                            const lab = r.reason && labels[r.reason] ? labels[r.reason][language === "bn" ? 0 : 1] : (language === "bn" ? "কারণ জানা নেই (পুরনো রিপোর্ট)" : "Reason unknown (old report)");
+                            return (
+                              <div key={i} className="text-[11px] leading-snug">
+                                <span className="font-black text-slate-800 dark:text-slate-200">{r.reporter_name || (language === "bn" ? "অজানা ব্যবহারকারী" : "Unknown user")}</span>
+                                <span className="text-slate-500"> — {lab}</span>
+                                <span className="text-slate-400"> · {new Date(r.created_at).toLocaleDateString()}</span>
+                              </div>
+                            );
+                          })
+                        )}
+                      </div>
+                    )}
 
                     {/* Footer: Delete Button */}
                     <div className="p-3 bg-slate-50 dark:bg-slate-950 border-t border-slate-100 dark:border-slate-850 flex items-center justify-end">
