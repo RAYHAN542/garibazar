@@ -27,7 +27,7 @@ const IP_MAX = 40; // searches per IP per hour (cache hits included)
 const DAY_MS = 24 * 60 * 60 * 1000;
 const DAILY_YT_CALLS_MAX = 90; // 90 x 100 units = 9,000 of the 10,000 daily quota
 const MAX_QUERY_LEN = 80;
-const MAX_RESULTS = 12;
+const MAX_RESULTS = 30;
 
 const VIDEO_ID_RE = /^[A-Za-z0-9_-]{11}$/;
 

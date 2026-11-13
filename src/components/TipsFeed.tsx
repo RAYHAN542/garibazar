@@ -54,6 +54,21 @@ export default function TipsFeed({ language }: TipsFeedProps) {
     async (raw: string) => {
       const q = raw.trim();
       if (q.length < 2) return;
+      const ck = "tips_cache_v1:" + q.toLowerCase();
+      try {
+        const raw = localStorage.getItem(ck);
+        if (raw) {
+          const c = JSON.parse(raw);
+          if (c && Array.isArray(c.items) && c.items.length > 0 && Date.now() - c.t < 6 * 60 * 60 * 1000) {
+            ++reqId.current;
+            setError(null);
+            setPlayingId(null);
+            setItems(c.items as TipItem[]);
+            setLoading(false);
+            return;
+          }
+        }
+      } catch (_) {}
       const my = ++reqId.current;
       setLoading(true);
       setError(null);
@@ -71,7 +86,13 @@ export default function TipsFeed({ language }: TipsFeedProps) {
           setError((data && data.error) || (bn ? "ভিডিও আনা যায়নি। আবার চেষ্টা করুন।" : "Could not load videos. Please try again."));
           return;
         }
-        setItems(Array.isArray(data?.items) ? (data.items as TipItem[]) : []);
+        const list = Array.isArray(data?.items) ? (data.items as TipItem[]) : [];
+        setItems(list);
+        if (list.length > 0) {
+          try {
+            localStorage.setItem(ck, JSON.stringify({ t: Date.now(), items: list }));
+          } catch (_) {}
+        }
       } catch (_) {
         if (my !== reqId.current) return;
         setItems([]);
@@ -185,9 +206,17 @@ export default function TipsFeed({ language }: TipsFeedProps) {
       </div>
 
       {loading && (
-        <p className="px-4 py-6 text-center text-sm font-semibold text-white/70">
-          {bn ? "ভিডিও খোঁজা হচ্ছে..." : "Searching videos..."}
-        </p>
+        <div className="px-3 pb-4 space-y-4" aria-busy="true">
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="rounded-2xl overflow-hidden bg-white/10 animate-pulse">
+              <div className="w-full aspect-video bg-white/10" />
+              <div className="px-3 py-3 space-y-2">
+                <div className="h-3.5 w-11/12 rounded bg-white/15" />
+                <div className="h-3 w-1/3 rounded bg-white/10" />
+              </div>
+            </div>
+          ))}
+        </div>
       )}
 
       {!loading && error && (
