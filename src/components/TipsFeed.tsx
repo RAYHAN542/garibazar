@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { isNativeAdsSupported } from "../utils/nativeAds";
+import { showTimedInterstitial } from "../hooks/useVideoInterstitial";
 import type { FormEvent } from "react";
 import { Search, Play } from "lucide-react";
 import type { SupportedLanguage } from "../types";
@@ -313,9 +315,10 @@ export default function TipsFeed({ language }: TipsFeedProps) {
                   ) : (
                     <button
                       type="button"
-                      onClick={() => {
+                      onClick={async () => {
                         setAutoPlayed(false);
                         soundRef.current = true;
+                        if (isNativeAdsSupported()) await showTimedInterstitial();
                         setPlayingId(v.id);
                       }}
                       aria-label={bn ? "ভিডিও চালান" : "Play video"}
