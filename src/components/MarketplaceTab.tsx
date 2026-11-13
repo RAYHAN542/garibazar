@@ -84,8 +84,8 @@ const ExcavatorIcon = ({ className }: { className?: string }) => (
 
 const POPULAR_CITIES = ["Dhaka (ঢাকা)", "Chittagong (চট্টগ্রাম)", "Sylhet (সিলেট)", "Rajshahi (রাজশাহী)", "Khulna (খুলনা)", "Barisal (বরিশাল)"];
 
-// শহরের নাম "Dhaka (ঢাকা)" ফরম্যাটে থাকে -- search bar-এর ভেতরের ছোট্ট
-// pill-এ পুরোটা আঁটবে না, তাই শুধু প্রথম অংশ (bracket-এর আগে পর্যন্ত) দেখানো হয়।
+// শহরের নাম "Dhaka (ঢাকা)" ফর্ম্যাটে থাকে -- search bar-এর ভেতরের ছোট্টো
+// pill-এ পুরোটা আঁটবে না, তাই শুধু প্রথম অংশ (bracket-এর আগ পর্যন্ত) দেখানো হয়।
 const getShortCityLabel = (selectedCity: string, language: SupportedLanguage): string => {
   if (selectedCity === "all") return language === "bn" ? "সব শহর" : "All City";
   return selectedCity.split(" (")[0];
@@ -215,6 +215,21 @@ useEffect(() => {
   fetchVideoListings().then((v) => { if (!cancelled) setDbVideos(v); }).catch(() => {});
   return () => { cancelled = true; };
 }, [isVideoFeedOpen, videoRefresh]);
+// 🔧 "মেকানিক টিপস" ট্যাবের "পার্টস দেখুন" বাটন (components/TipsFeed.tsx একটা "gari:show-parts" ইভেন্ট পাঠায়):
+// ভিডিও ফিড বন্ধ করে পার্টস ক্যাটাগরিতে (আর সমস্যার শব্দ দিয়ে, যেমন "ব্রেক") লিস্টিং দেখায়।
+useEffect(() => {
+  const onShowParts = (e: Event) => {
+    const q = String((e as CustomEvent).detail?.query || "").trim().slice(0, 40);
+    setIsVideoFeedOpen(false);
+    setSelectedCategory("spare_parts");
+    setSelectedSubCategory("all");
+    setSelectedBrand("all");
+    setSearchQuery(q);
+    try { window.scrollTo({ top: 0 }); } catch (_) {}
+  };
+  window.addEventListener("gari:show-parts", onShowParts);
+  return () => window.removeEventListener("gari:show-parts", onShowParts);
+}, [setSelectedCategory, setSelectedSubCategory, setSelectedBrand, setSearchQuery]);
 const feedVideos = useMemo(() => {
   const seen = new Set<string>();
   return [...dbVideos, ...videoListings]
@@ -598,11 +613,11 @@ const feedListings = spotlightFiller ? feedItems.slice(1) : feedItems;
 
                 {/* 🔧 (2026-10-01) আসল, আলাদা "শুধু বুস্ট পোস্ট" গ্রিড -- আগে এই
                     জায়গায় যেই "Premium Sponsored Spotlights" হেডার দেখানো হতো,
-                    সেটা আসলে নিচের সাধারণ মূল গ্রিডেরই (ads + organic মিশানো)
-                    একটা ভুল লেবেল ছিল, তাই বুস্ট-ছাড়া পোস্টও "স্পনসর্ড" হেডারের
+                    সেটা আসলে নিচের সাধারণ মূল গ্রিডেরই (ads + organic মিশানো) একটা
+                    ভুল লেবেল ছিল, তাই বুস্ট-ছাড়া পোস্টও "স্পনসর্ড" হেডারের
                     নিচে দেখাত আর কোনো "বিজ্ঞাপন" ব্যাজ থাকত না। এখন এটা সত্যিকারের
                     একটা পৃথক গ্রিড -- শুধু spotlightAds (সর্বোচ্চ MAX_SPOTLIGHT_ADS,
-                    impression-count অনুযায়ী ন্যায্যভাবে ঘোরানো) দেখায়, উপরের
+                    impression-count অনুযায়ী ন্যায়্যভাবে ঘোরানো) দেখায়, উপরের
                     স্লাইডারের মতোই, সবসময় উপরে, মূল ফিডের আগে। নিচের মূল গ্রিড
                     থেকে এই একই পোস্টগুলো বাদ দেওয়া হয় (displayListings), যাতে
                     ডুপ্লিকেট না দেখায়। */}
