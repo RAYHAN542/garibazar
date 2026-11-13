@@ -157,10 +157,6 @@ export function AdminPanel({ language, currentUser, listings: listingsProp, isUs
     );
   }
 
-  // Payment numbers form states
-  const [bkash, setBkash] = useState("01783457173 (Personal)");
-  const [nagad, setNagad] = useState("01783457173 (Personal)");
-  const [rocket, setRocket] = useState("01783457173 (Personal)");
   const [saveLoading, setSaveLoading] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
 
@@ -171,7 +167,7 @@ export function AdminPanel({ language, currentUser, listings: listingsProp, isUs
   const [actionSuccessMsg, setActionSuccessMsg] = useState("");
 
   // Sub-tabs for the Admin Panel itself to make it exceptionally organized and professional
-  const [adminSubTab, setAdminSubTab] = useState<"requests" | "listings" | "settings" | "tickets" | "analytics">("requests");
+  const [adminSubTab, setAdminSubTab] = useState<"requests" | "listings" | "tickets" | "analytics">("requests");
 
   // Visitor / login / signup analytics states
   const [visitEvents, setVisitEvents] = useState<any[]>([]);
@@ -243,25 +239,6 @@ export function AdminPanel({ language, currentUser, listings: listingsProp, isUs
     }
   };
 
-  // 🔧 (2026-09-26) payment_info moved into the same Supabase app_config
-  // table UpdateBanner.tsx's "version" row already lives in (key/value
-  // jsonb) -- was a Firestore settings/payment_info doc.
-  useEffect(() => {
-    const fetchPaymentInfo = async () => {
-      try {
-        const { data, error } = await supabase.from("app_config").select("value").eq("key", "payment_info").maybeSingle();
-        if (error) throw error;
-        if (data?.value) {
-          setBkash(data.value.bkash || "01783457173 (Personal)");
-          setNagad(data.value.nagad || "01783457173 (Personal)");
-          setRocket(data.value.rocket || "01783457173 (Personal)");
-        }
-      } catch (err) {
-        console.error("Could not fetch payment_info:", err);
-      }
-    };
-    fetchPaymentInfo();
-  }, []);
 
   // 🔧 (2026-09-25) refill_requests আগে Firestore-এ ছিল, কিন্তু payment flow
   // migration-এর পর client (useAdPromotion.ts/PromoteAdModal.tsx) এখন এই
@@ -529,32 +506,6 @@ export function AdminPanel({ language, currentUser, listings: listingsProp, isUs
     }
   };
 
-  const handleUpdatePaymentConfig = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSaveLoading(true);
-    setSaveSuccess(false);
-
-    try {
-      const { error } = await supabase.from("app_config").upsert({
-        key: "payment_info",
-        value: {
-          bkash: bkash.trim(),
-          nagad: nagad.trim(),
-          rocket: rocket.trim(),
-          updatedAt: new Date().toISOString(),
-          updatedBy: currentUser?.phoneNumber || currentUser?.email || "Admin",
-        },
-      });
-      if (error) throw error;
-
-      setSaveSuccess(true);
-      setTimeout(() => setSaveSuccess(false), 3000);
-    } catch (err) {
-      console.error("Error updating payment setup:", err);
-    } finally {
-      setSaveLoading(false);
-    }
-  };
 
   // 🔧 (2026-09-25) নিচের দুটো handler এখন Supabase-এ লেখে -- অধিকাংশ
   // ad_promotion রিকোয়েস্ট এমনিতেই api/payment/webhook.ts স্বয়ংক্রিয়ভাবে
@@ -808,17 +759,6 @@ export function AdminPanel({ language, currentUser, listings: listingsProp, isUs
         </button>
 
         <button
-          onClick={() => setAdminSubTab("settings")}
-          className={`pb-2.5 px-4 font-bold text-xs uppercase tracking-wider border-b-2 transition-all cursor-pointer shrink-0 whitespace-nowrap ${
-            adminSubTab === "settings"
-              ? "border-amber-500 text-amber-500"
-              : "border-transparent text-slate-400 hover:text-slate-300"
-          }`}
-        >
-          {language === "bn" ? "আমার বিকাশ/নগদ/রকেট নম্বর" : "Edit Payment Numbers"}
-        </button>
-
-        <button
           onClick={() => setAdminSubTab("tickets")}
           className={`pb-2.5 px-4 font-bold text-xs uppercase tracking-wider border-b-2 transition-all cursor-pointer shrink-0 whitespace-nowrap ${
             adminSubTab === "tickets"
@@ -860,83 +800,7 @@ export function AdminPanel({ language, currentUser, listings: listingsProp, isUs
       )}
 
       {/* PANEL CONTENTS */}
-      {adminSubTab === "settings" ? (
-        
-        /* 1. EDIT WALLET ROUTE NUMBERS */
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm max-w-xl">
-          <h5 className="text-sm font-black text-slate-800 dark:text-white mb-4 flex items-center gap-1.5">
-            <Smartphone className="w-4 h-4 text-amber-500" />
-            {language === "bn" ? "আমার পার্সোনাল মোবাইল পেমেন্ট নাম্বার সেট করুন" : "Set Your Mobile Payment Receivers"}
-          </h5>
-
-          <form onSubmit={handleUpdatePaymentConfig} className="space-y-4">
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-slate-600 dark:text-slate-400 block">
-                {language === "bn" ? "বিকাশ নম্বর (bKash Number)" : "bKash Send Money Number"}
-              </label>
-              <input
-                type="text"
-                value={bkash}
-                onChange={(e) => setBkash(e.target.value)}
-                placeholder="e.g. 017XXXXXXXX (Personal)"
-                className="w-full p-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-sm font-bold font-mono focus:outline-none focus:ring-2 focus:ring-amber-500/20 text-slate-900 dark:text-white"
-                required
-              />
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-slate-600 dark:text-slate-400 block">
-                {language === "bn" ? "নগদ নম্বর (Nagad Number)" : "Nagad Send Money Number"}
-              </label>
-              <input
-                type="text"
-                value={nagad}
-                onChange={(e) => setNagad(e.target.value)}
-                placeholder="e.g. 017XXXXXXXX (Personal)"
-                className="w-full p-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-sm font-bold font-mono focus:outline-none focus:ring-2 focus:ring-amber-500/20 text-slate-900 dark:text-white"
-                required
-              />
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-slate-600 dark:text-slate-400 block">
-                {language === "bn" ? "রকেট নম্বর (Rocket Number)" : "Rocket Send Money Number"}
-              </label>
-              <input
-                type="text"
-                value={rocket}
-                onChange={(e) => setRocket(e.target.value)}
-                placeholder="e.g. 017XXXXXXXX (Personal)"
-                className="w-full p-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-sm font-bold font-mono focus:outline-none focus:ring-2 focus:ring-amber-500/20 text-slate-900 dark:text-white"
-                required
-              />
-            </div>
-
-            {saveSuccess && (
-              <p className="text-emerald-500 text-xs font-bold flex items-center gap-1.5 font-sans">
-                <Check className="w-4 h-4" />
-                {language === "bn" ? "মোবাইল নম্বরসমূহ সফলভাবে আপডেট করা হয়েছে!" : "Payment details saved successfully! All users will see these numbers."}
-              </p>
-            )}
-
-            <button
-              type="submit"
-              disabled={saveLoading}
-              className="px-5 py-2.5 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-xs uppercase tracking-wider rounded-xl transition flex items-center gap-2 cursor-pointer"
-            >
-              {saveLoading ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <>
-                  <Save className="w-4 h-4" />
-                  {language === "bn" ? "তথ্য সেভ করুন" : "Save Changes"}
-                </>
-              )}
-            </button>
-          </form>
-        </div>
-
-      ) : adminSubTab === "listings" ? (
+      {adminSubTab === "listings" ? (
         
         /* 2. MANAGE MARKETPLACE LISTINGS INVENTORY */
         <div className="space-y-4">
