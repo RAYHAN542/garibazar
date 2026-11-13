@@ -183,9 +183,96 @@ export async function handleYoutubeSearch(req: any, res: any) {
   try {
     if (items.length) await supabase.rpc("tips_library_add", { p_q: q, p_items: items });
     await supabase.from("tips_videos").delete().lt("fetched_at", new Date(Date.now() - CACHE_PURGE_MS).toISOString());
+    await supabase
+      .from("tips_videos")
+      .update({ description: null, description_fetched_at: null })
+      .lt("description_fetched_at", new Date(Date.now() - CACHE_PURGE_MS).toISOString());
   } catch (e: any) {
     console.error("[youtube-search] library write error:", e?.message || e);
   }
 
   return res.status(200).json({ items, cached: false });
+}
+
+
+// ------------------------------------------------------------------------
+// Tips video description ("বিবরণ"): fetched only when a person taps it.
+// videos.list costs 1 quota unit (search.list costs 100). The text is kept in
+// tips_videos.description and refreshed after 25 days (YouTube 30-day rule).
+// ------------------------------------------------------------------------
+const DETAILS_IP_MAX = 120; // per IP per hour
+const DETAILS_DAILY_MAX = 900; // 900 units + search 9,000 stays under the 10,000 daily quota
+
+export async function handleYoutubeDetails(req: any, res: any) {
+  const id = typeof req.body?.id === "string" ? req.body.id.trim() : "";
+  if (!VIDEO_ID_RE.test(id)) {
+    return res.status(400).json({ error: "অবৈধ ভিডিও।" });
+  }
+  const ipOk = await checkAndBumpRateLimit("yt_details_ip_" + getClientIp(req), IP_WINDOW_MS, DETAILS_IP_MAX);
+  if (!ipOk) {
+    return res.status(429).json({ error: "অনেকবার চেষ্টা হয়েছে। কিছুক্ষণ পর আবার চেষ্টা করুন।" });
+  }
+
+  const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!supabaseUrl || !supabaseServiceKey) {
+    console.error("[youtube-details] Missing Supabase env vars");
+    return res.status(500).json({ error: "সার্ভার কনফিগারেশনে সমস্যা।" });
+  }
+  const supabase = createClient(supabaseUrl, supabaseServiceKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+
+  let stored = "";
+  try {
+    const { data, error } = await supabase.rpc("tips_library_get_description", { p_id: id });
+    const row: any = Array.isArray(data) ? data[0] : data;
+    if (error) {
+      console.error("[youtube-details] read error:", error.message);
+    } else if (row) {
+      stored = typeof row.description === "string" ? row.description : "";
+      if (row.fetched) return res.status(200).json({ description: stored });
+    }
+  } catch (e: any) {
+    console.error("[youtube-details] read error:", e?.message || e);
+  }
+
+  const apiKey = process.env.YOUTUBE_API_KEY;
+  if (!apiKey) {
+    console.error("[youtube-details] YOUTUBE_API_KEY is not set");
+    if (stored) return res.status(200).json({ description: stored });
+    return res.status(500).json({ error: "সার্ভার কনফিগারেশনে সমস্যা।" });
+  }
+  const dayOk = await checkAndBumpRateLimit("yt_details_daily_calls", DAY_MS, DETAILS_DAILY_MAX);
+  if (!dayOk) {
+    if (stored) return res.status(200).json({ description: stored });
+    return res.status(429).json({ error: "আজকের বিবরণ আনার সীমা শেষ। কাল আবার চেষ্টা করুন।" });
+  }
+
+  const params = new URLSearchParams({ part: "snippet", id, key: apiKey });
+  let ytResp: Response;
+  try {
+    ytResp = await fetch("https://www.googleapis.com/youtube/v3/videos?" + params.toString(), {
+      signal: AbortSignal.timeout(8000),
+    });
+  } catch (e: any) {
+    // never log the URL -- it contains the API key
+    console.error("[youtube-details] YouTube request failed:", e?.name || "error");
+    if (stored) return res.status(200).json({ description: stored });
+    return res.status(502).json({ error: "বিবরণ আনা যায়নি।" });
+  }
+  if (!ytResp.ok) {
+    console.error("[youtube-details] YouTube API status:", ytResp.status);
+    if (stored) return res.status(200).json({ description: stored });
+    return res.status(502).json({ error: "বিবরণ আনা যায়নি।" });
+  }
+
+  const body: any = await ytResp.json();
+  const description = decodeEntities(String(body?.items?.[0]?.snippet?.description || "")).slice(0, 4000);
+  try {
+    await supabase.rpc("tips_library_set_description", { p_id: id, p_desc: description });
+  } catch (e: any) {
+    console.error("[youtube-details] save error:", e?.message || e);
+  }
+  return res.status(200).json({ description });
 }

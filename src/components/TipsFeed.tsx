@@ -91,6 +91,50 @@ export default function TipsFeed({ language }: TipsFeedProps) {
   const soundRef = useRef(false);
   const [autoPlayed, setAutoPlayed] = useState(false);
   const [vehicleType, setVehicleType] = useState("car");
+  const [openDesc, setOpenDesc] = useState<string | null>(null);
+  const [descs, setDescs] = useState<Record<string, string>>({});
+  const [descLoadingId, setDescLoadingId] = useState<string | null>(null);
+  const [descErr, setDescErr] = useState<string | null>(null);
+
+  const toggleDesc = async (id: string) => {
+    if (openDesc === id) {
+      setOpenDesc(null);
+      return;
+    }
+    setOpenDesc(id);
+    setDescErr(null);
+    if (descs[id] !== undefined) return;
+    setDescLoadingId(id);
+    try {
+      const resp = await nativeFetch(apiUrl("/api/account-actions"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "youtube_details", id }),
+      });
+      const data = await resp.json().catch(() => null);
+      if (resp.ok && typeof data?.description === "string") {
+        const text = data.description as string;
+        setDescs((p) => ({ ...p, [id]: text || (bn ? "এই ভিডিওর কোনো বিবরণ নেই।" : "No description for this video.") }));
+      } else {
+        setDescErr(id);
+      }
+    } catch (_) {
+      setDescErr(id);
+    } finally {
+      setDescLoadingId(null);
+    }
+  };
+
+  const renderDesc = (t: string) =>
+    t.split(/(https?:\/\/[^\s]+)/g).map((part, i) =>
+      /^https?:\/\//.test(part) ? (
+        <a key={i} href={part} target="_blank" rel="noopener noreferrer" className="underline text-blue-700">
+          {part}
+        </a>
+      ) : (
+        <span key={i}>{part}</span>
+      )
+    );
 
   const runSearch = useCallback(
     async (raw: string) => {
@@ -339,6 +383,24 @@ export default function TipsFeed({ language }: TipsFeedProps) {
                 <div className="px-3 py-2.5">
                   <h3 className="text-sm font-extrabold leading-snug line-clamp-2 text-black">{v.title}</h3>
                   <p className="mt-0.5 text-xs font-semibold text-neutral-600 line-clamp-1">{v.channel}</p>
+                  <button
+                    type="button"
+                    onClick={() => toggleDesc(v.id)}
+                    className="mt-1.5 text-xs font-extrabold text-black underline cursor-pointer"
+                  >
+                    {openDesc === v.id ? (bn ? "বিবরণ বন্ধ ▴" : "Hide details ▴") : bn ? "বিবরণ দেখুন ▾" : "Show details ▾"}
+                  </button>
+                  {openDesc === v.id && (
+                    <div className="mt-2 max-h-48 overflow-y-auto rounded-lg bg-neutral-100 p-2.5 text-xs leading-relaxed text-neutral-800 whitespace-pre-wrap break-words">
+                      {descLoadingId === v.id
+                        ? bn ? "লোড হচ্ছে..." : "Loading..."
+                        : descs[v.id] !== undefined
+                        ? renderDesc(descs[v.id])
+                        : descErr === v.id
+                        ? bn ? "বিবরণ আনা যায়নি। বন্ধ করে আবার চাপুন।" : "Could not load. Close and tap again."
+                        : ""}
+                    </div>
+                  )}
                 </div>
               </div>
             );
