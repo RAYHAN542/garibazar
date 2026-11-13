@@ -14,6 +14,9 @@ import { apiUrl } from "../utils/apiBase";
 // person taps a video (one player at a time), so the phone stays fast.
 // Nothing is ever placed on top of the YouTube player (YouTube policy) --
 // title/channel/links sit below it.
+// 🔧 "পার্টস দেখুন" button under each video (below the player, never on it): closes the
+// video feed and shows spare-part listings for the problem the person picked
+// (MarketplaceTab listens for the "gari:show-parts" event).
 // ------------------------------------------------------------------------
 
 interface TipItem {
@@ -28,13 +31,13 @@ interface TipsFeedProps {
 
 const DEFAULT_QUERY = "গাড়ির সমস্যা ও সমাধান মেকানিক";
 
-const CHIPS: { bn: string; en: string; q: string }[] = [
-  { bn: "ব্রেক সমস্যা", en: "Brake problem", q: "গাড়ির ব্রেক সমস্যা সমাধান" },
-  { bn: "AC ঠান্ডা হয় না", en: "AC not cooling", q: "গাড়ির এসি ঠান্ডা হয় না সমাধান" },
-  { bn: "ব্যাটারি ডাউন", en: "Battery problem", q: "গাড়ির ব্যাটারি সমস্যা সমাধান" },
-  { bn: "ইঞ্জিন গরম", en: "Engine overheating", q: "ইঞ্জিন গরম হওয়ার সমস্যা সমাধান" },
-  { bn: "গিয়ার সমস্যা", en: "Gear problem", q: "গাড়ির গিয়ার সমস্যা সমাধান" },
-  { bn: "এক্সকাভেটর হাইড্রলিক", en: "Excavator hydraulic", q: "এক্সকাভেটর হাইড্রলিক সমস্যা সমাধান" },
+const CHIPS: { bn: string; en: string; q: string; part: string }[] = [
+  { bn: "ব্রেক সমস্যা", en: "Brake problem", q: "গাড়ির ব্রেক সমস্যা সমাধান", part: "ব্রেক" },
+  { bn: "AC ঠান্ডা হয় না", en: "AC not cooling", q: "গাড়ির এসি ঠান্ডা হয় না সমাধান", part: "এসি" },
+  { bn: "ব্যাটারি ডাউন", en: "Battery problem", q: "গাড়ির ব্যাটারি সমস্যা সমাধান", part: "ব্যাটারি" },
+  { bn: "ইঞ্জিন গরম", en: "Engine overheating", q: "ইঞ্জিন গরম হওয়ার সমস্যা সমাধান", part: "রেডিয়েটর" },
+  { bn: "গিয়ার সমস্যা", en: "Gear problem", q: "গাড়ির গিয়ার সমস্যা সমাধান", part: "গিয়ার" },
+  { bn: "এক্সকাভেটর হাইড্রলিক", en: "Excavator hydraulic", q: "এক্সকাভেটর হাইড্রলিক সমস্যা সমাধান", part: "এক্সকাভেটর" },
 ];
 
 export default function TipsFeed({ language }: TipsFeedProps) {
@@ -44,6 +47,7 @@ export default function TipsFeed({ language }: TipsFeedProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [playingId, setPlayingId] = useState<string | null>(null);
+  const [activePart, setActivePart] = useState("");
   const reqId = useRef(0);
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const playingRef = useRef<string | null>(null);
@@ -110,7 +114,14 @@ export default function TipsFeed({ language }: TipsFeedProps) {
 
   const onSubmit = (e: FormEvent) => {
     e.preventDefault();
+    setActivePart("");
     runSearch(input);
+  };
+
+  const showParts = () => {
+    try {
+      window.dispatchEvent(new CustomEvent("gari:show-parts", { detail: { query: activePart } }));
+    } catch (_) {}
   };
 
   playingRef.current = playingId;
@@ -195,6 +206,7 @@ export default function TipsFeed({ language }: TipsFeedProps) {
               type="button"
               onClick={() => {
                 setInput(bn ? c.bn : c.en);
+                setActivePart(c.part);
                 runSearch(c.q);
               }}
               className="shrink-0 rounded-full bg-white/10 px-3 py-1.5 text-xs font-bold text-white cursor-pointer"
@@ -271,6 +283,13 @@ export default function TipsFeed({ language }: TipsFeedProps) {
                 <div className="px-3 py-2.5">
                   <h3 className="text-sm font-extrabold leading-snug line-clamp-2 text-black">{v.title}</h3>
                   <p className="mt-0.5 text-xs font-semibold text-neutral-600 line-clamp-1">{v.channel}</p>
+                  <button
+                    type="button"
+                    onClick={showParts}
+                    className="mt-2 w-full py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-xs cursor-pointer"
+                  >
+                    {bn ? (activePart ? "এই সমস্যার পার্টস দেখুন" : "পার্টস দেখুন") : "View parts"}
+                  </button>
                 </div>
               </div>
             );
