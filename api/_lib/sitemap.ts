@@ -24,6 +24,11 @@ function escapeXml(str: string) {
 const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
+// 🔧 (2026-11-13) Supabase একবারে সর্বোচ্চ ১০০০ সারি ফেরত দেয় (.limit(5000) দিলেও), তাই ১০০০-এর
+// পরের লিস্টিংগুলো সাইটম্যাপে আসছিল না। এখন ১০০০ করে পাতা ধরে সর্বোচ্চ ৫০০০ পর্যন্ত আনা হয়।
+const PAGE_SIZE = 1000;
+const MAX_LISTINGS = 5000;
+
 // Builds a fresh sitemap.xml on every request (cached at the edge for an hour)
 // so newly posted listings show up for Google without a manual redeploy.
 export async function sitemapHandler(req: any, res: any) {
@@ -55,17 +60,23 @@ export async function sitemapHandler(req: any, res: any) {
       // is_sold can be null on older rows (never explicitly set) as well as
       // false -- .eq("is_sold", false) alone would silently exclude every
       // null row too (SQL: NULL = false is NULL, not true), so match both.
-      const { data, error } = await supabase
-        .from("listings")
-        .select("id, created_at")
-        .eq("is_deleted", false)
-        .or("is_sold.is.null,is_sold.eq.false")
-        .order("created_at", { ascending: false })
-        .limit(5000);
+      const rows: any[] = [];
+      for (let from = 0; from < MAX_LISTINGS; from += PAGE_SIZE) {
+        const { data, error } = await supabase
+          .from("listings")
+          .select("id, created_at")
+          .eq("is_deleted", false)
+          .or("is_sold.is.null,is_sold.eq.false")
+          .order("created_at", { ascending: false })
+          .order("id", { ascending: false })
+          .range(from, from + PAGE_SIZE - 1);
 
-      if (error) throw error;
+        if (error) throw error;
+        rows.push(...(data || []));
+        if (!data || data.length < PAGE_SIZE) break;
+      }
 
-      listingUrls = (data || []).map((row: any) => {
+      listingUrls = rows.map((row: any) => {
         let lastmod: string | undefined;
         try {
           if (row.created_at) lastmod = new Date(row.created_at).toISOString().slice(0, 10);
