@@ -33,6 +33,11 @@ if (!getApps().length) {
 //     ব্রডকাস্ট বাদ যায়, পরে জমে না (পছন্দের গাড়ির অ্যালার্ট আলাদা, সেটা ডেটাবেস পাঠায়)।
 //     আগে এই ফাঁক ছিল ৩০ মিনিট, ২০২৬-১১-০৮ এ ৫ ঘণ্টা করা হয়েছিল, এখন আবার ৩০ মিনিট।
 // চ্যাট মেসেজের পুশে এই সীমা নেই -- ওটা একজনের কাছে যাওয়া সরাসরি বার্তা।
+//
+// 🔴 (2026-11-14) নোটিফিকেশনে আর `tag` নেই (আগে "new_listing"/"device_alert" tag দিয়ে নতুনটা পুরনোটাকে
+// বদলে দিত, তাই ট্রেতে সবসময় ১টা থাকত আর আইকনের লাল সংখ্যা ১-এর বেশি হতো না)। এখন প্রতিটা
+// পোস্ট/মেসেজের নোটিফিকেশন আলাদা জমে থাকে, ফোনের লঞ্চার সেই জমা সংখ্যাই আইকনে দেখায়
+// (চ্যাট পুশে আগেও tag ছিল না)। অ্যাপ খুললে জমা নোটিফিকেশন মুছে সংখ্যা ০ করা পরের Play build-এর কাজ।
 const BD_UTC_OFFSET_HOURS = 6;
 const QUIET_START_HOUR_BD = 24; // 24 = starts at 12:00 AM
 const QUIET_END_HOUR_BD = 8;
@@ -144,7 +149,6 @@ export default async function handler(req: any, res: any) {
               ...(alertImage ? { imageUrl: alertImage } : {}),
             },
             data: { listingId: String(lst.id) },
-            android: { notification: { tag: "device_alert" } },
           });
           sentCount += r.successCount;
           r.responses.forEach((resp: any, idx: number) => {
@@ -272,7 +276,6 @@ export default async function handler(req: any, res: any) {
             ...(broadcastImage ? { imageUrl: broadcastImage } : {}),
           },
           data: { listingId: String(l.id) },
-          android: { notification: { tag: "new_listing" } },
         });
         sentCount += r.successCount;
       }
