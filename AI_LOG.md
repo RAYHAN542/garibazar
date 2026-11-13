@@ -1,3 +1,5 @@
 # AI কাজের লগ (তারিখ | AI | কী বদলালো | ফাইল)
 2026-11-14 | claude | Tips কালো-সাদা ডিজাইন, Videos+Tips-এ ১ মিনিটে ১ ad, রিফ্রেশ বন্ধ, ৫০ ভিডিও | TipsFeed.tsx, useVideoInterstitial.ts, PullToRefresh.tsx, youtubeSearch.ts
 2026-11-14 | claude | Tips ভিডিও লাইব্রেরি: আগে লাইব্রেরি থেকে দেখায়, YouTube ইউনিট কম খরচ, সীমা শেষে কাছাকাছি ভিডিও | youtubeSearch.ts
+2026-11-14 | claude-chat | (পরে লেখা, ৯–১৩ নভেম্বরের কাজ, লগ-নিয়মের আগে) স্লাইডার ও চ্যাটে ৳০ ঠিক, মিশ্র ফিড (নতুন+পছন্দের+পুরনো), ভিডিও ফিডে মিশ্র সাজানো, ঘণ্টায় লাল দাগ ও নোটিফিকেশন চালুর পপআপ, লগইনহীন ডিভাইসের পুশ টোকেন ও পছন্দের গাড়ির অ্যালার্ট, নোটিফিকেশনে ছবি, ব্রডকাস্ট ফাঁক ৩০ মিনিট, সাইটম্যাপ ১০০০+ লিস্টিং (sitemap এখন share-listing-এর মোড) | src/utils/feedRanker.ts, src/utils/devicePush.ts, MarketplaceTab.tsx, VideoFeed.tsx, PromotedSlider.tsx, ChatView.tsx, api/send-push.ts, api/share-listing.ts, api/_lib/sitemap.ts, vercel.json, Supabase: device_push_tokens + register_device_push + notify_matching_devices ট্রিগার
+2026-11-14 | claude-chat | push থেকে tag সরানো (নতুন বিজ্ঞাপন ও পছন্দের গাড়ি), যাতে আইকনে জমা নোটিফিকেশনের সংখ্যা বাড়ে | api/send-push.ts
