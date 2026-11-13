@@ -23,7 +23,7 @@ export function SellerShopPage({
   sellerId,
   fallbackSellerName = "Gari Bazar Seller",
   fallbackSellerPhoto = "",
-  fallbackLocation = "Dhaka",
+  fallbackLocation = "",
   fallbackContact = "",
   language,
   currentUser,
@@ -261,10 +261,12 @@ export function SellerShopPage({
                   )}
                 </h4>
                 <div className="text-xs text-slate-500 dark:text-slate-400 flex flex-wrap items-center justify-center sm:justify-start gap-3">
+                  {sellerLocation && (
                   <span className="flex items-center gap-1">
                     <MapPin className="w-3.5 h-3.5 text-slate-400" />
                     {sellerLocation}
                   </span>
+                )}
                 </div>
               </div>
             </div>
