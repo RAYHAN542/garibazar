@@ -36,6 +36,14 @@ const QUIET_START_HOUR_BD = 24; // 24 = starts at 12:00 AM
 const QUIET_END_HOUR_BD = 8;
 const NEW_LISTING_MIN_GAP_MS = 5 * 60 * 60 * 1000;
 
+// 🖼️ (2026-11-13) নোটিফিকেশনে গাড়ির ছবি: লিস্টিংয়ের প্রথম https ছবি। ছবি বড় হলে বা না এলে
+// অ্যান্ড্রয়েড ছবি ছাড়াই লেখা-সহ নোটিফিকেশন দেখায়, তাই এতে পুশ আটকায় না।
+const pickPushImage = (imgs: any): string | undefined => {
+  if (!Array.isArray(imgs)) return undefined;
+  const u = imgs.find((s: any) => typeof s === "string" && /^https:\/\//.test(s));
+  return u || undefined;
+};
+
 // 🔧 (2026-09-30) `supabase: any` here (was `ReturnType<typeof createClient>`)
 // -- a newer @supabase/supabase-js got pulled in by an unrelated npm install
 // and now infers `never` row/arg types for any client created without an
@@ -109,7 +117,7 @@ export default async function handler(req: any, res: any) {
         }
         const { data: lst } = await supabase
           .from("listings")
-          .select("id, title, price, is_deleted, is_sold")
+          .select("id, title, price, images, is_deleted, is_sold")
           .eq("id", deviceAlert.listingId)
           .maybeSingle();
         if (!lst || lst.is_deleted || lst.is_sold) {
@@ -121,6 +129,7 @@ export default async function handler(req: any, res: any) {
           .in("device_id", ids);
         const rows = (devs || []).filter((r: any) => r.fcm_token);
         const priceTxt = Number(lst.price) > 0 ? " - ৳" + Number(lst.price).toLocaleString("en-IN") : "";
+        const alertImage = pickPushImage(lst.images);
         let sentCount = 0;
         const deadDevices: string[] = [];
         for (let i = 0; i < rows.length; i += 500) {
@@ -130,6 +139,7 @@ export default async function handler(req: any, res: any) {
             notification: {
               title: "আপনার পছন্দের গাড়ি এসেছে 🚗",
               body: String(lst.title || "").slice(0, 80) + priceTxt,
+              ...(alertImage ? { imageUrl: alertImage } : {}),
             },
             data: { listingId: String(lst.id) },
             android: { notification: { tag: "device_alert" } },
@@ -210,7 +220,7 @@ export default async function handler(req: any, res: any) {
     if (listingId) {
       const { data: l } = await supabase
         .from("listings")
-        .select("id, title, price, seller_id")
+        .select("id, title, price, seller_id, images")
         .eq("id", listingId)
         .maybeSingle();
       if (!l || l.seller_id !== uid) {
@@ -249,6 +259,7 @@ export default async function handler(req: any, res: any) {
       const list = Array.from(tokens);
       const priceTxt =
         Number(l.price) > 0 ? " - ৳" + Number(l.price).toLocaleString("en-IN") : "";
+      const broadcastImage = pickPushImage(l.images);
       let sentCount = 0;
       for (let i = 0; i < list.length; i += 500) {
         const r = await getMessaging().sendEachForMulticast({
@@ -256,6 +267,7 @@ export default async function handler(req: any, res: any) {
           notification: {
             title: "নতুন বিজ্ঞাপন",
             body: String(l.title || "").slice(0, 80) + priceTxt,
+            ...(broadcastImage ? { imageUrl: broadcastImage } : {}),
           },
           data: { listingId: String(l.id) },
           android: { notification: { tag: "new_listing" } },
