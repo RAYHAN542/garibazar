@@ -2,9 +2,12 @@ import { useEffect, useRef, useState } from "react";
 import { preloadInterstitial, showInterstitial } from "../utils/interstitialAds";
 
 // প্রতি এতগুলো ভিডিও swipe করার পর একটা ad
-const AD_EVERY = 4;
+const AD_EVERY = 1;
 // দুই ad-এর মাঝে সর্বনিম্ন বিরতি
-const MIN_GAP_MS = 30_000;
+const MIN_GAP_MS = 60_000;
+// shared by Videos and Tips: 1 ad per minute overall
+let lastShownAt = Date.now();
+let adBusy = false;
 
 /**
  * ভিডিও ফিডে swipe গুনে Interstitial ad দেখায়।
@@ -15,7 +18,6 @@ export function useVideoInterstitial(activeIndex: number, enabled: boolean): boo
   const prevIndex = useRef(activeIndex);
   const advances = useRef(0);
   const busy = useRef(false);
-  const lastShown = useRef(0);
 
   useEffect(() => {
     if (enabled) void preloadInterstitial();
@@ -27,7 +29,7 @@ export function useVideoInterstitial(activeIndex: number, enabled: boolean): boo
     prevIndex.current = activeIndex;
     advances.current += 1;
     if (advances.current < AD_EVERY || busy.current) return;
-    if (Date.now() - lastShown.current < MIN_GAP_MS) return;
+    if (Date.now() - lastShownAt < MIN_GAP_MS) return;
 
     busy.current = true;
     setAdPlaying(true);
@@ -35,7 +37,7 @@ export function useVideoInterstitial(activeIndex: number, enabled: boolean): boo
       const shown = await showInterstitial();
       if (shown) {
         advances.current = 0;
-        lastShown.current = Date.now();
+        lastShownAt = Date.now();
       }
       busy.current = false;
       setAdPlaying(false);
@@ -44,4 +46,17 @@ export function useVideoInterstitial(activeIndex: number, enabled: boolean): boo
   }, [activeIndex, enabled]);
 
   return adPlaying;
+}
+
+export async function showTimedInterstitial(): Promise<boolean> {
+  if (adBusy || Date.now() - lastShownAt < MIN_GAP_MS) return false;
+  adBusy = true;
+  try {
+    const shown = await showInterstitial();
+    if (shown) lastShownAt = Date.now();
+    return !!shown;
+  } finally {
+    adBusy = false;
+    void preloadInterstitial();
+  }
 }
