@@ -206,7 +206,7 @@ export default function TipsFeed({ language }: TipsFeedProps) {
       onClick={() => {
         soundRef.current = true;
       }}
-      className="h-full w-full overflow-y-auto overscroll-contain bg-black text-white no-scrollbar"
+      data-no-ptr className="h-full w-full overflow-y-auto overscroll-contain bg-black text-white no-scrollbar"
       style={{ paddingTop: "calc(3.5rem + env(safe-area-inset-top))" }}
     >
       <div className="px-3 pt-2 pb-3">

@@ -10,7 +10,7 @@ export default function PullToRefresh() {
 
   useEffect(() => {
     const handleTouchStart = (e: TouchEvent) => {
-      if (window.scrollY <= 0 && !refreshing) {
+      if (window.scrollY <= 0 && !document.querySelector("[data-no-ptr]") && !refreshing) {
         startYRef.current = e.touches[0].clientY;
         pullingRef.current = true;
       }
@@ -19,7 +19,7 @@ export default function PullToRefresh() {
     const handleTouchMove = (e: TouchEvent) => {
       if (!pullingRef.current || startYRef.current === null || refreshing) return;
       const delta = e.touches[0].clientY - startYRef.current;
-      if (delta > 0 && window.scrollY <= 0) {
+      if (delta > 0 && window.scrollY <= 0 && !document.querySelector("[data-no-ptr]")) {
         setPullDistance(Math.min(delta * 0.5, 100));
       } else {
         pullingRef.current = false;
