@@ -135,7 +135,8 @@ const parts = [];
 if (!titleInDesc) parts.push(`🚗 ${l.title}`);
 if (desc) parts.push(desc);
 if (l.location && l.location !== "Bangladesh" && !desc.includes(l.location)) parts.push("", `📍 ${l.location}`);
-const caption = parts.join("\n") + `\n\n💰 দাম: আলোচনা সাপেক্ষ\n\nগাড়ির কোড: ${String(l.id).slice(0, 8)}`;
+const hasPhone = /01[3-9]\d{8}/.test(desc.replace(/[০-৯]/g, (d) => "০১২৩৪৫৬৭৮৯".indexOf(d)).replace(/[\s-]/g, ""));
+const caption = parts.join("\n") + (hasPhone ? "" : "\n\n📞 নম্বরের জন্য ইনবক্স করুন") + `\n\n💰 দাম: আলোচনা সাপেক্ষ\n\nগাড়ির কোড: ${String(l.id).slice(0, 8)}`;
 
 if (DRY_RUN) {
   console.log(`WOULD post listing ${l.id} with ${imgs.length} photos:\n${caption}\nimages: ${imgs.join(" , ")}`);
