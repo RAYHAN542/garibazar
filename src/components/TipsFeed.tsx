@@ -28,13 +28,52 @@ interface TipsFeedProps {
 
 const DEFAULT_QUERY = "গাড়ির সমস্যা ও সমাধান মেকানিক";
 
-const CHIPS: { bn: string; en: string; q: string }[] = [
-  { bn: "ব্রেক সমস্যা", en: "Brake problem", q: "গাড়ির ব্রেক সমস্যা সমাধান" },
-  { bn: "AC ঠান্ডা হয় না", en: "AC not cooling", q: "গাড়ির এসি ঠান্ডা হয় না সমাধান" },
-  { bn: "ব্যাটারি ডাউন", en: "Battery problem", q: "গাড়ির ব্যাটারি সমস্যা সমাধান" },
-  { bn: "ইঞ্জিন গরম", en: "Engine overheating", q: "ইঞ্জিন গরম হওয়ার সমস্যা সমাধান" },
-  { bn: "গিয়ার সমস্যা", en: "Gear problem", q: "গাড়ির গিয়ার সমস্যা সমাধান" },
-  { bn: "এক্সকাভেটর হাইড্রলিক", en: "Excavator hydraulic", q: "এক্সকাভেটর হাইড্রলিক সমস্যা সমাধান" },
+type Chip = { bn: string; en: string; q: string };
+const TYPES: { key: string; icon: string; bn: string; en: string; kw: string; base: string; chips: Chip[] }[] = [
+  {
+    key: "car", icon: "🚗", bn: "গাড়ি", en: "Car", kw: "গাড়ির", base: DEFAULT_QUERY,
+    chips: [
+      { bn: "ব্রেক সমস্যা", en: "Brake problem", q: "গাড়ির ব্রেক সমস্যা সমাধান" },
+      { bn: "AC ঠান্ডা হয় না", en: "AC not cooling", q: "গাড়ির এসি ঠান্ডা হয় না সমাধান" },
+      { bn: "ব্যাটারি ডাউন", en: "Battery problem", q: "গাড়ির ব্যাটারি সমস্যা সমাধান" },
+      { bn: "ইঞ্জিন গরম", en: "Engine overheating", q: "ইঞ্জিন গরম হওয়ার সমস্যা সমাধান" },
+      { bn: "গিয়ার সমস্যা", en: "Gear problem", q: "গাড়ির গিয়ার সমস্যা সমাধান" },
+      { bn: "স্টার্ট হয় না", en: "Won't start", q: "গাড়ি স্টার্ট হয় না সমাধান" },
+    ],
+  },
+  {
+    key: "bike", icon: "🏍️", bn: "বাইক", en: "Bike", kw: "বাইকের", base: "বাইক মোটরসাইকেল সমস্যা ও সমাধান মেকানিক",
+    chips: [
+      { bn: "স্টার্ট হয় না", en: "Won't start", q: "বাইক স্টার্ট হয় না সমাধান" },
+      { bn: "ব্রেক সমস্যা", en: "Brake problem", q: "বাইকের ব্রেক সমস্যা সমাধান" },
+      { bn: "ইঞ্জিন গরম", en: "Engine overheating", q: "বাইকের ইঞ্জিন গরম হওয়ার সমস্যা সমাধান" },
+      { bn: "চেইন সমস্যা", en: "Chain problem", q: "বাইকের চেইন সমস্যা সমাধান" },
+      { bn: "ব্যাটারি সমস্যা", en: "Battery problem", q: "বাইকের ব্যাটারি সমস্যা সমাধান" },
+      { bn: "ক্লাচ গিয়ার", en: "Clutch & gear", q: "বাইকের ক্লাচ গিয়ার সমস্যা সমাধান" },
+    ],
+  },
+  {
+    key: "truck", icon: "🚚", bn: "ট্রাক", en: "Truck", kw: "ট্রাকের", base: "ট্রাক সমস্যা ও সমাধান মেকানিক",
+    chips: [
+      { bn: "ইঞ্জিন গরম", en: "Engine overheating", q: "ট্রাকের ইঞ্জিন গরম হওয়ার সমস্যা সমাধান" },
+      { bn: "এয়ার ব্রেক", en: "Air brake", q: "ট্রাকের এয়ার ব্রেক সমস্যা সমাধান" },
+      { bn: "গিয়ারবক্স", en: "Gearbox", q: "ট্রাকের গিয়ারবক্স সমস্যা সমাধান" },
+      { bn: "কালো ধোঁয়া", en: "Black smoke", q: "ট্রাকের কালো ধোঁয়া সমস্যা সমাধান" },
+      { bn: "স্টার্ট হয় না", en: "Won't start", q: "ট্রাক স্টার্ট হয় না সমাধান" },
+      { bn: "টায়ার সমস্যা", en: "Tyre problem", q: "ট্রাকের টায়ার সমস্যা সমাধান" },
+    ],
+  },
+  {
+    key: "excavator", icon: "🏗️", bn: "এক্সকাভেটর", en: "Excavator", kw: "এক্সকাভেটরের", base: "এক্সকাভেটর সমস্যা ও সমাধান মেকানিক",
+    chips: [
+      { bn: "হাইড্রলিক", en: "Hydraulic", q: "এক্সকাভেটর হাইড্রলিক সমস্যা সমাধান" },
+      { bn: "ইঞ্জিন সমস্যা", en: "Engine problem", q: "এক্সকাভেটর ইঞ্জিন সমস্যা সমাধান" },
+      { bn: "ট্র্যাক চেইন", en: "Track chain", q: "এক্সকাভেটর ট্র্যাক চেইন সমস্যা সমাধান" },
+      { bn: "সুইং সমস্যা", en: "Swing problem", q: "এক্সকাভেটর সুইং সমস্যা সমাধান" },
+      { bn: "স্টার্ট হয় না", en: "Won't start", q: "এক্সকাভেটর স্টার্ট হয় না সমাধান" },
+      { bn: "বুম ও আর্ম", en: "Boom & arm", q: "এক্সকাভেটর বুম আর্ম সমস্যা সমাধান" },
+    ],
+  },
 ];
 
 export default function TipsFeed({ language }: TipsFeedProps) {
@@ -49,6 +88,7 @@ export default function TipsFeed({ language }: TipsFeedProps) {
   const playingRef = useRef<string | null>(null);
   const soundRef = useRef(false);
   const [autoPlayed, setAutoPlayed] = useState(false);
+  const [vehicleType, setVehicleType] = useState("car");
 
   const runSearch = useCallback(
     async (raw: string) => {
@@ -110,7 +150,9 @@ export default function TipsFeed({ language }: TipsFeedProps) {
 
   const onSubmit = (e: FormEvent) => {
     e.preventDefault();
-    runSearch(input);
+    const t = TYPES.find((x) => x.key === vehicleType) || TYPES[0];
+    const typed = input.trim();
+    runSearch(typed ? t.kw + " " + typed : t.base);
   };
 
   playingRef.current = playingId;
@@ -188,8 +230,31 @@ export default function TipsFeed({ language }: TipsFeedProps) {
           </button>
         </form>
 
+        <div className="mt-3 grid grid-cols-4 gap-2">
+          {TYPES.map((t) => {
+            const on = t.key === vehicleType;
+            return (
+              <button
+                key={t.key}
+                type="button"
+                onClick={() => {
+                  setVehicleType(t.key);
+                  setInput("");
+                  runSearch(t.base);
+                }}
+                className={`rounded-xl px-1 py-2 text-xs font-extrabold flex flex-col items-center gap-0.5 cursor-pointer ${
+                  on ? "bg-white text-black" : "bg-white/10 text-white"
+                }`}
+              >
+                <span className="text-base leading-none">{t.icon}</span>
+                <span>{bn ? t.bn : t.en}</span>
+              </button>
+            );
+          })}
+        </div>
+
         <div className="mt-2 flex gap-2 overflow-x-auto no-scrollbar pb-1">
-          {CHIPS.map((c) => (
+          {(TYPES.find((x) => x.key === vehicleType) || TYPES[0]).chips.map((c) => (
             <button
               key={c.q}
               type="button"
