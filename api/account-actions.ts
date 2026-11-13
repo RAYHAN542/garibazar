@@ -2,7 +2,7 @@ import { createClient } from "@supabase/supabase-js";
 import { applyCors } from "./_lib/cors.js";
 import { checkAndBumpRateLimit, getClientIp } from "./_lib/rateLimit.js";
 import { verifySupabaseToken } from "./_lib/verifyJwt.js";
-import { handleYoutubeSearch } from "./_lib/youtubeSearch.js";
+import { handleYoutubeSearch, handleYoutubeDetails } from "./_lib/youtubeSearch.js";
 
 // ============================================================================
 // api/account-actions.ts
@@ -292,6 +292,8 @@ export default async function handler(req: any, res: any) {
         return await handleSubmitSupportTicket(req, res);
       case "youtube_search":
         return await handleYoutubeSearch(req, res);
+      case "youtube_details":
+        return await handleYoutubeDetails(req, res);
       default:
         return res.status(400).json({ error: "Invalid action." });
     }
