@@ -72,6 +72,26 @@ export async function handleYoutubeSearch(req: any, res: any) {
     auth: { autoRefreshToken: false, persistSession: false },
   });
 
+  // 0) library: আগের সার্চে জমা ভিডিও আগে দেখি (YouTube ইউনিট খরচ নেই)
+  let libAny: TipItem[] = [];
+  try {
+    const { data: libRows, error: libErr } = await supabase.rpc("tips_library_search", { p_q: q, p_limit: MAX_RESULTS });
+    if (libErr) {
+      console.error("[youtube-search] library read error:", libErr.message);
+    } else if (Array.isArray(libRows)) {
+      const toItem = (r: any): TipItem => ({ id: String(r.video_id), title: String(r.title), channel: String(r.channel || "") });
+      const words = q.split(" ").filter((w) => w.length >= 2).length;
+      const minScore = Math.max(1, Math.min(words, 2));
+      const exact = libRows.filter((r: any) => Number(r.score) >= 1000);
+      const near = libRows.filter((r: any) => Number(r.score) >= minScore);
+      libAny = libRows.filter((r: any) => Number(r.score) > 0).map(toItem);
+      if (exact.length >= 12) return res.status(200).json({ items: exact.slice(0, MAX_RESULTS).map(toItem), cached: true });
+      if (near.length >= 15) return res.status(200).json({ items: near.slice(0, MAX_RESULTS).map(toItem), cached: true });
+    }
+  } catch (e: any) {
+    console.error("[youtube-search] library error:", e?.message || e);
+  }
+
   // 1) cache lookup
   let stale: TipItem[] | null = null;
   const { data: cached, error: cacheErr } = await supabase
@@ -100,6 +120,7 @@ export async function handleYoutubeSearch(req: any, res: any) {
   const dayOk = await checkAndBumpRateLimit("yt_search_daily_calls", DAY_MS, DAILY_YT_CALLS_MAX);
   if (!dayOk) {
     if (stale) return res.status(200).json({ items: stale, cached: true });
+    if (libAny.length) return res.status(200).json({ items: libAny, cached: true });
     return res.status(429).json({ error: "আজকের নতুন সার্চের সীমা শেষ। আগের সার্চগুলো দেখুন, বা কাল আবার চেষ্টা করুন।" });
   }
 
@@ -125,12 +146,14 @@ export async function handleYoutubeSearch(req: any, res: any) {
     // never log the URL -- it contains the API key
     console.error("[youtube-search] YouTube request failed:", e?.name || "error");
     if (stale) return res.status(200).json({ items: stale, cached: true });
+    if (libAny.length) return res.status(200).json({ items: libAny, cached: true });
     return res.status(502).json({ error: "YouTube থেকে ভিডিও আনা যায়নি। আবার চেষ্টা করুন।" });
   }
 
   if (!ytResp.ok) {
     console.error("[youtube-search] YouTube API status:", ytResp.status);
     if (stale) return res.status(200).json({ items: stale, cached: true });
+    if (libAny.length) return res.status(200).json({ items: libAny, cached: true });
     return res.status(502).json({ error: "YouTube থেকে ভিডিও আনা যায়নি। কিছুক্ষণ পর আবার চেষ্টা করুন।" });
   }
 
@@ -154,6 +177,14 @@ export async function handleYoutubeSearch(req: any, res: any) {
       .lt("created_at", new Date(Date.now() - CACHE_PURGE_MS).toISOString());
   } catch (e: any) {
     console.error("[youtube-search] cache write error:", e?.message || e);
+  }
+
+  // 5) নতুন ভিডিও লাইব্রেরিতে জমা (best effort)
+  try {
+    if (items.length) await supabase.rpc("tips_library_add", { p_q: q, p_items: items });
+    await supabase.from("tips_videos").delete().lt("fetched_at", new Date(Date.now() - CACHE_PURGE_MS).toISOString());
+  } catch (e: any) {
+    console.error("[youtube-search] library write error:", e?.message || e);
   }
 
   return res.status(200).json({ items, cached: false });
