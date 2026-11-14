@@ -15,7 +15,7 @@ import { apiUrl } from "./utils/apiBase";
 import { incrementListingView } from "./utils/counters";
 import {
   fetchInitialListings as fetchInitialListingsFromSupabase,
-  fetchMoreListingsMixed as fetchMoreListingsFromSupabase,
+  fetchMoreListingsFair as fetchMoreListingsFromSupabase,
   fetchAdListings as fetchAdListingsFromSupabase,
   fetchMyListings as fetchMyListingsFromSupabase,
   fetchListingById,

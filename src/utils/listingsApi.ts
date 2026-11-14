@@ -115,6 +115,7 @@ function applyCategoryFilters(query: any, filters?: CategoryFilters) {
 }
 
 export async function fetchInitialListings(limit = INITIAL_FETCH_LIMIT, filters?: CategoryFilters): Promise<ListingsPage> {
+  fairBag = null; // রিফ্রেশ/ফিল্টার বদলালে নতুন করে ঘোটানো হবে
   let query = supabase
     .from("listings")
     .select("*")
@@ -151,7 +152,54 @@ export async function fetchMoreListings(beforeCreatedAt: string, limit = 20, fil
   };
 }
 
-// 🔀 "আরো দেখুন" মিশ্র ফিড: মোট limit-টা পোস্ট (আগের মতোই ২০), অর্ধেক ক্রম ধরে পরের পুরনো পোস্ট,
+// ⚖️ "আরো দেখুন" ন্যায্য ফিড (shuffle bag): প্রথম পাতার পর বাকি সব পোস্টের আইডি একবার ঘুটিয়ে নেওয়া হয়,
+// তারপর প্রতি চাপে পরের limit-টা আনা হয়। তালিকা শেষ না হওয়া পর্যন্ত কোনো পোস্ট দ্বিতীয়বার আসে না,
+// আর কোনো পোস্ট বাদও পড়ে না, তাই সব পোস্ট সমান সুযোগ পায়। নতুন-পুরনো স্বাভাবিকভাবেই মিশে যায়।
+let fairBag: { key: string; ids: string[]; pos: number } | null = null;
+
+async function loadFairIds(filters?: CategoryFilters): Promise<string[]> {
+  const all: string[] = [];
+  for (let from = 0; from < 5000; from += 1000) {
+    let q: any = supabase.from("listings").select("id").eq("is_deleted", false);
+    q = applyCategoryFilters(q, filters);
+    const { data, error } = await q.order("created_at", { ascending: false }).range(from, from + 999);
+    if (error) throw error;
+    const rows = data || [];
+    rows.forEach((r: any) => all.push(String(r.id)));
+    if (rows.length < 1000) break;
+  }
+  return all;
+}
+
+export async function fetchMoreListingsFair(beforeCreatedAt: string, limit = 20, filters?: CategoryFilters): Promise<ListingsPage> {
+  const key = JSON.stringify(filters || {});
+  if (!fairBag || fairBag.key !== key) {
+    const ids = (await loadFairIds(filters)).slice(INITIAL_FETCH_LIMIT); // প্রথম পাতার (সবচেয়ে নতুন) পোস্ট আগেই দেখানো হয়েছে
+    for (let i = ids.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      const t = ids[i];
+      ids[i] = ids[j];
+      ids[j] = t;
+    }
+    fairBag = { key, ids, pos: 0 };
+  }
+  const bag = fairBag;
+  const chunk = bag.ids.slice(bag.pos, bag.pos + limit);
+  bag.pos += chunk.length;
+  let listings: PartListing[] = [];
+  if (chunk.length > 0) {
+    const { data, error } = await supabase.from("listings").select("*").eq("is_deleted", false).in("id", chunk);
+    if (error) {
+      bag.pos -= chunk.length;
+      throw error;
+    }
+    const byId = new Map((data || []).map((r: any) => [String(r.id), mapRowToListing(r)] as [string, PartListing]));
+    listings = chunk.map((id) => byId.get(id)).filter((x): x is PartListing => !!x);
+  }
+  return { listings, nextCursor: beforeCreatedAt, hasMore: bag.pos < bag.ids.length };
+}
+
+// 🔀 "আরো দেখুন" মিশ্র ফিড (পুরনো, এখন ব্যবহার হয় না): মোট limit-টা পোস্ট (আগের মতোই ২০), অর্ধেক ক্রম ধরে পরের পুরনো পোস্ট,
 // বাকি অর্ধেক পুরনো অংশের এলোমেলো জায়গা থেকে। ডাটাবেস থেকে পড়া পোস্টের সংখ্যা বাড়ে না।
 // আগে দেখানো পোস্ট আবার এলে App.tsx-এর merge সেটা বাদ দেয়।
 export async function fetchMoreListingsMixed(beforeCreatedAt: string, limit = 20, filters?: CategoryFilters): Promise<ListingsPage> {

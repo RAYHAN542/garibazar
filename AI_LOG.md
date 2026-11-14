@@ -11,3 +11,4 @@
 2026-11-15 | claude | Tips ভিডিওর নিচে পার্টস দেখুন বাটন (পার্টস ক্যাটাগরিতে খোঁজে) | TipsFeed.tsx, MarketplaceTab.tsx
 2026-11-15 | claude | আরো দেখুন: নতুন পাতার পোস্ট নিচে যোগ হয়, দেখানো পোস্টের জায়গা বদলায় না | MarketplaceTab.tsx
 2026-11-15 | claude | আরো দেখুন মিশ্র: ২০টার অর্ধেক ক্রম ধরে, অর্ধেক পুরনো অংশের এলোমেলো, ঘুরিয়ে মিশিয়ে নিচে যোগ (খরচ একই) | listingsApi.ts, App.tsx, MarketplaceTab.tsx
+2026-11-15 | claude | আরো দেখুন ন্যায্য (shuffle bag): প্রথম পাতার পর সব পোস্ট একবার ঘুটিয়ে, দ্বিতীয়বার নয়, কোনোটা বাদ নয় | listingsApi.ts, App.tsx, MarketplaceTab.tsx

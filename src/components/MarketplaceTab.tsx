@@ -260,16 +260,15 @@ const feedItems = useMemo(() => {
     (time(i.id) > newestKept ? fresh : older).push(i.id);
   }
   ref.key = key;
-  // 🔀 নতুন পাতার পোস্ট তারিখ ধরে সাজানো থাকে; অর্ধেক-অর্ধেক করে ঘুরিয়ে মেশাই (নতুন-পুরনো পাশাপাশি), তারপর পছন্দ অনুযায়ী মিশ্রণ।
-  const sortedOlder = [...older].sort((a, b) => time(b) - time(a));
-  const mid = Math.ceil(sortedOlder.length / 2);
-  const hi = sortedOlder.slice(0, mid);
-  const lo = sortedOlder.slice(mid);
-  const woven: PartListing[] = [];
-  for (let k = 0; k < hi.length; k++) {
-    woven.push(byId.get(hi[k]) as PartListing);
-    if (k < lo.length) woven.push(byId.get(lo[k]) as PartListing);
+  // 🔀 নতুন পাতার পোস্ট তারিখ-ক্রমে থাকে, তাই একবার ঘুটিয়ে (নতুন-পুরনো মিশিয়ে) বসাই, তারপর পছন্দ অনুযায়ী মিশ্রণ।
+  const shuffled = [...older];
+  for (let k = shuffled.length - 1; k > 0; k--) {
+    const j = Math.floor(Math.random() * (k + 1));
+    const t = shuffled[k];
+    shuffled[k] = shuffled[j];
+    shuffled[j] = t;
   }
+  const woven: PartListing[] = shuffled.map((id) => byId.get(id) as PartListing);
   const mixedOlder = sortBy === "latest" && searchQuery.trim().length === 0 ? mixFeed(woven) : woven;
   ref.ids = [...fresh, ...kept, ...mixedOlder.map((i) => i.id)];
   return ref.ids.map((id) => byId.get(id) as PartListing);
