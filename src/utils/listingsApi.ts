@@ -151,6 +151,41 @@ export async function fetchMoreListings(beforeCreatedAt: string, limit = 20, fil
   };
 }
 
+// 🔀 "আরো দেখুন" মিশ্র ফিড: মোট limit-টা পোস্ট (আগের মতোই ২০), অর্ধেক ক্রম ধরে পরের পুরনো পোস্ট,
+// বাকি অর্ধেক পুরনো অংশের এলোমেলো জায়গা থেকে। ডাটাবেস থেকে পড়া পোস্টের সংখ্যা বাড়ে না।
+// আগে দেখানো পোস্ট আবার এলে App.tsx-এর merge সেটা বাদ দেয়।
+export async function fetchMoreListingsMixed(beforeCreatedAt: string, limit = 20, filters?: CategoryFilters): Promise<ListingsPage> {
+  const half = Math.max(1, Math.floor(limit / 2));
+  const seq = await fetchMoreListings(beforeCreatedAt, half, filters);
+  let extra: PartListing[] = [];
+  if (seq.hasMore) {
+    try {
+      let cq: any = supabase
+        .from("listings")
+        .select("id", { count: "exact", head: true })
+        .eq("is_deleted", false)
+        .lt("created_at", beforeCreatedAt);
+      cq = applyCategoryFilters(cq, filters);
+      const { count } = await cq;
+      const total = Number(count) || 0;
+      if (total >= half * 2) {
+        const offset = half + Math.floor(Math.random() * (total - half * 2 + 1));
+        let rq: any = supabase
+          .from("listings")
+          .select("*")
+          .eq("is_deleted", false)
+          .lt("created_at", beforeCreatedAt);
+        rq = applyCategoryFilters(rq, filters);
+        const { data } = await rq.order("created_at", { ascending: false }).range(offset, offset + half - 1);
+        extra = (data || []).map(mapRowToListing);
+      }
+    } catch (_) {
+      // এলোমেলো অংশ না এলেও ক্রমের অংশ ঠিকই দেখানো হবে
+    }
+  }
+  return { listings: [...seq.listings, ...extra], nextCursor: seq.nextCursor, hasMore: seq.hasMore };
+}
+
 // 🔧 (2026-09-28) The caller used to pass 20, which silently capped the
 // boosted-ad pool at 20 -- with fair rotation (src/utils/adRotation.ts)
 // every boosted ad must be able to take its turn, so the pool has to hold

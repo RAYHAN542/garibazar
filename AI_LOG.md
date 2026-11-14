@@ -10,3 +10,4 @@
 2026-11-14 | claude | Chat tab red dot fix (unordered limit 50 missed unread), icon badge follows unread chat count | App.tsx, gariBadge.ts, GariBadgePlugin.java, GariFcmService.java
 2026-11-15 | claude | Tips ভিডিওর নিচে পার্টস দেখুন বাটন (পার্টস ক্যাটাগরিতে খোঁজে) | TipsFeed.tsx, MarketplaceTab.tsx
 2026-11-15 | claude | আরো দেখুন: নতুন পাতার পোস্ট নিচে যোগ হয়, দেখানো পোস্টের জায়গা বদলায় না | MarketplaceTab.tsx
+2026-11-15 | claude | আরো দেখুন মিশ্র: ২০টার অর্ধেক ক্রম ধরে, অর্ধেক পুরনো অংশের এলোমেলো, ঘুরিয়ে মিশিয়ে নিচে যোগ (খরচ একই) | listingsApi.ts, App.tsx, MarketplaceTab.tsx
