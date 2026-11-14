@@ -7,3 +7,4 @@
 2026-11-14 | claude-chat | পছন্দের গাড়ির অ্যালার্টে সীমা তোলা: মডেল মিললে কোনো সীমা নেই, শুধু ব্র্যান্ড+দাম মিললে দিনে ৩টা ও ২ ঘণ্টার ফাঁক (রাত ১২–সকাল ৮টা চুপ) | Supabase: matching_devices (আগের matching_device_ids বাদ), notify_matching_devices ট্রিগার ফাংশন (কোড ফাইল বদলায়নি)
 2026-11-14 | claude | Badge push step 1: server data-only for v2 devices (pushCompat), JS marker v:2 | api/_lib/pushCompat.ts, api/send-push.ts, src/utils/gariBadge.ts, devicePush.ts, main.tsx
 2026-11-14 | claude | Badge push step 2: native GariFcmService + GariBadgePlugin (ShortcutBadger), manifest, gradle | android/app/..., AI_LOG.md
+2026-11-14 | claude | Chat tab red dot fix (unordered limit 50 missed unread), icon badge follows unread chat count | App.tsx, gariBadge.ts, GariBadgePlugin.java, GariFcmService.java

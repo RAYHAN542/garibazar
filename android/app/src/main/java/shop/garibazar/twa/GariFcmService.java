@@ -158,4 +158,23 @@ public class GariFcmService extends MessagingService {
         NotificationManager nm = (NotificationManager) ctx.getSystemService(Context.NOTIFICATION_SERVICE);
         if (nm != null) nm.cancelAll();
     }
+
+    public static void setBadge(Context ctx, int n) {
+        int c = Math.max(0, Math.min(n, 99));
+        ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putInt(KEY_COUNT, c).apply();
+        try {
+            if (c == 0) {
+                ShortcutBadger.removeCount(ctx);
+            } else {
+                ShortcutBadger.applyCount(ctx, c);
+            }
+        } catch (Throwable t) {
+            // ignore
+        }
+    }
+
+    public static void cancelTray(Context ctx) {
+        NotificationManager nm = (NotificationManager) ctx.getSystemService(Context.NOTIFICATION_SERVICE);
+        if (nm != null) nm.cancelAll();
+    }
 }

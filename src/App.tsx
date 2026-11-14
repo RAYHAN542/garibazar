@@ -1,3 +1,4 @@
+import { setBadgeCount } from "./utils/gariBadge";
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -1133,6 +1134,7 @@ export default function App() {
   useEffect(() => {
     if (!authReady || !user?.uid) {
       setUnreadChatsCount(0);
+      if (authReady) setBadgeCount(0);
       return;
     }
     let active = true;
@@ -1141,7 +1143,8 @@ export default function App() {
         .from("chats")
         .select("unread_count")
         .or(`participant_a.eq.${user.uid},participant_b.eq.${user.uid}`)
-        .limit(50);
+        .order("last_message_at", { ascending: false })
+        .limit(300);
       if (!active) return;
       if (error) {
         console.warn("Failed to fetch unread chats:", error);
@@ -1153,6 +1156,7 @@ export default function App() {
         if (unreadForMe > 0) count++;
       });
       setUnreadChatsCount(count);
+      setBadgeCount(count);
     };
     fetchUnread();
     const channel = supabase
