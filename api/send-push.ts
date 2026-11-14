@@ -38,10 +38,18 @@ if (!getApps().length) {
 // বদলে দিত, তাই ট্রেতে সবসময় ১টা থাকত আর আইকনের লাল সংখ্যা ১-এর বেশি হতো না)। এখন প্রতিটা
 // পোস্ট/মেসেজের নোটিফিকেশন আলাদা জমে থাকে, ফোনের লঞ্চার সেই জমা সংখ্যাই আইকনে দেখায়
 // (চ্যাট পুশে আগেও tag ছিল না)। অ্যাপ খুললে জমা নোটিফিকেশন মুছে সংখ্যা ০ করা পরের Play build-এর কাজ।
+//
+// 📱 (2026-11-15) ব্রডকাস্ট এখন লগইনহীন ডিভাইসেও যায় (device_push_tokens টেবিলের টোকেন, নতুন অ্যাপ থেকে):
+//  - একই টোকেন দুই টেবিলে থাকলে একবারই যায় (Set দিয়ে ডুপ্লিকেট বাদ)।
+//  - পোস্টদাতার নিজের ডিভাইস বাদ (তার টোকেন ধরে, কারণ লগইনহীন টেবিলে uid নেই)।
+//  - যে ডিভাইস এই লিস্টিংয়েরই "পছন্দের গাড়ি" অ্যালার্ট পেয়েছে (last_alert_listing = এই লিস্টিং), সে বাদ,
+//    যাতে একই গাড়ির দুটো নোটিফিকেশন না যায়।
+//  - মৃত টোকেন (অ্যাপ মুছে ফেলা/মেয়াদ শেষ) device_push_tokens থেকে মুছে যায়।
 const BD_UTC_OFFSET_HOURS = 6;
 const QUIET_START_HOUR_BD = 24; // 24 = starts at 12:00 AM
 const QUIET_END_HOUR_BD = 8;
 const NEW_LISTING_MIN_GAP_MS = 30 * 60 * 1000;
+const DEVICE_TOKEN_MAX_AGE_MS = 60 * 24 * 60 * 60 * 1000;
 
 // 🖼️ (2026-11-13) নোটিফিকেশনে গাড়ির ছবি: লিস্টিংয়ের প্রথম https ছবি। ছবি বড় হলে বা না এলে
 // অ্যান্ড্রয়েড ছবি ছাড়াই লেখা-সহ নোটিফিকেশন দেখায়, তাই এতে পুশ আটকায় না।
@@ -249,6 +257,11 @@ export default async function handler(req: any, res: any) {
       if (!claimed || claimed.length === 0) {
         return res.status(200).json({ success: true, skipped: true });
       }
+
+      // পোস্টদাতার নিজের ফোনের টোকেন (লগইনহীন টেবিলে uid নেই, তাই টোকেন ধরে বাদ দিতে হবে)
+      const { data: posterRow } = await supabase.from("users").select("fcm_token").eq("uid", uid).maybeSingle();
+      const posterToken: string | null = posterRow?.fcm_token || null;
+
       const tokens = new Set<string>();
       for (let from = 0; from < 5000; from += 1000) {
         const { data: rows } = await supabase
@@ -262,14 +275,37 @@ export default async function handler(req: any, res: any) {
         });
         if (!rows || rows.length < 1000) break;
       }
+
+      // 📱 লগইনহীন ডিভাইস (নতুন অ্যাপ): এই লিস্টিংয়ের "পছন্দের গাড়ি" অ্যালার্ট যারা পেয়েছে তারা বাদ
+      const deviceByToken = new Map<string, string>();
+      const freshSince = new Date(Date.now() - DEVICE_TOKEN_MAX_AGE_MS).toISOString();
+      for (let from = 0; from < 10000; from += 1000) {
+        const { data: rows } = await supabase
+          .from("device_push_tokens")
+          .select("device_id, fcm_token")
+          .gt("updated_at", freshSince)
+          .or(`last_alert_listing.is.null,last_alert_listing.neq.${l.id}`)
+          .range(from, from + 999);
+        (rows || []).forEach((r: any) => {
+          if (r.fcm_token) {
+            tokens.add(r.fcm_token);
+            deviceByToken.set(r.fcm_token, r.device_id);
+          }
+        });
+        if (!rows || rows.length < 1000) break;
+      }
+      if (posterToken) tokens.delete(posterToken);
+
       const list = Array.from(tokens);
       const priceTxt =
         Number(l.price) > 0 ? " - ৳" + Number(l.price).toLocaleString("en-IN") : "";
       const broadcastImage = pickPushImage(l.images);
       let sentCount = 0;
+      const deadDevices: string[] = [];
       for (let i = 0; i < list.length; i += 500) {
+        const batch = list.slice(i, i + 500);
         const r = await sendMulticastSmart(supabase, {
-          tokens: list.slice(i, i + 500),
+          tokens: batch,
           notification: {
             title: "নতুন বিজ্ঞাপন",
             body: String(l.title || "").slice(0, 80) + priceTxt,
@@ -278,6 +314,17 @@ export default async function handler(req: any, res: any) {
           data: { listingId: String(l.id) },
         });
         sentCount += r.successCount;
+        r.responses.forEach((resp: any, idx: number) => {
+          const code = String(resp?.error?.code || "");
+          const dev = deviceByToken.get(batch[idx]);
+          if (!resp.success && dev && /registration-token-not-registered|invalid-registration-token|invalid-argument/.test(code)) {
+            deadDevices.push(dev);
+          }
+        });
+      }
+      // মৃত টোকেন পরিষ্কার (একসাথে বেশি আইডি দিলে ঠিকানা লম্বা হয়, তাই ১০০টা করে)
+      for (let i = 0; i < deadDevices.length; i += 100) {
+        await supabase.from("device_push_tokens").delete().in("device_id", deadDevices.slice(i, i + 100));
       }
       return res.status(200).json({ success: true, sent: sentCount });
     }
