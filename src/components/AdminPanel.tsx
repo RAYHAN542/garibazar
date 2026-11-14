@@ -202,6 +202,8 @@ export function AdminPanel({ language, currentUser, listings: listingsProp, isUs
   const [periodStats, setPeriodStats] = useState<Record<string, { today: number; yesterday: number; d7: number; d30: number; total: number }>>({});
   // Where Play Store app installs came from (website / facebook / organic ...)
   const [installSources, setInstallSources] = useState<{ source: string; total: number; today: number; last7d: number }[]>([]);
+  // আলাদা ভিজিটর (IP ধরে): আজ/গতকাল (দিন ধরে), ৭ ও ৩০ দিন (পুরো সময়ে আলাদা)
+  const [uniqueVisitors, setUniqueVisitors] = useState<{ daily: Record<string, number>; d7: number; d30: number }>({ daily: {}, d7: 0, d30: 0 });
 
   // Support tickets states
   const [ticketsList, setTicketsList] = useState<any[]>([]);
@@ -414,6 +416,19 @@ export function AdminPanel({ language, currentUser, listings: listingsProp, isUs
         );
       } catch (srcCatch) {
         console.error("Could not fetch install sources:", srcCatch);
+      }
+
+      // আলাদা ভিজিটর (distinct IP) -- আলাদা try, ব্যর্থ হলেও ওপরের সংখ্যা ঠিক থাকে।
+      try {
+        const { data: uv, error: uvErr } = await supabase.rpc("get_unique_visitors");
+        if (uvErr) throw uvErr;
+        setUniqueVisitors({
+          daily: (uv && uv.daily) || {},
+          d7: Number(uv && uv.d7) || 0,
+          d30: Number(uv && uv.d30) || 0,
+        });
+      } catch (uvCatch) {
+        console.error("Could not fetch unique visitors:", uvCatch);
       }
     } catch (err) {
       console.error("Could not fetch analytics summary:", err);
@@ -1293,6 +1308,19 @@ export function AdminPanel({ language, currentUser, listings: listingsProp, isUs
                         </div>
                         <p className="text-2xl font-black text-slate-850 dark:text-white mt-2">{cur.toLocaleString()}</p>
                         <p className={"text-[10px] font-bold mt-0.5 " + subColor}>{sub}</p>
+                        {c.k === "visits" && (() => {
+                          const u =
+                            analyticsPeriod === "today" ? uniqueVisitors.daily[dayStr(0)]
+                            : analyticsPeriod === "yesterday" ? uniqueVisitors.daily[dayStr(1)]
+                            : analyticsPeriod === "d7" ? uniqueVisitors.d7
+                            : analyticsPeriod === "d30" ? uniqueVisitors.d30
+                            : undefined;
+                          return u === undefined ? null : (
+                            <p className="text-[10px] font-bold mt-0.5 text-blue-500">
+                              {(bn ? "আলাদা ব্যবহারকারী (IP) " : "Unique users (IP) ") + u.toLocaleString()}
+                            </p>
+                          );
+                        })()}
                       </div>
                     );
                   })}

@@ -13,3 +13,4 @@
 2026-11-15 | claude | আরো দেখুন মিশ্র: ২০টার অর্ধেক ক্রম ধরে, অর্ধেক পুরনো অংশের এলোমেলো, ঘুরিয়ে মিশিয়ে নিচে যোগ (খরচ একই) | listingsApi.ts, App.tsx, MarketplaceTab.tsx
 2026-11-15 | claude | আরো দেখুন ন্যায্য (shuffle bag): প্রথম পাতার পর সব পোস্ট একবার ঘুটিয়ে, দ্বিতীয়বার নয়, কোনোটা বাদ নয় | listingsApi.ts, App.tsx, MarketplaceTab.tsx
 2026-11-15 | claude | ভিজিট: ৩০ মিনিটের বেশি পর অ্যাপ আবার খুললে নতুন ভিজিট গোনা হয় | App.tsx
+2026-11-15 | claude | অ্যাডমিন ড্যাশবোর্ডে আলাদা ভিজিটর (distinct IP) লাইন; Supabase: get_unique_visitors() | AdminPanel.tsx
