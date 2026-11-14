@@ -1,3 +1,4 @@
+import "./utils/gariBadge";
 import { startAdPreload } from "./utils/nativeAdPool";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";

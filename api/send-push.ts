@@ -1,5 +1,5 @@
 import { initializeApp, getApps, cert } from "firebase-admin/app";
-import { getMessaging } from "firebase-admin/messaging";
+import { sendSmart, sendMulticastSmart } from "./_lib/pushCompat.js";
 import { createClient } from "@supabase/supabase-js";
 import { applyCors } from "./_lib/cors.js";
 import { verifySupabaseToken } from "./_lib/verifyJwt.js";
@@ -69,7 +69,7 @@ export async function sendPushToUid(
   const { data: row, error } = await supabase.from("users").select("fcm_token").eq("uid", uid).maybeSingle();
   if (error || !row?.fcm_token) return false;
   try {
-    await getMessaging().send({
+    await sendSmart(supabase, {
       token: row.fcm_token as string,
       notification: { title, body },
       data: data || {},
@@ -141,7 +141,7 @@ export default async function handler(req: any, res: any) {
         const deadDevices: string[] = [];
         for (let i = 0; i < rows.length; i += 500) {
           const batch = rows.slice(i, i + 500);
-          const r = await getMessaging().sendEachForMulticast({
+          const r = await sendMulticastSmart(supabase, {
             tokens: batch.map((x: any) => x.fcm_token as string),
             notification: {
               title: "আপনার পছন্দের গাড়ি এসেছে 🚗",
@@ -268,7 +268,7 @@ export default async function handler(req: any, res: any) {
       const broadcastImage = pickPushImage(l.images);
       let sentCount = 0;
       for (let i = 0; i < list.length; i += 500) {
-        const r = await getMessaging().sendEachForMulticast({
+        const r = await sendMulticastSmart(supabase, {
           tokens: list.slice(i, i + 500),
           notification: {
             title: "নতুন বিজ্ঞাপন",
