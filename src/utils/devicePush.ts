@@ -1,3 +1,4 @@
+import { isGariBadgeAvailable } from "./gariBadge";
 import { PushNotifications } from "@capacitor/push-notifications";
 import { supabase } from "../supabase";
 import { loadInterest } from "./feedRanker";
@@ -59,6 +60,7 @@ function interestsPayload() {
     b: topEntries(it.b, 8),
     m: topEntries(it.m, 8),
     p: it.pW > 0 ? Math.round(it.pSum / it.pW) : 0,
+    v: isGariBadgeAvailable() ? 2 : 1,
   };
 }
 
