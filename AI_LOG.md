@@ -9,3 +9,4 @@
 2026-11-14 | claude | Badge push step 2: native GariFcmService + GariBadgePlugin (ShortcutBadger), manifest, gradle | android/app/..., AI_LOG.md
 2026-11-14 | claude | Chat tab red dot fix (unordered limit 50 missed unread), icon badge follows unread chat count | App.tsx, gariBadge.ts, GariBadgePlugin.java, GariFcmService.java
 2026-11-15 | claude | Tips ভিডিওর নিচে পার্টস দেখুন বাটন (পার্টস ক্যাটাগরিতে খোঁজে) | TipsFeed.tsx, MarketplaceTab.tsx
+2026-11-15 | claude | আরো দেখুন: নতুন পাতার পোস্ট নিচে যোগ হয়, দেখানো পোস্টের জায়গা বদলায় না | MarketplaceTab.tsx

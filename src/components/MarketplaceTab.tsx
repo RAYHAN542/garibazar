@@ -237,10 +237,32 @@ const feedVideos = useMemo(() => {
     .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
 }, [dbVideos, videoListings]);
 // 🎯 "সর্বশেষ" সাজানো আর সার্চ ফাঁকা থাকলে ফিড মিশ্র হয় (নতুন + পছন্দের + পুরনো); ইতিহাস না থাকলে আগের মতোই নতুন থেকে পুরনো।
+// 🔧 "আরো দেখুন" চাপলে আগে পুরো তালিকা নতুন করে মেশানো হতো, তাই নতুন পাতার পোস্ট উপরের দিকে ঢুকে যেত আর নিচে কিছু বাড়ত না।
+// এখন দেখানো পোস্টের জায়গা বদলায় না; নতুন পাতার পোস্ট নিচে যোগ হয়। সদ্য পোস্ট করা (সবচেয়ে নতুনের চেয়েও নতুন) উপরে বসে।
+const feedOrderRef = useRef<{ key: string; ids: string[] }>({ key: "", ids: [] });
 const feedItems = useMemo(() => {
   const base = filteredListings.filter((item) => !spotlightIds.has(item.id) && !item.videoUrl);
-  return sortBy === "latest" && searchQuery.trim().length === 0 ? mixFeed(base) : base;
-}, [filteredListings, spotlightIds, sortBy, searchQuery]);
+  const ordered = sortBy === "latest" && searchQuery.trim().length === 0 ? mixFeed(base) : base;
+  const key = [selectedCategory, selectedSubCategory, selectedBrand, selectedCity, sortBy, searchQuery.trim()].join("|");
+  const ref = feedOrderRef.current;
+  const byId = new Map(ordered.map((i) => [i.id, i] as [string, PartListing]));
+  const kept = ref.key === key ? ref.ids.filter((id) => byId.has(id)) : [];
+  const keptSet = new Set(kept);
+  const time = (id: string) => {
+    const t = new Date((byId.get(id) as PartListing).createdAt as any).getTime();
+    return Number.isFinite(t) ? t : 0;
+  };
+  const newestKept = kept.reduce((m, id) => Math.max(m, time(id)), -1);
+  const fresh: string[] = [];
+  const older: string[] = [];
+  for (const i of ordered) {
+    if (keptSet.has(i.id)) continue;
+    (time(i.id) > newestKept ? fresh : older).push(i.id);
+  }
+  ref.key = key;
+  ref.ids = [...fresh, ...kept, ...older];
+  return ref.ids.map((id) => byId.get(id) as PartListing);
+}, [filteredListings, spotlightIds, sortBy, searchQuery, selectedCategory, selectedSubCategory, selectedBrand, selectedCity]);
 // প্রতি পাতায় ২০টা আসে, কিন্তু ভিডিও/স্পনসরড পোস্ট গ্রিডে লুকানো থাকে; দৃশ্যমান পোস্ট কম হলে নিজে থেকে আরো আনি (সর্বোচ্চ ৩ বার)।
 const autoFillTries = useRef(0);
 useEffect(() => { autoFillTries.current = 0; }, [selectedCategory, selectedSubCategory]);
