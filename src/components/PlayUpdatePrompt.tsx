@@ -71,29 +71,59 @@ export default function PlayUpdatePrompt() {
   if (phase === "hidden" || (dismissed && phase !== "ready")) return null;
 
   return (
-    <div className="fixed top-0 left-0 right-0 z-[9998] bg-amber-500 text-slate-950 px-4 py-2 flex items-center justify-between gap-3 text-sm shadow-md">
-      <div className="flex items-center gap-2 min-w-0">
-        <Download className="w-4 h-4 shrink-0" />
-        <span className="truncate font-semibold">
-          {phase === "available" && "নতুন ভার্সন এসেছে — আপডেট করুন"}
-          {phase === "downloading" && "আপডেট ডাউনলোড হচ্ছে..."}
-          {phase === "ready" && "আপডেট ডাউনলোড হয়েছে — রিস্টার্ট করুন"}
-        </span>
-      </div>
-      <div className="flex items-center gap-3 shrink-0">
-        {phase === "available" && (
-          <button type="button" onClick={startUpdate} className="underline font-bold">
-            আপডেট
+    <div className="fixed inset-0 z-[9998] flex items-center justify-center bg-black/60 p-6">
+      <div className="relative w-full max-w-sm rounded-3xl bg-white dark:bg-slate-900 p-6 text-center shadow-2xl">
+        {phase !== "ready" && (
+          <button
+            type="button"
+            onClick={() => setDismissed(true)}
+            aria-label="বন্ধ করুন"
+            className="absolute top-3 right-3 p-1 text-slate-400 cursor-pointer"
+          >
+            <X className="w-5 h-5" />
           </button>
+        )}
+        <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-amber-500 text-slate-950">
+          <Download className="w-8 h-8" />
+        </div>
+        <h2 className="text-xl font-black text-slate-900 dark:text-white">
+          {phase === "ready" ? "আপডেট প্রস্তুত!" : "নতুন আপডেট এসেছে!"}
+        </h2>
+        <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
+          {phase === "available" && "আরও ভালো ফিচার, দ্রুত গতি ও নিরাপত্তার জন্য এখনই GariBazar আপডেট করুন।"}
+          {phase === "downloading" && "আপডেট ডাউনলোড হচ্ছে, একটু অপেক্ষা করুন..."}
+          {phase === "ready" && "ডাউনলোড শেষ। অ্যাপ রিস্টার্ট করলেই নতুন সংস্করণ চালু হবে।"}
+        </p>
+        {phase === "available" && (
+          <button
+            type="button"
+            onClick={startUpdate}
+            className="mt-5 w-full rounded-full bg-amber-500 py-3 text-base font-extrabold text-slate-950 cursor-pointer"
+          >
+            এখনই আপডেট করুন
+          </button>
+        )}
+        {phase === "downloading" && (
+          <div className="mt-5 w-full rounded-full bg-amber-500/60 py-3 text-base font-extrabold text-slate-950">
+            ডাউনলোড হচ্ছে...
+          </div>
         )}
         {phase === "ready" && (
-          <button type="button" onClick={restart} className="underline font-bold">
-            রিস্টার্ট
+          <button
+            type="button"
+            onClick={restart}
+            className="mt-5 w-full rounded-full bg-amber-500 py-3 text-base font-extrabold text-slate-950 cursor-pointer"
+          >
+            রিস্টার্ট করুন
           </button>
         )}
-        {phase !== "ready" && (
-          <button type="button" onClick={() => setDismissed(true)} aria-label="বন্ধ করুন">
-            <X className="w-4 h-4" />
+        {phase === "available" && (
+          <button
+            type="button"
+            onClick={() => setDismissed(true)}
+            className="mt-3 text-sm font-semibold text-slate-500 cursor-pointer"
+          >
+            পরে করব
           </button>
         )}
       </div>
