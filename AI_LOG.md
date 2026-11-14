@@ -14,3 +14,4 @@
 2026-11-15 | claude | আরো দেখুন ন্যায্য (shuffle bag): প্রথম পাতার পর সব পোস্ট একবার ঘুটিয়ে, দ্বিতীয়বার নয়, কোনোটা বাদ নয় | listingsApi.ts, App.tsx, MarketplaceTab.tsx
 2026-11-15 | claude | ভিজিট: ৩০ মিনিটের বেশি পর অ্যাপ আবার খুললে নতুন ভিজিট গোনা হয় | App.tsx
 2026-11-15 | claude | অ্যাডমিন ড্যাশবোর্ডে আলাদা ভিজিটর (distinct IP) লাইন; Supabase: get_unique_visitors() | AdminPanel.tsx
+2026-11-15 | claude-chat | "নতুন বিজ্ঞাপন" ব্রডকাস্ট এখন লগইনহীন ডিভাইসেও (device_push_tokens): ডুপ্লিকেট টোকেন, পোস্টদাতা ও একই লিস্টিংয়ের পছন্দের-অ্যালার্ট-পাওয়া ডিভাইস বাদ; Supabase: device_push_tokens.last_alert_listing + notify_matching_devices আপডেট | api/send-push.ts
