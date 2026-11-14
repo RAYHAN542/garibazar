@@ -173,15 +173,16 @@ export default function MarketplaceTab({
     : notificationPermission === "default";
 
   // প্রথম গাড়ি খোলার ৬ সেকেন্ড পর নরম পপআপ; "পরে" বললে ২/৫/১০ দিন পর আবার (সর্বোচ্চ ৩ বার)।
-  const maybeAskNotif = () => {
-    if (!isNativeDevice() || nativePerm !== "default" || notifAskTimer.current) return;
+  // অ্যাপে ঢোকার ৪ সেকেন্ড পর নরম পপআপ (ফোনের অনুমতি "জিজ্ঞেস করা হয়নি" থাকলে)। "পরে" বললে ২/৫/১০ দিন পর আবার।
+  useEffect(() => {
+    if (!isNativeDevice() || nativePerm !== "default") return;
     if (!shouldAutoAsk()) return;
-    notifAskTimer.current = window.setTimeout(() => {
-      notifAskTimer.current = null;
+    const askTimer = window.setTimeout(() => {
       setIsNotifModalOpen(true);
       recordAsked();
-    }, 6000);
-  };
+    }, 4000);
+    return () => window.clearTimeout(askTimer);
+  }, [nativePerm]);
 
   const handleEnableNotif = async () => {
     setNotifBusy(true);
@@ -194,7 +195,6 @@ export default function MarketplaceTab({
   // এই ইতিহাস দিয়েই নিচের মূল ফিড নতুন + পছন্দের + পুরনো মিলিয়ে সাজানো হয় (utils/feedRanker.ts)।
   const viewListing = (l: PartListing) => {
     trackInterest(l, 1);
-    maybeAskNotif();
     return handleViewListingDetails(l);
   };
 
