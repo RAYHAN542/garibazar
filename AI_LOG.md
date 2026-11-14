@@ -17,3 +17,4 @@
 2026-11-15 | claude-chat | "নতুন বিজ্ঞাপন" ব্রডকাস্ট এখন লগইনহীন ডিভাইসেও (device_push_tokens): ডুপ্লিকেট টোকেন, পোস্টদাতা ও একই লিস্টিংয়ের পছন্দের-অ্যালার্ট-পাওয়া ডিভাইস বাদ; Supabase: device_push_tokens.last_alert_listing + notify_matching_devices আপডেট | api/send-push.ts
 2026-11-15 | claude-chat | নোটিফিকেশন চালুর পপআপ এখন অ্যাপে ঢোকার ৪ সেকেন্ড পর (আগে প্রথম গাড়ি খোলার ৬ সেকেন্ড পর) | MarketplaceTab.tsx
 2026-11-15 | claude | Update prompt: big centered card instead of thin top bar | PlayUpdatePrompt.tsx
+2026-11-15 | claude | Play in-app rating sheet: own GariReview plugin (play:review 2.0.2), shows after 5th open + 30s, once per 45 days | GariReviewPlugin.java, gariReview.ts, MainActivity.java, build.gradle, main.tsx

@@ -11,6 +11,7 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(DohHttpPlugin.class);
         registerPlugin(InstallReferrerPlugin.class);
         registerPlugin(GariBadgePlugin.class);
+        registerPlugin(GariReviewPlugin.class);
         super.onCreate(savedInstanceState);
     }
 }
