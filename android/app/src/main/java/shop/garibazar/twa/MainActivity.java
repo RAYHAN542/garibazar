@@ -10,6 +10,7 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(InterstitialAdsPlugin.class);
         registerPlugin(DohHttpPlugin.class);
         registerPlugin(InstallReferrerPlugin.class);
+        registerPlugin(GariBadgePlugin.class);
         super.onCreate(savedInstanceState);
     }
 }

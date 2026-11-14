@@ -5,3 +5,4 @@
 2026-11-14 | claude-chat | push থেকে tag সরানো (নতুন বিজ্ঞাপন ও পছন্দের গাড়ি), যাতে আইকনে জমা নোটিফিকেশনের সংখ্যা বাড়ে | api/send-push.ts
 2026-11-14 | claude | Tips ভিডিওর বিবরণ (description) বক্স: চাপলে youtube_details (১ ইউনিট), লাইব্রেরিতে জমে | youtubeSearch.ts, account-actions.ts, TipsFeed.tsx
 2026-11-14 | claude | Badge push step 1: server data-only for v2 devices (pushCompat), JS marker v:2 | api/_lib/pushCompat.ts, api/send-push.ts, src/utils/gariBadge.ts, devicePush.ts, main.tsx
+2026-11-14 | claude | Badge push step 2: native GariFcmService + GariBadgePlugin (ShortcutBadger), manifest, gradle | android/app/..., AI_LOG.md
