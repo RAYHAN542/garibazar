@@ -382,6 +382,33 @@ export default function App() {
     }
   }, []);
 
+  // 🔁 অ্যাপ ব্যাকগ্রাউন্ডে রেখে ৩০ মিনিটের বেশি পর আবার খুললে নতুন ভিজিট গোনা হয়
+  // (আগে শুধু অ্যাপ নতুন করে চালু হলে গোনা হতো, তাই ফিরে আসা ব্যবহারকারী বাদ পড়ত)।
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    const KEY = "gari_bazar_last_active";
+    const GAP = 30 * 60 * 1000;
+    const stamp = () => {
+      try {
+        localStorage.setItem(KEY, String(Date.now()));
+      } catch {}
+    };
+    stamp();
+    const onVis = () => {
+      if (document.visibilityState === "hidden") {
+        stamp();
+        return;
+      }
+      try {
+        const last = Number(localStorage.getItem(KEY) || 0);
+        if (last > 0 && Date.now() - last > GAP) trackEvent("visit");
+      } catch {}
+      stamp();
+    };
+    document.addEventListener("visibilitychange", onVis);
+    return () => document.removeEventListener("visibilitychange", onVis);
+  }, []);
+
   // Android app: count a new install once per device (see utils/trackAppInstall)
   useEffect(() => {
     trackAppInstall();
