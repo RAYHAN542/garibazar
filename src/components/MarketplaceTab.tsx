@@ -215,6 +215,21 @@ useEffect(() => {
   fetchVideoListings().then((v) => { if (!cancelled) setDbVideos(v); }).catch(() => {});
   return () => { cancelled = true; };
 }, [isVideoFeedOpen, videoRefresh]);
+// 🔧 "মেকানিক টিপস"-এর "পার্টস দেখুন" বাটন (TipsFeed.tsx একটা "gari:show-parts" ইভেন্ট পাঠায়):
+// ভিডিও ফিড বন্ধ করে পার্টস ক্যাটাগরিতে (আর সমস্যার শব্দ দিয়ে, যেমন "ব্রেক") লিস্টিং দেখায়।
+useEffect(() => {
+  const onShowParts = (e: Event) => {
+    const q = String((e as CustomEvent).detail?.query || "").trim().slice(0, 40);
+    setIsVideoFeedOpen(false);
+    setSelectedCategory("spare_parts");
+    setSelectedSubCategory("all");
+    setSelectedBrand("all");
+    setSearchQuery(q);
+    try { window.scrollTo({ top: 0 }); } catch (_) {}
+  };
+  window.addEventListener("gari:show-parts", onShowParts);
+  return () => window.removeEventListener("gari:show-parts", onShowParts);
+}, [setSelectedCategory, setSelectedSubCategory, setSelectedBrand, setSearchQuery]);
 const feedVideos = useMemo(() => {
   const seen = new Set<string>();
   return [...dbVideos, ...videoListings]

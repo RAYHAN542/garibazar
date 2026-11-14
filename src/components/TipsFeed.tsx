@@ -78,6 +78,21 @@ const TYPES: { key: string; icon: string; bn: string; en: string; kw: string; ba
   },
 ];
 
+// "পার্টস দেখুন" বাটন: সার্চের লেখা থেকে পার্টসের শব্দ বের করে (না পেলে ফাঁকা = সব পার্টস)
+const PART_WORDS: [string, string][] = [
+  ["ব্রেক", "ব্রেক"], ["এসি", "এসি"], ["ব্যাটারি", "ব্যাটারি"], ["ইঞ্জিন", "ইঞ্জিন"],
+  ["গিয়ার", "gear"], ["ক্লাচ", "ক্লাচ"], ["টায়ার", "টায়ার"], ["চেইন", "চেইন"],
+  ["হাইড্রলিক", "হাইড্রলিক"], ["রেডিয়েটর", "রেডিয়েটর"],
+];
+const partWordOf = (q: string): string => {
+  const n = q.normalize("NFC");
+  const hit = PART_WORDS.find(([k]) => n.includes(k.normalize("NFC")));
+  return hit ? hit[1] : "";
+};
+const showParts = (q: string) => {
+  try { window.dispatchEvent(new CustomEvent("gari:show-parts", { detail: { query: partWordOf(q) } })); } catch (_) {}
+};
+
 export default function TipsFeed({ language }: TipsFeedProps) {
   const bn = language === "bn";
   const [input, setInput] = useState("");
@@ -91,6 +106,7 @@ export default function TipsFeed({ language }: TipsFeedProps) {
   const soundRef = useRef(false);
   const [autoPlayed, setAutoPlayed] = useState(false);
   const [vehicleType, setVehicleType] = useState("car");
+  const [lastQ, setLastQ] = useState("");
   const [openDesc, setOpenDesc] = useState<string | null>(null);
   const [descs, setDescs] = useState<Record<string, string>>({});
   const [descLoadingId, setDescLoadingId] = useState<string | null>(null);
@@ -140,6 +156,7 @@ export default function TipsFeed({ language }: TipsFeedProps) {
     async (raw: string) => {
       const q = raw.trim();
       if (q.length < 2) return;
+      setLastQ(q);
       const ck = "tips_cache_v1:" + q.toLowerCase();
       try {
         const raw = localStorage.getItem(ck);
@@ -401,6 +418,13 @@ export default function TipsFeed({ language }: TipsFeedProps) {
                         : ""}
                     </div>
                   )}
+                  <button
+                    type="button"
+                    onClick={() => showParts(lastQ)}
+                    className="mt-2 w-full py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-xs cursor-pointer"
+                  >
+                    {bn ? (partWordOf(lastQ) ? "এই সমস্যার পার্টস দেখুন" : "পার্টস দেখুন") : "View parts"}
+                  </button>
                 </div>
               </div>
             );
