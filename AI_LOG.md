@@ -22,3 +22,4 @@
 2026-11-15 | claude | R8: removed blanket keep for firebase + gms (Play 'DEX obfuscation 16%' warning); test on branch ai-claude/r8-rules before merging | android/app/proguard-rules.pro
 2026-11-15 | claude | ভিজিটে ডিভাইস আইডি পাঠানো, আলাদা ব্যবহারকারী ডিভাইস ধরে গোনা (IP পুরনো সারির জন্য); Supabase: site_visits.device_id | deviceId.ts, trackEvent.ts, analytics.ts, api/track-event.ts, AdminPanel.tsx
 2026-11-15 | claude | কার্ড থেকে VEHICLE/PART (গাড়ি/পার্ট) লেবেল সরানো (AD ব্যাজ থাকে) | ListingCard.tsx
+2026-11-15 | claude | ImageWithFallback: give-up timer starts only when card is near screen (fixes false 'ছবি নেই' on lazy cards) | src/components/ImageWithFallback.tsx

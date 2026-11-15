@@ -50,6 +50,19 @@ export function ImageWithFallback({ id, src, alt, className = "", isAd = false, 
   );
   const [retryNonce, setRetryNonce] = useState(0);
   const [autoRetries, setAutoRetries] = useState(0);
+  // Lazy images are not fetched until near the screen, so the give-up timer
+  // must start only once the card is near the viewport.
+  const [node, setNode] = useState<HTMLDivElement | null>(null);
+  const [inView, setInView] = useState(priority);
+  useEffect(() => {
+    if (inView || !node) return;
+    if (typeof IntersectionObserver === "undefined") { setInView(true); return; }
+    const io = new IntersectionObserver((entries) => {
+      if (entries.some((en) => en.isIntersecting)) { setInView(true); io.disconnect(); }
+    }, { rootMargin: "300px" });
+    io.observe(node);
+    return () => io.disconnect();
+  }, [node, inView]);
 
   // A reused component instance (list recycling) must start fresh for a new src.
   const mountedRef = useRef(false);
@@ -85,11 +98,11 @@ export function ImageWithFallback({ id, src, alt, className = "", isAd = false, 
 
   // Timeout: covers images that hang forever (onError never fires).
   useEffect(() => {
-    if (!loading || error || !src) return;
+    if (!loading || error || !src || !inView) return;
     const t = window.setTimeout(onFail, LOAD_TIMEOUT_MS);
     return () => window.clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loading, error, src, stage, retryNonce]);
+  }, [loading, error, src, stage, retryNonce, inView]);
 
   const handleLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
     const img = e.currentTarget;
@@ -138,7 +151,7 @@ export function ImageWithFallback({ id, src, alt, className = "", isAd = false, 
         : getOptimizedImageUrl(src, width);
 
   return (
-    <div className={`relative w-full h-full overflow-hidden ${className.includes("object-contain") ? "" : "bg-slate-100 dark:bg-slate-900"}`}>
+    <div ref={setNode} className={`relative w-full h-full overflow-hidden ${className.includes("object-contain") ? "" : "bg-slate-100 dark:bg-slate-900"}`}>
       {loading && (
         <div className="absolute inset-0 bg-slate-200 dark:bg-slate-800 animate-pulse flex items-center justify-center">
           <Loader2 className="w-6 h-6 text-slate-400/60 animate-spin" />
