@@ -18,3 +18,4 @@
 2026-11-15 | claude-chat | নোটিফিকেশন চালুর পপআপ এখন অ্যাপে ঢোকার ৪ সেকেন্ড পর (আগে প্রথম গাড়ি খোলার ৬ সেকেন্ড পর) | MarketplaceTab.tsx
 2026-11-15 | claude | Update prompt: big centered card instead of thin top bar | PlayUpdatePrompt.tsx
 2026-11-15 | claude | Play in-app rating sheet: own GariReview plugin (play:review 2.0.2), shows after 5th open + 30s, once per 45 days | GariReviewPlugin.java, gariReview.ts, MainActivity.java, build.gradle, main.tsx
+2026-11-15 | claude | Privacy Policy-তে YouTube API Services-এর কথা (বাংলা + English) + আপডেটের তারিখ | PrivacyPolicyPage.tsx

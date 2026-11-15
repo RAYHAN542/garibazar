@@ -84,7 +84,7 @@ export default function PrivacyPolicyPage({
             <div className="flex flex-wrap items-center gap-x-4 gap-y-2 pt-2 border-t border-slate-800 text-[11px] text-slate-400 font-medium">
               <span className="inline-flex items-center gap-1">
                 <Calendar className="w-3 h-3 text-indigo-400" />
-                {lang === "bn" ? "সর্বশেষ আপডেট: ৭ অক্টোবর, ২০২৬" : "Last Updated: October 7, 2026"}
+                {lang === "bn" ? "সর্বশেষ আপডেট: ১৫ নভেম্বর, ২০২৬" : "Last Updated: November 15, 2026"}
               </span>
               <span className="inline-flex items-center gap-1">
                 <Mail className="w-3 h-3 text-indigo-400" />
@@ -173,6 +173,9 @@ export default function PrivacyPolicyPage({
                   <li>
                     ওয়েবসাইটে Google AdSense-এর মতো তৃতীয় পক্ষের বিজ্ঞাপন দেখানো হতে পারে। তারা নিজেদের নীতি অনুযায়ী কুকি বা ডিভাইস শনাক্তকারী ব্যবহার করতে পারে।
                     অ্যান্ড্রয়েড অ্যাপে Google AdMob-এর মাধ্যমে বিজ্ঞাপন দেখানো হয়। Google বিজ্ঞাপন দেখাতে ও তার কার্যকারিতা মাপতে আপনার ডিভাইসের বিজ্ঞাপন আইডি (Advertising ID) ও অনুরূপ শনাক্তকারী ব্যবহার করতে পারে। ফোনের Settings → Google → Ads থেকে বিজ্ঞাপন আইডি মুছতে বা বিজ্ঞাপন-ব্যক্তিগতকরণ বন্ধ করতে পারেন। Google কীভাবে তথ্য ব্যবহার করে তা জানতে: policies.google.com/technologies/partner-sites
+                  </li>
+                  <li>
+                    মেকানিক টিপস ট্যাবে গাড়ির সমস্যার ভিডিও YouTube API Services (YouTube Data API ও YouTube-এর এমবেডেড প্লেয়ার) দিয়ে দেখানো হয়। আপনি সার্চ বক্সে যা লেখেন, শুধু সেই লেখা (আপনার নাম বা নম্বর ছাড়া) আমাদের সার্ভারের মাধ্যমে YouTube-এ পাঠানো হয়, এবং ফলাফল আমাদের ডেটাবেসে সর্বোচ্চ ৭ দিন ক্যাশ করা থাকে। ভিডিও চালালে YouTube/Google নিজেদের নীতি অনুযায়ী কুকি বা ডিভাইস শনাক্তকারী ব্যবহার করতে পারে। এই অংশ ব্যবহার করে আপনি <a href="https://www.youtube.com/t/terms" className="text-indigo-600 hover:underline" target="_blank" rel="noopener noreferrer">YouTube Terms of Service</a> মেনে নিচ্ছেন। Google-এর নীতি: <a href="https://policies.google.com/privacy" className="text-indigo-600 hover:underline" target="_blank" rel="noopener noreferrer">policies.google.com/privacy</a>
                   </li>
                 </ul>
               </section>
@@ -285,6 +288,9 @@ export default function PrivacyPolicyPage({
                   <li>
                     The website may show third-party ads such as Google AdSense, which may use cookies or device identifiers under their own policies.
                     The Android app shows ads through Google AdMob. Google may use your device's Advertising ID and similar identifiers to show ads and measure their performance. You can reset your advertising ID or turn off ad personalization in your phone's Settings → Google → Ads. To learn how Google uses data, see policies.google.com/technologies/partner-sites
+                  </li>
+                  <li>
+                    The Mechanic Tips tab shows car-repair videos using YouTube API Services (the YouTube Data API and YouTube's embedded player). Only the text you type in the search box (without your name or phone number) is sent to YouTube through our server, and the results are cached in our database for up to 7 days. When you play a video, YouTube/Google may use cookies or device identifiers under their own policies. By using this feature you agree to be bound by the <a href="https://www.youtube.com/t/terms" className="text-indigo-600 hover:underline" target="_blank" rel="noopener noreferrer">YouTube Terms of Service</a>. See also the <a href="https://policies.google.com/privacy" className="text-indigo-600 hover:underline" target="_blank" rel="noopener noreferrer">Google Privacy Policy</a>.
                   </li>
                 </ul>
               </section>
