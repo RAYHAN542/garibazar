@@ -1317,7 +1317,7 @@ export function AdminPanel({ language, currentUser, listings: listingsProp, isUs
                             : undefined;
                           return u === undefined ? null : (
                             <p className="text-[10px] font-bold mt-0.5 text-blue-500">
-                              {(bn ? "আলাদা ব্যবহারকারী (IP) " : "Unique users (IP) ") + u.toLocaleString()}
+                              {(bn ? "আলাদা ব্যবহারকারী (ডিভাইস) " : "Unique users (device) ") + u.toLocaleString()}
                             </p>
                           );
                         })()}

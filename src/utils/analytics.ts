@@ -1,6 +1,7 @@
 import { logger } from "./logger";
 import { nativeFetch } from "./nativeFetch";
 import { apiUrl } from "./apiBase";
+import { getVisitDeviceId } from "./deviceId";
 
 export const logAnalyticsEvent = (eventName: string, eventParams?: any) => {
   logger.debug(`Analytics Event: ${eventName}`, eventParams);
@@ -27,6 +28,7 @@ export const logAnalyticsEvent = (eventName: string, eventParams?: any) => {
         type,
         uid: eventParams?.uid || null,
         identifier: eventParams?.identifier || null,
+        deviceId: getVisitDeviceId(),
         path: typeof window !== "undefined" ? window.location.pathname : "",
         referrer: typeof document !== "undefined" ? document.referrer : "",
       }),

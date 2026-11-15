@@ -20,3 +20,4 @@
 2026-11-15 | claude | Play in-app rating sheet: own GariReview plugin (play:review 2.0.2), shows after 5th open + 30s, once per 45 days | GariReviewPlugin.java, gariReview.ts, MainActivity.java, build.gradle, main.tsx
 2026-11-15 | claude | Privacy Policy-তে YouTube API Services-এর কথা (বাংলা + English) + আপডেটের তারিখ | PrivacyPolicyPage.tsx
 2026-11-15 | claude | R8: removed blanket keep for firebase + gms (Play 'DEX obfuscation 16%' warning); test on branch ai-claude/r8-rules before merging | android/app/proguard-rules.pro
+2026-11-15 | claude | ভিজিটে ডিভাইস আইডি পাঠানো, আলাদা ব্যবহারকারী ডিভাইস ধরে গোনা (IP পুরনো সারির জন্য); Supabase: site_visits.device_id | deviceId.ts, trackEvent.ts, analytics.ts, api/track-event.ts, AdminPanel.tsx

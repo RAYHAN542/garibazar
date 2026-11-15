@@ -18,11 +18,13 @@ const rateLimitMap = new Map<string, { count: number; windowStart: number }>();
 // আসল insert হলেই চলে।
 const DEDUP_WINDOW_MS = 30 * 60 * 1000;
 const recentlyLoggedIps = new Map<string, number>();
-function shouldSkipDetailedLog(ip: string): boolean {
-  const last = recentlyLoggedIps.get(ip);
+// ডিভাইস আইডি থাকলে (IP + ডিভাইস) ধরে মেলানো হয়, তাই একই IP-র (মোবাইল নেটওয়ার্কে ভাগ করা) আলাদা ফোন বাদ পড়ে না।
+function shouldSkipDetailedLog(ip: string, deviceId?: string | null): boolean {
+  const key = deviceId ? ip + "|" + deviceId : ip;
+  const last = recentlyLoggedIps.get(key);
   const now = Date.now();
   if (last && now - last < DEDUP_WINDOW_MS) return true;
-  recentlyLoggedIps.set(ip, now);
+  recentlyLoggedIps.set(key, now);
   return false;
 }
 
@@ -330,6 +332,8 @@ export default async function handler(req: any, res: any) {
     const identifier = typeof body?.identifier === "string" ? body.identifier.slice(0, 128) : null;
     const path = typeof body?.path === "string" ? body.path.slice(0, 300) : "";
     const referrer = typeof body?.referrer === "string" ? body.referrer.slice(0, 300) : "";
+    const visitDeviceId =
+      typeof body?.deviceId === "string" && /^[A-Za-z0-9-]{16,64}$/.test(body.deviceId) ? body.deviceId : null;
 
     const ip = getClientIp(req);
 
@@ -356,7 +360,7 @@ export default async function handler(req: any, res: any) {
 
     // login/signup/install ইভেন্ট সবসময় লগ হয় (গুরুত্বপূর্ণ, কম ফ্রিকোয়েন্ট);
     // শুধু "visit" টাইপের জন্যই dedup প্রযোজ্য (এটাই বেশিরভাগ ট্রাফিক)।
-    const skipDetailedLog = type === "visit" && shouldSkipDetailedLog(ip);
+    const skipDetailedLog = type === "visit" && shouldSkipDetailedLog(ip, visitDeviceId);
     const metricCol =
       type === "login" ? "total_logins" : type === "signup" ? "total_signups" : type === "install" ? "total_installs" : "total_visits";
 
@@ -375,6 +379,7 @@ export default async function handler(req: any, res: any) {
         user_agent: userAgent,
         referrer,
         path,
+        device_id: visitDeviceId,
       });
       if (insertErr) console.error("site_visits insert error:", insertErr);
     } else {

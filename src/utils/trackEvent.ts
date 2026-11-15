@@ -1,5 +1,6 @@
 import { apiUrl } from "./apiBase";
 import { nativeFetch } from "./nativeFetch";
+import { getVisitDeviceId } from "./deviceId";
 
 // Fire-and-forget visitor/login/signup analytics. This never blocks or
 // throws -- if it fails for any reason (offline, ad-blocker, slow network)
@@ -14,6 +15,7 @@ export function trackEvent(type: "visit" | "login" | "signup" | "install", uid?:
         type,
         uid: uid || null,
         identifier: identifier || null,
+        deviceId: getVisitDeviceId(),
         path: window.location.pathname + window.location.search,
         referrer: document.referrer || "",
       }),
