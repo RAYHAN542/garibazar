@@ -113,15 +113,6 @@ function getTimeAgo(createdAt: any, language: SupportedLanguage): string {
 
 function ListingCardImpl({ listing, language, onViewDetails, onPromoteClick, isAdmin, priority = false }: ListingCardProps) {
   const isAd = listing.isAd;
-  const isVehicle = (listing as any).type === "vehicle"
-    ? true
-    : (listing as any).type === "part"
-    ? false
-    : listing.category === "vehicles";
-  const categoryLabel = isVehicle
-    ? (language === "bn" ? "গাড়ি" : "Vehicle")
-    : (language === "bn" ? "পার্ট" : "Part");
-
   return (
     <a
       href={`/l/${listing.id}`}
@@ -145,14 +136,6 @@ function ListingCardImpl({ listing, language, onViewDetails, onPromoteClick, isA
           width={500}
           height={340}
         />
-
-        <span
-          className={`absolute top-1.5 left-1.5 font-black text-[8.5px] uppercase tracking-wide px-1.5 py-0.5 rounded shadow-sm z-10 ${
-            isVehicle ? "bg-amber-500 text-white" : "bg-sky-600 text-white"
-          }`}
-        >
-          {categoryLabel}
-        </span>
 
         {isAd && (
           <span className="absolute top-1.5 right-1.5 bg-gradient-to-r from-orange-500 to-amber-500 text-white font-black text-[8px] uppercase tracking-wider px-1.5 py-0.5 rounded shadow-sm flex items-center gap-0.5 z-10">
