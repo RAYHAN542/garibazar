@@ -1,7 +1,5 @@
 name: Facebook auto post
 on:
-  schedule:
-    - cron: "*/15 2-13 * * *"
   workflow_dispatch:
 permissions:
   contents: read
