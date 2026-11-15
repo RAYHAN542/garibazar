@@ -1,3 +1,4 @@
+import { PushNotifications } from "@capacitor/push-notifications";
 import { setBadgeCount } from "./utils/gariBadge";
 /**
  * @license
@@ -654,7 +655,6 @@ export default function App() {
   const handleRequestNotificationPermission = async () => {
     if (isNativeApp()) {
       try {
-        const { PushNotifications } = await import(/* @vite-ignore */ "@capacitor/push-notifications");
         let permStatus = await PushNotifications.checkPermissions();
         if (permStatus.receive === "prompt") {
           permStatus = await PushNotifications.requestPermissions();

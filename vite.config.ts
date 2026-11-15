@@ -25,6 +25,8 @@ export default defineConfig(({ mode }) => {
     },
     build: {
       target: 'es2019',
+    // app is bundled inside the APK (loaded from the device); gzip size is small on web too
+    chunkSizeWarningLimit: 800,
       rollupOptions: {
         output: {
           manualChunks: {
@@ -41,6 +43,7 @@ export default defineConfig(({ mode }) => {
             // বদলালে firestore আপডেট হলেও ইউজারের browser cache থেকে
             // firebase-auth চাঙ্কটা পুনরায় ডাউনলোড করা লাগবে না (এবং উল্টোটাও)।
             'react-vendor': ['react', 'react-dom'],
+            'supabase-vendor': ['@supabase/supabase-js'],
             'icons-vendor': ['lucide-react'],
             'search-vendor': ['fuse.js'],
           },

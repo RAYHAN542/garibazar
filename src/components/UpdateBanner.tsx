@@ -1,3 +1,4 @@
+import { App as CapacitorAppStatic } from "@capacitor/app";
 import { useEffect, useState } from "react";
 import { Capacitor } from "@capacitor/core";
 import { supabase } from "../supabase";
@@ -53,7 +54,7 @@ export default function UpdateBanner({ language }: UpdateBannerProps) {
     (async () => {
       try {
         const [{ App: CapacitorApp }, configResult] = await Promise.all([
-          import("@capacitor/app"),
+          Promise.resolve({ App: CapacitorAppStatic }),
           supabase.from("app_config").select("value").eq("key", "version").maybeSingle(),
         ]);
 
