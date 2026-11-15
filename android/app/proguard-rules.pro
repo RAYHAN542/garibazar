@@ -39,8 +39,8 @@
 
 # Firebase + Google Play Services (used by @capacitor-firebase/app-check /
 # Play Integrity attestation)
--keep class com.google.firebase.** { *; }
--keep class com.google.android.gms.** { *; }
+# removed: libraries ship their own consumer rules
+# removed: libraries ship their own consumer rules
 -dontwarn com.google.firebase.**
 -dontwarn com.google.android.gms.**
 
