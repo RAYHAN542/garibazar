@@ -26,3 +26,4 @@
 2026-11-15 | claude | Vercel build warning 1: removed unused firebase-app/auth/firestore manualChunks (empty; app uses Supabase) | vite.config.ts
 2026-11-16 | claude | Vercel build warnings 3+4: supabase-vendor chunk, chunk limit 800, static capacitor app/push imports | vite.config.ts, App.tsx, UpdateBanner.tsx
 2026-11-16 | claude | Merged img-lazy-timeout (ImageWithFallback, was live on Vercel) + build-warnings into main in one push | main
+2026-11-16 | claude-chat | AdMob mediation-এ Unity Ads adapter যোগ (unity:4.16.6.0), video_feed_interstitial গ্রুপের Unity bidding-এর জন্য | android/app/build.gradle
