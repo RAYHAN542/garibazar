@@ -358,6 +358,40 @@ function VideoSlideImpl({ listing, index, rel, muted, adPlaying, language, onTog
 const VideoSlide = memo(VideoSlideImpl);
 
 export default function VideoFeed({ language, videos, currentUser, onLoginPrompt, onClose, onSelect, isAdmin, onStartChat, onPosted }: VideoFeedProps) {
+  // Phone back button: the feed owns one browser-history entry. Pushed on open,
+  // a back press (popstate to a non-feed entry) closes the feed, X removes the entry.
+  // A modal opened on top (listing details) pushes its own entry, so back closes that first.
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+  const feedPushedRef = useRef(false);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.history.pushState({ ...(window.history.state || {}), garibazarVideo: true }, "");
+    feedPushedRef.current = true;
+    const onPop = () => {
+      const st = window.history.state as { garibazarVideo?: boolean } | null;
+      if (st && st.garibazarVideo) return;
+      feedPushedRef.current = false;
+      onCloseRef.current();
+    };
+    window.addEventListener("popstate", onPop);
+    return () => {
+      window.removeEventListener("popstate", onPop);
+      const st = window.history.state as { garibazarVideo?: boolean } | null;
+      if (feedPushedRef.current && st && st.garibazarVideo) {
+        feedPushedRef.current = false;
+        window.history.back();
+      }
+    };
+  }, []);
+  const closeFeed = () => {
+    const st = window.history.state as { garibazarVideo?: boolean } | null;
+    if (feedPushedRef.current && st && st.garibazarVideo) {
+      window.history.back();
+    } else {
+      onCloseRef.current();
+    }
+  };
   const [activeIndex, setActiveIndex] = useState(0);
   const [muted, setMuted] = useState(false);
   const toggleMute = useCallback(() => setMuted((m) => !m), []);
@@ -473,7 +507,7 @@ export default function VideoFeed({ language, videos, currentUser, onLoginPrompt
           )}
           <button
             type="button"
-            onClick={onClose}
+            onClick={closeFeed}
             className="w-9 h-9 rounded-full bg-black/55 flex items-center justify-center text-white cursor-pointer"
             aria-label="Close"
           >

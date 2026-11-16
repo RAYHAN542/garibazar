@@ -30,3 +30,4 @@
 2026-11-16 | claude-chat | R8 missing class ফিক্স: Unity adapter-এর সাথে Unity Ads SDK (com.unity3d.ads:unity-ads:4.16.+) আলাদা dependency হিসেবে যোগ | android/app/build.gradle
 2026-11-17 | claude | Tips tab renamed to 'গাড়ির সমস্যা?' / 'Car problem?' (with ❓) | VideoFeed.tsx
 2026-11-17 | claude | Video header: Tips tab (গাড়ির সমস্যা?) solid orange button, Videos tab bordered, shorter Add button label so nothing overlaps | VideoFeed.tsx
+2026-11-17 | claude | Video feed back button: VideoFeed owns one history entry (push on open, popstate closes, X removes entry) | VideoFeed.tsx
