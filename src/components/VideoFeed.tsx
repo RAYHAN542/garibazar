@@ -445,8 +445,8 @@ export default function VideoFeed({ language, videos, currentUser, onLoginPrompt
       key={id}
       type="button"
       onClick={() => switchTab(id)}
-      className={`h-8 px-3 rounded-full text-sm font-black cursor-pointer whitespace-nowrap ${
-        tab === id ? "bg-white text-black" : "bg-white/15 text-white"
+      className={`h-8 px-2.5 shrink-0 rounded-full text-[13px] font-black cursor-pointer whitespace-nowrap ${
+        tab === id ? "bg-white text-black shadow" : id === "tips" ? "bg-amber-500 text-black shadow-md" : "bg-white/25 text-white border border-white/30"
       }`}
     >
       {label}
@@ -468,7 +468,7 @@ export default function VideoFeed({ language, videos, currentUser, onLoginPrompt
               className="h-9 px-3 rounded-full bg-red-600 hover:bg-red-700 text-white text-xs font-extrabold flex items-center gap-1 cursor-pointer shadow-md"
             >
               <Plus className="w-4 h-4" />
-              <span className="whitespace-nowrap">{language === "bn" ? "ভিডিও যোগ করুন" : "Add Video"}</span>
+              <span className="whitespace-nowrap">{language === "bn" ? "যোগ করুন" : "Add"}</span>
             </button>
           )}
           <button

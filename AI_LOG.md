@@ -29,3 +29,4 @@
 2026-11-16 | claude-chat | AdMob mediation-এ Unity Ads adapter যোগ (unity:4.16.6.0), video_feed_interstitial গ্রুপের Unity bidding-এর জন্য | android/app/build.gradle
 2026-11-16 | claude-chat | R8 missing class ফিক্স: Unity adapter-এর সাথে Unity Ads SDK (com.unity3d.ads:unity-ads:4.16.+) আলাদা dependency হিসেবে যোগ | android/app/build.gradle
 2026-11-17 | claude | Tips tab renamed to 'গাড়ির সমস্যা?' / 'Car problem?' (with ❓) | VideoFeed.tsx
+2026-11-17 | claude | Video header: Tips tab (গাড়ির সমস্যা?) solid orange button, Videos tab bordered, shorter Add button label so nothing overlaps | VideoFeed.tsx
