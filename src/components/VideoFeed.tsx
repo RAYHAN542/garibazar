@@ -458,7 +458,7 @@ export default function VideoFeed({ language, videos, currentUser, onLoginPrompt
       <div className="absolute top-0 inset-x-0 z-10 flex items-center justify-between px-3 pt-[calc(0.75rem+env(safe-area-inset-top))] pb-2 bg-gradient-to-b from-black/70 to-transparent">
         <div className="flex items-center gap-1.5">
           {tabBtn("sale", language === "bn" ? "ভিডিও" : "Videos")}
-          {tabBtn("tips", language === "bn" ? "টিপস" : "Tips")}
+          {tabBtn("tips", language === "bn" ? "❓ গাড়ির সমস্যা?" : "❓ Car problem?")}
         </div>
         <div className="flex items-center gap-2">
           {tab === "sale" && (

@@ -28,3 +28,4 @@
 2026-11-16 | claude | Merged img-lazy-timeout (ImageWithFallback, was live on Vercel) + build-warnings into main in one push | main
 2026-11-16 | claude-chat | AdMob mediation-এ Unity Ads adapter যোগ (unity:4.16.6.0), video_feed_interstitial গ্রুপের Unity bidding-এর জন্য | android/app/build.gradle
 2026-11-16 | claude-chat | R8 missing class ফিক্স: Unity adapter-এর সাথে Unity Ads SDK (com.unity3d.ads:unity-ads:4.16.+) আলাদা dependency হিসেবে যোগ | android/app/build.gradle
+2026-11-17 | claude | Tips tab renamed to 'গাড়ির সমস্যা?' / 'Car problem?' (with ❓) | VideoFeed.tsx
