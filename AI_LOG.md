@@ -36,3 +36,4 @@
 2026-11-18 | claude | Video post: if frame capture fails use a default cover image instead of the add-one-photo error | src/utils/videoPoster.ts, AddPartForm.tsx
 2026-11-18 | claude | versionName now 1.9.<run number> (was fixed 1.9); versionCode unchanged | android/app/build.gradle
 2026-11-18 | claude | Profile tab: Logout/Login moved out of 'ব্যক্তিগত তথ্য' into its own bottom row of the profile card; old logout button removed from the info box | src/App.tsx
+2026-11-18 | claude | Profile tab: logged-out first row says Login/Register and opens login (was 'Personal info'); bottom logout row shown only when logged in | src/App.tsx

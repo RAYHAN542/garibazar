@@ -2437,7 +2437,7 @@ export default function App() {
                     <button
                       type="button"
                       id="profile-row-personal"
-                      onClick={() => setIsPersonalInfoOpen(!isPersonalInfoOpen)}
+                      onClick={() => (user ? setIsPersonalInfoOpen(!isPersonalInfoOpen) : setIsAuthOpen(true))}
                       className="w-full flex items-center justify-between p-4.5 hover:bg-slate-50 dark:hover:bg-slate-800/40 cursor-pointer text-left transition select-none"
                     >
                       <div className="flex items-center gap-3.5">
@@ -2446,13 +2446,13 @@ export default function App() {
                         </div>
                         <div>
                           <p className="text-sm sm:text-base font-extrabold text-slate-800 dark:text-slate-100">
-                            {language === "bn" ? "ব্যক্তিগত তথ্য" : "Personal info"}
+                            {user ? (language === "bn" ? "ব্যক্তিগত তথ্য" : "Personal info") : (language === "bn" ? "লগইন করুন / রেজিস্ট্রেশন" : "Login / Register")}
                           </p>
                           
                         </div>
                       </div>
                       <div className="flex items-center gap-1 text-slate-400 dark:text-slate-500">
-                        {isPersonalInfoOpen ? (
+                        {!user ? null : isPersonalInfoOpen ? (
                           <span className="text-xs font-bold text-amber-500">{language === "bn" ? "বন্ধ করুন" : "Close"}</span>
                         ) : (
                           <span className="text-xs font-bold text-slate-400 dark:text-slate-550">{language === "bn" ? "দেখুন" : "View"}</span>
@@ -2928,7 +2928,7 @@ export default function App() {
                     )}
                   </div>
 
-                  <div className="border-t border-slate-100 dark:border-slate-800 p-4">
+                  <div className={`border-t border-slate-100 dark:border-slate-800 p-4 ${user ? "" : "hidden"}`}>
                     {user ? (
                       <button type="button" onClick={handleLogout} className="w-full bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 dark:text-rose-400 font-extrabold text-sm py-3 px-4 rounded-xl transition duration-200 flex items-center justify-center gap-2 cursor-pointer">
                         <LogOut className="w-4 h-4 shrink-0" />
