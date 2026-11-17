@@ -34,3 +34,4 @@
 2026-11-18 | claude | Guests can see seller numbers (IP limit 30/h); every call click counted; daily_stats views+clicks fixed (DB fns); masked number tap reveals instead of calling | api/get-seller-contact.ts, ListingDetailModal.tsx, VideoFeed.tsx (+Supabase migration count_every_call_click_and_daily_stats)
 2026-11-18 | claude | Guest reveal fix: fetch trims empty 'Bearer ' to 'Bearer', server took it as bad token (401); now parsed as guest | api/get-seller-contact.ts
 2026-11-18 | claude | Video post: if frame capture fails use a default cover image instead of the add-one-photo error | src/utils/videoPoster.ts, AddPartForm.tsx
+2026-11-18 | claude | versionName now 1.9.<run number> (was fixed 1.9); versionCode unchanged | android/app/build.gradle
