@@ -42,7 +42,7 @@ export default async function handler(req: any, res: any) {
 
   try {
     const authHeader = req.headers.authorization || "";
-    const idToken = authHeader.replace("Bearer ", "");
+    const idToken = authHeader.replace(/^Bearer\s*/i, "").trim();
     // Guests (no token) may reveal numbers too; they are limited per IP instead of per user.
     let uid: string | null = null;
     if (idToken) {
