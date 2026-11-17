@@ -173,6 +173,85 @@ export default async function handler(req: any, res: any) {
         return res.status(200).json({ success: true, sent: sentCount });
       }
 
+      const soldPush = (req.body || {}).internalSoldPush;
+      if (soldPush) {
+        if (!soldPush.listingId) {
+          return res.status(400).json({ error: "তথ্য অসম্পূর্ণ।" });
+        }
+        const soldHourBd = (new Date().getUTCHours() + BD_UTC_OFFSET_HOURS) % 24;
+        if (soldHourBd < QUIET_END_HOUR_BD) {
+          return res.status(200).json({ success: true, skipped: "quiet_hours" });
+        }
+        const { data: sl } = await supabase
+          .from("listings")
+          .select("id, title, seller_id, images, is_sold, is_deleted")
+          .eq("id", soldPush.listingId)
+          .maybeSingle();
+        if (!sl || !sl.is_sold || sl.is_deleted) {
+          return res.status(200).json({ success: true, skipped: "not_sold" });
+        }
+        const { data: sellerRow } = await supabase.from("users").select("fcm_token").eq("uid", sl.seller_id).maybeSingle();
+        const sellerToken: string | null = sellerRow?.fcm_token || null;
+        const soldTokens = new Set<string>();
+        for (let from = 0; from < 5000; from += 1000) {
+          const { data: rows } = await supabase
+            .from("users")
+            .select("fcm_token")
+            .not("fcm_token", "is", null)
+            .neq("uid", sl.seller_id)
+            .range(from, from + 999);
+          (rows || []).forEach((r: any) => {
+            if (r.fcm_token) soldTokens.add(r.fcm_token);
+          });
+          if (!rows || rows.length < 1000) break;
+        }
+        const soldDeviceByToken = new Map<string, string>();
+        const soldFresh = new Date(Date.now() - DEVICE_TOKEN_MAX_AGE_MS).toISOString();
+        for (let from = 0; from < 10000; from += 1000) {
+          const { data: rows } = await supabase
+            .from("device_push_tokens")
+            .select("device_id, fcm_token")
+            .gt("updated_at", soldFresh)
+            .range(from, from + 999);
+          (rows || []).forEach((r: any) => {
+            if (r.fcm_token) {
+              soldTokens.add(r.fcm_token);
+              soldDeviceByToken.set(r.fcm_token, r.device_id);
+            }
+          });
+          if (!rows || rows.length < 1000) break;
+        }
+        if (sellerToken) soldTokens.delete(sellerToken);
+        const soldList = Array.from(soldTokens);
+        const soldImage = pickPushImage(sl.images);
+        let soldSent = 0;
+        const soldDead: string[] = [];
+        for (let i = 0; i < soldList.length; i += 500) {
+          const batch = soldList.slice(i, i + 500);
+          const r = await sendMulticastSmart(supabase, {
+            tokens: batch,
+            notification: {
+              title: "🎉 বিক্রি হয়ে গেছে!",
+              body: String(sl.title || "").slice(0, 70) + " — Garibazar-এ বিক্রি হলো। আপনিও পোস্ট করুন",
+              ...(soldImage ? { imageUrl: soldImage } : {}),
+            },
+            data: { listingId: String(sl.id) },
+          });
+          soldSent += r.successCount;
+          r.responses.forEach((resp: any, idx: number) => {
+            const code = String(resp?.error?.code || "");
+            const dev = soldDeviceByToken.get(batch[idx]);
+            if (!resp.success && dev && /registration-token-not-registered|invalid-registration-token|invalid-argument/.test(code)) {
+              soldDead.push(dev);
+            }
+          });
+        }
+        for (let i = 0; i < soldDead.length; i += 100) {
+          await supabase.from("device_push_tokens").delete().in("device_id", soldDead.slice(i, i + 100));
+        }
+        return res.status(200).json({ success: true, sent: soldSent });
+      }
+
       const chatPush = (req.body || {}).internalChatPush;
       if (chatPush) {
         const c = chatPush;
