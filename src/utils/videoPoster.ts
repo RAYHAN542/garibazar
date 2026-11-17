@@ -141,3 +141,25 @@ export const captureVideoPoster = (file: File): Promise<File> =>
     document.body.appendChild(el);
     el.src = url;
   });
+
+export const makePlaceholderPoster = (): Promise<File> => {
+  const c = document.createElement("canvas");
+  c.width = 640;
+  c.height = 360;
+  const g = c.getContext("2d");
+  if (g) {
+    g.fillStyle = "#1f2937";
+    g.fillRect(0, 0, 640, 360);
+    g.fillStyle = "#ffffff";
+    g.beginPath();
+    g.moveTo(280, 130);
+    g.lineTo(280, 230);
+    g.lineTo(370, 180);
+    g.closePath();
+    g.fill();
+  }
+  const bin = atob(c.toDataURL("image/jpeg", 0.8).split(",")[1]);
+  const arr = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+  return Promise.resolve(new File([arr], "video-cover.jpg", { type: "image/jpeg" }));
+};

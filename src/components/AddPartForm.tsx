@@ -5,7 +5,7 @@ import { supabase } from "../supabase";
 import { sanitizeText, validatePriceInput, validateBanglaPhone } from "../utils/sanitizer";
 import { uploadToCloudinary } from "../utils/cloudinary";
 import { prepareVideo, uploadVideoToR2 } from "../utils/videoUpload";
-import { captureVideoPoster } from "../utils/videoPoster";
+import { captureVideoPoster, makePlaceholderPoster } from "../utils/videoPoster";
 import { nativeFetch } from "../utils/nativeFetch";
 import { apiUrl } from "../utils/apiBase";
 import { CITIES } from "../translations";
@@ -367,7 +367,7 @@ export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPromp
     setVideo({ preview: URL.createObjectURL(file), status: "processing", progress: 0 });
 
     try {
-      const poster = await captureVideoPoster(file);
+      const poster = await captureVideoPoster(file).catch(() => makePlaceholderPoster());
       if (job !== videoJobRef.current) return;
       void addImageFiles([poster], 0);
 
