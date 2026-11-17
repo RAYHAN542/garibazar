@@ -31,3 +31,4 @@
 2026-11-17 | claude | Tips tab renamed to 'গাড়ির সমস্যা?' / 'Car problem?' (with ❓) | VideoFeed.tsx
 2026-11-17 | claude | Video header: Tips tab (গাড়ির সমস্যা?) solid orange button, Videos tab bordered, shorter Add button label so nothing overlaps | VideoFeed.tsx
 2026-11-17 | claude | Video feed back button: VideoFeed owns one history entry (push on open, popstate closes, X removes entry) | VideoFeed.tsx
+2026-11-18 | claude | Guests can see seller numbers (IP limit 30/h); every call click counted; daily_stats views+clicks fixed (DB fns); masked number tap reveals instead of calling | api/get-seller-contact.ts, ListingDetailModal.tsx, VideoFeed.tsx (+Supabase migration count_every_call_click_and_daily_stats)

@@ -149,13 +149,11 @@ function VideoSlideImpl({ listing, index, rel, muted, adPlaying, language, onTog
   }, [isActive]);
 
   const revealPhone = async () => {
-    if (!currentUser?.uid) { onLoginPrompt(); return; }
     setPhoneLoading(true);
     setPhoneError(false);
     try {
       const { data: sessionData } = await supabase.auth.getSession();
-      const token = sessionData?.session?.access_token;
-      if (!token) throw new Error("no session");
+      const token = sessionData?.session?.access_token || "";
       const resp = await nativeFetch(apiUrl("/api/get-seller-contact"), {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
@@ -165,7 +163,6 @@ function VideoSlideImpl({ listing, index, rel, muted, adPlaying, language, onTog
       if (!resp.ok) throw new Error(data?.error || "failed");
       setPhone((data.contactNumber as string) || null);
       trackInterest(listing, 3);
-      try { await trackListingClick(listing.id); } catch (_) {}
     } catch (_) {
       setPhoneError(true);
     } finally {
@@ -280,7 +277,7 @@ function VideoSlideImpl({ listing, index, rel, muted, adPlaying, language, onTog
             )}
             <div className="mt-4">
               {phone ? (
-                <a href={`tel:${phone}`} className="flex w-full items-center justify-center gap-2 rounded-xl bg-green-600 py-3 font-black text-white">
+                <a href={`tel:${phone}`} onClick={() => { void trackListingClick(listing.id); }} className="flex w-full items-center justify-center gap-2 rounded-xl bg-green-600 py-3 font-black text-white">
                   <Phone className="w-4 h-4" />
                   {phone}
                 </a>

@@ -304,8 +304,8 @@ export function ListingDetailModal({ listing, language, currentUser, onClose, on
   };
 
   const fetchContactNumberViaApi = async (): Promise<string | null> => {
-    const idToken = await getAuthToken();
-    if (!idToken) throw new Error("লগইন সেশন পাওয়া যায়নি");
+    // Login is optional now: without a session the server limits by IP.
+    const idToken = (await getAuthToken()) || "";
     const resp = await nativeFetch(apiUrl("/api/get-seller-contact"), {
       method: "POST",
       headers: {
@@ -344,11 +344,6 @@ export function ListingDetailModal({ listing, language, currentUser, onClose, on
   // "Show number" চাপার পর fetch — লগইন করা থাকলেই কাজ করবে।
   useEffect(() => {
     if (!showPhoneNumber || fetchedContactNumber) return;
-    if (!currentUser?.uid) {
-      setShowPhoneNumber(false);
-      onLoginPrompt?.();
-      return;
-    }
     let active = true;
     setContactLoading(true);
     (async () => {
@@ -800,7 +795,11 @@ export function ListingDetailModal({ listing, language, currentUser, onClose, on
                     <a 
                       id="detail-contact-tele"
                       href={`tel:${fetchedContactNumber || ""}`} 
-                      onClick={handleContactClick}
+                      onClick={(e) => {
+                        // number not shown yet: reveal it instead of dialing an empty number (not a call click)
+                        if (!fetchedContactNumber) { e.preventDefault(); setShowPhoneNumber(true); return; }
+                        handleContactClick();
+                      }}
                       className="font-mono font-black text-xl text-amber-500 hover:text-amber-600 hover:underline block cursor-pointer"
                     >
                       📞 {contactLoading ? "..." : (isOwner || isAdmin || showPhoneNumber) ? (fetchedContactNumber || "—") : maskPhoneNumber(fetchedContactNumber)}

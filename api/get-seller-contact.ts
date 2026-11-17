@@ -28,6 +28,8 @@ const RATE_LIMIT_MAX = 50; // reveals per user per hour -- generous for a
 // genuine buyer browsing many listings, but stops a scripted account from
 // harvesting the whole marketplace's phone numbers in one sweep.
 
+const GUEST_RATE_LIMIT_MAX = 30; // reveals per IP per hour for people who are not logged in
+
 const UUID_RE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
 // Firestore-era auto-generated doc IDs are alphanumeric base62-ish strings.
 const SAFE_LEGACY_ID = /^[A-Za-z0-9_-]{1,64}$/;
@@ -41,21 +43,25 @@ export default async function handler(req: any, res: any) {
   try {
     const authHeader = req.headers.authorization || "";
     const idToken = authHeader.replace("Bearer ", "");
-    if (!idToken) {
-      return res.status(401).json({ error: "লগইন করা প্রয়োজন।" });
+    // Guests (no token) may reveal numbers too; they are limited per IP instead of per user.
+    let uid: string | null = null;
+    if (idToken) {
+      uid = await verifySupabaseToken(idToken);
+      if (!uid) {
+        return res.status(401).json({ error: "যাচাই ব্যর্থ হয়েছে।" });
+      }
     }
-
-    const uid = await verifySupabaseToken(idToken);
-    if (!uid) {
-      return res.status(401).json({ error: "যাচাই ব্যর্থ হয়েছে।" });
-    }
+    const ipRaw = String(req.headers["x-forwarded-for"] || req.headers["x-real-ip"] || "");
+    const ip = ipRaw.split(",")[0].trim() || "unknown";
 
     const { listingId } = req.body || {};
     if (!listingId || typeof listingId !== "string") {
       return res.status(400).json({ error: "listingId প্রয়োজন।" });
     }
 
-    const allowed = await checkAndBumpRateLimit(`contact_reveal_${uid}`, RATE_LIMIT_WINDOW_MS, RATE_LIMIT_MAX);
+    const allowed = uid
+      ? await checkAndBumpRateLimit(`contact_reveal_${uid}`, RATE_LIMIT_WINDOW_MS, RATE_LIMIT_MAX)
+      : await checkAndBumpRateLimit(`contact_reveal_ip_${ip}`, RATE_LIMIT_WINDOW_MS, GUEST_RATE_LIMIT_MAX);
     if (!allowed) {
       return res.status(429).json({
         error: "অনেকবার নম্বর দেখার চেষ্টা হয়েছে। কিছুক্ষণ পর আবার চেষ্টা করুন।",
