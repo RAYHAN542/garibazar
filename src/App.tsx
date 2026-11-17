@@ -2501,14 +2501,6 @@ export default function App() {
                               </div>
                             </div>
 
-                            <button
-                              type="button"
-                              onClick={handleLogout}
-                              className="w-full mt-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 dark:text-rose-400 font-extrabold text-xs py-2.5 px-4 rounded-xl transition duration-200 flex items-center justify-center gap-1.5 cursor-pointer"
-                            >
-                              <LogOut className="w-4 h-4 shrink-0" />
-                              <span>{language === "bn" ? "লগআউট করুন" : "Log Out of Account"}</span>
-                            </button>
                           </div>
                         ) : (
                           <div className="text-center py-2 space-y-3">
@@ -2936,6 +2928,19 @@ export default function App() {
                     )}
                   </div>
 
+                  <div className="border-t border-slate-100 dark:border-slate-800 p-4">
+                    {user ? (
+                      <button type="button" onClick={handleLogout} className="w-full bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 dark:text-rose-400 font-extrabold text-sm py-3 px-4 rounded-xl transition duration-200 flex items-center justify-center gap-2 cursor-pointer">
+                        <LogOut className="w-4 h-4 shrink-0" />
+                        <span>{language === "bn" ? "লগআউট করুন" : "Log Out"}</span>
+                      </button>
+                    ) : (
+                      <button type="button" onClick={() => setIsAuthOpen(true)} className="w-full bg-gradient-to-r from-amber-500 to-orange-600 text-slate-950 font-black py-3 px-4 rounded-xl text-sm transition duration-200 flex items-center justify-center gap-2 shadow-sm cursor-pointer">
+                        <User className="w-4 h-4 fill-slate-950 text-slate-950 shrink-0" />
+                        <span>{language === "bn" ? "লগইন করুন / রেজিস্ট্রেশন" : "Sign In / Register"}</span>
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
             )}
