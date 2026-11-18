@@ -30,7 +30,7 @@ import me.leolin.shortcutbadger.ShortcutBadger;
  * Everything else is passed to Capacitor's normal MessagingService.
  */
 public class GariFcmService extends MessagingService {
-    private static final String CHANNEL_ID = "gb_push";
+    private static final String CHANNEL_ID = "gb_push_v2";
     private static final String PREFS = "gb_badge";
     private static final String KEY_COUNT = "count";
 
@@ -75,7 +75,12 @@ public class GariFcmService extends MessagingService {
         NotificationManager nm = (NotificationManager) ctx.getSystemService(Context.NOTIFICATION_SERVICE);
         if (nm == null) return;
         if (Build.VERSION.SDK_INT >= 26 && nm.getNotificationChannel(CHANNEL_ID) == null) {
+            // পুরোনো চ্যানেলে ভাইব্রেশন বন্ধ ছিল (অ্যান্ড্রয়েডে চ্যানেল বানানোর পর সেটিং বদলানো যায় না), তাই নতুন আইডির চ্যানেল
+            nm.deleteNotificationChannel("gb_push");
             NotificationChannel ch = new NotificationChannel(CHANNEL_ID, "GariBazar", NotificationManager.IMPORTANCE_HIGH);
+            ch.enableVibration(true);
+            ch.setVibrationPattern(new long[]{0, 300, 200, 300});
+            ch.enableLights(true);
             nm.createNotificationChannel(ch);
         }
 

@@ -5,6 +5,7 @@ import { PartListing, SupportedLanguage } from "../types";
 import { isItemVehicle, matchesSubCategoryFilter } from "../utils/listingFilters";
 import { convertBengaliDigitsToEnglish, toPhoneticKey } from "../searchAliases";
 import { searchListings } from "../utils/searchApi";
+import { trackSearchBrand } from "../utils/feedRanker";
 
 interface SearchPageProps {
   language: SupportedLanguage;
@@ -174,8 +175,16 @@ export default function SearchPage({ language, listings, searchHistory, onSaveHi
     setFilters(draft);
     setSheetOpen(false);
   };
+  const trackedQueryRef = useRef("");
   const submitQuery = () => {
-    if (query.trim().length > 1) onSaveHistory(query);
+    if (query.trim().length > 1) {
+      onSaveHistory(query);
+      const qk = query.trim().toLowerCase();
+      if (trackedQueryRef.current !== qk) {
+        trackedQueryRef.current = qk;
+        trackSearchBrand(query, [...remote, ...listings], toPhoneticKey);
+      }
+    }
   };
   const pick = (item: PartListing) => {
     submitQuery();

@@ -38,3 +38,4 @@
 2026-11-18 | claude | Profile tab: Logout/Login moved out of 'ব্যক্তিগত তথ্য' into its own bottom row of the profile card; old logout button removed from the info box | src/App.tsx
 2026-11-18 | claude | Profile tab: logged-out first row says Login/Register and opens login (was 'Personal info'); bottom logout row shown only when logged in | src/App.tsx
 2026-11-18 | claude | Favorite-car device alert: removed 200-device cap in api/send-push.ts internalDeviceAlert (ids and dead-token deletes now chunked by 100); DB side (matching_devices no limit, night posts held until 8am) done in Supabase | api/send-push.ts
+2026-11-18 | claude | Favorite-car interest: no decay, brand search/save/2nd open = 3 points, interest synced 20s after change; push channel gb_push_v2 with vibration (needs new AAB) | src/utils/feedRanker.ts, devicePush.ts, SearchPage.tsx, ListingDetailModal.tsx, VideoFeed.tsx, GariFcmService.java

@@ -150,3 +150,13 @@ export function recordAsked(): void {
     localStorage.setItem(ASK_KEY, JSON.stringify({ n: (Number(s.n) || 0) + 1, last: Date.now() }));
   } catch (_) {}
 }
+
+// 🎯 পছন্দ বদলালে (গাড়ি খোলা/সেভ/সার্চ) ২০ সেকেন্ড পরে সার্ভারে পাঠাই, যাতে অ্যাপ আবার না খুললেও নোটিফিকেশন ঠিক মেলে
+let interestTimer: any = null;
+try {
+  window.addEventListener("gb:interest-changed", () => {
+    if (!isNativeDevice()) return;
+    if (interestTimer) clearTimeout(interestTimer);
+    interestTimer = setTimeout(() => { void syncDeviceToken(true); }, 20000);
+  });
+} catch (_) {}

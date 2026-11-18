@@ -95,7 +95,7 @@ function VideoSlideImpl({ listing, index, rel, muted, adPlaying, language, onTog
       } else {
         next = [...favs, listing.id];
         setSaved(true);
-        trackInterest(listing, 2);
+        trackInterest(listing, 3);
       }
       localStorage.setItem("gari_bazar_favorites", JSON.stringify(next));
       window.dispatchEvent(new Event("storage"));

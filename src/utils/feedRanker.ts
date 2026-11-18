@@ -15,7 +15,6 @@ import { PartListing } from "../types";
 // ---------------------------------------------------------------------------
 
 const STORAGE_KEY = "gb_interest_v1";
-const HALF_LIFE_DAYS = 7;
 const NEW_WINDOW_MS = 48 * 60 * 60 * 1000;
 const LIKED_MIN_SCORE = 1.5;
 const MAX_KEYS = 40;
@@ -59,8 +58,7 @@ export function loadInterest(): Interest {
     if (!raw) return emptyInterest();
     const p = JSON.parse(raw);
     if (!p || typeof p !== "object") return emptyInterest();
-    const days = Math.max(0, (Date.now() - (Number(p.t) || Date.now())) / 86400000);
-    const f = Math.pow(0.5, days / HALF_LIFE_DAYS);
+    const f = 1; // আগ্রহ কখনো কমে না
     return {
       t: Date.now(),
       b: decayMap(p.b, f),
@@ -84,6 +82,8 @@ export function trackInterest(listing: PartListing, weight = 1): void {
     const sub = norm((listing as any).subCategory);
     if (brand) it.b[brand] = (it.b[brand] || 0) + weight;
     if (model && model.length <= MAX_MODEL_LEN) it.m[model] = (it.m[model] || 0) + weight;
+    // একই নামের পোস্ট ২ বার খুললে সেই মডেলের পয়েন্ট ৩ হয়ে যায়
+    if (weight === 1 && model && model.length <= MAX_MODEL_LEN && it.m[model] >= 2 && it.m[model] < 3) it.m[model] = 3;
     if (sub) it.s[sub] = (it.s[sub] || 0) + weight;
     const price = Number((listing as any).price);
     if (Number.isFinite(price) && price > 0) {
@@ -94,9 +94,37 @@ export function trackInterest(listing: PartListing, weight = 1): void {
     it.m = trimMap(it.m);
     it.s = trimMap(it.s);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(it));
+    try { window.dispatchEvent(new Event("gb:interest-changed")); } catch (_) {}
   } catch (_) {
     // localStorage বন্ধ/ভর্তি হলে চুপচাপ বাদ -- ফিড আগের মতোই চলবে
   }
+}
+
+/** ব্র্যান্ডের নামে সার্চ করলে সেই ব্র্যান্ডে ৩ পয়েন্ট। */
+export function trackSearchBrand(query: string, pool: PartListing[], phonetic?: (s: string) => string): void {
+  try {
+    const q = norm(query);
+    if (q.length < 2) return;
+    const tokens = q.split(/\s+/).filter(Boolean);
+    const phTokens = phonetic ? tokens.filter((t) => t.length > 2).map((t) => phonetic(t)) : [];
+    const brands = new Set<string>();
+    for (const item of pool) {
+      const b = norm((item as any).brand);
+      if (b) brands.add(b);
+    }
+    const hits: string[] = [];
+    brands.forEach((b) => {
+      const direct = tokens.includes(b) || (b.includes(" ") && q.includes(b));
+      const phon = !!phonetic && b.length > 2 && !b.includes(" ") && phTokens.includes(phonetic(b));
+      if (direct || phon) hits.push(b);
+    });
+    if (hits.length === 0) return;
+    const it = loadInterest();
+    for (const b of hits) it.b[b] = (it.b[b] || 0) + 3;
+    it.b = trimMap(it.b);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(it));
+    try { window.dispatchEvent(new Event("gb:interest-changed")); } catch (_) {}
+  } catch (_) {}
 }
 
 function scoreItem(item: PartListing, it: Interest): number {

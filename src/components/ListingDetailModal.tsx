@@ -5,6 +5,7 @@ import { X, MapPin, Sparkles, Play, Flag, ShieldAlert, CheckCircle2, ChevronLeft
 import { logAnalyticsEvent } from "../utils/analytics";
 import { supabase } from "../supabase";
 import { trackListingClick } from "../utils/counters";
+import { trackInterest } from "../utils/feedRanker";
 import { getOptimizedImageUrl } from "../utils/cloudinary";
 import { apiUrl } from "../utils/apiBase";
 import { NativeAdSlot } from "./NativeAdSlot";
@@ -248,6 +249,7 @@ export function ListingDetailModal({ listing, language, currentUser, onClose, on
       if (error) throw error;
 
       setAddToDashboardSuccess(true);
+      trackInterest(listing, 3);
       if (onPurchaseAdded) {
         onPurchaseAdded();
       }
@@ -372,6 +374,7 @@ export function ListingDetailModal({ listing, language, currentUser, onClose, on
       } else {
         nextFav = [...favs, listing.id];
         setIsFavorite(true);
+        trackInterest(listing, 3);
       }
       localStorage.setItem("gari_bazar_favorites", JSON.stringify(nextFav));
       window.dispatchEvent(new Event("storage"));
