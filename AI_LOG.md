@@ -42,3 +42,4 @@
 2026-11-18 | claude | Share in the Android app opens the real share sheet (@capacitor/share; WebView has no navigator.share, it only copied); web unchanged; needs new APK | src/utils/shareLink.ts, ListingDetailModal.tsx, VideoFeed.tsx, package.json
 2026-11-18 | claude | Supabase (via MCP, no repo file): new table category_daily_clicks(day,category,sub_category,clicks; RLS on, no policies); increment_listing_click now also +1 per category/day; backfilled 22 dated clicks | DB only
 2026-11-18 | claude | Supabase (via MCP): increment_listing_click per-IP click limit 120 -> 600/hour (shared mobile IPs); counts guests and logged-in | DB only
+2026-11-19 | claude | হোম বাটন সারিতে Daraz অ্যাফিলিয়েট 'অনলাইন শপ' বাটন (হেভি ইকুইপমেন্ট ও ভিডিওর মাঝে, নতুন ট্যাবে খোলে); লিংক AFFILIATE_SHOPS লিস্টে | src/components/MarketplaceTab.tsx

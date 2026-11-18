@@ -16,6 +16,11 @@ import { mixFeed, trackInterest } from "../utils/feedRanker";
 import { isNativeDevice, checkPushPerm, syncDeviceToken, requestDevicePush, shouldAutoAsk, recordAsked } from "../utils/devicePush";
 import type { PushPerm } from "../utils/devicePush";
 
+// 🛒 অনলাইন শপ (অ্যাফিলিয়েট) -- নতুন অ্যাপ যোগ করতে শুধু এখানে এক লাইন বাড়াও।
+const AFFILIATE_SHOPS = [
+  { id: "daraz", bn: "অনলাইন শপ", en: "Online Shop", url: "https://s.daraz.com.bd/s.YSO6H?cc" },
+];
+
 interface MarketplaceTabProps {
   language: SupportedLanguage;
   activeTranslations: TranslationSet;
@@ -577,23 +582,37 @@ const feedListings = spotlightFiller ? feedItems.slice(1) : feedItems;
                 <div className={`flex gap-2 mb-3 animate-[slide-down_0.2s_ease-out] ${activeBrandCat ? "hidden" : ""}`}>
                   <button
                     onClick={() => { heavyQuickCategory.onClick(); try { logAnalyticsEvent("select_category", { category: heavyQuickCategory.id }); } catch (_) {} }}
-                    className={`flex-1 min-w-0 flex items-center justify-center gap-1.5 py-2.5 rounded-2xl border transition-all duration-150 cursor-pointer ${
+                    className={`flex-1 min-w-0 flex items-center justify-center gap-1 px-1 py-2.5 rounded-2xl border transition-all duration-150 cursor-pointer ${
                       heavyQuickCategory.active
                         ? "bg-amber-500 border-amber-500 text-slate-950 shadow-md scale-[0.98]"
                         : "bg-white dark:bg-slate-900 border-slate-150 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:border-amber-400/50"
                     }`}
                   >
                     <HeavyIcon className="w-5 h-5 shrink-0" />
-                    <span className="text-[11px] font-extrabold leading-none whitespace-nowrap">{language === "bn" ? heavyQuickCategory.bn : heavyQuickCategory.en}</span>
+                    <span className="text-[10px] font-extrabold leading-tight text-center">{language === "bn" ? heavyQuickCategory.bn : heavyQuickCategory.en}</span>
                   </button>
+
+                  {AFFILIATE_SHOPS.map((shop) => (
+                    <a
+                      key={shop.id}
+                      href={shop.url}
+                      target="_blank"
+                      rel="sponsored noopener noreferrer"
+                      onClick={() => { try { logAnalyticsEvent("affiliate_click", { shop: shop.id }); } catch (_) {} }}
+                      className="flex-1 min-w-0 flex items-center justify-center gap-1 px-1 py-2.5 rounded-2xl border border-orange-500 bg-orange-500 hover:bg-orange-600 text-white shadow-md active:scale-[0.98] transition-all duration-150 cursor-pointer"
+                    >
+                      <ShoppingBag className="w-4 h-4 shrink-0" />
+                      <span className="text-[10px] font-extrabold leading-tight text-center">{language === "bn" ? shop.bn : shop.en}</span>
+                    </a>
+                  ))}
 
                   <button
                     type="button"
                     onClick={() => setIsVideoFeedOpen(true)}
-                    className="flex-1 min-w-0 flex items-center justify-center gap-1.5 py-2.5 rounded-2xl border border-red-600 bg-red-600 hover:bg-red-700 text-white shadow-md active:scale-[0.98] transition-all duration-150 cursor-pointer"
+                    className="flex-1 min-w-0 flex items-center justify-center gap-1 px-1 py-2.5 rounded-2xl border border-red-600 bg-red-600 hover:bg-red-700 text-white shadow-md active:scale-[0.98] transition-all duration-150 cursor-pointer"
                   >
                     <Play className="w-4 h-4 shrink-0 fill-white" />
-                    <span className="text-[11px] font-extrabold leading-none whitespace-nowrap">{language === "bn" ? "গাড়ির ভিডিও দেখুন" : "Watch Videos"}</span>
+                    <span className="text-[10px] font-extrabold leading-tight text-center">{language === "bn" ? "গাড়ির ভিডিও দেখুন" : "Watch Videos"}</span>
                   </button>
                 </div>
 
