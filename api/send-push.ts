@@ -125,7 +125,7 @@ export default async function handler(req: any, res: any) {
       const deviceAlert = (req.body || {}).internalDeviceAlert;
       if (deviceAlert) {
         const ids: string[] = Array.isArray(deviceAlert.deviceIds)
-          ? deviceAlert.deviceIds.map((x: any) => String(x)).filter(Boolean).slice(0, 200)
+          ? deviceAlert.deviceIds.map((x: any) => String(x)).filter(Boolean)
           : [];
         if (!deviceAlert.listingId || ids.length === 0) {
           return res.status(400).json({ error: "তথ্য অসম্পূর্ণ।" });
@@ -138,11 +138,15 @@ export default async function handler(req: any, res: any) {
         if (!lst || lst.is_deleted || lst.is_sold) {
           return res.status(200).json({ success: true, skipped: "listing_unavailable" });
         }
-        const { data: devs } = await supabase
-          .from("device_push_tokens")
-          .select("device_id, fcm_token")
-          .in("device_id", ids);
-        const rows = (devs || []).filter((r: any) => r.fcm_token);
+        const devs: any[] = [];
+        for (let i = 0; i < ids.length; i += 100) {
+          const { data: part } = await supabase
+            .from("device_push_tokens")
+            .select("device_id, fcm_token")
+            .in("device_id", ids.slice(i, i + 100));
+          if (part) devs.push(...part);
+        }
+        const rows = devs.filter((r: any) => r.fcm_token);
         const priceTxt = Number(lst.price) > 0 ? " - ৳" + Number(lst.price).toLocaleString("en-IN") : "";
         const alertImage = pickPushImage(lst.images);
         let sentCount = 0;
@@ -167,8 +171,8 @@ export default async function handler(req: any, res: any) {
           });
         }
         // অ্যাপ মুছে ফেলা/মেয়াদ শেষ টোকেন পরিষ্কার
-        if (deadDevices.length > 0) {
-          await supabase.from("device_push_tokens").delete().in("device_id", deadDevices);
+        for (let i = 0; i < deadDevices.length; i += 100) {
+          await supabase.from("device_push_tokens").delete().in("device_id", deadDevices.slice(i, i + 100));
         }
         return res.status(200).json({ success: true, sent: sentCount });
       }
