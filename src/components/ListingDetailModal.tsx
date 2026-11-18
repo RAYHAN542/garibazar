@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { nativeFetch } from "../utils/nativeFetch";
+import { canShare, shareLink } from "../utils/shareLink";
 import { PartListing, SupportedLanguage } from "../types";
 import { X, MapPin, Sparkles, Play, Flag, ShieldAlert, CheckCircle2, ChevronLeft, ChevronRight, Loader2, ShoppingBag, MessageSquare, Share2 } from "lucide-react";
 import { logAnalyticsEvent } from "../utils/analytics";
@@ -149,8 +150,8 @@ export function ListingDetailModal({ listing, language, currentUser, onClose, on
       : `Check this out on Gari Bazar: ${listing.title}`;
 
     try {
-      if (navigator.share) {
-        await navigator.share({ title: shareTitle, text: shareText, url: shareUrl });
+      if (canShare()) {
+        await shareLink({ title: shareTitle, text: shareText, url: shareUrl });
         return;
       }
     } catch (e) {

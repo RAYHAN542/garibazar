@@ -5,6 +5,7 @@ import { AddPartForm } from "./AddPartForm";
 import TipsFeed from "./TipsFeed";
 import { supabase } from "../supabase";
 import { nativeFetch } from "../utils/nativeFetch";
+import { canShare, shareLink } from "../utils/shareLink";
 import { apiUrl } from "../utils/apiBase";
 import { trackListingClick, incrementListingView } from "../utils/counters";
 import { isNativeAdsSupported } from "../utils/nativeAds";
@@ -106,8 +107,8 @@ function VideoSlideImpl({ listing, index, rel, muted, adPlaying, language, onTog
     const shareUrl = `https://garibazar.shop/1/${listing.id}`;
     const shareText = language === "bn" ? `গাড়ি বাজারে দেখুন: ${listing.title}` : `Check this out on Gari Bazar: ${listing.title}`;
     try {
-      if (navigator.share) {
-        await navigator.share({ title: listing.title, text: shareText, url: shareUrl });
+      if (canShare()) {
+        await shareLink({ title: listing.title, text: shareText, url: shareUrl });
         return;
       }
     } catch (_) {}
