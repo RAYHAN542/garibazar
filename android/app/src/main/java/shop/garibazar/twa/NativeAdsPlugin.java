@@ -101,8 +101,8 @@ public class NativeAdsPlugin extends Plugin {
         } catch (Exception ignored) {
         }
         getActivity().runOnUiThread(() -> {
-            // DEBUG-OFF PG (ফেরাতে নিচের লাইন বদলে .setMaxAdContentRating(RequestConfiguration.MAX_AD_CONTENT_RATING_PG) বসাও)
-            RequestConfiguration.Builder cfg = new RequestConfiguration.Builder();
+            RequestConfiguration.Builder cfg = new RequestConfiguration.Builder()
+                .setMaxAdContentRating(RequestConfiguration.MAX_AD_CONTENT_RATING_PG);
             if (!testIds.isEmpty()) cfg.setTestDeviceIds(testIds);
             MobileAds.setRequestConfiguration(cfg.build());
             MobileAds.initialize(getContext(), status -> call.resolve());
