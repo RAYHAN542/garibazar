@@ -15,6 +15,7 @@ import { fetchVideoListings } from "../utils/listingsApi";
 import { mixFeed, trackInterest } from "../utils/feedRanker";
 import { isNativeDevice, checkPushPerm, syncDeviceToken, requestDevicePush, shouldAutoAsk, recordAsked } from "../utils/devicePush";
 import type { PushPerm } from "../utils/devicePush";
+import { AppLauncher } from "@capacitor/app-launcher";
 
 // 🛒 অনলাইন শপ (অ্যাফিলিয়েট) -- নতুন অ্যাপ যোগ করতে শুধু এখানে এক লাইন বাড়াও।
 const AFFILIATE_SHOPS = [
@@ -598,7 +599,7 @@ const feedListings = spotlightFiller ? feedItems.slice(1) : feedItems;
                       href={shop.url}
                       target="_blank"
                       rel="sponsored noopener noreferrer"
-                      onClick={() => { try { logAnalyticsEvent("affiliate_click", { shop: shop.id }); } catch (_) {} }}
+                      onClick={(e) => { try { logAnalyticsEvent("affiliate_click", { shop: shop.id }); } catch (_) {} if (isNativeDevice()) { e.preventDefault(); AppLauncher.openUrl({ url: shop.url }).catch(() => { try { window.open(shop.url, "_blank"); } catch (_) {} }); } }}
                       className="flex-1 min-w-0 flex items-center justify-center gap-1 px-1 py-2.5 rounded-2xl border border-orange-500 bg-orange-500 hover:bg-orange-600 text-white shadow-md active:scale-[0.98] transition-all duration-150 cursor-pointer"
                     >
                       <ShoppingBag className="w-4 h-4 shrink-0" />

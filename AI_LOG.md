@@ -43,3 +43,4 @@
 2026-11-18 | claude | Supabase (via MCP, no repo file): new table category_daily_clicks(day,category,sub_category,clicks; RLS on, no policies); increment_listing_click now also +1 per category/day; backfilled 22 dated clicks | DB only
 2026-11-18 | claude | Supabase (via MCP): increment_listing_click per-IP click limit 120 -> 600/hour (shared mobile IPs); counts guests and logged-in | DB only
 2026-11-19 | claude | হোম বাটন সারিতে Daraz অ্যাফিলিয়েট 'অনলাইন শপ' বাটন (হেভি ইকুইপমেন্ট ও ভিডিওর মাঝে, নতুন ট্যাবে খোলে); লিংক AFFILIATE_SHOPS লিস্টে | src/components/MarketplaceTab.tsx
+2026-11-19 | claude-chat | অনলাইন শপ বাটন নেটিভ অ্যাপে অ্যাপের ব্রাউজারের বদলে AppLauncher দিয়ে ফোনের Chrome/Daraz অ্যাপে খোলে (ওয়েবে আগের মতো); নতুন APK লাগবে | src/components/MarketplaceTab.tsx, package.json, package-lock.json
