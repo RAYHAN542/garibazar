@@ -44,6 +44,21 @@ export default function ShopPage({
   const [image, setImage] = useState("");
   const [price, setPrice] = useState("");
   const [saving, setSaving] = useState(false);
+  const [pasteText, setPasteText] = useState("");
+  // Daraz-এর "Copy Info" লেখা পেস্ট করলে নাম, দাম, লিংক নিজে বসে যায়।
+  const parseInfo = (text: string) => {
+    setPasteText(text);
+    const name = text.match(/Product Name:\s*(.+)/i);
+    const orig = text.match(/Product Price:\s*(.+)/i);
+    const disc = text.match(/Discount Price:\s*(.+)/i);
+    const link = text.match(/https:\/\/\S+/);
+    if (name) setTitle(name[1].trim().slice(0, 120));
+    if (link) setUrl(link[0].trim());
+    const o = orig ? orig[1].trim() : "";
+    const d = disc ? disc[1].trim() : "";
+    if (d && o && d !== o) setPrice((d + " (ছিল " + o + ")").slice(0, 30));
+    else if (d || o) setPrice((d || o).slice(0, 30));
+  };
 
   // ব্যাক বাটন চাপলে শপ বন্ধ হবে (অ্যাপ থেকে বের হবে না)।
   useEffect(() => {
@@ -90,7 +105,7 @@ export default function ShopPage({
     });
     setSaving(false);
     if (error) { alert((bn ? "যোগ হয়নি: " : "Failed: ") + error.message); return; }
-    setTitle(""); setUrl(""); setImage(""); setPrice("");
+    setTitle(""); setUrl(""); setImage(""); setPrice(""); setPasteText("");
     setFormOpen(false);
     void load();
   };
@@ -127,6 +142,7 @@ export default function ShopPage({
         {isAdmin && formOpen && (
           <div className="mb-4 p-3 rounded-2xl bg-white dark:bg-slate-900 border border-orange-300 space-y-2">
             <p className="text-xs font-black text-orange-600">{bn ? "নতুন প্রোডাক্ট (শুধু অ্যাডমিন দেখছেন)" : "New product (admin only)"}</p>
+            <textarea className={inputCls} rows={3} placeholder={bn ? "Daraz-এর Copy Info এখানে পেস্ট করুন (নাম, দাম, লিংক নিজে বসে যাবে)" : "Paste Daraz Copy Info here"} value={pasteText} onChange={(e) => parseInfo(e.target.value)} />
             <input className={inputCls} placeholder={bn ? "প্রোডাক্টের নাম *" : "Product name *"} value={title} onChange={(e) => setTitle(e.target.value)} />
             <input className={inputCls} placeholder={bn ? "Daraz affiliate লিংক (https://...) *" : "Affiliate link (https://...) *"} value={url} onChange={(e) => setUrl(e.target.value)} />
             <input className={inputCls} placeholder={bn ? "ছবির লিংক (https://..., ইচ্ছামতো)" : "Image link (optional)"} value={image} onChange={(e) => setImage(e.target.value)} />
