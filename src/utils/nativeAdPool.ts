@@ -8,8 +8,8 @@ let inflight: Promise<void> | null = null;
 let counter = 0;
 
 // No-fill backoff: after a failed load, don't send new ad requests for a while
-// (0.5 -> 1 -> 2 -> 5 min). Resets on the first successful load.
-const BACKOFF_MINUTES = [0.5, 1, 2, 5];
+// (2 -> 5 -> 15 -> 30 min). Resets on the first successful load.
+const BACKOFF_MINUTES = [2, 5, 15, 30];
 let failStreak = 0;
 let blockedUntil = 0;
 // শেষ আসল ব্যর্থতার কারণ (শুধু ডিবাগ বক্সে দেখানোর জন্য)

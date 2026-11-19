@@ -56,3 +56,4 @@
 2026-11-19 | claude | app-ads.txt: added InMobi seller line (Only InMobi list from the InMobi dashboard) | public/app-ads.txt
 2026-11-19 | claude-chat | site_visits-এ app_version কলাম (Supabase migration site_visits_app_version); অ্যাপ/ওয়েব ভিজিটে ভার্সন ("web" বা "x.y.z(build)") পাঠানো ও জমা | api/track-event.ts, src/utils/trackEvent.ts
 2026-11-20 | claude | টেস্ট ফেরানো: Unity+InMobi adapter চালু, R8 ও PG আগের অবস্থায় (পুরোনো #431 বিল্ডেও No fill, তাই কারণ অ্যাপের বাইরে)
+2026-11-20 | claude | Reverted native ad no-fill backoff to 2/5/15/30 min: AdMob data showed requests -60% with impressions +154% after long backoff | src/utils/nativeAdPool.ts
