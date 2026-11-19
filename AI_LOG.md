@@ -57,3 +57,4 @@
 2026-11-19 | claude-chat | site_visits-এ app_version কলাম (Supabase migration site_visits_app_version); অ্যাপ/ওয়েব ভিজিটে ভার্সন ("web" বা "x.y.z(build)") পাঠানো ও জমা | api/track-event.ts, src/utils/trackEvent.ts
 2026-11-20 | claude | টেস্ট: Unity + InMobi mediation adapter সাময়িক কমেন্ট-আউট (টেস্ট ad 'No fill' কারণ ধরতে; ফল দেখে ফেরানো/রাখা ঠিক হবে) | android/app/build.gradle
 2026-11-20 | claude | টেস্ট: R8 keep firebase+gms ফিরিয়ে আনা (টেস্ট ad 'No fill' কারণ ধরতে; ফল দেখে রাখা/সরানো ঠিক হবে) | android/app/proguard-rules.pro
+2026-11-20 | claude | টেস্ট: AdMob MAX_AD_CONTENT_RATING_PG সাময়িক বন্ধ (R8/Unity/InMobi কারণ না প্রমাণিত; টেস্ট ad 'No fill' কারণ ধরতে; ফল দেখে ফেরানো ঠিক হবে) | NativeAdsPlugin.java
