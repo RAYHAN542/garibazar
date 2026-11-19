@@ -68,6 +68,17 @@ if (typeof document !== "undefined") {
   }
 }
 
+// Counts a tap on an affiliate shop button (once per visitor per shop per day). Never throws.
+export function trackAffiliateClick(shop: string): void {
+  try {
+    const visitor = getVisitorId();
+    if (!visitor) return;
+    void Promise.resolve(supabase.rpc("log_affiliate_click", { p_shop: shop, p_visitor: visitor })).catch(() => {});
+  } catch {
+    // analytics must never break the page
+  }
+}
+
 // True only for Android phones browsing the website (not inside the app,
 // not an already-installed PWA, not iPhone/desktop).
 export function isAndroidWeb(): boolean {
