@@ -55,3 +55,4 @@
 2026-11-19 | claude | AdMob mediation: added InMobi adapter com.google.ads.mediation:inmobi:11.1.0.0 (branch ai-claude/inmobi, merge only after green build) | android/app/build.gradle
 2026-11-19 | claude | app-ads.txt: added InMobi seller line (Only InMobi list from the InMobi dashboard) | public/app-ads.txt
 2026-11-19 | claude-chat | site_visits-এ app_version কলাম (Supabase migration site_visits_app_version); অ্যাপ/ওয়েব ভিজিটে ভার্সন ("web" বা "x.y.z(build)") পাঠানো ও জমা | api/track-event.ts, src/utils/trackEvent.ts
+2026-11-20 | claude | টেস্ট: Unity + InMobi mediation adapter সাময়িক কমেন্ট-আউট (টেস্ট ad 'No fill' কারণ ধরতে; ফল দেখে ফেরানো/রাখা ঠিক হবে) | android/app/build.gradle
