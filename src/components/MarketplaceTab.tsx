@@ -15,8 +15,7 @@ import { fetchVideoListings } from "../utils/listingsApi";
 import { mixFeed, trackInterest } from "../utils/feedRanker";
 import { isNativeDevice, checkPushPerm, syncDeviceToken, requestDevicePush, shouldAutoAsk, recordAsked } from "../utils/devicePush";
 import type { PushPerm } from "../utils/devicePush";
-import { AppLauncher } from "@capacitor/app-launcher";
-import { trackAffiliateClick } from "../utils/playStore";
+import ShopPage from "./ShopPage";
 
 // 🛒 অনলাইন শপ (অ্যাফিলিয়েট) -- নতুন অ্যাপ যোগ করতে শুধু এখানে এক লাইন বাড়াও।
 const AFFILIATE_SHOPS = [
@@ -208,6 +207,7 @@ export default function MarketplaceTab({
   const [isCityPickerOpen, setIsCityPickerOpen] = useState(false);
 const [isSearchOpen, setIsSearchOpen] = useState(false);
 const [isVideoFeedOpen, setIsVideoFeedOpen] = useState(false);
+const [isShopOpen, setIsShopOpen] = useState(false);
 // 🎬 যেসব লিস্টিংয়ে সেলার ভিডিও দিয়েছে (videoUrl আছে) শুধু সেগুলো -- "ভিডিও দেখুন" ফিডের জন্য।
 const videoListings = useMemo(
   () => [...adListings, ...listings.filter((l) => !adListings.some((a) => a.id === l.id))].filter((l) => !!l.videoUrl && !l.isSold),
@@ -600,7 +600,7 @@ const feedListings = spotlightFiller ? feedItems.slice(1) : feedItems;
                       href={shop.url}
                       target="_blank"
                       rel="sponsored noopener noreferrer"
-                      onClick={(e) => { try { logAnalyticsEvent("affiliate_click", { shop: shop.id }); } catch (_) {} trackAffiliateClick(shop.id); if (isNativeDevice()) { e.preventDefault(); AppLauncher.openUrl({ url: shop.url }).catch(() => { try { window.open(shop.url, "_blank"); } catch (_) {} }); } }}
+                      onClick={(e) => { e.preventDefault(); try { logAnalyticsEvent("affiliate_click", { shop: shop.id }); } catch (_) {} setIsShopOpen(true); }}
                       className="flex-1 min-w-0 flex items-center justify-center gap-1 px-1 py-2.5 rounded-2xl border border-orange-500 bg-orange-500 hover:bg-orange-600 text-white shadow-md active:scale-[0.98] transition-all duration-150 cursor-pointer"
                     >
                       <ShoppingBag className="w-4 h-4 shrink-0" />
@@ -786,6 +786,7 @@ const feedListings = spotlightFiller ? feedItems.slice(1) : feedItems;
                   </div>
                 )}
 
+{isShopOpen && <ShopPage language={language} isAdmin={isUserAdmin} fallbackUrl={AFFILIATE_SHOPS[0].url} onClose={() => setIsShopOpen(false)} />}
 {isSearchOpen && <SearchPage language={language} listings={[...adListings, ...listings.filter((l) => !adListings.some((a) => a.id === l.id))]} searchHistory={searchHistory} onSaveHistory={appendSearchHistory} onClose={() => setIsSearchOpen(false)} onSelect={(l) => { setIsSearchOpen(false); viewListing(l); }} />}
 {isVideoFeedOpen && <VideoFeed onPosted={() => setVideoRefresh((n) => n + 1)} onStartChat={onStartChat} isAdmin={isUserAdmin} language={language} videos={feedVideos} currentUser={user} onLoginPrompt={() => setIsAuthOpen(true)} onClose={() => setIsVideoFeedOpen(false)} onSelect={(l) => { setIsVideoFeedOpen(false); viewListing(l); }} />}
                 {isNotifModalOpen && isNativeDevice() && (
