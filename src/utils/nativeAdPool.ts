@@ -25,8 +25,9 @@ export async function loadAdWithRetry(id: string, unit: string, isCancelled: () 
     throw new Error("ad-backoff " + mins + "m" + (lastLoadError ? " (" + lastLoadError + ")" : ""));
   }
   // Healthy: one quick retry. After failures: a single attempt only.
-  const waits = failStreak === 0 ? [0, 1200] : [0];
+  const waits = failStreak === 0 ? [0, 5000] : [0];
   let lastErr: unknown = null;
+  let firstErr: unknown = null;
   for (const w of waits) {
     if (w) {
       await sleep(w);
@@ -40,13 +41,18 @@ export async function loadAdWithRetry(id: string, unit: string, isCancelled: () 
       lastLoadError = "";
       return;
     } catch (e) {
+      if (!firstErr) firstErr = e;
       lastErr = e;
     }
   }
-  lastLoadError = String((lastErr as { message?: string } | null)?.message ?? lastErr).slice(0, 120);
+  const msgOf = (x: unknown) => String((x as { message?: string } | null)?.message ?? x);
+  const m1 = msgOf(firstErr).slice(0, 110);
+  const m2 = msgOf(lastErr).slice(0, 80);
+  const combined = m1 === m2 ? m1 : "first: " + m1 + " >> then: " + m2;
+  lastLoadError = combined.slice(0, 200);
   failStreak++;
   blockedUntil = Date.now() + BACKOFF_MINUTES[Math.min(failStreak - 1, BACKOFF_MINUTES.length - 1)] * 60 * 1000;
-  throw lastErr;
+  throw new Error(combined);
 }
 
 function preload(): Promise<void> {
