@@ -54,3 +54,4 @@
 2026-11-19 | claude | Native ad no-fill backoff shortened from 2/5/15/30 min to 0.5/1/2/5 min (match rate was 63%, requests down 60%) | src/utils/nativeAdPool.ts
 2026-11-19 | claude | AdMob mediation: added InMobi adapter com.google.ads.mediation:inmobi:11.1.0.0 (branch ai-claude/inmobi, merge only after green build) | android/app/build.gradle
 2026-11-19 | claude | app-ads.txt: added InMobi seller line (Only InMobi list from the InMobi dashboard) | public/app-ads.txt
+2026-11-19 | claude-chat | site_visits-এ app_version কলাম (Supabase migration site_visits_app_version); অ্যাপ/ওয়েব ভিজিটে ভার্সন ("web" বা "x.y.z(build)") পাঠানো ও জমা | api/track-event.ts, src/utils/trackEvent.ts

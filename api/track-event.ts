@@ -334,6 +334,9 @@ export default async function handler(req: any, res: any) {
     const referrer = typeof body?.referrer === "string" ? body.referrer.slice(0, 300) : "";
     const visitDeviceId =
       typeof body?.deviceId === "string" && /^[A-Za-z0-9-]{16,64}$/.test(body.deviceId) ? body.deviceId : null;
+    // অ্যাপ ভার্সন (যেমন "1.2.3(45)") বা "web"; অচেনা ফরম্যাট হলে বাদ।
+    const appVersion =
+      typeof body?.appVersion === "string" && /^[A-Za-z0-9._() -]{1,32}$/.test(body.appVersion) ? body.appVersion : null;
 
     const ip = getClientIp(req);
 
@@ -380,6 +383,7 @@ export default async function handler(req: any, res: any) {
         referrer,
         path,
         device_id: visitDeviceId,
+        app_version: appVersion,
       });
       if (insertErr) console.error("site_visits insert error:", insertErr);
     } else {
