@@ -48,3 +48,4 @@
 2026-11-19 | claude-chat | অনলাইন শপ বাটন এখন শপ পেজ খোলে: অ্যাডমিন অ্যাপ থেকেই একটা একটা করে প্রোডাক্ট (নাম, affiliate লিংক, ছবি, দাম) যোগ/লুকানো/মোছা করে, সবাই দেখে; প্রোডাক্ট ডাটাবেসে তাই যোগ করতে APK লাগে না; Supabase: shop_products (RLS: লেখা শুধু is_admin) + log_shop_click RPC; নতুন APK লাগবে (প্রথমবার) | src/components/ShopPage.tsx, src/components/MarketplaceTab.tsx, DB
 2026-11-19 | claude-chat | শপ ফর্মে Daraz 'Copy Info' পেস্ট-বক্স: নাম, ছাড়ের দাম (আগের দামসহ) ও লিংক নিজে বসে যায় | src/components/ShopPage.tsx
 2026-11-19 | claude-chat | শপ ফর্মে গ্যালারি থেকে ছবি বাছাই (আগের uploadToCloudinary = R2 আপলোড ব্যবহার, লগইন লাগে) | src/components/ShopPage.tsx
+2026-11-19 | claude | অনলাইন শপ পেজ: ওপরের 'Daraz-এ আরো প্রোডাক্ট দেখুন' বাটন সরানো; প্রতিটা কার্ডে 'Daraz-এ N বিক্রি' (shop_products.sold_text, অ্যাডমিন ফর্মে নতুন ঘর + পেন্সিল বাটনে সম্পাদনা) | src/components/ShopPage.tsx + DB sold_text কলাম

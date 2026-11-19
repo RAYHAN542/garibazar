@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import type { ChangeEvent } from "react";
 import { uploadToCloudinary } from "../utils/cloudinary";
-import { X, ShoppingBag, Plus, Trash2, Eye, EyeOff, Loader2, ExternalLink } from "lucide-react";
+import { X, ShoppingBag, Plus, Trash2, Eye, EyeOff, Loader2, Pencil } from "lucide-react";
 import { AppLauncher } from "@capacitor/app-launcher";
 import { supabase } from "../supabase";
 import { isNativeDevice } from "../utils/devicePush";
@@ -14,6 +14,7 @@ interface Product {
   url: string;
   image_url: string | null;
   price_text: string | null;
+  sold_text: string | null;
   shop: string;
   active: boolean;
   clicks: number;
@@ -30,7 +31,6 @@ const openExternal = (url: string) => {
 export default function ShopPage({
   language,
   isAdmin,
-  fallbackUrl,
   onClose,
 }: {
   language: SupportedLanguage;
@@ -45,6 +45,7 @@ export default function ShopPage({
   const [url, setUrl] = useState("");
   const [image, setImage] = useState("");
   const [price, setPrice] = useState("");
+  const [sold, setSold] = useState("");
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const pickImage = async (e: ChangeEvent<HTMLInputElement>) => {
@@ -118,16 +119,24 @@ export default function ShopPage({
       url: u,
       image_url: im || null,
       price_text: price.trim() || null,
+      sold_text: sold.trim().slice(0, 20) || null,
     });
     setSaving(false);
     if (error) { alert((bn ? "যোগ হয়নি: " : "Failed: ") + error.message); return; }
-    setTitle(""); setUrl(""); setImage(""); setPrice(""); setPasteText("");
+    setTitle(""); setUrl(""); setImage(""); setPrice(""); setSold(""); setPasteText("");
     setFormOpen(false);
     void load();
   };
 
   const toggleActive = async (p: Product) => {
     await supabase.from("shop_products").update({ active: !p.active }).eq("id", p.id);
+    void load();
+  };
+  const editSold = async (p: Product) => {
+    const v = window.prompt(bn ? "Daraz-এ কত বিক্রি? (যেমন 618 বা 1.9k, ফাঁকা রাখলে মুছে যাবে)" : "Sold on Daraz (e.g. 618 or 1.9k; empty = clear)", p.sold_text || "");
+    if (v === null) return;
+    const { error } = await supabase.from("shop_products").update({ sold_text: v.trim().slice(0, 20) || null }).eq("id", p.id);
+    if (error) { alert((bn ? "সেভ হয়নি: " : "Failed: ") + error.message); return; }
     void load();
   };
   const removeProduct = async (p: Product) => {
@@ -170,17 +179,13 @@ export default function ShopPage({
             </div>
             <input className={inputCls} placeholder={bn ? "ছবির লিংক (https://..., ইচ্ছামতো)" : "Image link (optional)"} value={image} onChange={(e) => setImage(e.target.value)} />
             <input className={inputCls} placeholder={bn ? "দাম, যেমন ৳১৪৯ (ইচ্ছামতো)" : "Price, e.g. ৳149 (optional)"} value={price} onChange={(e) => setPrice(e.target.value)} />
+            <input className={inputCls} placeholder={bn ? "Daraz-এ কত বিক্রি, যেমন 618 বা 1.9k (শুধু আসল সংখ্যা)" : "Sold on Daraz, e.g. 618 or 1.9k (real number only)"} value={sold} onChange={(e) => setSold(e.target.value)} />
             <button type="button" onClick={addProduct} disabled={saving} className="w-full py-2.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-black text-sm cursor-pointer disabled:opacity-60 flex items-center justify-center gap-2">
               {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
               <span>{bn ? "শপে যোগ করুন" : "Add to shop"}</span>
             </button>
           </div>
         )}
-
-        <button type="button" onClick={() => { trackAffiliateClick("daraz"); openExternal(fallbackUrl); }} className="w-full mb-3 py-3 rounded-2xl bg-orange-500 hover:bg-orange-600 text-white font-black text-sm flex items-center justify-center gap-2 cursor-pointer shadow-md">
-          <ExternalLink className="w-4 h-4" />
-          <span>{bn ? "Daraz-এ আরো প্রোডাক্ট দেখুন" : "See more on Daraz"}</span>
-        </button>
 
         {items === null ? (
           <div className="py-16 flex justify-center"><Loader2 className="w-7 h-7 text-orange-500 animate-spin" /></div>
@@ -201,6 +206,7 @@ export default function ShopPage({
                   <div className="p-2 flex-1">
                     <p className="text-xs font-bold text-slate-800 dark:text-slate-100 line-clamp-2 leading-snug">{p.title}</p>
                     {p.price_text && <p className="mt-1 text-sm font-black text-orange-600">{p.price_text}</p>}
+                    {p.sold_text && <p className="mt-0.5 text-[11px] font-bold text-slate-500 dark:text-slate-400">{bn ? "Daraz-এ " + p.sold_text + " বিক্রি" : p.sold_text + " sold on Daraz"}</p>}
                   </div>
                 </button>
                 <button type="button" onClick={() => openProduct(p)} className="mx-2 mb-2 py-1.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-xs font-black cursor-pointer">
@@ -209,6 +215,7 @@ export default function ShopPage({
                 {isAdmin && (
                   <div className="px-2 pb-2 flex items-center gap-2 text-[10px] font-bold text-slate-500">
                     <span className="flex-1">{bn ? "ক্লিক: " : "Clicks: "}{p.clicks}</span>
+                    <button type="button" onClick={() => editSold(p)} className="p-1 cursor-pointer" title="sold"><Pencil className="w-4 h-4" /></button>
                     <button type="button" onClick={() => toggleActive(p)} className="p-1 cursor-pointer" title={p.active ? "hide" : "show"}>
                       {p.active ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                     </button>
