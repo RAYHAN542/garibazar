@@ -49,3 +49,4 @@
 2026-11-19 | claude-chat | শপ ফর্মে Daraz 'Copy Info' পেস্ট-বক্স: নাম, ছাড়ের দাম (আগের দামসহ) ও লিংক নিজে বসে যায় | src/components/ShopPage.tsx
 2026-11-19 | claude-chat | শপ ফর্মে গ্যালারি থেকে ছবি বাছাই (আগের uploadToCloudinary = R2 আপলোড ব্যবহার, লগইন লাগে) | src/components/ShopPage.tsx
 2026-11-19 | claude | অনলাইন শপ পেজ: ওপরের 'Daraz-এ আরো প্রোডাক্ট দেখুন' বাটন সরানো; প্রতিটা কার্ডে 'Daraz-এ N বিক্রি' (shop_products.sold_text, অ্যাডমিন ফর্মে নতুন ঘর + পেন্সিল বাটনে সম্পাদনা) | src/components/ShopPage.tsx + DB sold_text কলাম
+2026-11-19 | claude | Native ad ডিবাগ: backoff-এর সময়ও আসল ব্যর্থতার কারণ (load failed: কোড কারণ) ও বাকি মিনিট হলুদ বক্সে দেখায় (শুধু টেস্ট ইনস্টল; Play Store-এ কিছু বদলায়নি) | src/utils/nativeAdPool.ts

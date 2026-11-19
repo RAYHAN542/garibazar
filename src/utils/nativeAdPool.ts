@@ -12,13 +12,18 @@ let counter = 0;
 const BACKOFF_MINUTES = [2, 5, 15, 30];
 let failStreak = 0;
 let blockedUntil = 0;
+// শেষ আসল ব্যর্থতার কারণ (শুধু ডিবাগ বক্সে দেখানোর জন্য)
+let lastLoadError = "";
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
 /** No fill হলে দ্রুত আবার চেষ্টা (০, ১.২ সেকেন্ড, ৩ সেকেন্ড)। সবগুলো ব্যর্থ হলে error ছোড়ে। */
 export async function loadAdWithRetry(id: string, unit: string, isCancelled: () => boolean = () => false): Promise<void> {
   // Recent no-fill: skip the request entirely so AdMob isn't hammered.
-  if (Date.now() < blockedUntil) throw new Error("ad-backoff");
+  if (Date.now() < blockedUntil) {
+    const mins = Math.max(1, Math.ceil((blockedUntil - Date.now()) / 60000));
+    throw new Error("ad-backoff " + mins + "m" + (lastLoadError ? " (" + lastLoadError + ")" : ""));
+  }
   // Healthy: one quick retry. After failures: a single attempt only.
   const waits = failStreak === 0 ? [0, 1200] : [0];
   let lastErr: unknown = null;
@@ -32,11 +37,13 @@ export async function loadAdWithRetry(id: string, unit: string, isCancelled: () 
       await NativeAds.load({ id, adUnitId: unit });
       failStreak = 0;
       blockedUntil = 0;
+      lastLoadError = "";
       return;
     } catch (e) {
       lastErr = e;
     }
   }
+  lastLoadError = String((lastErr as { message?: string } | null)?.message ?? lastErr).slice(0, 120);
   failStreak++;
   blockedUntil = Date.now() + BACKOFF_MINUTES[Math.min(failStreak - 1, BACKOFF_MINUTES.length - 1)] * 60 * 1000;
   throw lastErr;
