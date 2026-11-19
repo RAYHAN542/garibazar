@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import type { ChangeEvent } from "react";
+import { uploadToCloudinary } from "../utils/cloudinary";
 import { X, ShoppingBag, Plus, Trash2, Eye, EyeOff, Loader2, ExternalLink } from "lucide-react";
 import { AppLauncher } from "@capacitor/app-launcher";
 import { supabase } from "../supabase";
@@ -44,6 +46,20 @@ export default function ShopPage({
   const [image, setImage] = useState("");
   const [price, setPrice] = useState("");
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const pickImage = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files && e.target.files[0];
+    e.target.value = "";
+    if (!file) return;
+    setUploading(true);
+    try {
+      const u = await uploadToCloudinary(file);
+      setImage(u);
+    } catch (err: any) {
+      alert((bn ? "ছবি আপলোড হয়নি: " : "Upload failed: ") + (err && err.message ? err.message : String(err)));
+    }
+    setUploading(false);
+  };
   const [pasteText, setPasteText] = useState("");
   // Daraz-এর "Copy Info" লেখা পেস্ট করলে নাম, দাম, লিংক নিজে বসে যায়।
   const parseInfo = (text: string) => {
@@ -145,6 +161,13 @@ export default function ShopPage({
             <textarea className={inputCls} rows={3} placeholder={bn ? "Daraz-এর Copy Info এখানে পেস্ট করুন (নাম, দাম, লিংক নিজে বসে যাবে)" : "Paste Daraz Copy Info here"} value={pasteText} onChange={(e) => parseInfo(e.target.value)} />
             <input className={inputCls} placeholder={bn ? "প্রোডাক্টের নাম *" : "Product name *"} value={title} onChange={(e) => setTitle(e.target.value)} />
             <input className={inputCls} placeholder={bn ? "Daraz affiliate লিংক (https://...) *" : "Affiliate link (https://...) *"} value={url} onChange={(e) => setUrl(e.target.value)} />
+            <div className="flex items-center gap-2">
+              <label className="flex-1 py-2 rounded-xl border border-dashed border-orange-400 text-orange-600 text-xs font-black text-center cursor-pointer">
+                {uploading ? (bn ? "আপলোড হচ্ছে..." : "Uploading...") : (bn ? "📷 গ্যালারি থেকে ছবি বাছুন" : "📷 Choose image")}
+                <input type="file" accept="image/*" className="hidden" disabled={uploading} onChange={pickImage} />
+              </label>
+              {image && <img src={image} alt="" className="w-12 h-12 rounded-lg object-cover border border-slate-200" />}
+            </div>
             <input className={inputCls} placeholder={bn ? "ছবির লিংক (https://..., ইচ্ছামতো)" : "Image link (optional)"} value={image} onChange={(e) => setImage(e.target.value)} />
             <input className={inputCls} placeholder={bn ? "দাম, যেমন ৳১৪৯ (ইচ্ছামতো)" : "Price, e.g. ৳149 (optional)"} value={price} onChange={(e) => setPrice(e.target.value)} />
             <button type="button" onClick={addProduct} disabled={saving} className="w-full py-2.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-black text-sm cursor-pointer disabled:opacity-60 flex items-center justify-center gap-2">
