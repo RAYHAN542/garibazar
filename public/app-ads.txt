@@ -1,2 +1,3 @@
 google.com, pub-1085596401571838, DIRECT, f08c47fec0942fa0
 facebook.com, 1406024351422505, DIRECT, c3e20eee3f780d68
+inmobi.com, bd13b911f78743ae93b3959ec0681e40, DIRECT, 83e75a7ae333ca9d
