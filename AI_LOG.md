@@ -59,3 +59,4 @@
 2026-11-20 | claude | Reverted native ad no-fill backoff to 2/5/15/30 min: AdMob data showed requests -60% with impressions +154% after long backoff | src/utils/nativeAdPool.ts
 2026-11-20 | claude | sideload APK-র native test ইউনিট 2247696110 → 1044960115 (Interstitial test কাজ করে কিন্তু native সবসময় No fill; শুধু test ইউনিট, Play Store live ইউনিট একই) | src/utils/nativeAds.ts
 2026-11-20 | claude | sideload APK-তে native ad আসল ইউনিটে (Google native test ইউনিট দুটোই No fill; ফোন AdMob Test device তাই 'Test Ad' লেবেল); debug বক্স sideload-এ থাকে; Play Store অপরিবর্তিত | src/utils/nativeAds.ts
+2026-11-21 | claude | Interstitial ad দেখানোর আগে ৮০০ms বিরতি (AdMob CTR 38% = ভুল ক্লিকের সন্দেহ; Tips প্লে-ট্যাপ ও ভিডিও swipe-এর ঠিক পরে ad আসত) | InterstitialAdsPlugin.java

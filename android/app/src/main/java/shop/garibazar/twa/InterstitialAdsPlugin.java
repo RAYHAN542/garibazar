@@ -100,7 +100,16 @@ public class InterstitialAdsPlugin extends Plugin {
                     call.resolve(r);
                 }
             });
-            ad.show(getActivity());
+            // swipe/ট্যাপ থেকে আঙুল সরে যেতে সময় দিই, নইলে ad ঠিক আঙুলের নিচে এসে ভুল ক্লিক হয়
+            new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
+                try {
+                    ad.show(getActivity());
+                } catch (Exception e) {
+                    JSObject r = new JSObject();
+                    r.put("shown", false);
+                    call.resolve(r);
+                }
+            }, 800);
         });
     }
 }
