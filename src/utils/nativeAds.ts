@@ -23,7 +23,7 @@ export const NativeAds = registerPlugin<NativeAdsPlugin>("NativeAds");
 export const isNativeAdsSupported = (): boolean =>
   Capacitor.isNativePlatform() && Capacitor.getPlatform() === "android";
 
-const TEST_NATIVE_UNIT = "ca-app-pub-3940256099942544/2247696110";
+const TEST_NATIVE_UNIT = "ca-app-pub-3940256099942544/1044960115"; // Native Video test (আগে 2247696110 → No fill)
 const LIVE_NATIVE_UNIT = "ca-app-pub-1085596401571838/3337709776";
 
 export const IS_TEST_UNIT = (unit: string): boolean => unit === TEST_NATIVE_UNIT;
