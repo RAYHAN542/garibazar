@@ -26,7 +26,10 @@ export const isNativeAdsSupported = (): boolean =>
 const TEST_NATIVE_UNIT = "ca-app-pub-3940256099942544/1044960115"; // Native Video test (আগে 2247696110 → No fill)
 const LIVE_NATIVE_UNIT = "ca-app-pub-1085596401571838/3337709776";
 
-export const IS_TEST_UNIT = (unit: string): boolean => unit === TEST_NATIVE_UNIT;
+// sideload (Play Store ছাড়া) ইনস্টল হলে true -- তখন আসল ইউনিটেও debug বক্স দেখায়
+let sideloadInstall = false;
+
+export const IS_TEST_UNIT = (unit: string): boolean => unit === TEST_NATIVE_UNIT || sideloadInstall;
 
 let unitPromise: Promise<string> | null = null;
 
@@ -39,7 +42,9 @@ export function resolveNativeUnit(): Promise<string> {
     unitPromise = (async () => {
       try {
         const r = await NativeAds.installSource();
-        return r.fromPlayStore ? LIVE_NATIVE_UNIT : TEST_NATIVE_UNIT;
+        // sideload-এ Google-এর native test ইউনিট সবসময় No fill দিচ্ছিল; ফোন AdMob Test device তাই আসল ইউনিটও Test Ad হয়ে আসে
+        sideloadInstall = !r.fromPlayStore;
+        return LIVE_NATIVE_UNIT;
       } catch {
         return TEST_NATIVE_UNIT;
       }

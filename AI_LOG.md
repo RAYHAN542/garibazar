@@ -58,3 +58,4 @@
 2026-11-20 | claude | টেস্ট ফেরানো: Unity+InMobi adapter চালু, R8 ও PG আগের অবস্থায় (পুরোনো #431 বিল্ডেও No fill, তাই কারণ অ্যাপের বাইরে)
 2026-11-20 | claude | Reverted native ad no-fill backoff to 2/5/15/30 min: AdMob data showed requests -60% with impressions +154% after long backoff | src/utils/nativeAdPool.ts
 2026-11-20 | claude | sideload APK-র native test ইউনিট 2247696110 → 1044960115 (Interstitial test কাজ করে কিন্তু native সবসময় No fill; শুধু test ইউনিট, Play Store live ইউনিট একই) | src/utils/nativeAds.ts
+2026-11-20 | claude | sideload APK-তে native ad আসল ইউনিটে (Google native test ইউনিট দুটোই No fill; ফোন AdMob Test device তাই 'Test Ad' লেবেল); debug বক্স sideload-এ থাকে; Play Store অপরিবর্তিত | src/utils/nativeAds.ts
