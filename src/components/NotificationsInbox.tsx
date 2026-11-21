@@ -103,7 +103,7 @@ export default function NotificationsInbox({ language, listings, notifOff, onEna
     try {
       const saved = JSON.parse(localStorage.getItem("gari_push_inbox") || "[]");
       for (const p of saved) {
-        if (!p || (!p.chatId && !p.listingId)) continue;
+        if (!p || (!p.chatId && !p.listingId) || (!p.title && !p.body)) continue;
         pushCards.push({
           id: "push-" + p.id,
           kind: "push",
