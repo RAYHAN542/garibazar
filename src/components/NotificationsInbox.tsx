@@ -227,7 +227,7 @@ export default function NotificationsInbox({ language, listings, notifOff, onEna
             <div key={card.id} className="border-b border-slate-200 dark:border-slate-800">
               <button
                 type="button"
-                onClick={() => (isSell ? leave(onSell) : card.kind === "push" ? leave(() => window.dispatchEvent(new CustomEvent("gari_push_target", { detail: { listingId: card.listingId, chatId: card.chatId } }))) : setOpenId(open ? null : card.id))}
+                onClick={() => (isSell ? leave(onSell) : card.kind === "push" ? leave(() => { try { const kept = JSON.parse(localStorage.getItem("gari_push_inbox") || "[]").filter((x: any) => "push-" + x.id !== card.id); localStorage.setItem("gari_push_inbox", JSON.stringify(kept)); } catch (_) {} window.dispatchEvent(new CustomEvent("gari_push_target", { detail: { listingId: card.listingId, chatId: card.chatId } })); }) : setOpenId(open ? null : card.id))}
                 className="w-full flex items-start gap-3 px-4 py-3.5 text-left cursor-pointer active:bg-slate-100 dark:active:bg-slate-900"
               >
                 {isSell || card.kind === "push" ? (
