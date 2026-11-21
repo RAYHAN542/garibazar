@@ -24,7 +24,7 @@ import {
 import { shuffleArray, interleaveAds, MAX_SPOTLIGHT_ADS, MAX_INLINE_ADS, ADS_INTERLEAVE_GAP } from "./utils/adRotation.js";
 import { useAdPromotion } from "./hooks/useAdPromotion";
 import { usePushNotifications } from "./hooks/usePushNotifications";
-import { Car, Search, User, LogOut, Globe, Loader2, ShoppingBag, Phone, ChevronRight, ShieldCheck, Send, Check, Download, Smartphone } from "lucide-react";
+import { Car, Search, User, LogOut, Globe, Loader2, ShoppingBag, Phone, ChevronRight, ShieldCheck, Send, Check, Download, Smartphone, Bell } from "lucide-react";
 
 import { PartListing, SupportedLanguage } from "./types";
 import { translations, CATEGORIES, SAMPLE_LISTINGS, AD_PACKAGES } from "./translations";
@@ -32,6 +32,7 @@ import { translations, CATEGORIES, SAMPLE_LISTINGS, AD_PACKAGES } from "./transl
 import { ListingCard } from "./components/ListingCard";
 import { HeaderNav } from "./components/HeaderNav";
 import MarketplaceTab from "./components/MarketplaceTab";
+import { countUnread } from "./utils/notifSeen";
 // 📦 নিচের কম্পোনেন্টগুলো lazy-loaded — এগুলোর কোড শুধু তখনই ডাউনলোড হবে যখন
 // ইউজার সত্যিই সেই অংশে যাবে (modal খুলবে/ট্যাব বদলাবে), শুরুতেই না।
 const ListingDetailModal = lazy(() => import("./components/ListingDetailModal").then(m => ({ default: m.ListingDetailModal })));
@@ -310,6 +311,13 @@ export default function App() {
   // সব বুস্ট করা অ্যাড: হোমপেজের পেজিনেশনের ওপর নির্ভর না করে সরাসরি fetch করা,
   // যাতে "Load More" চাপার আগেই সবসময় বুস্ট ব্যানার দেখা যায়।
   const [adListings, setAdListings] = useState<PartListing[]>([]);
+  const [notifTick, setNotifTick] = useState(0);
+  useEffect(() => {
+    const h = () => setNotifTick((n) => n + 1);
+    window.addEventListener("gb:notif-seen", h);
+    return () => window.removeEventListener("gb:notif-seen", h);
+  }, []);
+  const unreadNotifCount = useMemo(() => countUnread([...listings, ...adListings]), [listings, adListings, notifTick]);
   const [purchases, setPurchases] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -2550,6 +2558,33 @@ export default function App() {
                         </div>
                       </div>
                       <ChevronRight className="w-4 h-4 text-slate-400 dark:text-slate-500" />
+                    </button>
+                  </div>
+
+                  {/* Row 1.7: Notifications (ইনবক্স + লাল সংখ্যা) */}
+                  <div className="transition duration-150">
+                    <button
+                      type="button"
+                      id="profile-row-notifications"
+                      onClick={() => { (window as any).__gbOpenInbox = true; setActiveTab("market"); try { window.dispatchEvent(new Event("gari:open-inbox")); } catch (_) {} }}
+                      className="w-full flex items-center justify-between p-4.5 hover:bg-slate-50 dark:hover:bg-slate-800/40 cursor-pointer text-left transition select-none"
+                    >
+                      <div className="flex items-center gap-3.5">
+                        <div className="w-9 h-9 rounded-full bg-rose-500 text-white flex items-center justify-center shrink-0 shadow-xs">
+                          <Bell className="w-5 h-5 text-white" />
+                        </div>
+                        <p className="text-sm sm:text-base font-extrabold text-slate-800 dark:text-slate-100">
+                          {language === "bn" ? "নোটিফিকেশন" : "Notifications"}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {unreadNotifCount > 0 && (
+                          <span className="min-w-[22px] h-[22px] px-1.5 rounded-full bg-red-500 text-white text-[11px] font-black flex items-center justify-center">
+                            {unreadNotifCount > 99 ? "99+" : unreadNotifCount}
+                          </span>
+                        )}
+                        <ChevronRight className="w-4 h-4 text-slate-400 dark:text-slate-500" />
+                      </div>
                     </button>
                   </div>
 

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, Bell, Plus } from "lucide-react";
 import { PartListing, SupportedLanguage } from "../types";
 import { loadInterest } from "../utils/feedRanker";
+import { markNotifSeen } from "../utils/notifSeen";
 
 // 🔔 নোটিফিকেশন ইনবক্স পেজ: ঘণ্টা চাপলে খোলে।
 // কার্ডগুলো অ্যাপেই বানানো হয় (সার্ভার/খরচ লাগে না): ফোনে জমা পছন্দ (feedRanker) + লোড হওয়া পোস্ট থেকে।
@@ -65,6 +66,7 @@ export default function NotificationsInbox({ language, listings, notifOff, onEna
       ownEntry.current = false;
       onClose();
     };
+    markNotifSeen();
     window.addEventListener("popstate", onPop);
     return () => window.removeEventListener("popstate", onPop);
   }, []);

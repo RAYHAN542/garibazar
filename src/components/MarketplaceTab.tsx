@@ -210,6 +210,12 @@ const [isSearchOpen, setIsSearchOpen] = useState(false);
 const [isVideoFeedOpen, setIsVideoFeedOpen] = useState(false);
 const [isShopOpen, setIsShopOpen] = useState(false);
 const [isInboxOpen, setIsInboxOpen] = useState(false);
+useEffect(() => {
+  const openInbox = () => { (window as any).__gbOpenInbox = false; setIsInboxOpen(true); };
+  if ((window as any).__gbOpenInbox) openInbox();
+  window.addEventListener("gari:open-inbox", openInbox);
+  return () => window.removeEventListener("gari:open-inbox", openInbox);
+}, []);
 const openNotifSettings = () => {
   if (isNativeDevice()) { setIsNotifModalOpen(true); return; }
   if (notificationPermission === "granted") {
