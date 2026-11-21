@@ -171,7 +171,7 @@ export default function NotificationsInbox({ language, listings, notifOff, onEna
           title: bn ? "মিস করবেন না!" : "Don't miss these",
           sub: bn ? `গত ২ দিনে ${pool.length}টি নতুন ${what}` : `${pool.length} new ${what} in the last 2 days`,
           date: fmtDate(pool[0]),
-          items: pool.slice(0, 6),
+          items: pool.slice(0, 50),
         });
       }
 
