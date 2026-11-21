@@ -23,7 +23,9 @@ interface Props {
 
 interface Card {
   id: string;
-  kind: "list" | "sell";
+  kind: "list" | "sell" | "push";
+  chatId?: string;
+  listingId?: string;
   title: string;
   sub: string;
   date: string;
@@ -97,6 +99,23 @@ export default function NotificationsInbox({ language, listings, notifOff, onEna
 
   const cards = useMemo<Card[]>(() => {
     const out: Card[] = [];
+    const pushCards: Card[] = [];
+    try {
+      const saved = JSON.parse(localStorage.getItem("gari_push_inbox") || "[]");
+      for (const p of saved) {
+        if (!p || (!p.chatId && !p.listingId)) continue;
+        pushCards.push({
+          id: "push-" + p.id,
+          kind: "push",
+          title: p.title || (bn ? "নোটিফিকেশন" : "Notification"),
+          sub: p.body || "",
+          date: (() => { try { return new Date(p.ts).toLocaleDateString(bn ? "bn-BD" : "en-US", { month: "short", day: "numeric" }); } catch (_) { return ""; } })(),
+          items: [],
+          chatId: p.chatId || "",
+          listingId: p.listingId || "",
+        });
+      }
+    } catch (_) {}
     try {
       const alive = listings.filter((l) => !l.isSold && !!pic(l)).sort((a, b) => ts(b) - ts(a));
       const it = loadInterest();
@@ -168,7 +187,7 @@ export default function NotificationsInbox({ language, listings, notifOff, onEna
         });
       }
     } catch (_) {}
-    return out;
+    return [...pushCards, ...out];
   }, [listings, language]);
 
   const priceText = (l: PartListing): string => {
@@ -208,12 +227,12 @@ export default function NotificationsInbox({ language, listings, notifOff, onEna
             <div key={card.id} className="border-b border-slate-200 dark:border-slate-800">
               <button
                 type="button"
-                onClick={() => (isSell ? leave(onSell) : setOpenId(open ? null : card.id))}
+                onClick={() => (isSell ? leave(onSell) : card.kind === "push" ? leave(() => window.dispatchEvent(new CustomEvent("gari_push_target", { detail: { listingId: card.listingId, chatId: card.chatId } }))) : setOpenId(open ? null : card.id))}
                 className="w-full flex items-start gap-3 px-4 py-3.5 text-left cursor-pointer active:bg-slate-100 dark:active:bg-slate-900"
               >
-                {isSell ? (
+                {isSell || card.kind === "push" ? (
                   <div className="w-16 h-16 rounded-xl bg-amber-500/15 text-amber-500 flex items-center justify-center shrink-0">
-                    <Plus className="w-8 h-8" />
+                    {card.kind === "push" ? <Bell className="w-7 h-7" /> : <Plus className="w-8 h-8" />}
                   </div>
                 ) : (
                   <div className="w-16 h-16 rounded-xl overflow-hidden grid grid-cols-2 grid-rows-2 gap-px bg-slate-300 dark:bg-slate-700 shrink-0">

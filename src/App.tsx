@@ -450,6 +450,28 @@ export default function App() {
     return () => window.removeEventListener("gari_push_open", onPushOpen);
   }, []);
 
+  useEffect(() => {
+    const onTarget = async (ev: any) => {
+      const d = ev?.detail || {};
+      try {
+        if (d.listingId) {
+          const found = await fetchListingById(String(d.listingId));
+          if (found) {
+            setActiveTab("market");
+            setSelectedListing(found);
+          }
+        } else if (d.chatId) {
+          setSelectedListing(null);
+          setActiveTab("chats");
+        }
+      } catch (e) {
+        console.warn("push target failed:", e);
+      }
+    };
+    window.addEventListener("gari_push_target", onTarget);
+    return () => window.removeEventListener("gari_push_target", onTarget);
+  }, []);
+
   const [hasOpenedSharedListing, setHasOpenedSharedListing] = useState(false);
   useEffect(() => {
     if (hasOpenedSharedListing) return;
