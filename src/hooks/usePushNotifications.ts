@@ -54,7 +54,7 @@ export function usePushNotifications(uid: string | null | undefined) {
                 const n: any = action?.notification || {};
                 const id = String(n.id || Date.now());
                 const old = JSON.parse(localStorage.getItem("gari_push_inbox") || "[]");
-                const list = [{ id, title: String(data.gb_title || n.title || ""), body: String(data.gb_body || n.body || ""), chatId: data.chatId ? String(data.chatId) : "", listingId: data.listingId ? String(data.listingId) : "", ts: Date.now() }, ...old.filter((x: any) => x.id !== id)];
+                const list = [{ id, title: String(data.push_title || data.gb_title || n.title || ""), body: String(data.push_body || data.gb_body || n.body || ""), chatId: data.chatId ? String(data.chatId) : "", listingId: data.listingId ? String(data.listingId) : "", ts: Date.now() }, ...old.filter((x: any) => x.id !== id)];
                 localStorage.setItem("gari_push_inbox", JSON.stringify(list.slice(0, 20)));
               } catch (_) {}
               window.dispatchEvent(new CustomEvent("gari_push_open", { detail: data }));

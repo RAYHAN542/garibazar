@@ -93,6 +93,8 @@ public class GariFcmService extends MessagingService {
             launch.putExtra(k, e.getValue());
         }
         String mid = message.getMessageId();
+        launch.putExtra("push_title", title);
+        launch.putExtra("push_body", body);
         launch.putExtra("google.message_id", mid != null ? mid : String.valueOf(System.currentTimeMillis()));
 
         int id = (int) (System.nanoTime() & 0x7fffffff);
