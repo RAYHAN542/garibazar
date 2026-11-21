@@ -805,7 +805,7 @@ const feedListings = spotlightFiller ? feedItems.slice(1) : feedItems;
 
 {isInboxOpen && <NotificationsInbox language={language} listings={[...adListings, ...listings.filter((l) => !adListings.some((a) => a.id === l.id))]} notifOff={notifOff} onEnable={() => { if (!isNativeDevice()) setIsInboxOpen(false); openNotifSettings(); }} onClose={() => setIsInboxOpen(false)} onSelect={viewListing} onSell={() => setActiveTab("sell")} />}
 {isShopOpen && <ShopPage language={language} isAdmin={isUserAdmin} fallbackUrl={AFFILIATE_SHOPS[0].url} onClose={() => setIsShopOpen(false)} />}
-{isSearchOpen && <SearchPage language={language} listings={[...adListings, ...listings.filter((l) => !adListings.some((a) => a.id === l.id))]} searchHistory={searchHistory} onSaveHistory={appendSearchHistory} onClose={() => setIsSearchOpen(false)} onSelect={(l) => { setIsSearchOpen(false); viewListing(l); }} />}
+{isSearchOpen && <SearchPage language={language} listings={[...adListings, ...listings.filter((l) => !adListings.some((a) => a.id === l.id))]} searchHistory={searchHistory} onSaveHistory={appendSearchHistory} onClose={() => setIsSearchOpen(false)} onSelect={(l) => { viewListing(l); }} />}
 {isVideoFeedOpen && <VideoFeed onPosted={() => setVideoRefresh((n) => n + 1)} onStartChat={onStartChat} isAdmin={isUserAdmin} language={language} videos={feedVideos} currentUser={user} onLoginPrompt={() => setIsAuthOpen(true)} onClose={() => setIsVideoFeedOpen(false)} onSelect={(l) => { setIsVideoFeedOpen(false); viewListing(l); }} />}
                 {isNotifModalOpen && isNativeDevice() && (
                   <div className="fixed inset-0 z-[120] flex items-end sm:items-center justify-center" onClick={() => setIsNotifModalOpen(false)}>
