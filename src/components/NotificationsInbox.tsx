@@ -103,12 +103,12 @@ export default function NotificationsInbox({ language, listings, notifOff, onEna
     try {
       const saved = JSON.parse(localStorage.getItem("gari_push_inbox") || "[]");
       for (const p of saved) {
-        if (!p || (!p.chatId && !p.listingId) || (!p.title && !p.body)) continue;
+        if (!p || (!p.chatId && !p.listingId)) continue;
         pushCards.push({
           id: "push-" + p.id,
           kind: "push",
-          title: p.title || (bn ? "নোটিফিকেশন" : "Notification"),
-          sub: p.body || "",
+          title: p.title || (p.chatId ? (bn ? "নতুন মেসেজ" : "New message") : (bn ? "পোস্ট দেখুন" : "View post")),
+          sub: p.body || (p.chatId ? (bn ? "আপনাকে একটি মেসেজ পাঠানো হয়েছে" : "You received a message") : ""),
           date: (() => { try { return new Date(p.ts).toLocaleDateString(bn ? "bn-BD" : "en-US", { month: "short", day: "numeric" }); } catch (_) { return ""; } })(),
           items: [],
           chatId: p.chatId || "",
