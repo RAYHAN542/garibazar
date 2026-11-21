@@ -16,6 +16,7 @@ import { mixFeed, trackInterest } from "../utils/feedRanker";
 import { isNativeDevice, checkPushPerm, syncDeviceToken, requestDevicePush, shouldAutoAsk, recordAsked } from "../utils/devicePush";
 import type { PushPerm } from "../utils/devicePush";
 import ShopPage from "./ShopPage";
+import NotificationsInbox from "./NotificationsInbox";
 
 // 🛒 অনলাইন শপ (অ্যাফিলিয়েট) -- নতুন অ্যাপ যোগ করতে শুধু এখানে এক লাইন বাড়াও।
 const AFFILIATE_SHOPS = [
@@ -208,6 +209,17 @@ export default function MarketplaceTab({
 const [isSearchOpen, setIsSearchOpen] = useState(false);
 const [isVideoFeedOpen, setIsVideoFeedOpen] = useState(false);
 const [isShopOpen, setIsShopOpen] = useState(false);
+const [isInboxOpen, setIsInboxOpen] = useState(false);
+const openNotifSettings = () => {
+  if (isNativeDevice()) { setIsNotifModalOpen(true); return; }
+  if (notificationPermission === "granted") {
+    alert(language === "bn" ? "নোটিফিকেশন ইতিমধ্যে চালু আছে ✅" : "Notifications are already enabled ✅");
+  } else if (notificationPermission === "denied") {
+    alert(language === "bn" ? "নোটিফিকেশন বন্ধ করা আছে। ব্রাউজার/সাইট সেটিংস থেকে চালু করুন।" : "Notifications are blocked. Please allow them from your browser/site settings.");
+  } else {
+    setShowNotificationPrompt(true);
+  }
+};
 // 🎬 যেসব লিস্টিংয়ে সেলার ভিডিও দিয়েছে (videoUrl আছে) শুধু সেগুলো -- "ভিডিও দেখুন" ফিডের জন্য।
 const videoListings = useMemo(
   () => [...adListings, ...listings.filter((l) => !adListings.some((a) => a.id === l.id))].filter((l) => !!l.videoUrl && !l.isSold),
@@ -410,19 +422,7 @@ const feedListings = spotlightFiller ? feedItems.slice(1) : feedItems;
 
                   <button
                     type="button"
-                    onClick={() => {
-                      if (isNativeDevice()) {
-                        setIsNotifModalOpen(true);
-                        return;
-                      }
-                      if (notificationPermission === "granted") {
-                        alert(language === "bn" ? "নোটিফিকেশন ইতিমধ্যে চালু আছে ✅" : "Notifications are already enabled ✅");
-                      } else if (notificationPermission === "denied") {
-                        alert(language === "bn" ? "নোটিফিকেশন বন্ধ করা আছে। ব্রাউজার/সাইট সেটিংস থেকে চালু করুন।" : "Notifications are blocked. Please allow them from your browser/site settings.");
-                      } else {
-                        setShowNotificationPrompt(true);
-                      }
-                    }}
+                    onClick={() => setIsInboxOpen(true)}
                     className="relative p-1.5 w-8 h-8 rounded-full text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer shrink-0 flex items-center justify-center"
                     title={language === "bn" ? "নোটিফিকেশন" : "Notifications"}
                   >
@@ -786,6 +786,7 @@ const feedListings = spotlightFiller ? feedItems.slice(1) : feedItems;
                   </div>
                 )}
 
+{isInboxOpen && <NotificationsInbox language={language} listings={[...adListings, ...listings.filter((l) => !adListings.some((a) => a.id === l.id))]} notifOff={notifOff} onEnable={() => { if (!isNativeDevice()) setIsInboxOpen(false); openNotifSettings(); }} onClose={() => setIsInboxOpen(false)} onSelect={viewListing} onSell={() => setActiveTab("sell")} />}
 {isShopOpen && <ShopPage language={language} isAdmin={isUserAdmin} fallbackUrl={AFFILIATE_SHOPS[0].url} onClose={() => setIsShopOpen(false)} />}
 {isSearchOpen && <SearchPage language={language} listings={[...adListings, ...listings.filter((l) => !adListings.some((a) => a.id === l.id))]} searchHistory={searchHistory} onSaveHistory={appendSearchHistory} onClose={() => setIsSearchOpen(false)} onSelect={(l) => { setIsSearchOpen(false); viewListing(l); }} />}
 {isVideoFeedOpen && <VideoFeed onPosted={() => setVideoRefresh((n) => n + 1)} onStartChat={onStartChat} isAdmin={isUserAdmin} language={language} videos={feedVideos} currentUser={user} onLoginPrompt={() => setIsAuthOpen(true)} onClose={() => setIsVideoFeedOpen(false)} onSelect={(l) => { setIsVideoFeedOpen(false); viewListing(l); }} />}
