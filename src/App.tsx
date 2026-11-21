@@ -435,19 +435,13 @@ export default function App() {
   //      syncing the whole marketplace).
   // The full `listings` collection still loads in the background as normal.
   useEffect(() => {
-    const onPushOpen = async (ev: any) => {
-      const d = ev?.detail || {};
+    const onPushOpen = async (_ev: any) => {
+      // push ক্লিক করলে আগে 🔔 নোটিফিকেশন ইনবক্স খুলবে
       try {
-        if (d.listingId) {
-          const found = await fetchListingById(String(d.listingId));
-          if (found) {
-            setActiveTab("market");
-            setSelectedListing(found);
-          }
-        } else if (d.chatId) {
-          setSelectedListing(null);
-          setActiveTab("chats");
-        }
+        (window as any).__gbOpenInbox = true;
+        setSelectedListing(null);
+        setActiveTab("market");
+        try { window.dispatchEvent(new Event("gari:open-inbox")); } catch (_) {}
       } catch (e) {
         console.warn("push open failed:", e);
       }
