@@ -17,6 +17,7 @@ import { isNativeDevice, checkPushPerm, syncDeviceToken, requestDevicePush, shou
 import type { PushPerm } from "../utils/devicePush";
 import ShopPage from "./ShopPage";
 import NotificationsInbox from "./NotificationsInbox";
+import { countUnread } from "../utils/notifSeen";
 
 // 🛒 অনলাইন শপ (অ্যাফিলিয়েট) -- নতুন অ্যাপ যোগ করতে শুধু এখানে এক লাইন বাড়াও।
 const AFFILIATE_SHOPS = [
@@ -210,6 +211,13 @@ const [isSearchOpen, setIsSearchOpen] = useState(false);
 const [isVideoFeedOpen, setIsVideoFeedOpen] = useState(false);
 const [isShopOpen, setIsShopOpen] = useState(false);
 const [isInboxOpen, setIsInboxOpen] = useState(false);
+const [notifTick, setNotifTick] = useState(0);
+useEffect(() => {
+  const h = () => setNotifTick((n) => n + 1);
+  window.addEventListener("gb:notif-seen", h);
+  return () => window.removeEventListener("gb:notif-seen", h);
+}, []);
+const unreadNotifCount = useMemo(() => countUnread([...adListings, ...listings]), [adListings, listings, notifTick]);
 useEffect(() => {
   const openInbox = () => { (window as any).__gbOpenInbox = false; setIsInboxOpen(true); };
   if ((window as any).__gbOpenInbox) openInbox();
@@ -433,7 +441,10 @@ const feedListings = spotlightFiller ? feedItems.slice(1) : feedItems;
                     title={language === "bn" ? "নোটিফিকেশন" : "Notifications"}
                   >
                     <Bell className="w-4 h-4" />
-                    {notifOff && (
+                    {unreadNotifCount > 0 && (
+                      <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-red-500 text-white text-[9px] font-black flex items-center justify-center border border-white dark:border-slate-900">{unreadNotifCount > 99 ? "99+" : unreadNotifCount}</span>
+                    )}
+                    {unreadNotifCount === 0 && notifOff && (
                       <span className="absolute top-0.5 right-0.5 w-2.5 h-2.5 rounded-full bg-red-500 border-2 border-white dark:border-slate-900 animate-pulse"></span>
                     )}
                   </button>
