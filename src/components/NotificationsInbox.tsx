@@ -168,16 +168,6 @@ export default function NotificationsInbox({ language, listings, notifOff, onEna
         });
       }
     } catch (_) {}
-
-    // 4) বিক্রেতা হওয়ার কার্ড
-    out.push({
-      id: "sell",
-      kind: "sell",
-      title: bn ? "১ মিনিটে বিজ্ঞাপন দিন!" : "Post an ad in 1 minute!",
-      sub: bn ? "আপনার গাড়ি বা পার্টসের বিজ্ঞাপন ফ্রিতে দিন" : "Post free ads for your car or parts",
-      date: "",
-      items: [],
-    });
     return out;
   }, [listings, language]);
 
@@ -208,6 +198,9 @@ export default function NotificationsInbox({ language, listings, notifOff, onEna
           </button>
         )}
 
+        {cards.length === 0 && (
+          <p className="px-4 py-10 text-center text-sm font-semibold text-slate-400">{bn ? "এখনো কোনো নোটিফিকেশন নেই" : "No notifications yet"}</p>
+        )}
         {cards.map((card) => {
           const isSell = card.kind === "sell";
           const open = openId === card.id;
