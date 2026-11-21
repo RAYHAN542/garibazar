@@ -157,7 +157,7 @@ export default function NotificationsInbox({ language, listings, notifOff, onEna
       }
 
       // 3) গত ২ দিনের নতুন পোস্ট (পছন্দের ধরনে, না থাকলে সব)
-      const cutoff = Date.now() - 48 * 60 * 60 * 1000;
+      const cutoff = (() => { const d0 = new Date(); d0.setHours(0, 0, 0, 0); return d0.getTime(); })();
       const fresh = alive.filter((l) => ts(l) > cutoff);
       const topSub = top(it.s, 1, 1)[0];
       const freshSub = topSub ? fresh.filter((l) => norm(l.subCategory) === topSub) : [];
@@ -169,7 +169,7 @@ export default function NotificationsInbox({ language, listings, notifOff, onEna
           id: "fresh",
           kind: "list",
           title: bn ? "মিস করবেন না!" : "Don't miss these",
-          sub: bn ? `গত ২ দিনে ${pool.length}টি নতুন ${what}` : `${pool.length} new ${what} in the last 2 days`,
+          sub: bn ? `আজ ${pool.length}টি নতুন ${what}` : `${pool.length} new ${what} today`,
           date: fmtDate(pool[0]),
           items: pool.slice(0, 50),
         });
