@@ -1,4 +1,5 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { isItemVehicle, matchesSubCategoryFilter } from "../utils/listingFilters";
 import { X, Volume2, VolumeX, Play, MapPin, Plus, Phone, Bookmark, Share2, MessageCircle, Eye } from "lucide-react";
 import type { PartListing, SupportedLanguage } from "../types";
 import { AddPartForm } from "./AddPartForm";
@@ -398,12 +399,19 @@ export default function VideoFeed({ language, videos, currentUser, onLoginPrompt
   const [posted, setPosted] = useState(false);
   // 🔧 (youtube-tips) "sale" = seller videos (as before), "tips" = YouTube mechanic tips.
   const [tab, setTab] = useState<"sale" | "tips">("sale");
+  const [vf, setVf] = useState<"all" | "car" | "part" | "bike" | "truck" | "heavy">("all");
   const containerRef = useRef<HTMLDivElement>(null);
   const jumpPending = useRef(false);
   const firstIdAtPost = useRef<string | null>(null);
   // 🎯 ভিডিও ফিডও মিশ্র: নতুন + পছন্দের + পুরনো (ইতিহাস না থাকলে আগের মতোই নতুন থেকে পুরনো)।
   // তালিকা বদলালেই (নতুন ভিডিও লোড/পোস্ট) শুধু নতুন করে সাজে, ভিডিও দেখার সময় ক্রম লাফায় না।
-  const ordered = useMemo(() => mixFeed(videos), [videos]);
+  const shown = useMemo(() => videos.filter((v: PartListing) => {
+    if (vf === "all") return true;
+    if (vf === "part") return !isItemVehicle(v);
+    if (!isItemVehicle(v)) return false;
+    return matchesSubCategoryFilter(v, vf === "heavy" ? "other_heavy_equipment" : vf);
+  }), [videos, vf]);
+  const ordered = useMemo(() => mixFeed(shown), [shown]);
   // প্রতি ৪টা ভিডিও swipe-এর পর Interstitial (video) ad; ad চলার সময় ভিডিও pause
   const adPlaying = useVideoInterstitial(activeIndex, isNativeAdsSupported());
 
@@ -487,6 +495,20 @@ export default function VideoFeed({ language, videos, currentUser, onLoginPrompt
 
   return (
     <div data-no-ptr className="fixed inset-0 z-[80] bg-black overscroll-none">
+      {tab === "sale" && (
+        <div className="absolute inset-x-0 z-10 flex gap-1.5 overflow-x-auto px-3 pb-1" style={{ top: "calc(3.5rem + env(safe-area-inset-top))" }}>
+          {([["all", "সব", "All"], ["car", "গাড়ি", "Car"], ["part", "পার্টস", "Part"], ["bike", "বাইক", "Bike"], ["truck", "ট্রাক", "Truck"], ["heavy", "হেভি ইকুইপমেন্ট", "Heavy Equipment"]] as const).map(([id, bnL, enL]) => (
+            <button
+              key={id}
+              type="button"
+              onClick={() => { setVf(id); setActiveIndex(0); try { containerRef.current?.scrollTo({ top: 0 }); } catch (_) {} }}
+              className={`h-8 px-3 shrink-0 rounded-full text-[12px] font-black cursor-pointer whitespace-nowrap ${vf === id ? "bg-amber-500 text-black" : "bg-black/45 text-white border border-white/30"}`}
+            >
+              {language === "bn" ? bnL : enL}
+            </button>
+          ))}
+        </div>
+      )}
       <div className="absolute top-0 inset-x-0 z-10 flex items-center justify-between px-3 pt-[calc(0.75rem+env(safe-area-inset-top))] pb-2 bg-gradient-to-b from-black/70 to-transparent">
         <div className="flex items-center gap-1.5">
           {tabBtn("sale", language === "bn" ? "ভিডিও" : "Videos")}
