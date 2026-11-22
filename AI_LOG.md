@@ -65,3 +65,4 @@
 2026-11-21 | claude-chat | প্রোফাইলে 'নোটিফিকেশন' সারি + লাল সংখ্যা (ইনবক্স শেষ খোলার পর নতুন পোস্ট, সর্বোচ্চ ২ দিন, ফোনে জমা); চাপলে ইনবক্স খোলে; ইনবক্স খুললে সংখ্যা ০ | src/utils/notifSeen.ts, src/App.tsx, src/components/MarketplaceTab.tsx, src/components/NotificationsInbox.tsx
 2026-11-21 | claude-chat | নোটিফিকেশন ইনবক্স থেকে 'বিজ্ঞাপন দিন' কার্ড সরানো (বলা হয়নি, ভুলে যোগ হয়েছিল); কার্ড না থাকলে 'এখনো কোনো নোটিফিকেশন নেই' | src/components/NotificationsInbox.tsx
 2026-11-21 | claude-chat | হোমপেজের 🔔-তে প্রোফাইলের মতো একই লাল সংখ্যা (notifSeen.countUnread); সংখ্যা ০ আর নোটিফিকেশন বন্ধ থাকলে আগের লাল দাগ | src/components/MarketplaceTab.tsx
+2026-11-21 | claude-chat | চ্যাট পুশ কার্ড চাপলে সরাসরি ওই কথোপকথন খোলে (window.__gbOpenChatId, ChatView থ্রেড লোডের পর খোলে) | src/components/ChatView.tsx, src/App.tsx

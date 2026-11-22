@@ -461,6 +461,7 @@ export default function App() {
             setSelectedListing(found);
           }
         } else if (d.chatId) {
+          (window as any).__gbOpenChatId = String(d.chatId);
           setSelectedListing(null);
           setActiveTab("chats");
         }

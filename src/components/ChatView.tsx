@@ -331,6 +331,15 @@ export function ChatView({ currentUser, language, onLoginPrompt, initialListingT
       }
       const list = (data || []).map(mapThreadRow);
       setThreads(list);
+      // 🔔 পুশ কার্ড থেকে এলে সরাসরি ওই কথোপকথন খোলা
+      try {
+        const wantId = (window as any).__gbOpenChatId;
+        if (wantId) {
+          const hit = list.find((t) => t.id === String(wantId));
+          if (hit) handleSelectThread(hit);
+          (window as any).__gbOpenChatId = "";
+        }
+      } catch (_) {}
       setLoadingThreads(false);
 
       if (initialListingToChat) {
