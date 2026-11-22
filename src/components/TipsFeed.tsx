@@ -6,6 +6,7 @@ import { Search, Play } from "lucide-react";
 import type { SupportedLanguage } from "../types";
 import { nativeFetch } from "../utils/nativeFetch";
 import { apiUrl } from "../utils/apiBase";
+import { incrementTipView, getTipViews } from "../utils/counters";
 
 // ------------------------------------------------------------------------
 // "মেকানিক টিপস" tab inside the video feed.
@@ -26,6 +27,7 @@ interface TipItem {
 
 interface TipsFeedProps {
   language: SupportedLanguage;
+  isAdmin?: boolean;
 }
 
 const DEFAULT_QUERY = "গাড়ির সমস্যা ও সমাধান মেকানিক";
@@ -93,7 +95,7 @@ const showParts = (q: string) => {
   try { window.dispatchEvent(new CustomEvent("gari:show-parts", { detail: { query: partWordOf(q) } })); } catch (_) {}
 };
 
-export default function TipsFeed({ language }: TipsFeedProps) {
+export default function TipsFeed({ language, isAdmin }: TipsFeedProps) {
   const bn = language === "bn";
   const [input, setInput] = useState("");
   const [items, setItems] = useState<TipItem[]>([]);
@@ -104,6 +106,27 @@ export default function TipsFeed({ language }: TipsFeedProps) {
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const playingRef = useRef<string | null>(null);
   const soundRef = useRef(false);
+  const [tipViews, setTipViews] = useState<Record<string, number>>({});
+
+  // ভিডিও চালু হলে প্রতি সেশনে একবার ভিউ গোনা
+  useEffect(() => {
+    if (!playingId) return;
+    try {
+      const KEY = "gb_tip_viewed";
+      const seen: string[] = JSON.parse(sessionStorage.getItem(KEY) || "[]");
+      if (seen.includes(playingId)) return;
+      sessionStorage.setItem(KEY, JSON.stringify([...seen, playingId].slice(-200)));
+      incrementTipView(playingId);
+    } catch (_) {}
+  }, [playingId]);
+
+  // শুধু এডমিন: ভিউ সংখ্যা আনা
+  useEffect(() => {
+    if (!isAdmin || items.length === 0) return;
+    let alive = true;
+    getTipViews(items.map((x) => x.id)).then((m) => { if (alive) setTipViews(m); });
+    return () => { alive = false; };
+  }, [isAdmin, items]);
   const [autoPlayed, setAutoPlayed] = useState(false);
   const [vehicleType, setVehicleType] = useState("car");
   const [lastQ, setLastQ] = useState("");
@@ -400,6 +423,7 @@ export default function TipsFeed({ language }: TipsFeedProps) {
                 <div className="px-4 py-3">
                   <h3 className="text-sm font-extrabold leading-snug line-clamp-2 text-white">{v.title}</h3>
                   <p className="mt-0.5 text-xs font-semibold text-white/60 line-clamp-1">{v.channel}</p>
+              {isAdmin && <p className="mt-0.5 text-[11px] font-black text-amber-400">👁 {tipViews[v.id] ?? 0}</p>}
                   <button
                     type="button"
                     onClick={() => toggleDesc(v.id)}

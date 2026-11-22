@@ -545,7 +545,7 @@ export default function VideoFeed({ language, videos, currentUser, onLoginPrompt
       )}
 
       {tab === "tips" ? (
-        <TipsFeed language={language} />
+        <TipsFeed language={language} isAdmin={isAdmin} />
       ) : ordered.length === 0 ? (
         <div className="h-full w-full flex flex-col items-center justify-center px-8 text-center text-white">
           <div className="w-16 h-16 rounded-full bg-white/10 flex items-center justify-center mb-4">
