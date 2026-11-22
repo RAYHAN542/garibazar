@@ -106,6 +106,17 @@ export default function TipsFeed({ language, isAdmin }: TipsFeedProps) {
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const playingRef = useRef<string | null>(null);
   const soundRef = useRef(false);
+  const headRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = headRef.current;
+    const root = scrollRef.current;
+    if (!el || !root || typeof ResizeObserver === "undefined") return;
+    const set = () => root.style.setProperty("--hh", el.offsetHeight + "px");
+    set();
+    const ro = new ResizeObserver(set);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
   const [tipViews, setTipViews] = useState<Record<string, number>>({});
 
   // ভিডিও চালু হলে প্রতি সেশনে একবার ভিউ গোনা
@@ -290,11 +301,10 @@ export default function TipsFeed({ language, isAdmin }: TipsFeedProps) {
       onClick={() => {
         soundRef.current = true;
       }}
-      data-no-ptr className="h-full w-full overflow-y-auto overscroll-contain snap-y snap-proximity bg-black text-white no-scrollbar"
-      style={{ paddingTop: "calc(3.5rem + env(safe-area-inset-top))" }}
+      data-no-ptr className="h-full w-full overflow-y-auto overscroll-contain snap-y snap-proximity scroll-pt-[var(--hh,0px)] bg-black text-white no-scrollbar"
     >
-      <div className="px-3 pt-2 pb-3">
-        <h2 className="text-base font-black leading-snug">
+      <div ref={headRef} className="sticky top-0 z-10 bg-black px-3 pt-2 pb-2">
+        <h2 className="hidden">
           {bn ? "মেকানিক টিপস — গাড়ির সমস্যার সমাধান" : "Mechanic Tips — fix car problems"}
         </h2>
 
@@ -316,7 +326,7 @@ export default function TipsFeed({ language, isAdmin }: TipsFeedProps) {
           </button>
         </form>
 
-        <div className="mt-3 grid grid-cols-4 gap-2">
+        <div className="mt-2 grid grid-cols-4 gap-1.5">
           {TYPES.map((t) => {
             const on = t.key === vehicleType;
             return (
@@ -328,7 +338,7 @@ export default function TipsFeed({ language, isAdmin }: TipsFeedProps) {
                   setInput("");
                   runSearch(t.base);
                 }}
-                className={`rounded-xl px-1 py-2 text-xs font-extrabold flex flex-col items-center gap-0.5 cursor-pointer ${
+                className={`rounded-xl px-1 py-1 text-[11px] font-extrabold flex flex-col items-center gap-0.5 cursor-pointer ${
                   on ? "bg-white text-black" : "bg-white/10 text-white"
                 }`}
               >
@@ -385,7 +395,7 @@ export default function TipsFeed({ language, isAdmin }: TipsFeedProps) {
           {items.map((v) => {
             const playing = playingId === v.id;
             return (
-              <div key={v.id} data-vid={v.id} className="snap-start min-h-[calc(100dvh-3.5rem-env(safe-area-inset-top,0px))] first:min-h-0 flex flex-col justify-center first:justify-start overflow-hidden bg-black text-white">
+              <div key={v.id} data-vid={v.id} className="snap-start min-h-[calc(100dvh-3.5rem-env(safe-area-inset-top,0px)-var(--hh,0px))] flex flex-col justify-center overflow-hidden bg-black text-white">
                 <div className="relative w-full aspect-video bg-black">
                   {playing ? (
                     <iframe
