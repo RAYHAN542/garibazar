@@ -1646,13 +1646,16 @@ export default function App() {
     }
   }, [adListings]);
 
-  const handleDeleteListingBySeller = async (itemId: string) => {
-    const confirmDelete = window.confirm(
-      language === "bn" 
-        ? "আপনি কি নিশ্চিত যে আপনি স্থায়ীভাবে এই বিজ্ঞাপনটি মুছে ফেলতে চান?" 
-        : "Are you sure you want to permanently delete this listing?"
-    );
-    if (!confirmDelete) return;
+  const handleDeleteListingBySeller = async (itemId: string, skipConfirm = false) => {
+    // skipConfirm: পোস্ট ডিটেইল মোডাল নিজে নিশ্চিত করে নিয়েছে
+    if (!skipConfirm) {
+      const confirmDelete = window.confirm(
+        language === "bn" 
+          ? "আপনি কি নিশ্চিত যে আপনি স্থায়ীভাবে এই বিজ্ঞাপনটি মুছে ফেলতে চান?" 
+          : "Are you sure you want to permanently delete this listing?"
+      );
+      if (!confirmDelete) return;
+    }
 
     try {
       const isLocal = itemId.startsWith("local-") || itemId.startsWith("temp-");
@@ -1683,6 +1686,7 @@ export default function App() {
     } catch (err) {
       console.error("Error deleting listing:", err);
       alert(language === "bn" ? "মুছে ফেলতে ব্যর্থ হয়েছে" : "Failed to delete listing.");
+      if (skipConfirm) throw err;
     }
   };
 
@@ -3069,6 +3073,10 @@ export default function App() {
             setInitialListingToChat(listingToChat);
             setSelectedListing(null);
             setActiveTab("chats");
+          }}
+          onDeleteListing={async (id) => {
+            await handleDeleteListingBySeller(id, true);
+            closeListingDetail();
           }}
           onViewSellerShop={(sellerId, fallbackName, fallbackPhoto, fallbackLocation, fallbackContact) => {
             setActiveSellerShopId(sellerId);

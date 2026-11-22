@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { nativeFetch } from "../utils/nativeFetch";
 import { canShare, shareLink } from "../utils/shareLink";
 import { PartListing, SupportedLanguage } from "../types";
-import { X, MapPin, Sparkles, Play, Flag, ShieldAlert, CheckCircle2, ChevronLeft, ChevronRight, Loader2, ShoppingBag, MessageSquare, Share2 } from "lucide-react";
+import { X, MapPin, Sparkles, Play, Flag, ShieldAlert, CheckCircle2, ChevronLeft, ChevronRight, Loader2, ShoppingBag, MessageSquare, Share2, Trash2 } from "lucide-react";
 import { logAnalyticsEvent } from "../utils/analytics";
 import { supabase } from "../supabase";
 import { trackListingClick } from "../utils/counters";
@@ -43,9 +43,10 @@ interface ListingDetailModalProps {
   onInitiateSellerChat?: (listing: PartListing) => void;
   onViewSellerShop?: (sellerId: string, fallbackName: string, fallbackPhoto?: string, fallbackLocation?: string, fallbackContact?: string) => void;
   isAdmin?: boolean;
+  onDeleteListing?: (listingId: string) => Promise<void>;
 }
 
-export function ListingDetailModal({ listing, language, currentUser, onClose, onPurchaseAdded, onLoginPrompt, onInitiateSellerChat, onViewSellerShop, isAdmin = false }: ListingDetailModalProps) {
+export function ListingDetailModal({ listing, language, currentUser, onClose, onPurchaseAdded, onLoginPrompt, onInitiateSellerChat, onViewSellerShop, isAdmin = false, onDeleteListing }: ListingDetailModalProps) {
   const [isPlayingVideo, setIsPlayingVideo] = useState(false);
   // 🔧 (2026-11-04) আগে "ভিডিও দেখুন" চাপলে আসল ভিডিও না চালিয়ে একটা নকল প্লেয়ার
   // (ভুয়া "0:14 / 2:30", "HDR 1080p") দেখাত, তাই বুস্ট করা ভিডিও লিস্টিংয়ে ভিডিও চলত
@@ -121,6 +122,8 @@ export function ListingDetailModal({ listing, language, currentUser, onClose, on
   // Toggle states
   const [isSold, setIsSold] = useState(listing.isSold || false);
   const [soldLoading, setSoldLoading] = useState(false);
+  // 🗑️ মালিক ভুল পোস্ট নিজে ডিলিট করতে পারবে (আগে অনেকে ডিলিট না বুঝে 'বিক্রি হয়েছে' চাপত)
+  const [deleteLoading, setDeleteLoading] = useState(false);
   const [soldError, setSoldError] = useState<string | null>(null);
 
   // Content Flag/Report states
@@ -406,6 +409,24 @@ export function ListingDetailModal({ listing, language, currentUser, onClose, on
   // verifies ownership server-side and works for Google/Facebook-logged-in
   // sellers who don't have a Supabase session (see the getAuthToken comment
   // above for why a direct client write can't be used here).
+  const handleDeletePost = async () => {
+    if (!isOwner || !onDeleteListing) return;
+    const ok = window.confirm(
+      language === "bn"
+        ? "এই পোস্টটি স্থায়ীভাবে মুছে ফেলবেন? এটা আর ফেরত আনা যাবে না।"
+        : "Delete this post permanently? This can't be undone."
+    );
+    if (!ok) return;
+    setDeleteLoading(true);
+    try {
+      await onDeleteListing(listing.id);
+    } catch {
+      // ব্যর্থ হলে App.tsx আগেই alert দেখিয়েছে; মোডাল খোলা থাকবে
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
+
   const handleToggleSold = async () => {
     if (!isOwner) return;
     setSoldLoading(true);
@@ -917,6 +938,35 @@ export function ListingDetailModal({ listing, language, currentUser, onClose, on
                     language === "bn" ? "অবিক্রিত করুন" : "Mark as Available"
                   ) : (
                     language === "bn" ? "বিক্রিত হিসেবে চিহ্নিত করুন" : "Mark as Sold"
+                  )}
+                </button>
+              </div>
+            )}
+
+            {/* Owner-only: Delete post (ভুল পোস্ট হলে বিক্রিত না করে ডিলিট) */}
+            {isOwner && onDeleteListing && (
+              <div className="flex items-center justify-between gap-3 p-3.5 bg-slate-50 dark:bg-slate-950 border border-slate-150 dark:border-slate-850 rounded-xl">
+                <div>
+                  <p className="text-xs font-extrabold text-slate-800 dark:text-slate-100">
+                    {language === "bn" ? "ভুল পোস্ট হয়েছে বা আর রাখতে চান না?" : "Posted by mistake or no longer needed?"}
+                  </p>
+                  <p className="text-[11px] font-bold text-slate-500 mt-0.5">
+                    {language === "bn" ? "বিক্রি হলে উপরের বাটন, ভুল হলে ডিলিট করুন" : "Sold? Use the button above. Mistake? Delete it."}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleDeletePost}
+                  disabled={deleteLoading}
+                  className="px-4 py-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 shrink-0 bg-red-500 text-white disabled:opacity-60"
+                >
+                  {deleteLoading ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <>
+                      <Trash2 className="w-3.5 h-3.5" />
+                      {language === "bn" ? "পোস্ট ডিলিট করুন" : "Delete post"}
+                    </>
                   )}
                 </button>
               </div>
