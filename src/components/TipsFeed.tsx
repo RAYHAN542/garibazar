@@ -267,7 +267,7 @@ export default function TipsFeed({ language }: TipsFeedProps) {
       onClick={() => {
         soundRef.current = true;
       }}
-      data-no-ptr className="h-full w-full overflow-y-auto overscroll-contain bg-black text-white no-scrollbar"
+      data-no-ptr className="h-full w-full overflow-y-auto overscroll-contain snap-y snap-proximity bg-black text-white no-scrollbar"
       style={{ paddingTop: "calc(3.5rem + env(safe-area-inset-top))" }}
     >
       <div className="px-3 pt-2 pb-3">
@@ -358,11 +358,11 @@ export default function TipsFeed({ language }: TipsFeedProps) {
       )}
 
       {!loading && items.length > 0 && (
-        <div className="px-3 pb-4 space-y-4">
+        <div className="pb-4">
           {items.map((v) => {
             const playing = playingId === v.id;
             return (
-              <div key={v.id} data-vid={v.id} className="rounded-2xl overflow-hidden bg-white text-black">
+              <div key={v.id} data-vid={v.id} className="snap-start min-h-[100dvh] flex flex-col justify-center overflow-hidden bg-black text-white">
                 <div className="relative w-full aspect-video bg-black">
                   {playing ? (
                     <iframe
@@ -397,18 +397,18 @@ export default function TipsFeed({ language }: TipsFeedProps) {
                     </button>
                   )}
                 </div>
-                <div className="px-3 py-2.5">
-                  <h3 className="text-sm font-extrabold leading-snug line-clamp-2 text-black">{v.title}</h3>
-                  <p className="mt-0.5 text-xs font-semibold text-neutral-600 line-clamp-1">{v.channel}</p>
+                <div className="px-4 py-3">
+                  <h3 className="text-sm font-extrabold leading-snug line-clamp-2 text-white">{v.title}</h3>
+                  <p className="mt-0.5 text-xs font-semibold text-white/60 line-clamp-1">{v.channel}</p>
                   <button
                     type="button"
                     onClick={() => toggleDesc(v.id)}
-                    className="mt-1.5 text-xs font-extrabold text-black underline cursor-pointer"
+                    className="mt-1.5 text-xs font-extrabold text-white underline cursor-pointer"
                   >
                     {openDesc === v.id ? (bn ? "বিবরণ বন্ধ ▴" : "Hide details ▴") : bn ? "বিবরণ দেখুন ▾" : "Show details ▾"}
                   </button>
                   {openDesc === v.id && (
-                    <div className="mt-2 max-h-48 overflow-y-auto rounded-lg bg-neutral-100 p-2.5 text-xs leading-relaxed text-neutral-800 whitespace-pre-wrap break-words">
+                    <div className="mt-2 max-h-48 overflow-y-auto rounded-lg bg-white/10 p-2.5 text-xs leading-relaxed text-white/90 whitespace-pre-wrap break-words">
                       {descLoadingId === v.id
                         ? bn ? "লোড হচ্ছে..." : "Loading..."
                         : descs[v.id] !== undefined
