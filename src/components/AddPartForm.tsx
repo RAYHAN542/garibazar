@@ -212,15 +212,27 @@ export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPromp
   // উপরে নিচের দিকে টান আটকানো হয়। ফর্ম বন্ধ হলে listener সরে যায়।
   useEffect(() => {
     let startY = 0;
-    const onStart = (e: TouchEvent) => { startY = e.touches[0].clientY; };
+    let tracking = false;
+    const onStart = (e: TouchEvent) => { startY = e.touches[0].clientY; tracking = e.touches.length === 1; };
+    const onEnd = () => { tracking = false; };
     const onMove = (e: TouchEvent) => {
+      if (!tracking || e.touches.length !== 1) return;
+      // লেখা সিলেক্ট/কপির সময় (হ্যান্ডেল টানা) পেজ স্ক্রল আটকানো হবে না
+      const ae = document.activeElement as HTMLTextAreaElement | null;
+      if (ae && typeof ae.selectionStart === "number" && ae.selectionStart !== ae.selectionEnd) return;
+      const sel = window.getSelection && window.getSelection();
+      if (sel && !sel.isCollapsed) return;
       if (window.scrollY <= 0 && e.touches[0].clientY > startY && e.cancelable) e.preventDefault();
     };
     window.addEventListener("touchstart", onStart, { passive: true });
     window.addEventListener("touchmove", onMove, { passive: false });
+    window.addEventListener("touchend", onEnd, { passive: true });
+    window.addEventListener("touchcancel", onEnd, { passive: true });
     return () => {
       window.removeEventListener("touchstart", onStart);
       window.removeEventListener("touchmove", onMove);
+      window.removeEventListener("touchend", onEnd);
+      window.removeEventListener("touchcancel", onEnd);
     };
   }, []);
 
