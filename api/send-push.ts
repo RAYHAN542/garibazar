@@ -74,6 +74,23 @@ export async function sendPushToUid(
   body: string,
   data?: Record<string, string>
 ): Promise<boolean> {
+  // 🔔 (2026-11-22) অ্যাপের 🔔 ইনবক্সের জন্য: চ্যাট/পোস্ট-সংক্রান্ত ব্যক্তিগত পুশ টেবিলে জমা থাকে
+  // (টোকেন না থাকলেও, যাতে অ্যাপ খুললে তালিকায় দেখা যায়)। লেখা ব্যর্থ হলেও পুশ আটকায় না।
+  if (data && (data.chatId || data.listingId)) {
+    try {
+      const { error: inboxErr } = await supabase.from("user_notifications").insert({
+        uid,
+        kind: data.chatId ? "chat" : "listing",
+        title,
+        body,
+        chat_id: data.chatId || null,
+        listing_id: data.listingId || null,
+      });
+      if (inboxErr) console.warn("user_notifications insert failed:", inboxErr.message);
+    } catch (e: any) {
+      console.warn("user_notifications insert error:", e?.message || e);
+    }
+  }
   const { data: row, error } = await supabase.from("users").select("fcm_token").eq("uid", uid).maybeSingle();
   if (error || !row?.fcm_token) return false;
   try {
