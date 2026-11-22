@@ -496,7 +496,7 @@ export default function VideoFeed({ language, videos, currentUser, onLoginPrompt
   return (
     <div data-no-ptr className="fixed inset-0 z-[80] bg-black overscroll-none">
       {tab === "sale" && (
-        <div className="absolute inset-x-0 z-10 flex gap-1.5 overflow-x-auto px-3 pb-1" style={{ top: "calc(3.5rem + env(safe-area-inset-top))" }}>
+        <div className="absolute left-0 right-[3.75rem] z-10 flex gap-1.5 overflow-x-auto pl-3 pr-2 pb-1" style={{ top: "calc(3.5rem + env(safe-area-inset-top))" }}>
           {([["all", "সব", "All"], ["car", "গাড়ি", "Car"], ["part", "পার্টস", "Part"], ["bike", "বাইক", "Bike"], ["truck", "ট্রাক", "Truck"], ["heavy", "হেভি ইকুইপমেন্ট", "Heavy Equipment"]] as const).map(([id, bnL, enL]) => (
             <button
               key={id}
