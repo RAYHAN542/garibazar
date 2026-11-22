@@ -509,7 +509,7 @@ export default function VideoFeed({ language, videos, currentUser, onLoginPrompt
           ))}
         </div>
       )}
-      <div className="absolute top-0 inset-x-0 z-10 flex items-center justify-between px-3 pt-[calc(0.75rem+env(safe-area-inset-top))] pb-2 bg-gradient-to-b from-black/70 to-transparent">
+      <div className={`absolute top-0 inset-x-0 z-10 flex items-center justify-between px-3 pt-[calc(0.75rem+env(safe-area-inset-top))] pb-2 ${tab === "tips" ? "bg-black" : "bg-gradient-to-b from-black/70 to-transparent"}`}>
         <div className="flex items-center gap-1.5">
           {tabBtn("sale", language === "bn" ? "ভিডিও" : "Videos")}
           {tabBtn("tips", language === "bn" ? "❓ গাড়ির সমস্যা?" : "❓ Car problem?")}
@@ -545,7 +545,7 @@ export default function VideoFeed({ language, videos, currentUser, onLoginPrompt
       )}
 
       {tab === "tips" ? (
-        <TipsFeed language={language} isAdmin={isAdmin} />
+        <div className="h-full pt-[calc(3.5rem+env(safe-area-inset-top,0px))]"><TipsFeed language={language} isAdmin={isAdmin} /></div>
       ) : ordered.length === 0 ? (
         <div className="h-full w-full flex flex-col items-center justify-center px-8 text-center text-white">
           <div className="w-16 h-16 rounded-full bg-white/10 flex items-center justify-center mb-4">

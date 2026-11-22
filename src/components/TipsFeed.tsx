@@ -385,7 +385,7 @@ export default function TipsFeed({ language, isAdmin }: TipsFeedProps) {
           {items.map((v) => {
             const playing = playingId === v.id;
             return (
-              <div key={v.id} data-vid={v.id} className="snap-start min-h-[100dvh] flex flex-col justify-center overflow-hidden bg-black text-white">
+              <div key={v.id} data-vid={v.id} className="snap-start min-h-[calc(100dvh-3.5rem-env(safe-area-inset-top,0px))] flex flex-col justify-center overflow-hidden bg-black text-white">
                 <div className="relative w-full aspect-video bg-black">
                   {playing ? (
                     <iframe
