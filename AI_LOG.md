@@ -68,3 +68,4 @@
 2026-11-21 | claude-chat | চ্যাট পুশ কার্ড চাপলে সরাসরি ওই কথোপকথন খোলে (window.__gbOpenChatId, ChatView থ্রেড লোডের পর খোলে) | src/components/ChatView.tsx, src/App.tsx
 2026-11-21 | claude-chat | পোস্ট ফর্মে লেখা সিলেক্ট/কপির পর স্ক্রল আটকে যাওয়া ঠিক: pull-to-refresh আটকানোর touchmove হ্যান্ডলার এখন touchstart দেখা গেলে এবং লেখা সিলেক্ট না থাকলেই কাজ করে | src/components/AddPartForm.tsx
 2026-11-21 | claude-chat | পোস্ট ফর্মে বিবরণ বক্সের লেখা উপরে স্ক্রল না হওয়া ঠিক: পেজ উপরে থাকলে pull-to-refresh আটকানোর touchmove হ্যান্ডলার textarea-র ভেতরের টানাও আটকাত; এখন textarea বাদ, touchstart দেখা গেলে এবং লেখা সিলেক্ট না থাকলেই আটকায়; textarea-তে overscroll-behavior: contain | src/components/AddPartForm.tsx
+2026-11-22 | claude-chat | পোস্ট ডিটেইলে (শুধু মালিকের, অবিক্রিত, বুস্ট-না-করা) দামের উপরে 'বিজ্ঞাপন বুস্ট করুন' বক্স: ট্যাপে AD_PACKAGES-এর দিন/দাম তালিকা + WhatsApp বাটন (wa.me, নম্বর BOOST_WHATSAPP) | src/components/ListingDetailModal.tsx

@@ -11,6 +11,7 @@ import { getOptimizedImageUrl } from "../utils/cloudinary";
 import { apiUrl } from "../utils/apiBase";
 import { NativeAdSlot } from "./NativeAdSlot";
 import { WebAdSlot } from "./WebAdSlot";
+import { AD_PACKAGES } from "../translations";
 
 // নাম ফাঁকা বা সাধারণ ফলব্যাক ("User", "Seller", "বিক্রেতা") হলে ফেসবুকের মতো "বেনামী" দেখাবে।
 const ANON_SELLER_NAMES = ["", "user", "seller", "বিক্রেতা", "ব্যবহারকারী", "বেনামী", "anonymous"];
@@ -28,6 +29,9 @@ const maskPhoneNumber = (num?: string): string => {
   if (digits.length <= 4) return digits;
   return "•".repeat(digits.length - 4) + digits.slice(-4);
 };
+
+// 🚀 বুস্ট করতে যোগাযোগের WhatsApp নম্বর
+const BOOST_WHATSAPP = "8801321450671";
 
 interface ListingDetailModalProps {
   listing: PartListing;
@@ -136,6 +140,16 @@ export function ListingDetailModal({ listing, language, currentUser, onClose, on
 
   // Share state (shows "Link Copied" feedback when Web Share API isn't available)
   const [shareCopied, setShareCopied] = useState(false);
+
+  // 🚀 বুস্ট বক্স (শুধু নিজের পোস্টে): প্যাকেজ তালিকা + WhatsApp-এ যোগাযোগ
+  const [showBoost, setShowBoost] = useState(false);
+  const [boostPkgId, setBoostPkgId] = useState<string>(String(AD_PACKAGES[0]?.id ?? ""));
+  const boostPkg = AD_PACKAGES.find((p) => String(p.id) === boostPkgId) || AD_PACKAGES[0];
+  const boostWaText =
+    (language === "bn" ? "আমি আমার বিজ্ঞাপন বুস্ট করতে চাই।" : "I want to boost my ad.") +
+    "\n" + listing.title + "\nhttps://garibazar.shop/l/" + listing.id +
+    (boostPkg ? "\n" + (language === "bn" ? boostPkg.nameBn : boostPkg.nameEn) + " - " + boostPkg.durationDays + (language === "bn" ? " দিন" : " days") + " - ৳" + boostPkg.price : "");
+  const boostWaLink = "https://wa.me/" + BOOST_WHATSAPP + "?text=" + encodeURIComponent(boostWaText);
 
   const handleShareListing = async () => {
     // এই লিংকটা মানুষ কপি করে বাইরে (WhatsApp, Facebook ইত্যাদি) শেয়ার করে,
@@ -668,6 +682,58 @@ export function ListingDetailModal({ listing, language, currentUser, onClose, on
                     {language === "bn" ? "বিক্রেতা এই প্রোডাক্টটি বিক্রয় সম্পন্ন হিসেবে চিহ্নিত করেছেন। কোনো নতুন কল করার প্রয়োজন নেই।" : "The seller has marked this post as SOLD. Please do not call this number."}
                   </p>
                 </div>
+              </div>
+            )}
+
+            {/* 🚀 বুস্ট বক্স: শুধু নিজের, অবিক্রিত, এখনো বুস্ট-না-করা পোস্টে */}
+            {isOwner && !isSold && !listing.isAd && AD_PACKAGES.length > 0 && (
+              <div className="rounded-xl border border-amber-500/30 bg-gradient-to-r from-amber-500/15 to-orange-500/10 overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() => setShowBoost((v) => !v)}
+                  className="w-full p-4 flex items-center justify-between gap-3 text-left cursor-pointer"
+                >
+                  <div className="min-w-0">
+                    <p className="text-sm font-black text-slate-900 dark:text-white leading-snug">
+                      {language === "bn" ? "🚀 আরও মানুষের কাছে পোস্ট পৌঁছাতে চাইলে বিজ্ঞাপন বুস্ট করুন" : "🚀 Want your post to reach more people? Boost your ad"}
+                    </p>
+                    <p className="mt-0.5 text-[11px] font-bold text-amber-700 dark:text-amber-400">
+                      {language === "bn" ? "কত টাকায় কয়দিন — দেখতে ট্যাপ করুন" : "Tap to see price and days"}
+                    </p>
+                  </div>
+                  <ChevronRight className={`w-5 h-5 text-amber-600 shrink-0 transition-transform ${showBoost ? "rotate-90" : ""}`} />
+                </button>
+                {showBoost && (
+                  <div className="px-4 pb-4 space-y-2">
+                    {AD_PACKAGES.map((pkg) => {
+                      const sel = String(pkg.id) === boostPkgId;
+                      return (
+                        <button
+                          key={String(pkg.id)}
+                          type="button"
+                          onClick={() => setBoostPkgId(String(pkg.id))}
+                          className={`w-full flex items-center justify-between gap-3 p-3 rounded-xl border text-left cursor-pointer ${
+                            sel ? "border-amber-500 bg-amber-500/10" : "border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900"
+                          }`}
+                        >
+                          <div>
+                            <p className="text-xs font-black text-slate-800 dark:text-slate-100">{language === "bn" ? pkg.nameBn : pkg.nameEn}</p>
+                            <p className="text-[11px] font-bold text-slate-500">{language === "bn" ? pkg.durationDays + " দিন" : pkg.durationDays + " days"}</p>
+                          </div>
+                          <span className="text-sm font-black text-amber-600 dark:text-amber-400 font-mono">৳{Number(pkg.price).toLocaleString("en-IN")}</span>
+                        </button>
+                      );
+                    })}
+                    <a
+                      href={boostWaLink}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="w-full py-3 px-5 rounded-xl font-black text-xs flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white cursor-pointer"
+                    >
+                      <span>{language === "bn" ? "WhatsApp-এ বুস্ট করতে যোগাযোগ করুন" : "Contact us on WhatsApp to boost"}</span>
+                    </a>
+                  </div>
+                )}
               </div>
             )}
 
