@@ -217,6 +217,9 @@ export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPromp
     const onEnd = () => { tracking = false; };
     const onMove = (e: TouchEvent) => {
       if (!tracking || e.touches.length !== 1) return;
+      // বিবরণ বক্সের ভেতরে আঙুল টানলে বক্সের লেখা নিজে স্ক্রল হবে, আটকানো হবে না
+      const tg = e.target as HTMLElement | null;
+      if (tg && tg.closest && tg.closest("textarea")) return;
       // লেখা সিলেক্ট/কপির সময় (হ্যান্ডেল টানা) পেজ স্ক্রল আটকানো হবে না
       const ae = document.activeElement as HTMLTextAreaElement | null;
       if (ae && typeof ae.selectionStart === "number" && ae.selectionStart !== ae.selectionEnd) return;
@@ -742,6 +745,7 @@ export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPromp
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             rows={5}
+            style={{ overscrollBehaviorY: "contain" }}
             placeholder={
               language === "bn"
                 ? "যা বিক্রি করছেন তার বিস্তারিত লিখুন — নাম, মডেল, অবস্থা, এবং জেলার নাম উল্লেখ করুন যাতে ক্রেতারা সহজে খুঁজে পায়..."
