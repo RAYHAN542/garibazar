@@ -1,3 +1,5 @@
+import LinkVideo from "./LinkVideo";
+import { parseVideoLink } from "../utils/videoLink";
 import React, { useState, useEffect } from "react";
 import { nativeFetch } from "../utils/nativeFetch";
 import { canShare, shareLink } from "../utils/shareLink";
@@ -590,7 +592,9 @@ export function ListingDetailModal({ listing, language, currentUser, onClose, on
           <div className="relative w-full h-72 sm:h-96 bg-slate-950 flex items-center justify-center overflow-hidden">
             {isPlayingVideo ? (
               <div className="relative w-full h-full bg-black flex flex-col justify-center items-center">
-                {videoSrc ? (
+                {videoSrc && parseVideoLink(videoSrc) ? (
+                  <LinkVideo link={parseVideoLink(videoSrc)!} poster={listing.image || undefined} />
+                ) : videoSrc ? (
                   <video
                     key={videoSrc}
                     src={videoSrc}

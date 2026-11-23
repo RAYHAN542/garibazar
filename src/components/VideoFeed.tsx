@@ -1,3 +1,5 @@
+import LinkVideo from "./LinkVideo";
+import { parseVideoLink } from "../utils/videoLink";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { isItemVehicle, matchesSubCategoryFilter } from "../utils/listingFilters";
 import { X, Volume2, VolumeX, Play, MapPin, Plus, Phone, Bookmark, Share2, MessageCircle, Eye } from "lucide-react";
@@ -217,7 +219,9 @@ function VideoSlideImpl({ listing, index, rel, muted, adPlaying, language, onTog
       data-index={index}
       className="h-full w-full snap-start snap-always relative bg-black flex items-center justify-center overflow-hidden"
     >
-      {isNear && listing.videoUrl ? (
+      {isNear && listing.videoUrl && parseVideoLink(listing.videoUrl) ? (
+        <LinkVideo link={parseVideoLink(listing.videoUrl)!} poster={listing.image || undefined} />
+      ) : isNear && listing.videoUrl ? (
         <video
           ref={videoRef}
           src={listing.videoUrl + "#t=0.1"}
