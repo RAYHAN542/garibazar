@@ -191,6 +191,7 @@ export default function TipsFeed({ language, isAdmin }: TipsFeedProps) {
       const q = raw.trim();
       if (q.length < 2) return;
       setLastQ(q);
+      try { scrollRef.current?.scrollTo({ top: 0 }); } catch (_) {}
       const ck = "tips_cache_v1:" + q.toLowerCase();
       try {
         const raw = localStorage.getItem(ck);
@@ -207,6 +208,7 @@ export default function TipsFeed({ language, isAdmin }: TipsFeedProps) {
         }
       } catch (_) {}
       const my = ++reqId.current;
+      setItems([]);
       setLoading(true);
       setError(null);
       setPlayingId(null);
@@ -358,7 +360,7 @@ export default function TipsFeed({ language, isAdmin }: TipsFeedProps) {
                 setInput(bn ? c.bn : c.en);
                 runSearch(c.q);
               }}
-              className="shrink-0 rounded-full bg-white/10 px-3 py-1.5 text-xs font-bold text-white cursor-pointer"
+              className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-bold cursor-pointer ${lastQ === c.q ? "bg-amber-500 text-black" : "bg-white/10 text-white"}`}
             >
               {bn ? c.bn : c.en}
             </button>
