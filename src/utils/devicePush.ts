@@ -2,6 +2,7 @@ import { isGariBadgeAvailable } from "./gariBadge";
 import { PushNotifications } from "@capacitor/push-notifications";
 import { supabase } from "../supabase";
 import { loadInterest } from "./feedRanker";
+import { savedSearchesPayload } from "./savedSearches";
 
 // ---------------------------------------------------------------------------
 // 🔔 লগইন ছাড়া ক্রেতার জন্য পুশ নোটিফিকেশন (পছন্দের গাড়ির অ্যালার্ট)।
@@ -61,6 +62,7 @@ function interestsPayload() {
     m: topEntries(it.m, 8),
     p: it.pW > 0 ? Math.round(it.pSum / it.pW) : 0,
     v: isGariBadgeAvailable() ? 2 : 1,
+    ss: savedSearchesPayload(),
   };
 }
 

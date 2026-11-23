@@ -3,6 +3,7 @@ import { ArrowLeft, Bell, Plus } from "lucide-react";
 import { PartListing, SupportedLanguage } from "../types";
 import { loadInterest } from "../utils/feedRanker";
 import { markNotifSeen } from "../utils/notifSeen";
+import SavedSearchesPanel from "./SavedSearchesPanel";
 
 // 🔔 নোটিফিকেশন ইনবক্স পেজ: ঘণ্টা চাপলে খোলে।
 // কার্ডগুলো অ্যাপেই বানানো হয় (সার্ভার/খরচ লাগে না): ফোনে জমা পছন্দ (feedRanker) + লোড হওয়া পোস্ট থেকে।
@@ -216,6 +217,8 @@ export default function NotificationsInbox({ language, listings, notifOff, onEna
             <span className="px-3 py-1 rounded-full bg-amber-500 text-slate-950 text-xs font-black">{bn ? "চালু" : "On"}</span>
           </button>
         )}
+
+        <SavedSearchesPanel language={language} />
 
         {cards.length === 0 && (
           <p className="px-4 py-10 text-center text-sm font-semibold text-slate-400">{bn ? "এখনো কোনো নোটিফিকেশন নেই" : "No notifications yet"}</p>
