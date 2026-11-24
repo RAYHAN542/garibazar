@@ -51,9 +51,32 @@ async function isRateLimited(key: string): Promise<boolean> {
   return data !== true;
 }
 
+// 🔑 গেস্ট পুনরুদ্ধার: অ্যাকাউন্ট ছাড়া পোস্টে নম্বরে নিজে থেকে অ্যাকাউন্ট খোলা হয়, এলোমেলো পাসওয়ার্ড
+// শুধু ওই ডিভাইসের localStorage-এ থাকে। অন্য ডিভাইস/ব্রাউজার/অ্যাপ বা ডাটা ক্লিয়ারে সেটা হারালে
+// ইউজার নিজের নম্বরেই আটকে যেত। শুধু app_metadata.guest=true অ্যাকাউন্টে (আসল সাইন-আপ অ্যাকাউন্টে নয়)
+// নতুন পাসওয়ার্ড বসিয়ে ঢুকতে দেওয়া হয়। app_metadata শুধু সার্ভার লিখতে পারে, ইউজার বদলাতে পারে না।
+async function recoverGuestAccount(phone: string, password: string): Promise<any | null> {
+  const digits = phone.replace(/^\+/, "");
+  let found: any = null;
+  for (let page = 1; page <= 10 && !found; page++) {
+    const { data, error } = await supabaseAdmin.auth.admin.listUsers({ page, perPage: 1000 });
+    if (error) { console.error("guest recover listUsers failed:", error.message); return null; }
+    const users = data?.users || [];
+    found = users.find((u: any) => String(u.phone || "").replace(/^\+/, "") === digits) || null;
+    if (users.length < 1000) break;
+  }
+  if (!found || found.app_metadata?.guest !== true) return null;
+  const { error: updErr } = await supabaseAdmin.auth.admin.updateUserById(found.id, { password, phone_confirm: true });
+  if (updErr) { console.error("guest recover update failed:", updErr.message); return null; }
+  const { data: sessionData, error: signInError } = await newSignInClient().auth.signInWithPassword({ phone, password });
+  if (signInError || !sessionData.session) { console.error("guest recover signin failed:", signInError?.message); return null; }
+  return sessionData;
+}
+
 async function handleSignup(req: any, res: any) {
   const phone = normalizeBanglaPhone(req.body?.phone);
   const password = String(req.body?.password || "");
+  const isGuestSignup = req.body?.guest === true;
 
   if (!phone) {
     return res.status(400).json({ error: "সঠিক মোবাইল নম্বর দিন (যেমন: 01XXXXXXXXX)।" });
@@ -66,10 +89,22 @@ async function handleSignup(req: any, res: any) {
     phone,
     password,
     phone_confirm: true,
+    ...(isGuestSignup ? { app_metadata: { guest: true } } : {}),
   });
 
   if (createError) {
     if (createError.status === 422 || /already.*registered|already.*exists/i.test(createError.message || "")) {
+      if (isGuestSignup) {
+        const recovered = await recoverGuestAccount(phone, password);
+        if (recovered) {
+          return res.status(200).json({
+            access_token: recovered.session.access_token,
+            refresh_token: recovered.session.refresh_token,
+            uid: recovered.user.id,
+            phone,
+          });
+        }
+      }
       return res.status(409).json({
         error: "এই নম্বরে আগে থেকেই অ্যাকাউন্ট আছে। লগইন করুন।",
         code: "ALREADY_REGISTERED",

@@ -246,11 +246,11 @@ export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPromp
   const getUid = (): string | undefined => currentUser?.uid || guestUserRef.current?.uid;
 
   const ensureGuestSession = async (cleanPhone: string): Promise<boolean> => {
-    const callAuth = async (action: "signup" | "login", password: string) => {
+    const callAuth = async (action: "signup" | "login", password: string, guest = false) => {
       const resp = await nativeFetch(apiUrl("/api/auth/phone"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action, phone: cleanPhone, password }),
+        body: JSON.stringify({ action, phone: cleanPhone, password, ...(guest ? { guest: true } : {}) }),
       });
       return { ok: resp.ok, data: await resp.json() } as { ok: boolean; data: any };
     };
@@ -260,24 +260,32 @@ export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPromp
       saved = JSON.parse(localStorage.getItem("gari_bazar_guest_cred") || "null");
     } catch (e) {}
 
-    let result: { ok: boolean; data: any };
-    const hasSaved = !!saved && saved.phone === cleanPhone;
-    if (hasSaved && saved) {
-      result = await callAuth("login", saved.password);
-    } else {
+    // নতুন এলোমেলো পাসওয়ার্ডে গেস্ট সাইন-আপ। নম্বরে আগের গেস্ট অ্যাকাউন্ট থাকলে সার্ভার
+    // পাসওয়ার্ড বদলে ঢুকিয়ে দেয় (পাসওয়ার্ড হারানো ডিভাইসের সমস্যা মেটাতে)।
+    const guestSignup = async () => {
       const bytes = new Uint8Array(16);
       crypto.getRandomValues(bytes);
       const password = Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
-      result = await callAuth("signup", password);
-      if (result.ok) {
+      const r = await callAuth("signup", password, true);
+      if (r.ok) {
         try {
           localStorage.setItem("gari_bazar_guest_cred", JSON.stringify({ phone: cleanPhone, password }));
         } catch (e) {}
       }
+      return r;
+    };
+
+    let result: { ok: boolean; data: any };
+    const hasSaved = !!saved && saved.phone === cleanPhone;
+    if (hasSaved && saved) {
+      result = await callAuth("login", saved.password);
+      if (!result.ok) result = await guestSignup();
+    } else {
+      result = await guestSignup();
     }
 
     if (!result.ok) {
-      if (hasSaved || result.data?.code === "ALREADY_REGISTERED") return false;
+      if (result.data?.code === "ALREADY_REGISTERED") return false;
       throw new Error(result.data?.error || "Account could not be created");
     }
 
