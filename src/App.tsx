@@ -33,6 +33,7 @@ import { ListingCard } from "./components/ListingCard";
 import { HeaderNav } from "./components/HeaderNav";
 import MarketplaceTab from "./components/MarketplaceTab";
 import { countUnread } from "./utils/notifSeen";
+import MarketReportPage from "./components/MarketReportPage";
 // 📦 নিচের কম্পোনেন্টগুলো lazy-loaded — এগুলোর কোড শুধু তখনই ডাউনলোড হবে যখন
 // ইউজার সত্যিই সেই অংশে যাবে (modal খুলবে/ট্যাব বদলাবে), শুরুতেই না।
 const ListingDetailModal = lazy(() => import("./components/ListingDetailModal").then(m => ({ default: m.ListingDetailModal })));
@@ -312,6 +313,7 @@ export default function App() {
   // যাতে "Load More" চাপার আগেই সবসময় বুস্ট ব্যানার দেখা যায়।
   const [adListings, setAdListings] = useState<PartListing[]>([]);
   const [notifTick, setNotifTick] = useState(0);
+  const [isReportOpen, setIsReportOpen] = useState(false);
   useEffect(() => {
     const h = () => setNotifTick((n) => n + 1);
     window.addEventListener("gb:notif-seen", h);
@@ -2609,6 +2611,26 @@ export default function App() {
                     </button>
                   </div>
 
+                  {/* Row 1.8: গাড়ির বাজার দামের রিপোর্ট */}
+                  <div className="transition duration-150">
+                    <button
+                      type="button"
+                      id="profile-row-market-report"
+                      onClick={() => setIsReportOpen(true)}
+                      className="w-full flex items-center justify-between p-4.5 hover:bg-slate-50 dark:hover:bg-slate-800/40 cursor-pointer text-left transition select-none"
+                    >
+                      <div className="flex items-center gap-3.5">
+                        <div className="w-9 h-9 rounded-full bg-sky-500 text-white flex items-center justify-center shrink-0 shadow-xs text-base">
+                          📊
+                        </div>
+                        <p className="text-sm sm:text-base font-extrabold text-slate-800 dark:text-slate-100">
+                          {language === "bn" ? "গাড়ির বাজার দাম" : "Car market prices"}
+                        </p>
+                      </div>
+                      <ChevronRight className="w-4 h-4 text-slate-400 dark:text-slate-500" />
+                    </button>
+                  </div>
+
                   {/* Row 2: Change language (ক্লিক করলে ডিয়েটাইল দেখাবে) */}
                   <div className="transition duration-150">
                     <button
@@ -3104,6 +3126,8 @@ export default function App() {
       )}
 
       {/* 3b. Free daily "Boost Ads" lottery — 1-in-100 win chance, one spin per user per day */}
+      {isReportOpen && <MarketReportPage language={language} onClose={() => setIsReportOpen(false)} />}
+
       {isLotteryOpen && (
         <LotteryModal
           isOpen={isLotteryOpen}
