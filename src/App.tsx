@@ -3126,7 +3126,7 @@ export default function App() {
       )}
 
       {/* 3b. Free daily "Boost Ads" lottery — 1-in-100 win chance, one spin per user per day */}
-      {isReportOpen && <MarketReportPage language={language} onClose={() => setIsReportOpen(false)} />}
+      {isReportOpen && <MarketReportPage language={language} onClose={() => setIsReportOpen(false)} uid={user?.uid || null} isAdmin={!!user?.isAdmin} onLoginPrompt={() => setIsAuthOpen(true)} />}
 
       {isLotteryOpen && (
         <LotteryModal

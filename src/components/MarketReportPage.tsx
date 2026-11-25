@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, ChevronRight, Loader2, Search } from "lucide-react";
 import { supabase } from "../supabase";
 import { SupportedLanguage } from "../types";
+import MarketReportComments from "./MarketReportComments";
 
 // 📊 গাড়ির বাজার দামের রিপোর্ট: গত ৬ মাসের পোস্ট থেকে ব্র্যান্ড-মডেল (আর বছর) অনুযায়ী দামের সীমা।
 // সবাই দেখতে পারে। কারো পোস্টকে "বেশি/কম" বলা হয় না -- শুধু বাজারের ছবি দেখানো হয়।
@@ -34,13 +35,24 @@ const fmt = (v: number, bn: boolean): string => {
   return Math.round(v).toLocaleString("en-IN");
 };
 
-export default function MarketReportPage({ language, onClose }: { language: SupportedLanguage; onClose: () => void }) {
+export default function MarketReportPage({ language, onClose, uid = null, isAdmin = false, onLoginPrompt }: { language: SupportedLanguage; onClose: () => void; uid?: string | null; isAdmin?: boolean; onLoginPrompt?: () => void }) {
   const bn = language === "bn";
   const ownEntry = useRef(false);
   const [rows, setRows] = useState<Row[] | null>(null);
   const [failed, setFailed] = useState(false);
   const [query, setQuery] = useState("");
   const [openKey, setOpenKey] = useState<string | null>(null);
+
+  // পেজ বন্ধ করে তারপর কিছু করা (লগইন পপআপ এই পেজের নিচে পড়ে যায়, তাই আগে বন্ধ করতে হয়)
+  const leaveThen = (after?: () => void) => {
+    if (ownEntry.current) {
+      try { window.history.back(); } catch (_) {}
+      window.setTimeout(() => { onClose(); if (after) after(); }, 80);
+    } else {
+      onClose();
+      if (after) after();
+    }
+  };
 
   // ফোনের back বোতাম এই পেজ বন্ধ করে (ইনবক্সের মতো নিজের একটা history entry)
   useEffect(() => {
@@ -204,6 +216,15 @@ export default function MarketReportPage({ language, onClose }: { language: Supp
                     </div>
                   ))}
                 </div>
+              )}
+              {open && (
+                <MarketReportComments
+                  modelKey={g.key}
+                  language={language}
+                  uid={uid}
+                  isAdmin={isAdmin}
+                  onLoginPrompt={() => leaveThen(onLoginPrompt)}
+                />
               )}
             </div>
           );
