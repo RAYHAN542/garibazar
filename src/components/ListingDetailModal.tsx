@@ -16,6 +16,9 @@ import { NativeAdSlot } from "./NativeAdSlot";
 import { WebAdSlot } from "./WebAdSlot";
 import { AD_PACKAGES } from "../translations";
 
+// Boost-your-ad card on the listing page (owner only) is hidden. Set to true to show it again.
+const SHOW_BOOST_CARD = false;
+
 // নাম ফাঁকা বা সাধারণ ফলব্যাক ("User", "Seller", "বিক্রেতা") হলে ফেসবুকের মতো "বেনামী" দেখাবে।
 const ANON_SELLER_NAMES = ["", "user", "seller", "বিক্রেতা", "ব্যবহারকারী", "বেনামী", "anonymous"];
 const isAnonSeller = (name?: string | null) => ANON_SELLER_NAMES.includes((name || "").trim().toLowerCase());
@@ -713,7 +716,7 @@ export function ListingDetailModal({ listing, language, currentUser, onClose, on
             )}
 
             {/* 🚀 বুস্ট বক্স: শুধু নিজের, অবিক্রিত, এখনো বুস্ট-না-করা পোস্টে */}
-            {isOwner && !isSold && !listing.isAd && AD_PACKAGES.length > 0 && (
+            {SHOW_BOOST_CARD && isOwner && !isSold && !listing.isAd && AD_PACKAGES.length > 0 && (
               <div className="rounded-xl border border-amber-500/30 bg-gradient-to-r from-amber-500/15 to-orange-500/10 overflow-hidden">
                 <button
                   type="button"
