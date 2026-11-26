@@ -190,22 +190,6 @@ export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPromp
   const [price, setPrice] = useState("");
   const [phone, setPhone] = useState(toEnglishDigits(currentUser?.phoneNumber || ""));
   const [description, setDescription] = useState("");
-  // 📍 জেলা: বিবরণ থেকে ধরা পড়লে নিজে বসে, না হলে আগেরবার যেটা বাছা হয়েছিল সেটা, না হলে ইউজার বাছে।
-  // (জেলা না থাকলে ক্রেতারা শহর দিয়ে ফিল্টার করে পোস্টটা পায় না)
-  const [city, setCity] = useState<string>(() => {
-    try {
-      const v = localStorage.getItem("gb_last_city_v1") || "";
-      return (CITIES as readonly string[]).includes(v) ? v : "";
-    } catch (_) {
-      return "";
-    }
-  });
-  const [cityTouched, setCityTouched] = useState(false);
-  useEffect(() => {
-    if (cityTouched) return;
-    const det = detectLocationFromText(description);
-    if (det) setCity(det);
-  }, [description, cityTouched]);
   const [images, setImages] = useState<{ file: File; preview: string; url?: string; status: "idle" | "uploading" | "success" | "error"; progress: number; errorMessage?: string }[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -449,11 +433,6 @@ export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPromp
       return;
     }
 
-    if (!(city || detectLocationFromText(description))) {
-      showError(language === "bn" ? "জেলা বাছাই করুন, যাতে ক্রেতারা শহর দিয়ে খুঁজে পায়" : "Please choose your district so buyers can find your listing");
-      return;
-    }
-
     if (mode === "video" && !video) {
       showError(language === "bn" ? "অনুগ্রহ করে একটি ভিডিও যোগ করুন" : "Please add a video");
       return;
@@ -545,7 +524,7 @@ export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPromp
       // শিরোনাম: বিবরণ থেকে ব্র্যান্ড/মডেল/সাল খুঁজে (যেমন "Toyota Axio 2008"); না পেলে আগের মতো প্রথম লাইন।
       const cleanTitle = sanitizeText(buildListingTitle(description, kind) || deriveTitleFromDescription(description));
       const cleanPrice = price ? String(validatePriceInput(price)) : "0";
-      const detectedLocation = city || detectLocationFromText(description) || "Bangladesh";
+      const detectedLocation = detectLocationFromText(description) || "Bangladesh";
       const cleanPhone = sanitizeText(cleanPhoneDigits);
 
       // ইউজার যে বাটন চেপেছে সেটাই একমাত্র সত্য -- বিবরণ থেকে কোনো অনুমান নেই।
@@ -635,7 +614,6 @@ export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPromp
           ...(videoUrl ? { videoUrl, hasVideo: true, isVideo: true } : {})
         });
       }
-      try { if (city) localStorage.setItem("gb_last_city_v1", city); } catch (_) {}
       window.dispatchEvent(new Event("gari_bazar_refreshed_data"));
       onPostSuccess();
     } catch (err: any) {
@@ -784,25 +762,6 @@ export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPromp
             className="w-full px-3 py-2 border rounded-lg text-sm bg-white text-gray-900 focus:outline-none focus:border-orange-500"
             required
           />
-        </div>
-
-        <div>
-          <label className="block text-xs font-semibold text-gray-700 mb-1">
-            {language === "bn" ? "কোন জেলায়? *" : "Which district? *"}
-          </label>
-          <select
-            value={city}
-            onChange={(e) => { setCity(e.target.value); setCityTouched(true); }}
-            className="w-full px-3 py-2 border rounded-lg text-sm bg-white text-gray-900 focus:outline-none focus:border-orange-500"
-          >
-            <option value="">{language === "bn" ? "জেলা বাছাই করুন" : "Choose district"}</option>
-            {(CITIES as readonly string[]).filter((c) => /^[^(]+\([^)]+\)$/.test(c)).map((c) => (
-              <option key={c} value={c}>{c}</option>
-            ))}
-          </select>
-          <p className="mt-1 text-[11px] text-gray-400">
-            {language === "bn" ? "বিবরণে জেলার নাম থাকলে নিজে থেকেই বসে যাবে" : "Filled automatically if your description mentions a district"}
-          </p>
         </div>
 
         {/* 🔧 (2026-10-01) Submit বাটনের ঠিক উপরে একই error দ্বিতীয়বার --
