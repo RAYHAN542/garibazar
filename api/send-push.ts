@@ -194,6 +194,141 @@ export default async function handler(req: any, res: any) {
         return res.status(200).json({ success: true, sent: sentCount });
       }
 
+      // 🌅 (2026-11-26) সকালের ফ্লাশ: রাতে (১২টা–৮টা) পাঠানো যায়নি এমন খবর সকালে পাঠানো।
+      //  জমা থাকে pending_morning_pushes টেবিলে; ডেটাবেসের cron "flush-morning-pushes" রোজ ৮:০৫-এ ডাকে।
+      //  ক) রাতে কেউ বিক্রেতার পোস্টে কল বাটনে চেপেছিল -> বিক্রেতাকে একটাই পুশ (একাধিক পোস্ট হলে সংখ্যাসহ)
+      //  খ) রাতে নতুন বিজ্ঞাপন এসেছিল -> সবার কাছে একটাই সারসংক্ষেপ ("রাতে N টি নতুন বিজ্ঞাপন এসেছে")
+      //  dryRun: true দিলে কিছু পাঠায়/মোছে না, শুধু সংখ্যা ফেরত দেয় (টেস্টের জন্য)।
+      const morning = (req.body || {}).internalMorningFlush;
+      if (morning) {
+        const dryRun = morning.dryRun === true;
+        const { data: pendRows } = await supabase
+          .from("pending_morning_pushes")
+          .select("id, kind, listing_id")
+          .order("created_at", { ascending: true })
+          .limit(2000);
+        const pending: any[] = pendRows || [];
+        if (pending.length === 0) {
+          return res.status(200).json({ success: true, dryRun, sellerPushes: 0, summarySent: 0, listings: 0 });
+        }
+        const pendIds = Array.from(new Set(pending.map((p: any) => String(p.listing_id))));
+        const alive = new Map<string, any>();
+        for (let i = 0; i < pendIds.length; i += 100) {
+          const { data: ls } = await supabase
+            .from("listings")
+            .select("id, title, price, images, seller_id, is_deleted, is_sold, created_at")
+            .in("id", pendIds.slice(i, i + 100));
+          (ls || []).forEach((x: any) => {
+            if (!x.is_deleted && !x.is_sold) alive.set(String(x.id), x);
+          });
+        }
+
+        // ক) বিক্রেতার কল
+        const bySeller = new Map<string, any[]>();
+        pending
+          .filter((p: any) => p.kind === "seller_call")
+          .forEach((p: any) => {
+            const l = alive.get(String(p.listing_id));
+            if (!l || !l.seller_id) return;
+            const arr = bySeller.get(l.seller_id) || [];
+            arr.push(l);
+            bySeller.set(l.seller_id, arr);
+          });
+        let sellerPushes = 0;
+        for (const [sellerId, ls] of Array.from(bySeller.entries())) {
+          if (dryRun) {
+            sellerPushes++;
+            continue;
+          }
+          const first = ls[0];
+          const titleTxt = String(first.title || "").slice(0, 60);
+          const okSeller = await sendPushToUid(
+            supabase,
+            sellerId,
+            ls.length > 1 ? "রাতে কয়েকজন আপনার পোস্টে আগ্রহী ছিলেন 📞" : "রাতে কেউ আপনার পোস্টে আগ্রহী ছিলেন 📞",
+            ls.length > 1
+              ? `${ls.length}টি পোস্টে কল বাটনে চাপ পড়েছে। ফোন ধরার জন্য তৈরি থাকুন।`
+              : `"${titleTxt}" দেখে একজন কল বাটনে চেপেছিলেন। ফোন ধরার জন্য তৈরি থাকুন।`,
+            { listingId: String(first.id) }
+          );
+          if (okSeller) sellerPushes++;
+        }
+
+        // খ) রাতের নতুন বিজ্ঞাপনের সারসংক্ষেপ
+        const nightNew: any[] = pending
+          .filter((p: any) => p.kind === "new_listing")
+          .map((p: any) => alive.get(String(p.listing_id)))
+          .filter(Boolean);
+        let summarySent = 0;
+        if (nightNew.length > 0 && !dryRun) {
+          nightNew.sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+          const newest = nightNew[0];
+          const nNew = nightNew.length;
+          const sumTokens = new Set<string>();
+          for (let from = 0; from < 5000; from += 1000) {
+            const { data: rows } = await supabase
+              .from("users")
+              .select("fcm_token")
+              .not("fcm_token", "is", null)
+              .range(from, from + 999);
+            (rows || []).forEach((r: any) => {
+              if (r.fcm_token) sumTokens.add(r.fcm_token);
+            });
+            if (!rows || rows.length < 1000) break;
+          }
+          const sumDevByToken = new Map<string, string>();
+          const sumFresh = new Date(Date.now() - DEVICE_TOKEN_MAX_AGE_MS).toISOString();
+          for (let from = 0; from < 10000; from += 1000) {
+            const { data: rows } = await supabase
+              .from("device_push_tokens")
+              .select("device_id, fcm_token")
+              .gt("updated_at", sumFresh)
+              .range(from, from + 999);
+            (rows || []).forEach((r: any) => {
+              if (r.fcm_token) {
+                sumTokens.add(r.fcm_token);
+                sumDevByToken.set(r.fcm_token, r.device_id);
+              }
+            });
+            if (!rows || rows.length < 1000) break;
+          }
+          const sumList = Array.from(sumTokens);
+          const sumPrice = Number(newest.price) > 0 ? " - ৳" + Number(newest.price).toLocaleString("en-IN") : "";
+          const sumImage = pickPushImage(newest.images);
+          const sumDead: string[] = [];
+          for (let i = 0; i < sumList.length; i += 500) {
+            const batch = sumList.slice(i, i + 500);
+            const r = await sendMulticastSmart(supabase, {
+              tokens: batch,
+              notification: {
+                title: nNew > 1 ? `রাতে ${nNew}টি নতুন বিজ্ঞাপন এসেছে 🌅` : "রাতে একটি নতুন বিজ্ঞাপন এসেছে 🌅",
+                body: String(newest.title || "").slice(0, 80) + sumPrice,
+                ...(sumImage ? { imageUrl: sumImage } : {}),
+              },
+              data: { listingId: String(newest.id) },
+            });
+            summarySent += r.successCount;
+            r.responses.forEach((resp: any, idx: number) => {
+              const code = String(resp?.error?.code || "");
+              const dev = sumDevByToken.get(batch[idx]);
+              if (!resp.success && dev && /registration-token-not-registered|invalid-registration-token|invalid-argument/.test(code)) {
+                sumDead.push(dev);
+              }
+            });
+          }
+          for (let i = 0; i < sumDead.length; i += 100) {
+            await supabase.from("device_push_tokens").delete().in("device_id", sumDead.slice(i, i + 100));
+          }
+        }
+        if (!dryRun) {
+          const doneIds = pending.map((p: any) => p.id);
+          for (let i = 0; i < doneIds.length; i += 200) {
+            await supabase.from("pending_morning_pushes").delete().in("id", doneIds.slice(i, i + 200));
+          }
+        }
+        return res.status(200).json({ success: true, dryRun, sellerPushes, summarySent, listings: nightNew.length });
+      }
+
       const soldPush = (req.body || {}).internalSoldPush;
       if (soldPush) {
         if (!soldPush.listingId) {
@@ -344,6 +479,12 @@ export default async function handler(req: any, res: any) {
       // রাতে ঘুমের সময় কোনো ব্রডকাস্ট নয় -- এখানে থেমে গেলে ৩০ মিনিটের ঘড়ি ছোঁয়া হয় না।
       const bdHour = (new Date().getUTCHours() + BD_UTC_OFFSET_HOURS) % 24;
       if (bdHour >= QUIET_START_HOUR_BD || bdHour < QUIET_END_HOUR_BD) {
+        // 🌅 রাতে পাঠানো না গেলেও সকালের সারসংক্ষেপের জন্য জমিয়ে রাখা (সকাল ৮:০৫-এ একটাই পুশ)
+        try {
+          await supabase
+            .from("pending_morning_pushes")
+            .upsert({ kind: "new_listing", listing_id: l.id, seller_id: uid }, { onConflict: "kind,listing_id", ignoreDuplicates: true });
+        } catch (_) {}
         return res.status(200).json({ success: true, skipped: "quiet_hours" });
       }
 
