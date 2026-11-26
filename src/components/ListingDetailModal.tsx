@@ -9,6 +9,7 @@ import { logAnalyticsEvent } from "../utils/analytics";
 import { supabase } from "../supabase";
 import { trackListingClick } from "../utils/counters";
 import { trackInterest } from "../utils/feedRanker";
+import { addModelSearchFromListing } from "../utils/savedSearches";
 import { getOptimizedImageUrl } from "../utils/cloudinary";
 import { apiUrl } from "../utils/apiBase";
 import { NativeAdSlot } from "./NativeAdSlot";
@@ -269,6 +270,7 @@ export function ListingDetailModal({ listing, language, currentUser, onClose, on
       if (error) throw error;
 
       setAddToDashboardSuccess(true);
+      try { addModelSearchFromListing(listing); } catch (_) {}
       trackInterest(listing, 3);
       if (onPurchaseAdded) {
         onPurchaseAdded();

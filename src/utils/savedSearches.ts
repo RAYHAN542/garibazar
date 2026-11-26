@@ -110,3 +110,29 @@ export function describeSavedSearch(s: SavedSearch, bn: boolean): string {
   if (s.p) parts.push((bn ? "৳" : "≤ ৳") + s.p.toLocaleString("en-IN") + (bn ? " পর্যন্ত" : ""));
   return parts.join(" • ");
 }
+
+// 💾 "ড্যাশবোর্ডে সংরক্ষণ" চাপলে ওই মডেল "আমি খুঁজছি"-তে নিজে ঢোকে: এরপর ওই মডেলের নতুন পোস্টে নোটিফিকেশন (দাম যা-ই হোক)।
+// ৫টা ভরা থাকলে সবচেয়ে পুরনোটা সরে যায়, যাতে সবচেয়ে নতুন সংরক্ষণটাই কাজ করে।
+const MODEL_STOP = new Set(["toyota","honda","nissan","suzuki","mitsubishi","mazda","subaru","yamaha","bajaj","tvs","hero","used","new","car","cars","japan","sale","fresh","recondition","reconditioned","full","super","good","price","auction","grade","for","the","and","with","bangladesh","dhaka"]);
+
+export function modelKeywordOf(l: { brand?: string; model?: string; title?: string }): string {
+  const text = ((l.model || "") + " " + (l.title || "")).toLowerCase();
+  const brand = (l.brand || "").toLowerCase().trim();
+  const toks = text.match(/[a-z][a-z0-9-]{2,}/g) || [];
+  for (const t of toks) {
+    if (t === brand || MODEL_STOP.has(t)) continue;
+    return t;
+  }
+  return "";
+}
+
+export function addModelSearchFromListing(l: { brand?: string; model?: string; title?: string }): void {
+  const b = cleanText(l.brand);
+  const k = cleanText(modelKeywordOf(l));
+  if (!k) return; // মডেলের নাম ধরা না গেলে শুধু ব্র্যান্ড দিয়ে সবার অ্যালার্ট দেওয়া হবে না
+  const list = loadSavedSearches();
+  if (list.some((s) => s.b === b && s.k === k && !s.p && !s.y1 && !s.y2)) return;
+  if (list.length >= MAX_SAVED_SEARCHES) list.shift();
+  list.push({ id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), b, k, p: 0, y1: 0, y2: 0 });
+  persist(list);
+}
