@@ -68,10 +68,12 @@ interface VideoSlideProps {
   isAdmin: boolean;
   onStartChat: (listing: PartListing) => void;
   onClose: () => void;
+  onNext?: () => boolean;
 }
 
-function VideoSlideImpl({ listing, index, rel, muted, adPlaying, language, onToggleMute, onForceMute, currentUser, onLoginPrompt, isAdmin, onStartChat, onClose }: VideoSlideProps) {
+function VideoSlideImpl({ listing, index, rel, muted, adPlaying, language, onToggleMute, onForceMute, currentUser, onLoginPrompt, isAdmin, onStartChat, onClose, onNext }: VideoSlideProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const playsRef = useRef(0);
   const [paused, setPaused] = useState(false);
   const isActive = rel === 0;
   // 🔧 (youtube-tips) was rel -1..2 (4 videos loaded at once); now previous, current, next only.
@@ -149,7 +151,7 @@ function VideoSlideImpl({ listing, index, rel, muted, adPlaying, language, onTog
   const [phoneError, setPhoneError] = useState(false);
 
   useEffect(() => {
-    if (!isActive) setExpanded(false);
+    if (!isActive) { setExpanded(false); playsRef.current = 0; }
   }, [isActive]);
 
   const revealPhone = async () => {
@@ -227,8 +229,14 @@ function VideoSlideImpl({ listing, index, rel, muted, adPlaying, language, onTog
           src={listing.videoUrl + "#t=0.1"}
           poster={listing.image || undefined}
           className="h-full w-full object-cover [transform:translateZ(0)]"
-          loop
           playsInline
+          onEnded={() => {
+            playsRef.current += 1;
+            const moved = playsRef.current >= 2 && !expanded && onNext ? onNext() : false;
+            if (moved) { playsRef.current = 0; return; }
+            const v = videoRef.current;
+            if (v) { try { v.currentTime = 0; } catch (_) {} v.play().catch(() => {}); }
+          }}
           muted={muted}
           preload={rel === 0 || rel === 1 ? "auto" : "metadata"}
           onClick={togglePause}
@@ -401,10 +409,32 @@ export default function VideoFeed({ language, videos, currentUser, onLoginPrompt
   const forceMute = useCallback(() => setMuted(true), []);
   const [isPostOpen, setIsPostOpen] = useState(false);
   const [posted, setPosted] = useState(false);
+  const [showHint, setShowHint] = useState<boolean>(() => {
+    try { return !localStorage.getItem("gb_video_hint_v1"); } catch (_) { return false; }
+  });
+  const dismissHint = useCallback(() => {
+    setShowHint(false);
+    try { localStorage.setItem("gb_video_hint_v1", "1"); } catch (_) {}
+  }, []);
+  useEffect(() => {
+    if (!showHint) return;
+    const t = setTimeout(dismissHint, 4000);
+    return () => clearTimeout(t);
+  }, [showHint, dismissHint]);
+  useEffect(() => {
+    if (activeIndex > 0 && showHint) dismissHint();
+  }, [activeIndex, showHint, dismissHint]);
   // 🔧 (youtube-tips) "sale" = seller videos (as before), "tips" = YouTube mechanic tips.
   const [tab, setTab] = useState<"sale" | "tips">("sale");
   const [vf, setVf] = useState<"all" | "car" | "part" | "bike" | "truck" | "heavy">("all");
   const containerRef = useRef<HTMLDivElement>(null);
+  const goNext = useCallback((i: number): boolean => {
+    try {
+      const el = containerRef.current?.querySelector('[data-index="' + (i + 1) + '"]') as HTMLElement | null;
+      if (el) { el.scrollIntoView({ behavior: "smooth", block: "start" }); return true; }
+    } catch (_) {}
+    return false;
+  }, []);
   const jumpPending = useRef(false);
   const firstIdAtPost = useRef<string | null>(null);
   // 🎯 ভিডিও ফিডও মিশ্র: নতুন + পছন্দের + পুরনো (ইতিহাস না থাকলে আগের মতোই নতুন থেকে পুরনো)।
@@ -450,7 +480,7 @@ export default function VideoFeed({ language, videos, currentUser, onLoginPrompt
     );
     root.querySelectorAll("[data-index]").forEach((el) => observer.observe(el));
     return () => { if (timer) clearTimeout(timer); observer.disconnect(); };
-  }, [videos.length, tab]);
+  }, [videos.length, tab, ordered.length, vf]);
 
   // পোস্টের পর নতুন ভিডিও তালিকার মাথায় এলে সেখানে নিয়ে যাই।
   useEffect(() => {
@@ -540,6 +570,14 @@ export default function VideoFeed({ language, videos, currentUser, onLoginPrompt
         </div>
       </div>
 
+      {showHint && tab === "sale" && ordered.length > 1 && (
+        <div className="absolute bottom-32 inset-x-0 z-20 flex justify-center pointer-events-none">
+          <span className="px-4 py-2 rounded-full bg-black/60 text-white text-xs font-bold animate-bounce">
+            {language === "bn" ? "↑ উপরে সোয়াইপ করুন" : "↑ Swipe up"}
+          </span>
+        </div>
+      )}
+
       {posted && (
         <div className="absolute top-[calc(4rem+env(safe-area-inset-top))] inset-x-0 z-20 flex justify-center pointer-events-none">
           <span className="px-4 py-2 rounded-full bg-green-600 text-white text-xs font-bold shadow-lg">
@@ -580,9 +618,25 @@ export default function VideoFeed({ language, videos, currentUser, onLoginPrompt
               isAdmin={!!isAdmin}
               onStartChat={onStartChat}
               onClose={onClose}
+              onNext={() => goNext(index)}
               onSelect={onSelect}
             />
           ))}
+          <div data-index={ordered.length} className="h-full w-full snap-start snap-always relative bg-black flex flex-col items-center justify-center px-8 text-center text-white gap-3">
+            <div className="w-14 h-14 rounded-full bg-white/10 flex items-center justify-center">
+              <Play className="w-7 h-7 fill-white" />
+            </div>
+            <p className="text-base font-extrabold">{language === "bn" ? "সব ভিডিও দেখা হয়ে গেছে 🎉" : "You've seen all the videos 🎉"}</p>
+            <p className="text-sm text-white/70 font-semibold">{language === "bn" ? "আপনার গাড়ির ভিডিও যোগ করুন, বা পোস্টগুলো দেখুন।" : "Add a video of your car, or browse the posts."}</p>
+            <div className="flex gap-2 mt-1">
+              <button type="button" onClick={() => setIsPostOpen(true)} className="px-4 py-2 rounded-full bg-red-600 text-white text-xs font-extrabold cursor-pointer">
+                {language === "bn" ? "ভিডিও যোগ করুন" : "Add a video"}
+              </button>
+              <button type="button" onClick={closeFeed} className="px-4 py-2 rounded-full bg-white/20 border border-white/30 text-white text-xs font-extrabold cursor-pointer">
+                {language === "bn" ? "পোস্ট দেখুন" : "Browse posts"}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
