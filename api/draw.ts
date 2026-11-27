@@ -18,7 +18,7 @@ const getTodayInDhaka = (): string => {
 // জেতার সম্ভাবনা ঠিক ১০ জনের মধ্যে ১ জন (১০%)। ক্রিপ্টো-সিকিউর random ব্যবহার করা হচ্ছে
 // যাতে ক্লায়েন্ট সাইড থেকে ম্যানিপুলেট করা সম্ভব না হয় — পুরো ড্র সার্ভারেই হয়।
 const WIN_CHANCE_DENOMINATOR = 10;
-const BOOST_DURATION_HOURS = 24;
+const BOOST_DAYS_OPTIONS = [1, 2];
 
 // Firestore-era auto-generated doc IDs are 20-char base62-ish strings --
 // alphanumeric only. Anything outside that charset is never a real legacy
@@ -123,8 +123,10 @@ export default async function handler(req: any, res: any) {
     const win = roll === 0;
 
     let adExpiresAt: string | null = null;
+    let days = 0;
     if (win) {
-      adExpiresAt = new Date(Date.now() + BOOST_DURATION_HOURS * 60 * 60 * 1000).toISOString();
+      days = BOOST_DAYS_OPTIONS[randomInt(0, BOOST_DAYS_OPTIONS.length)];
+      adExpiresAt = new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString();
       const { error: boostErr } = await supabase
         .from("listings")
         .update({ is_ad: true, ad_tier: "featured", ad_expires_at: adExpiresAt })
@@ -150,7 +152,7 @@ export default async function handler(req: any, res: any) {
       console.error("lottery draw: failed to write audit row:", auditErr.message);
     }
 
-    return res.status(200).json({ win, adExpiresAt });
+    return res.status(200).json({ win, days, adExpiresAt });
   } catch (err: any) {
     console.error("lottery draw failed:", err);
     return res.status(500).json({ error: "সার্ভারে সমস্যা হয়েছে। আবার চেষ্টা করুন।" });
