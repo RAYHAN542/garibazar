@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
+import { parseVideoLink } from "../utils/videoLink";
 import { SupportedLanguage } from "../types";
 import { Camera, Loader2, AlertTriangle, X, Video, Car, Bike, Truck, Wrench } from "lucide-react";
 import { supabase } from "../supabase";
@@ -199,6 +200,7 @@ export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPromp
   // নতুনটার ওপর বসে না যায়।
   const [video, setVideo] = useState<VideoState | null>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
+  const [videoLinkText, setVideoLinkText] = useState("");
   const videoJobRef = useRef(0);
   // 🔧 (2026-10-01) ফর্মটা বড়, আর submit বাটন একদম নিচে। আগে error শুধু
   // ফর্মের সবার উপরে দেখানো হতো -- ইউজার নিচে scroll করে থেকে submit চাপলে
@@ -433,7 +435,7 @@ export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPromp
       return;
     }
 
-    if (mode === "video" && !video) {
+    if (mode === "video" && !video && !parseVideoLink(videoLinkText)) {
       showError(language === "bn" ? "অনুগ্রহ করে একটি ভিডিও যোগ করুন" : "Please add a video");
       return;
     }
@@ -500,7 +502,8 @@ export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPromp
     setShowCategoryModal(false);
     const cleanPhoneDigits = toEnglishDigits(phone).replace(/\D/g, "");
     const uploadedUrls = images.filter(img => img.status === "success" && img.url).map(img => img.url as string);
-    const videoUrl = video && video.status === "success" ? video.url : undefined;
+    const linkUrl = parseVideoLink(videoLinkText) ? videoLinkText.trim() : undefined;
+    const videoUrl = (video && video.status === "success" ? video.url : undefined) || linkUrl;
     if (mode === "video" && !videoUrl) {
       showError(language === "bn" ? "ভিডিও আপলোড হয়নি। ভিডিও মুছে আবার দিন।" : "Video upload failed. Remove the video and add it again.");
       return;
@@ -728,6 +731,32 @@ export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPromp
             </button>
           )}
           <input type="file" ref={videoInputRef} onChange={handleVideoSelect} accept="video/*" className="hidden" />
+          {!video && (
+            <div className="mt-3">
+              <p className="mb-1 text-xs font-semibold text-gray-500">
+                {language === "bn" ? "অথবা YouTube / Facebook ভিডিওর লিংক দিন" : "Or paste a YouTube / Facebook video link"}
+              </p>
+              <input
+                type="url"
+                inputMode="url"
+                value={videoLinkText}
+                onChange={(e) => setVideoLinkText(e.target.value)}
+                placeholder="https://youtu.be/..."
+                className="w-full rounded-lg border bg-white px-3 py-2 text-sm text-gray-900"
+              />
+              {videoLinkText.trim() !== "" && (
+                parseVideoLink(videoLinkText) ? (
+                  <p className="mt-1 text-xs font-bold text-green-600">
+                    {language === "bn" ? "✓ লিংক ঠিক আছে" : "✓ Link looks good"}
+                  </p>
+                ) : (
+                  <p className="mt-1 text-xs font-bold text-red-500">
+                    {language === "bn" ? "লিংকটি চেনা যায়নি। YouTube বা Facebook ভিডিওর পুরো লিংক দিন (fb.watch চলবে না)।" : "Link not recognised. Use a full YouTube or Facebook video link (fb.watch does not work)."}
+                  </p>
+                )
+              )}
+            </div>
+          )}
         </div>
         )}
 
