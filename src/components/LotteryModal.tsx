@@ -21,12 +21,17 @@ const getTodayInDhaka = (): string => {
 };
 
 // ---- Spin wheel geometry ----
-const WHEEL_SEGMENTS = 8;
-const WIN_SEGMENT_INDEX = 0;
+const WHEEL_SEGMENTS = 14;
+// ঘরের ধরন: 1 = ১ দিন, 2 = ২ দিন, 0 = আবার চেষ্টা
+const SEGMENT_DAYS = [1, 0, 0, 2, 0, 0, 0, 1, 0, 0, 2, 0, 0, 0];
 const SEGMENT_ANGLE = 360 / WHEEL_SEGMENTS;
 const SPIN_DURATION_MS = 4200;
 const WAIT_LOOP_MS = 1000;
 const SEGMENT_COLORS = ["#f59e0b", "#0f172a"];
+const pickWinIndex = (days: number): number => {
+  const idx = SEGMENT_DAYS.map((d, i) => (d === days ? i : -1)).filter((i) => i >= 0);
+  return idx[Math.floor(Math.random() * idx.length)];
+};
 
 export function LotteryModal({ isOpen, onClose, language, currentUser, userMetadata, listings, setIsAuthOpen, fromPost }: LotteryModalProps) {
   const [selectedListingId, setSelectedListingId] = useState<string>("");
@@ -64,7 +69,7 @@ export function LotteryModal({ isOpen, onClose, language, currentUser, userMetad
   };
 
   const pickRandomLosingIndex = (): number => {
-    const options = Array.from({ length: WHEEL_SEGMENTS }, (_, i) => i).filter((i) => i !== WIN_SEGMENT_INDEX);
+    const options = Array.from({ length: WHEEL_SEGMENTS }, (_, i) => i).filter((i) => SEGMENT_DAYS[i] === 0);
     return options[Math.floor(Math.random() * options.length)];
   };
 
@@ -120,7 +125,7 @@ export function LotteryModal({ isOpen, onClose, language, currentUser, userMetad
         throw new Error(data.error || (language === "bn" ? "কিছু ভুল হয়েছে।" : "Something went wrong."));
       }
 
-      const landingIndex = data.win ? WIN_SEGMENT_INDEX : pickRandomLosingIndex();
+      const landingIndex = data.win ? pickWinIndex(data.days === 2 ? 2 : 1) : pickRandomLosingIndex();
 
       // চাকাটা ঠিক যেখানে ঘুরছিল (continuous loop) সেখান থেকেই, কোনো ঝাঁকুনি ছাড়াই,
       // আসল ফলাফলের দিকে মসৃণভাবে ধীরে ধীরে থামানো হচ্ছে।
@@ -251,7 +256,7 @@ export function LotteryModal({ isOpen, onClose, language, currentUser, userMetad
                   return (
                     <div key={i} className="absolute inset-0" style={{ transform: `rotate(${angle}deg)` }}>
                       <span className="absolute top-3 left-1/2 -translate-x-1/2 text-white font-black text-[11px] leading-tight text-center whitespace-nowrap drop-shadow">
-                        {i === WIN_SEGMENT_INDEX ? "🎁" : (i % 2 === 1 ? "১ দিন" : "২ দিন")}
+                        {SEGMENT_DAYS[i] === 1 ? "১ দিন" : SEGMENT_DAYS[i] === 2 ? "২ দিন" : "আবার চেষ্টা"}
                       </span>
                     </div>
                   );
