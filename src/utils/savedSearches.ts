@@ -114,23 +114,63 @@ const SEARCH_MODELS: string[][] = [
   ["apache", "অ্যাপাচি"],
   ["r15"],
 ];
+// ট্রাক, পিকআপ, ভেকু ও আরও বাইক। b থাকলে পোস্টের ব্র্যান্ডও মিলতে হবে (ছোট নম্বর/শব্দ যাতে ভুল পোস্টে না মেলে)।
+// names = সার্চে যা লিখতে পারে, keys = পোস্টে যা খোঁজা হবে
+const MORE_MODELS: { names: string[]; keys: string[]; b?: string }[] = [
+  ...["407", "709", "909", "912", "1109", "1212", "1615", "1613"].map((n) => ({
+    names: [n], keys: [n, n.replace(/\d/g, (d) => "০১২৩৪৫৬৭৮৯"[Number(d)])], b: "tata",
+  })),
+  { names: ["ace", "tata ace", "এইস"], keys: ["ace", "এস ই"], b: "tata" },
+  { names: ["ex2", "ex 2"], keys: ["ex2", "ex 2"], b: "tata" },
+  { names: ["1114", "11.14"], keys: ["1114", "11 14"], b: "eicher" },
+  { names: ["canter", "ক্যান্টার"], keys: ["canter", "ক্যান্টার"] },
+  { names: ["dyna", "ডায়না"], keys: ["dyna", "ডায়না"] },
+  { names: ["bolero", "বোলেরো"], keys: ["bolero", "বোলেরো"] },
+  { names: ["e70b", "e70", "e-70b"], keys: ["e70", "e-70"] },
+  { names: ["e120b", "e120"], keys: ["e120", "e-120"] },
+  { names: ["e200b", "e200"], keys: ["e200", "e-200"] },
+  { names: ["cat 307", "307d"], keys: ["cat 307", "307d", "307 d"] },
+  { names: ["cat 320", "320d", "320b"], keys: ["cat 320", "320b", "320 d"] },
+  { names: ["sk05", "sk 05"], keys: ["sk05", "sk 05"], b: "kobelco" },
+  { names: ["sk60", "sk 60"], keys: ["sk60", "sk 60"], b: "kobelco" },
+  { names: ["sh120"], keys: ["sh120", "sh 120"], b: "sumitomo" },
+  { names: ["pc120"], keys: ["pc120", "pc 120"], b: "komatsu" },
+  { names: ["fz", "fzs"], keys: ["fz"], b: "yamaha" },
+  { names: ["mt15", "mt-15", "mt 15"], keys: ["mt-15", "mt15", "mt 15"], b: "yamaha" },
+  { names: ["gsxr", "gsx-r"], keys: ["gsxr", "gsx-r"] },
+  { names: ["hornet", "হর্নেট"], keys: ["hornet", "হর্নেট"] },
+  { names: ["hunk", "হাঙ্ক"], keys: ["hunk", "হাঙ্ক"] },
+  { names: ["splendor", "স্প্লেন্ডার"], keys: ["splendor", "স্প্লেন্ডার"] },
+  { names: ["stryker"], keys: ["stryker"] },
+  { names: ["metro"], keys: ["metro"], b: "tvs" },
+];
 const MODEL_KEY = "gb_searched_model_v1";
 const nfc = (t: string) => t.normalize("NFC").toLowerCase();
 
+const allModels = (): { names: string[]; keys: string[]; b?: string }[] =>
+  SEARCH_MODELS.map((g) => ({ names: g, keys: g })).concat(MORE_MODELS);
+
 export function rememberSearchedModel(query: string): void {
-  const q = " " + nfc(query).replace(/\s+/g, " ").trim() + " ";
-  const hit = SEARCH_MODELS.find((g) => g.some((n) => q.includes(" " + nfc(n) + " ")));
+  const en = nfc(query).replace(/[০-৯]/g, (d) => String("০১২৩৪৫৬৭৮৯".indexOf(d)));
+  const q = " " + en.replace(/\s+/g, " ").trim() + " ";
+  const hit = allModels().find((m) => m.names.some((n) => q.includes(" " + nfc(n) + " ")));
   if (!hit) return;
   try {
-    localStorage.setItem(MODEL_KEY, hit[0]);
+    localStorage.setItem(MODEL_KEY, hit.names[0]);
     window.dispatchEvent(new Event("gb:interest-changed"));
   } catch (_) {}
 }
 
-function searchedModelNames(): string[] {
+function searchedModelRules(): Array<Record<string, string | number>> {
   try {
     const k = localStorage.getItem(MODEL_KEY);
-    return SEARCH_MODELS.find((g) => g[0] === k) || [];
+    const m = allModels().find((x) => x.names[0] === k);
+    if (!m) return [];
+    return m.keys.map((key) => {
+      const o: Record<string, string | number> = { k: key.toLowerCase() };
+      if (m.b) o.b = m.b;
+      return o;
+    });
   } catch (_) {
     return [];
   }
@@ -148,8 +188,7 @@ export function savedSearchesPayload(): Array<Record<string, string | number>> {
     return o;
   });
   // সার্ভার সর্বোচ্চ ৫টা শর্ত দেখে; সেভ করা সার্চের পরে খালি ঘর থাকলে সর্বশেষ সার্চ করা মডেল যায়
-  const extra = searchedModelNames().map((k) => ({ k: k.toLowerCase() } as Record<string, string | number>));
-  return saved.concat(extra).slice(0, MAX_SAVED_SEARCHES);
+  return saved.concat(searchedModelRules()).slice(0, MAX_SAVED_SEARCHES);
 }
 
 export function describeSavedSearch(s: SavedSearch, bn: boolean): string {
