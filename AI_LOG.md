@@ -84,3 +84,4 @@
 2026-11-27 | claude | After a successful post the daily lottery wheel opens (3s delay, only if not used today); lottery shows 'loading your new post' while the list refreshes | src/App.tsx, src/components/LotteryModal.tsx
 2026-11-27 | claude | লটারি popup ডিটেইল পেজের (z-[65]) পেছনে লুকাচ্ছিল, তাই z-[80] করা হয়েছে; ৩ সেকেন্ড দেরি বাদ | src/App.tsx, src/components/LotteryModal.tsx
 2026-11-27 | claude | লটারি চাকা w-52 থেকে w-72 বড় করা, ঘরে '১ দিন'/'২ দিন' লেখা (শুধু ছবি, জেতার লজিক বদলায়নি) | src/components/LotteryModal.tsx
+2026-11-27 | claude | api/draw.ts: জিতলে ১ বা ২ দিনের বুস্ট (র‍্যান্ডম ৫০/৫০), রেসপন্সে days পাঠায় | api/draw.ts
