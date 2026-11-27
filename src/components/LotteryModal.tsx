@@ -38,6 +38,7 @@ export function LotteryModal({ isOpen, onClose, language, currentUser, userMetad
   const [spinning, setSpinning] = useState(false);
   const [error, setError] = useState("");
   const [result, setResult] = useState<"win" | "lose" | null>(null);
+  const [wonDays, setWonDays] = useState(1);
   const [wheelRotation, setWheelRotation] = useState(0);
   const [transitionMs, setTransitionMs] = useState(SPIN_DURATION_MS);
   const [waitingForServer, setWaitingForServer] = useState(false);
@@ -146,7 +147,7 @@ export function LotteryModal({ isOpen, onClose, language, currentUser, userMetad
       });
 
       spinTimeoutRef.current = setTimeout(() => {
-        setResult(data.win ? "win" : "lose");
+        setWonDays(data.days === 2 ? 2 : 1); setResult(data.win ? "win" : "lose");
         setSpinning(false);
       }, SPIN_DURATION_MS);
     } catch (err: any) {
@@ -192,8 +193,8 @@ export function LotteryModal({ isOpen, onClose, language, currentUser, userMetad
             </h3>
             <p className="text-slate-500 dark:text-slate-400 text-sm max-w-xs">
               {language === "bn"
-                ? "আপনার প্রোডাক্টটি এখন ২৪ ঘণ্টার জন্য ফ্রী ফিচার্ড বিজ্ঞাপন হিসেবে লাইভ হয়ে গেছে!"
-                : "Your listing is now live as a free Featured ad for the next 24 hours!"}
+                ? (wonDays === 2 ? "আপনার প্রোডাক্টটি এখন ২ দিনের জন্য ফ্রী ফিচার্ড বিজ্ঞাপন!" : "আপনার প্রোডাক্টটি এখন ১ দিনের জন্য ফ্রী ফিচার্ড বিজ্ঞাপন!")
+                : `Your listing is now live as a free Featured ad for the next ${wonDays} day${wonDays > 1 ? "s" : ""}!`}
             </p>
             <button
               onClick={handleClose}
@@ -272,8 +273,8 @@ export function LotteryModal({ isOpen, onClose, language, currentUser, userMetad
 
             <p className="text-slate-500 dark:text-slate-450 text-xs text-center leading-relaxed px-2">
               {language === "bn"
-                ? "প্রতি ১০ জনের মধ্যে ১ জন র‍্যান্ডম বিজয়ী হন — জিতলে আপনার প্রোডাক্ট ২৪ ঘণ্টার জন্য ফ্রী ফিচার্ড বিজ্ঞাপন হিসেবে লাইভ হয়ে যাবে।"
-                : "1 in 10 people randomly win — winners get their listing live as a free Featured ad for 24 hours."}
+                ? "প্রতি ১০ জনের মধ্যে ১ জন র‍্যান্ডম বিজয়ী হন — জিতলে আপনার প্রোডাক্ট ১ বা ২ দিনের জন্য ফ্রী ফিচার্ড বিজ্ঞাপন হিসেবে লাইভ হয়ে যাবে।"
+                : `1 in 10 people randomly win — winners get their listing live as a free Featured ad for 1 or 2 days.`}
             </p>
 
             {error && (
