@@ -13,6 +13,7 @@ interface LotteryModalProps {
   userMetadata: any;
   listings: PartListing[];
   setIsAuthOpen: (v: boolean) => void;
+  fromPost?: boolean;
 }
 
 const getTodayInDhaka = (): string => {
@@ -27,7 +28,7 @@ const SPIN_DURATION_MS = 4200;
 const WAIT_LOOP_MS = 1000;
 const SEGMENT_COLORS = ["#f59e0b", "#0f172a"];
 
-export function LotteryModal({ isOpen, onClose, language, currentUser, userMetadata, listings, setIsAuthOpen }: LotteryModalProps) {
+export function LotteryModal({ isOpen, onClose, language, currentUser, userMetadata, listings, setIsAuthOpen, fromPost }: LotteryModalProps) {
   const [selectedListingId, setSelectedListingId] = useState<string>("");
   const [spinning, setSpinning] = useState(false);
   const [error, setError] = useState("");
@@ -337,7 +338,13 @@ export function LotteryModal({ isOpen, onClose, language, currentUser, userMetad
               </div>
             )}
 
-            {currentUser && eligibleListings.length === 0 && (
+            {currentUser && fromPost && eligibleListings.length === 0 && (
+              <div className="p-3 bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 rounded-xl text-xs flex items-center gap-2">
+                <Loader2 className="w-4 h-4 animate-spin shrink-0" />
+                {language === "bn" ? "আপনার নতুন পোস্ট লোড হচ্ছে..." : "Loading your new post..."}
+              </div>
+            )}
+            {currentUser && !fromPost && eligibleListings.length === 0 && (
               <div className="p-3 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-xs text-slate-500 dark:text-slate-400 text-center">
                 {language === "bn" ? "লটারিতে অংশ নিতে প্রথমে একটি প্রোডাক্ট পোস্ট করুন।" : "Post a product first to join the lottery."}
               </div>

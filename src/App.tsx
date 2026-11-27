@@ -348,6 +348,7 @@ export default function App() {
   const [selectedListing, setSelectedListing] = useState<PartListing | null>(null);
   const [promotingListing, setPromotingListing] = useState<PartListing | null>(null);
   const [isLotteryOpen, setIsLotteryOpen] = useState(false);
+  const [lotteryFromPost, setLotteryFromPost] = useState(false);
   const [editingListing, setEditingListing] = useState<PartListing | null>(null);
   const [isStandalonePrivacy, setIsStandalonePrivacy] = useState(false);
   const [isStandaloneDeletion, setIsStandaloneDeletion] = useState(false);
@@ -2285,6 +2286,13 @@ export default function App() {
                   currentUser={userMetadata}
                   onPostSuccess={() => {
                     setActiveTab("market");
+              // Daily free-boost lottery opens after a successful post (only if not used today).
+              try {
+                const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Dhaka" });
+                if (userMetadata?.lastLotteryDate !== today) {
+                  window.setTimeout(() => { setLotteryFromPost(true); setIsLotteryOpen(true); }, 3000);
+                }
+              } catch (_) {}
                   }}
                   onLoginPrompt={() => {
                     setIsAuthOpen(true);
@@ -3131,7 +3139,8 @@ export default function App() {
       {isLotteryOpen && (
         <LotteryModal
           isOpen={isLotteryOpen}
-          onClose={() => setIsLotteryOpen(false)}
+          onClose={() => { setIsLotteryOpen(false); setLotteryFromPost(false); }}
+        fromPost={lotteryFromPost}
           language={language}
           currentUser={user}
           userMetadata={userMetadata}
