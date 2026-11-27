@@ -24,6 +24,7 @@ interface AddPartFormProps {
   // a video (max 20 sec) instead of photos; the cover photo is taken from the
   // video automatically.
   mode?: "photo" | "video";
+  videoSource?: "upload" | "link";
 }
 
 const compressImageToBlob = async (file: File, maxWidth = 1200, maxHeight = 1200): Promise<{ blob: Blob; dataUrl: string }> => {
@@ -186,7 +187,7 @@ type VideoState = {
   errorMessage?: string;
 };
 
-export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPrompt, onViewListing, mode = "photo" }: AddPartFormProps) {
+export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPrompt, onViewListing, mode = "photo", videoSource = "upload" }: AddPartFormProps) {
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [price, setPrice] = useState("");
   const [phone, setPhone] = useState(toEnglishDigits(currentUser?.phoneNumber || ""));
@@ -690,7 +691,33 @@ export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPromp
         </div>
         )}
 
-        {mode === "video" && (
+        {mode === "video" && videoSource === "link" && (
+          <div>
+            <label className="block text-xs font-semibold text-gray-700 mb-1">
+              {language === "bn" ? "YouTube / Facebook ভিডিওর লিংক *" : "YouTube / Facebook video link *"}
+            </label>
+            <input
+              type="url"
+              inputMode="url"
+              value={videoLinkText}
+              onChange={(e) => setVideoLinkText(e.target.value)}
+              placeholder="https://youtu.be/..."
+              className="w-full rounded-lg border bg-white px-3 py-2 text-sm text-gray-900"
+            />
+            {videoLinkText.trim() !== "" && (
+              parseVideoLink(videoLinkText) ? (
+                <p className="mt-1 text-xs font-bold text-green-600">
+                  {language === "bn" ? "✓ লিংক ঠিক আছে" : "✓ Link looks good"}
+                </p>
+              ) : (
+                <p className="mt-1 text-xs font-bold text-red-500">
+                  {language === "bn" ? "লিংকটি চেনা যায়নি। YouTube বা Facebook ভিডিওর পুরো লিংক দিন (fb.watch চলবে না)।" : "Link not recognised. Use a full YouTube or Facebook video link (fb.watch does not work)."}
+                </p>
+              )
+            )}
+          </div>
+        )}
+        {mode === "video" && videoSource === "upload" && (
         <div>
           <label className="block text-xs font-semibold text-gray-700 mb-2">
             {language === "bn" ? "ভিডিও যোগ করুন (সর্বোচ্চ ২০ সেকেন্ড) *" : "Add Video (max 20 seconds) *"}
@@ -731,7 +758,7 @@ export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPromp
             </button>
           )}
           <input type="file" ref={videoInputRef} onChange={handleVideoSelect} accept="video/*" className="hidden" />
-          {!video && (
+          {false && (
             <div className="mt-3">
               <p className="mb-1 text-xs font-semibold text-gray-500">
                 {language === "bn" ? "অথবা YouTube / Facebook ভিডিওর লিংক দিন" : "Or paste a YouTube / Facebook video link"}
