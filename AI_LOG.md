@@ -83,3 +83,4 @@
 2026-11-27 | claude | Hid the boost-your-ad card on the listing page (owner only) behind SHOW_BOOST_CARD=false in ListingDetailModal.tsx; boost UI in DashboardTab.tsx and PromoteAdModal.tsx left unchanged | src/components/ListingDetailModal.tsx
 2026-11-27 | claude | After a successful post the daily lottery wheel opens (3s delay, only if not used today); lottery shows 'loading your new post' while the list refreshes | src/App.tsx, src/components/LotteryModal.tsx
 2026-11-27 | claude | লটারি popup ডিটেইল পেজের (z-[65]) পেছনে লুকাচ্ছিল, তাই z-[80] করা হয়েছে; ৩ সেকেন্ড দেরি বাদ | src/App.tsx, src/components/LotteryModal.tsx
+2026-11-27 | claude | লটারি চাকা w-52 থেকে w-72 বড় করা, ঘরে '১ দিন'/'২ দিন' লেখা (শুধু ছবি, জেতার লজিক বদলায়নি) | src/components/LotteryModal.tsx
