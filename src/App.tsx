@@ -1144,6 +1144,7 @@ export default function App() {
         simulatedCredits: row.simulated_credits,
         referralCode: row.referral_code,
         blockedUids: row.blocked_uids,
+        lastLotteryDate: row.last_lottery_date,
       };
       setUserMetadata((prev: any) => ({ ...prev, ...mapped }));
 
