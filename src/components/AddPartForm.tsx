@@ -502,7 +502,10 @@ export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPromp
     const picked = POST_KINDS[kind];
     setShowCategoryModal(false);
     const cleanPhoneDigits = toEnglishDigits(phone).replace(/\D/g, "");
-    const uploadedUrls = images.filter(img => img.status === "success" && img.url).map(img => img.url as string);
+    const uploadedUrlsRaw = images.filter(img => img.status === "success" && img.url).map(img => img.url as string);
+    const linkInfo = mode === "video" && videoSource === "link" ? parseVideoLink(videoLinkText) : null;
+    const ytThumbUrl = linkInfo && linkInfo.kind === "youtube" ? linkInfo.thumb : undefined;
+    const uploadedUrls = uploadedUrlsRaw.length > 0 ? uploadedUrlsRaw : (ytThumbUrl ? [ytThumbUrl] : []);
     const linkUrl = parseVideoLink(videoLinkText) ? videoLinkText.trim() : undefined;
     const videoUrl = (video && video.status === "success" ? video.url : undefined) || linkUrl;
     if (mode === "video" && !videoUrl) {
@@ -654,7 +657,7 @@ export function AddPartForm({ language, currentUser, onPostSuccess, onLoginPromp
       )}
 
       <form onSubmit={handleFormSubmit} className="space-y-5">
-        {mode === "photo" && (
+        {(mode === "photo" || (mode === "video" && videoSource === "link" && parseVideoLink(videoLinkText)?.kind === "facebook")) && (
         <div>
           <label className="block text-xs font-semibold text-gray-700 mb-2">
             {language === "bn" ? "ছবি যোগ করুন (সর্বোচ্চ ৫টি) *" : "Add Photos (Max 5) *"}

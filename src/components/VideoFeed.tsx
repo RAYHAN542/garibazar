@@ -408,6 +408,8 @@ export default function VideoFeed({ language, videos, currentUser, onLoginPrompt
   const toggleMute = useCallback(() => setMuted((m) => !m), []);
   const forceMute = useCallback(() => setMuted(true), []);
   const [isPostOpen, setIsPostOpen] = useState(false);
+  const [postViaLink, setPostViaLink] = useState(false);
+  useEffect(() => { if (!isPostOpen) setPostViaLink(false); }, [isPostOpen]);
   const [posted, setPosted] = useState(false);
   const [showHint, setShowHint] = useState<boolean>(() => {
     try { return !localStorage.getItem("gb_video_hint_v1"); } catch (_) { return false; }
@@ -550,6 +552,15 @@ export default function VideoFeed({ language, videos, currentUser, onLoginPrompt
         </div>
         <div className="flex items-center gap-2">
           {tab === "sale" && (
+          <button
+            type="button"
+            onClick={() => { setPostViaLink(true); setIsPostOpen(true); }}
+            className="h-9 px-2.5 rounded-full bg-white text-black text-xs font-extrabold flex items-center gap-1 cursor-pointer shadow-md"
+          >
+            🔗 {language === "bn" ? "লিংক" : "Link"}
+          </button>
+        )}
+        {tab === "sale" && (
             <button
               type="button"
               onClick={() => setIsPostOpen(true)}
@@ -658,6 +669,7 @@ export default function VideoFeed({ language, videos, currentUser, onLoginPrompt
           <div className="p-3 pb-10">
             <AddPartForm
               mode="video"
+                videoSource={postViaLink ? "link" : "upload"}
               language={language}
               currentUser={currentUser}
               onPostSuccess={() => { setIsPostOpen(false); setPosted(true); jumpPending.current = true; firstIdAtPost.current = videos[0]?.id ?? null; setTimeout(() => { jumpPending.current = false; }, 15000); onPosted?.(); try { containerRef.current?.scrollTo({ top: 0 }); } catch (_) {} setActiveIndex(0); }}
