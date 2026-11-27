@@ -14,6 +14,7 @@ interface LotteryModalProps {
   listings: PartListing[];
   setIsAuthOpen: (v: boolean) => void;
   fromPost?: boolean;
+  onUsed?: () => void;
 }
 
 const getTodayInDhaka = (): string => {
@@ -33,7 +34,7 @@ const pickWinIndex = (days: number): number => {
   return idx[Math.floor(Math.random() * idx.length)];
 };
 
-export function LotteryModal({ isOpen, onClose, language, currentUser, userMetadata, listings, setIsAuthOpen, fromPost }: LotteryModalProps) {
+export function LotteryModal({ isOpen, onClose, language, currentUser, userMetadata, listings, setIsAuthOpen, fromPost, onUsed }: LotteryModalProps) {
   const [selectedListingId, setSelectedListingId] = useState<string>("");
   const [spinning, setSpinning] = useState(false);
   const [error, setError] = useState("");
@@ -126,6 +127,7 @@ export function LotteryModal({ isOpen, onClose, language, currentUser, userMetad
         throw new Error(data.error || (language === "bn" ? "কিছু ভুল হয়েছে।" : "Something went wrong."));
       }
 
+      onUsed?.();
       const landingIndex = data.win ? pickWinIndex(data.days === 2 ? 2 : 1) : pickRandomLosingIndex();
 
       // চাকাটা ঠিক যেখানে ঘুরছিল (continuous loop) সেখান থেকেই, কোনো ঝাঁকুনি ছাড়াই,

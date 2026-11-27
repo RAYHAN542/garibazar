@@ -3141,6 +3141,7 @@ export default function App() {
           isOpen={isLotteryOpen}
           onClose={() => { setIsLotteryOpen(false); setLotteryFromPost(false); }}
         fromPost={lotteryFromPost}
+        onUsed={() => setUserMetadata((prev: any) => ({ ...(prev || {}), lastLotteryDate: new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Dhaka" }) }))}
           language={language}
           currentUser={user}
           userMetadata={userMetadata}
