@@ -87,3 +87,4 @@
 2026-11-27 | claude | api/draw.ts: জিতলে ১ বা ২ দিনের বুস্ট (র‍্যান্ডম ৫০/৫০), রেসপন্সে days পাঠায় | api/draw.ts
 2026-11-27 | claude | লটারি চাকা ১৪ ঘর (২টা ১ দিন, ২টা ২ দিন, ১০টা আবার চেষ্টা); সার্ভারের days অনুযায়ী সেই ঘরে থামে | src/components/LotteryModal.tsx
 2026-11-27 | claude | লটারি জেতার মেসেজ ও বর্ণনা ১/২ দিন অনুযায়ী (wonDays state) | src/components/LotteryModal.tsx
+2026-11-27 | claude | স্পিনের সার্ভার উত্তর আসামাত্র userMetadata.lastLotteryDate আজকের তারিখ (onUsed প্রপ), যাতে একই দিনে পোস্টের পর popup আর না আসে | src/App.tsx, src/components/LotteryModal.tsx
