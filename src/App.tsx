@@ -2290,7 +2290,7 @@ export default function App() {
               try {
                 const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Dhaka" });
                 if (userMetadata?.lastLotteryDate !== today) {
-                  window.setTimeout(() => { setLotteryFromPost(true); setIsLotteryOpen(true); }, 3000);
+                  window.setTimeout(() => { setLotteryFromPost(true); setIsLotteryOpen(true); }, 0);
                 }
               } catch (_) {}
                   }}
