@@ -90,3 +90,4 @@
 2026-11-27 | claude | স্পিনের সার্ভার উত্তর আসামাত্র userMetadata.lastLotteryDate আজকের তারিখ (onUsed প্রপ), যাতে একই দিনে পোস্টের পর popup আর না আসে | src/App.tsx, src/components/LotteryModal.tsx
 2026-11-27 | claude | applyUserRow-এ last_lottery_date যোগ, যাতে অ্যাপ খুললে সার্ভারের আজকের লটারির তারিখ পড়ে | src/App.tsx
 2026-11-28 | claude | পছন্দের অ্যালার্ট: শুধু ব্র্যান্ড মিললে আর যাবে না, মডেল মিলতে হবে (Supabase migration matching_devices_require_model) | DB only
+2026-11-28 | claude | সার্চে মডেলের নাম (axio, premio...) দিলে সেই মডেলের পছন্দের অ্যালার্ট চালু হয় (সেভ-সার্চের খালি ঘরে যায়, তালিকা বদলায় না); নতুন APK লাগবে | src/utils/savedSearches.ts, src/components/SearchPage.tsx

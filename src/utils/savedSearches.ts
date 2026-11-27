@@ -88,9 +88,57 @@ export function removeSavedSearch(id: string): void {
   persist(loadSavedSearches().filter((s) => s.id !== id));
 }
 
+// 🔎 সার্চে মডেলের নাম থাকলে (যেমন "axio") সর্বশেষ সার্চ করা মডেলটা ফোনে জমা থাকে, সার্ভারে সেভ-সার্চের খালি ঘরে যায়।
+// ব্যবহারকারীর নিজের "আমি খুঁজছি" তালিকা বদলায় না। প্রতিটা সারির প্রথম নাম ইংরেজি, বাকিগুলো বাংলা বানান।
+const SEARCH_MODELS: string[][] = [
+  ["corolla", "করোলা", "করোল্লা", "কোরোল্লা"],
+  ["axio", "এক্সিও", "আক্সিও"],
+  ["premio", "প্রিমিও"],
+  ["allion", "এলিয়ন", "অ্যালিয়ন"],
+  ["noah", "নোহা", "নোয়াহ"],
+  ["voxy", "ভক্সি", "ভক্সী"],
+  ["hiace", "হায়েস", "হায়েক্স"],
+  ["probox", "প্রোবক্স"],
+  ["fielder", "ফিল্ডার"],
+  ["succeed"],
+  ["corona", "করোনা"],
+  ["carina", "ক্যারিনা"],
+  ["starlet", "স্টারলেট"],
+  ["prado", "প্রাডো"],
+  ["x-trail", "xtrail", "এক্স ট্রেইল"],
+  ["vezel", "ভেজেল", "ভেসেল"],
+  ["civic", "সিভিক"],
+  ["gixxer", "জিক্সার"],
+  ["pulsar", "পালসার"],
+  ["discover", "ডিসকভার"],
+  ["apache", "অ্যাপাচি"],
+  ["r15"],
+];
+const MODEL_KEY = "gb_searched_model_v1";
+const nfc = (t: string) => t.normalize("NFC").toLowerCase();
+
+export function rememberSearchedModel(query: string): void {
+  const q = " " + nfc(query).replace(/\s+/g, " ").trim() + " ";
+  const hit = SEARCH_MODELS.find((g) => g.some((n) => q.includes(" " + nfc(n) + " ")));
+  if (!hit) return;
+  try {
+    localStorage.setItem(MODEL_KEY, hit[0]);
+    window.dispatchEvent(new Event("gb:interest-changed"));
+  } catch (_) {}
+}
+
+function searchedModelNames(): string[] {
+  try {
+    const k = localStorage.getItem(MODEL_KEY);
+    return SEARCH_MODELS.find((g) => g[0] === k) || [];
+  } catch (_) {
+    return [];
+  }
+}
+
 /** সার্ভারে পাঠানোর ছোট রূপ (শূন্য/ফাঁকা বাদ) */
 export function savedSearchesPayload(): Array<Record<string, string | number>> {
-  return loadSavedSearches().map((s) => {
+  const saved = loadSavedSearches().map((s) => {
     const o: Record<string, string | number> = {};
     if (s.b) o.b = s.b;
     if (s.k) o.k = s.k;
@@ -99,6 +147,9 @@ export function savedSearchesPayload(): Array<Record<string, string | number>> {
     if (s.y2) o.y2 = s.y2;
     return o;
   });
+  // সার্ভার সর্বোচ্চ ৫টা শর্ত দেখে; সেভ করা সার্চের পরে খালি ঘর থাকলে সর্বশেষ সার্চ করা মডেল যায়
+  const extra = searchedModelNames().map((k) => ({ k: k.toLowerCase() } as Record<string, string | number>));
+  return saved.concat(extra).slice(0, MAX_SAVED_SEARCHES);
 }
 
 export function describeSavedSearch(s: SavedSearch, bn: boolean): string {

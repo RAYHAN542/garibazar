@@ -6,6 +6,7 @@ import { isItemVehicle, matchesSubCategoryFilter } from "../utils/listingFilters
 import { convertBengaliDigitsToEnglish, toPhoneticKey } from "../searchAliases";
 import { searchListings } from "../utils/searchApi";
 import { trackSearchBrand } from "../utils/feedRanker";
+import { rememberSearchedModel } from "../utils/savedSearches";
 
 interface SearchPageProps {
   language: SupportedLanguage;
@@ -183,6 +184,7 @@ export default function SearchPage({ language, listings, searchHistory, onSaveHi
       if (trackedQueryRef.current !== qk) {
         trackedQueryRef.current = qk;
         trackSearchBrand(query, [...remote, ...listings], toPhoneticKey);
+        rememberSearchedModel(query);
       }
     }
   };
