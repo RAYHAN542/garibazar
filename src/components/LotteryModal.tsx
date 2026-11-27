@@ -228,7 +228,7 @@ export function LotteryModal({ isOpen, onClose, language, currentUser, userMetad
               </h3>
             </div>
 
-            <div className="relative w-52 h-52 mx-auto select-none">
+            <div className="relative w-72 h-72 mx-auto select-none">
               <style>{`
                 @keyframes lottery-wait-spin {
                   from { transform: rotate(0deg); }
@@ -250,8 +250,8 @@ export function LotteryModal({ isOpen, onClose, language, currentUser, userMetad
                   const angle = i * SEGMENT_ANGLE + SEGMENT_ANGLE / 2;
                   return (
                     <div key={i} className="absolute inset-0" style={{ transform: `rotate(${angle}deg)` }}>
-                      <span className="absolute top-2.5 left-1/2 -translate-x-1/2 text-white font-black text-sm drop-shadow">
-                        {i === WIN_SEGMENT_INDEX ? "🎁" : i + 1}
+                      <span className="absolute top-3 left-1/2 -translate-x-1/2 text-white font-black text-[11px] leading-tight text-center whitespace-nowrap drop-shadow">
+                        {i === WIN_SEGMENT_INDEX ? "🎁" : (i % 2 === 1 ? "১ দিন" : "২ দিন")}
                       </span>
                     </div>
                   );
